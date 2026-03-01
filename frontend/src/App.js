@@ -670,11 +670,11 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user }) {
     catch(e) { toast({ title: "Hata", variant: "destructive" }); }
   };
 
-  const adminKarar = async (metinId, onay) => {
+  const adminKarar = async (metinId, onay, direkt = false) => {
     try {
-      await axios.post(`${API}/diagnostic/texts/${metinId}/admin-karar`, { onay });
+      await axios.post(`${API}/diagnostic/texts/${metinId}/admin-karar`, { onay, direkt });
       fetchMetinler();
-      toast({ title: onay ? "Oylama başlatıldı" : "Reddedildi" });
+      toast({ title: direkt ? "✅ Direkt havuza alındı" : onay ? "🗳️ Oylama başlatıldı" : "❌ Reddedildi" });
     } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
   };
 
@@ -772,8 +772,9 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user }) {
                   <p className="text-sm text-gray-600 mt-1 line-clamp-2">{m.icerik}</p>
                 </div>
               </div>
-              <div className="flex gap-2 mt-3">
-                <Button size="sm" onClick={() => adminKarar(m.id, true)} className="bg-green-600 hover:bg-green-700 text-white">✅ Oylama Başlat</Button>
+              <div className="flex gap-2 mt-3 flex-wrap">
+                <Button size="sm" onClick={() => adminKarar(m.id, true, false)} className="bg-blue-600 hover:bg-blue-700 text-white">🗳️ Oylama Başlat</Button>
+                <Button size="sm" onClick={() => adminKarar(m.id, true, true)} className="bg-green-600 hover:bg-green-700 text-white">✅ Direkt Havuza Al</Button>
                 <Button size="sm" variant="destructive" onClick={() => adminKarar(m.id, false)}>❌ Reddet</Button>
                 <Button size="sm" variant="destructive" onClick={() => sil(m.id)}><Trash2 className="h-4 w-4"/></Button>
               </div>
@@ -1752,10 +1753,10 @@ function GelisimAlani({ user }) {
     return Math.round(onay / toplam * 100);
   };
 
-  const adminKarar = async (icerikId, onay) => {
+  const adminKarar = async (icerikId, onay, direkt = false) => {
     try {
-      await axios.post(`${API}/gelisim/icerik/${icerikId}/admin-karar`, { onay });
-      toast({ title: onay ? "Oylama başlatıldı" : "İçerik reddedildi" });
+      await axios.post(`${API}/gelisim/icerik/${icerikId}/admin-karar`, { onay, direkt });
+      toast({ title: direkt ? "✅ Direkt yayına alındı" : onay ? "🗳️ Oylama başlatıldı" : "❌ İçerik reddedildi" });
       fetchAll();
     } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
   };
@@ -1961,8 +1962,9 @@ function GelisimAlani({ user }) {
                         </div>
                       </div>
                       {icerik.aciklama && <p className="text-sm text-gray-600 mb-3">{icerik.aciklama}</p>}
-                      <div className="flex gap-2">
-                        <Button size="sm" onClick={() => adminKarar(icerik.id, true)} className="bg-green-600 hover:bg-green-700 text-white">✅ Oylama Başlat</Button>
+                      <div className="flex gap-2 flex-wrap">
+                        <Button size="sm" onClick={() => adminKarar(icerik.id, true, false)} className="bg-blue-600 hover:bg-blue-700 text-white">🗳️ Oylama Başlat</Button>
+                        <Button size="sm" onClick={() => adminKarar(icerik.id, true, true)} className="bg-green-600 hover:bg-green-700 text-white">✅ Direkt Yayına Al</Button>
                         <Button size="sm" variant="destructive" onClick={() => adminKarar(icerik.id, false)}>❌ Reddet</Button>
                       </div>
                     </CardContent>
