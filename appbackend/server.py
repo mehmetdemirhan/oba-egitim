@@ -1,0 +1,744 @@
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from dotenv import load_dotenv
+from starlette.middleware.cors import CORSMiddleware
+from motor.motor_asyncio import AsyncIOMotorClient
+import os
+import logging
+from pathlib import Path
+from pydantic import BaseModel, Field, EmailStr
+from typing import List, Optional
+import uuid
+from datetime import datetime, timezone, timedelta
+from enum import Enum
+from passlib.context import CryptContext
+from jose import JWTError, jwt
+
+ROOT_DIR = Path(__file__).parent
+load_dotenv(ROOT_DIR / '.env')
+
+# MongoDB connection
+mongo_url = os.environ['MONGO_URL']
+client = AsyncIOMotorClient(mongo_url)
+db = client[os.environ['DB_NAME']]
+
+# JWT Config
+SECRET_KEY = os.environ.get('SECRET_KEY', 'okuma-becerileri-secret-key-change-in-production')
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get('ACCESS_TOKEN_EXPIRE_MINUTES', '60'))
+
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+security = HTTPBearer()
+
+# Create the main app without a prefix
+app = FastAPI(title="Okuma Becerileri Akademisi API")
+
+# Create a router with the /api prefix
+api_router = APIRouter(prefix="/api")
+
+# ─────────────────────────────────────────────
+# ENUMS
+# ─────────────────────────────────────────────
+
+class TeacherLevel(str, Enum):
+    YENI = "yeni"
+    UZMAN = "uzman"
+
+class UserRole(str, Enum):
+    ADMIN = "admin"
+    TEACHER = "teacher"
+    STUDENT = "student"
+    PARENT = "parent"
+
+# ─────────────────────────────────────────────
+# HELPERS
+# ─────────────────────────────────────────────
+
+def prepare_for_mongo(data):
+    if isinstance(data, dict):
+        for key, value in data.items():
+            if isinstance(value, datetime):
+                data[key] = value.isoformat()
+            elif isinstance(value, dict):
+                data[key] = prepare_for_mongo(value)
+            elif isinstance(value, list):
+                data[key] = [prepare_for_mongo(item) if isinstance(item, dict) else item for item in value]
+    return data
+
+def parse_from_mongo(item):
+    if isinstance(item, dict):
+        for key, value in item.items():
+            if key.endswith('_tarihi') or key in ('olusturma_tarihi', 'tarih'):
+                if isinstance(value, str):
+                    try:
+                        item[key] = datetime.fromisoformat(value)
+                    except:
+                        pass
+            elif isinstance(value, dict):
+                item[key] = parse_from_mongo(value)
+            elif isinstance(value, list):
+                item[key] = [parse_from_mongo(s) if isinstance(s, dict) else s for s in value]
+    return item
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+def verify_password(plain: str, hashed: str) -> bool:
+    return pwd_context.verify(plain, hashed)
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def decode_token(token: str) -> dict:
+    try:
+        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Geçersiz veya süresi dolmuş token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    payload = decode_token(credentials.credentials)
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Geçersiz token")
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=401, detail="Kullanıcı bulunamadı")
+    return user
+
+def require_role(*roles: UserRole):
+    async def checker(current_user=Depends(get_current_user)):
+        if current_user.get("role") not in [r.value for r in roles]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bu işlem için yetkiniz yok"
+            )
+        return current_user
+    return checker
+
+# ─────────────────────────────────────────────
+# AUTH MODELS
+# ─────────────────────────────────────────────
+
+class UserCreate(BaseModel):
+    ad: str
+    soyad: str
+    email: str
+    password: str
+    role: UserRole
+    linked_id: Optional[str] = None  # teacher_id, student_id or parent's student_id
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+class UserResponse(BaseModel):
+    id: str
+    ad: str
+    soyad: str
+    email: str
+    role: UserRole
+    linked_id: Optional[str] = None
+    olusturma_tarihi: datetime
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
+class ChangePassword(BaseModel):
+    old_password: str
+    new_password: str
+
+# ─────────────────────────────────────────────
+# AUTH ROUTES
+# ─────────────────────────────────────────────
+
+@api_router.post("/auth/login", response_model=TokenResponse)
+async def login(credentials: UserLogin):
+    user = await db.users.find_one({"email": credentials.email.lower().strip()})
+    if not user or not verify_password(credentials.password, user.get("password_hash", "")):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="E-posta veya şifre hatalı"
+        )
+    
+    token = create_access_token({"sub": user["id"], "role": user["role"]})
+    
+    user_response = UserResponse(
+        id=user["id"],
+        ad=user["ad"],
+        soyad=user["soyad"],
+        email=user["email"],
+        role=user["role"],
+        linked_id=user.get("linked_id"),
+        olusturma_tarihi=datetime.fromisoformat(user["olusturma_tarihi"]) if isinstance(user.get("olusturma_tarihi"), str) else user.get("olusturma_tarihi", datetime.now(timezone.utc))
+    )
+    
+    return TokenResponse(access_token=token, user=user_response)
+
+@api_router.get("/auth/me", response_model=UserResponse)
+async def get_me(current_user=Depends(get_current_user)):
+    return UserResponse(
+        id=current_user["id"],
+        ad=current_user["ad"],
+        soyad=current_user["soyad"],
+        email=current_user["email"],
+        role=current_user["role"],
+        linked_id=current_user.get("linked_id"),
+        olusturma_tarihi=datetime.fromisoformat(current_user["olusturma_tarihi"]) if isinstance(current_user.get("olusturma_tarihi"), str) else current_user.get("olusturma_tarihi", datetime.now(timezone.utc))
+    )
+
+@api_router.post("/auth/change-password")
+async def change_password(data: ChangePassword, current_user=Depends(get_current_user)):
+    if not verify_password(data.old_password, current_user.get("password_hash", "")):
+        raise HTTPException(status_code=400, detail="Mevcut şifre hatalı")
+    
+    new_hash = hash_password(data.new_password)
+    await db.users.update_one(
+        {"id": current_user["id"]},
+        {"$set": {"password_hash": new_hash}}
+    )
+    return {"message": "Şifre başarıyla güncellendi"}
+
+# Admin: kullanıcı oluşturma (sadece admin)
+@api_router.post("/auth/users", response_model=UserResponse)
+async def create_user(
+    user_data: UserCreate,
+    current_user=Depends(require_role(UserRole.ADMIN))
+):
+    # Email kontrolü
+    existing = await db.users.find_one({"email": user_data.email.lower().strip()})
+    if existing:
+        raise HTTPException(status_code=400, detail="Bu e-posta zaten kayıtlı")
+    
+    user_doc = {
+        "id": str(uuid.uuid4()),
+        "ad": user_data.ad,
+        "soyad": user_data.soyad,
+        "email": user_data.email.lower().strip(),
+        "password_hash": hash_password(user_data.password),
+        "role": user_data.role.value,
+        "linked_id": user_data.linked_id,
+        "olusturma_tarihi": datetime.now(timezone.utc).isoformat()
+    }
+    await db.users.insert_one(user_doc)
+    
+    return UserResponse(
+        id=user_doc["id"],
+        ad=user_doc["ad"],
+        soyad=user_doc["soyad"],
+        email=user_doc["email"],
+        role=user_doc["role"],
+        linked_id=user_doc.get("linked_id"),
+        olusturma_tarihi=datetime.now(timezone.utc)
+    )
+
+@api_router.get("/auth/users", response_model=List[UserResponse])
+async def list_users(current_user=Depends(require_role(UserRole.ADMIN))):
+    users = await db.users.find().to_list(length=None)
+    result = []
+    for u in users:
+        result.append(UserResponse(
+            id=u["id"],
+            ad=u["ad"],
+            soyad=u["soyad"],
+            email=u["email"],
+            role=u["role"],
+            linked_id=u.get("linked_id"),
+            olusturma_tarihi=datetime.fromisoformat(u["olusturma_tarihi"]) if isinstance(u.get("olusturma_tarihi"), str) else datetime.now(timezone.utc)
+        ))
+    return result
+
+@api_router.delete("/auth/users/{user_id}")
+async def delete_user(user_id: str, current_user=Depends(require_role(UserRole.ADMIN))):
+    if user_id == current_user["id"]:
+        raise HTTPException(status_code=400, detail="Kendi hesabınızı silemezsiniz")
+    result = await db.users.delete_one({"id": user_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı")
+    return {"message": "Kullanıcı silindi"}
+
+# ─────────────────────────────────────────────
+# STARTUP: Admin kullanıcı oluştur
+# ─────────────────────────────────────────────
+
+@app.on_event("startup")
+async def create_default_admin():
+    """
+    .env dosyasındaki bilgilerle varsayılan admin oluşturur.
+    Admin zaten varsa tekrar oluşturmaz.
+    """
+    admin_email = os.environ.get('ADMIN_EMAIL', 'admin@oba.com')
+    admin_password = os.environ.get('ADMIN_PASSWORD', 'Admin123!')
+    admin_ad = os.environ.get('ADMIN_AD', 'Sistem')
+    admin_soyad = os.environ.get('ADMIN_SOYAD', 'Yöneticisi')
+
+    existing = await db.users.find_one({"email": admin_email})
+    if not existing:
+        admin_doc = {
+            "id": str(uuid.uuid4()),
+            "ad": admin_ad,
+            "soyad": admin_soyad,
+            "email": admin_email,
+            "password_hash": hash_password(admin_password),
+            "role": UserRole.ADMIN.value,
+            "linked_id": None,
+            "olusturma_tarihi": datetime.now(timezone.utc).isoformat()
+        }
+        await db.users.insert_one(admin_doc)
+        logging.info(f"✅ Varsayılan admin oluşturuldu: {admin_email}")
+    else:
+        logging.info(f"ℹ️ Admin zaten mevcut: {admin_email}")
+
+# ─────────────────────────────────────────────
+# MEVCUT MODELLER (değişmeden korunuyor)
+# ─────────────────────────────────────────────
+
+class Teacher(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    ad: str
+    soyad: str
+    brans: str
+    telefon: str
+    seviye: TeacherLevel
+    ogrenci_sayisi: int = 0
+    atanan_ogrenciler: List[str] = []
+    yapilmasi_gereken_odeme: float = 0.0
+    yapilan_odeme: float = 0.0
+    olusturma_tarihi: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @property
+    def tam_ad(self):
+        return f"{self.ad} {self.soyad}"
+
+    @property
+    def borc(self):
+        has_students = self.ogrenci_sayisi > 0 or len(self.atanan_ogrenciler) > 0
+        if not has_students:
+            return 0.0
+        return max(0, self.yapilmasi_gereken_odeme - self.yapilan_odeme)
+
+class TeacherCreate(BaseModel):
+    ad: str
+    soyad: str
+    brans: str
+    telefon: str
+    seviye: TeacherLevel
+    yapilmasi_gereken_odeme: float = 0.0
+
+class TeacherUpdate(BaseModel):
+    ad: Optional[str] = None
+    soyad: Optional[str] = None
+    brans: Optional[str] = None
+    telefon: Optional[str] = None
+    seviye: Optional[TeacherLevel] = None
+    yapilmasi_gereken_odeme: Optional[float] = None
+    yapilan_odeme: Optional[float] = None
+
+class Student(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    ad: str
+    soyad: str
+    sinif: str
+    veli_ad: str
+    veli_soyad: str
+    veli_telefon: str
+    aldigi_egitim: str
+    kur: str
+    yapilmasi_gereken_odeme: float = 0.0
+    yapilan_odeme: float = 0.0
+    ogretmene_yapilacak_odeme: float = 0.0
+    ogretmen_id: Optional[str] = None
+    olusturma_tarihi: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class StudentCreate(BaseModel):
+    ad: str
+    soyad: str
+    sinif: str
+    veli_ad: str
+    veli_soyad: str
+    veli_telefon: str
+    aldigi_egitim: str
+    kur: str
+    yapilmasi_gereken_odeme: float = 0.0
+    ogretmene_yapilacak_odeme: float = 0.0
+    ogretmen_id: Optional[str] = None
+
+class StudentUpdate(BaseModel):
+    ad: Optional[str] = None
+    soyad: Optional[str] = None
+    sinif: Optional[str] = None
+    veli_ad: Optional[str] = None
+    veli_soyad: Optional[str] = None
+    veli_telefon: Optional[str] = None
+    aldigi_egitim: Optional[str] = None
+    kur: Optional[str] = None
+    yapilmasi_gereken_odeme: Optional[float] = None
+    yapilan_odeme: Optional[float] = None
+    ogretmene_yapilacak_odeme: Optional[float] = None
+    ogretmen_id: Optional[str] = None
+
+class Course(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    ad: str
+    fiyat: float
+    sure: int
+    olusturma_tarihi: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    ogrenci_sayisi: int = 0
+
+class CourseCreate(BaseModel):
+    ad: str
+    fiyat: float
+    sure: int
+
+class CourseUpdate(BaseModel):
+    ad: Optional[str] = None
+    fiyat: Optional[float] = None
+    sure: Optional[int] = None
+
+class Payment(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    tip: str
+    kisi_id: str
+    miktar: float
+    aciklama: Optional[str] = None
+    tarih: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class PaymentCreate(BaseModel):
+    tip: str
+    kisi_id: str
+    miktar: float
+    aciklama: Optional[str] = None
+
+class DashboardStats(BaseModel):
+    toplam_ogretmen: int
+    toplam_ogrenci: int
+    toplam_kurs: int
+    toplam_ogrenci_alacak: float
+    toplam_ogretmen_borc: float
+    bu_ay_odenen_toplam: float
+
+class WeeklyStats(BaseModel):
+    hafta: str
+    yeni_ogrenciler: int
+    odemeler: float
+    gelir: float
+
+class MonthlyStats(BaseModel):
+    ay: str
+    yeni_ogrenciler: int
+    odemeler: float
+    gelir: float
+    toplam_borc: float
+
+class ExportData(BaseModel):
+    ogretmenler: List[dict]
+    ogrenciler: List[dict]
+    kurslar: List[dict]
+    odemeler: List[dict]
+
+# ─────────────────────────────────────────────
+# MEVCUT ROUTE'LAR (değişmeden korunuyor)
+# ─────────────────────────────────────────────
+
+@api_router.get("/dashboard", response_model=DashboardStats)
+async def get_dashboard_stats():
+    teacher_count = await db.teachers.count_documents({})
+    student_count = await db.students.count_documents({})
+    course_count = await db.courses.count_documents({})
+    teachers = await db.teachers.find().to_list(length=None)
+    students = await db.students.find().to_list(length=None)
+    total_student_receivable = sum(max(0, s.get('yapilmasi_gereken_odeme', 0) - s.get('yapilan_odeme', 0)) for s in students)
+    total_teacher_debt = 0
+    for t in teachers:
+        has_students = t.get('ogrenci_sayisi', 0) > 0 or len(t.get('atanan_ogrenciler', [])) > 0
+        if has_students:
+            total_teacher_debt += max(0, t.get('yapilmasi_gereken_odeme', 0) - t.get('yapilan_odeme', 0))
+    current_month_start = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    monthly_payments = await db.payments.find({"tarih": {"$gte": current_month_start.isoformat()}}).to_list(length=None)
+    monthly_total = sum(p.get('miktar', 0) for p in monthly_payments)
+    return DashboardStats(
+        toplam_ogretmen=teacher_count,
+        toplam_ogrenci=student_count,
+        toplam_kurs=course_count,
+        toplam_ogrenci_alacak=total_student_receivable,
+        toplam_ogretmen_borc=total_teacher_debt,
+        bu_ay_odenen_toplam=monthly_total
+    )
+
+@api_router.get("/stats/weekly", response_model=List[WeeklyStats])
+async def get_weekly_stats():
+    from datetime import timedelta
+    stats = []
+    now = datetime.now(timezone.utc)
+    for i in range(12):
+        week_start = now - timedelta(weeks=i+1)
+        week_end = now - timedelta(weeks=i)
+        students_this_week = await db.students.find({"olusturma_tarihi": {"$gte": week_start.isoformat(), "$lt": week_end.isoformat()}}).to_list(length=None)
+        payments_this_week = await db.payments.find({"tarih": {"$gte": week_start.isoformat(), "$lt": week_end.isoformat()}}).to_list(length=None)
+        stats.append(WeeklyStats(
+            hafta=f"{week_start.strftime('%d/%m')} - {week_end.strftime('%d/%m')}",
+            yeni_ogrenciler=len(students_this_week),
+            odemeler=sum(p.get('miktar', 0) for p in payments_this_week),
+            gelir=sum(s.get('yapilmasi_gereken_odeme', 0) for s in students_this_week)
+        ))
+    return list(reversed(stats))
+
+@api_router.get("/stats/monthly", response_model=List[MonthlyStats])
+async def get_monthly_stats():
+    from datetime import timedelta
+    stats = []
+    now = datetime.now(timezone.utc)
+    for i in range(6):
+        if i == 0:
+            month_end = now
+        else:
+            month_end = now.replace(day=1) - timedelta(days=1)
+            for j in range(i-1):
+                month_end = month_end.replace(day=1) - timedelta(days=1)
+                month_end = month_end.replace(day=28)
+        month_start = month_end.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        students_this_month = await db.students.find({"olusturma_tarihi": {"$gte": month_start.isoformat(), "$lt": month_end.isoformat()}}).to_list(length=None)
+        payments_this_month = await db.payments.find({"tarih": {"$gte": month_start.isoformat(), "$lt": month_end.isoformat()}}).to_list(length=None)
+        students_total = await db.students.find({"olusturma_tarihi": {"$lt": month_end.isoformat()}}).to_list(length=None)
+        stats.append(MonthlyStats(
+            ay=month_start.strftime('%B %Y'),
+            yeni_ogrenciler=len(students_this_month),
+            odemeler=sum(p.get('miktar', 0) for p in payments_this_month),
+            gelir=sum(s.get('yapilmasi_gereken_odeme', 0) for s in students_this_month),
+            toplam_borc=sum(max(0, s.get('yapilmasi_gereken_odeme', 0) - s.get('yapilan_odeme', 0)) for s in students_total)
+        ))
+    return list(reversed(stats))
+
+@api_router.post("/teachers", response_model=Teacher)
+async def create_teacher(teacher_data: TeacherCreate):
+    teacher = Teacher(**teacher_data.dict())
+    await db.teachers.insert_one(prepare_for_mongo(teacher.dict()))
+    return teacher
+
+@api_router.get("/teachers", response_model=List[Teacher])
+async def get_teachers():
+    teachers = await db.teachers.find().to_list(length=None)
+    result = []
+    for teacher in teachers:
+        real_count = await db.students.count_documents({"ogretmen_id": teacher['id']})
+        teacher['ogrenci_sayisi'] = real_count
+        if teacher.get('ogrenci_sayisi', 0) != real_count:
+            await db.teachers.update_one({"id": teacher['id']}, {"$set": {"ogrenci_sayisi": real_count}})
+        result.append(Teacher(**parse_from_mongo(teacher)))
+    return result
+
+@api_router.get("/teachers/{teacher_id}", response_model=Teacher)
+async def get_teacher(teacher_id: str):
+    teacher = await db.teachers.find_one({"id": teacher_id})
+    if not teacher:
+        raise HTTPException(status_code=404, detail="Öğretmen bulunamadı")
+    return Teacher(**parse_from_mongo(teacher))
+
+@api_router.get("/teachers/{teacher_id}/students", response_model=List[Student])
+async def get_teacher_students(teacher_id: str):
+    teacher = await db.teachers.find_one({"id": teacher_id})
+    if not teacher:
+        raise HTTPException(status_code=404, detail="Öğretmen bulunamadı")
+    students = await db.students.find({"ogretmen_id": teacher_id}).to_list(length=None)
+    return [Student(**parse_from_mongo(s)) for s in students]
+
+@api_router.put("/teachers/{teacher_id}", response_model=Teacher)
+async def update_teacher(teacher_id: str, teacher_update: TeacherUpdate):
+    update_data = teacher_update.dict(exclude_unset=True)
+    if not update_data:
+        raise HTTPException(status_code=400, detail="Güncellenecek veri bulunamadı")
+    result = await db.teachers.update_one({"id": teacher_id}, {"$set": update_data})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Öğretmen bulunamadı")
+    teacher = await db.teachers.find_one({"id": teacher_id})
+    return Teacher(**parse_from_mongo(teacher))
+
+@api_router.delete("/teachers/{teacher_id}")
+async def delete_teacher(teacher_id: str):
+    result = await db.teachers.delete_one({"id": teacher_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Öğretmen bulunamadı")
+    return {"message": "Öğretmen başarıyla silindi"}
+
+@api_router.post("/students", response_model=Student)
+async def create_student(student_data: StudentCreate):
+    student = Student(**student_data.dict())
+    await db.students.insert_one(prepare_for_mongo(student.dict()))
+    if student.ogretmen_id:
+        teacher = await db.teachers.find_one({"id": student.ogretmen_id})
+        if teacher:
+            await db.teachers.update_one(
+                {"id": student.ogretmen_id},
+                {"$inc": {"ogrenci_sayisi": 1, "yapilmasi_gereken_odeme": student.ogretmene_yapilacak_odeme},
+                 "$addToSet": {"atanan_ogrenciler": student.id}}
+            )
+    return student
+
+@api_router.get("/students", response_model=List[Student])
+async def get_students():
+    students = await db.students.find().to_list(length=None)
+    return [Student(**parse_from_mongo(s)) for s in students]
+
+@api_router.get("/students/{student_id}", response_model=Student)
+async def get_student(student_id: str):
+    student = await db.students.find_one({"id": student_id})
+    if not student:
+        raise HTTPException(status_code=404, detail="Öğrenci bulunamadı")
+    return Student(**parse_from_mongo(student))
+
+@api_router.put("/students/{student_id}", response_model=Student)
+async def update_student(student_id: str, student_update: StudentUpdate):
+    update_data = student_update.dict(exclude_unset=True)
+    if not update_data:
+        raise HTTPException(status_code=400, detail="Güncellenecek veri bulunamadı")
+    old_student = await db.students.find_one({"id": student_id})
+    if not old_student:
+        raise HTTPException(status_code=404, detail="Öğrenci bulunamadı")
+    old_teacher_id = old_student.get('ogretmen_id')
+    new_teacher_id = update_data.get('ogretmen_id')
+    old_payment = old_student.get('ogretmene_yapilacak_odeme', 0)
+    new_payment = update_data.get('ogretmene_yapilacak_odeme', old_payment)
+    await db.students.update_one({"id": student_id}, {"$set": update_data})
+    if old_teacher_id != new_teacher_id:
+        if old_teacher_id:
+            await db.teachers.update_one({"id": old_teacher_id}, {"$inc": {"ogrenci_sayisi": -1, "yapilmasi_gereken_odeme": -old_payment}, "$pull": {"atanan_ogrenciler": student_id}})
+        if new_teacher_id:
+            await db.teachers.update_one({"id": new_teacher_id}, {"$inc": {"ogrenci_sayisi": 1, "yapilmasi_gereken_odeme": new_payment}, "$addToSet": {"atanan_ogrenciler": student_id}})
+    elif old_teacher_id and old_payment != new_payment:
+        await db.teachers.update_one({"id": old_teacher_id}, {"$inc": {"yapilmasi_gereken_odeme": new_payment - old_payment}})
+    student = await db.students.find_one({"id": student_id})
+    return Student(**parse_from_mongo(student))
+
+@api_router.delete("/students/{student_id}")
+async def delete_student(student_id: str):
+    student = await db.students.find_one({"id": student_id})
+    if not student:
+        raise HTTPException(status_code=404, detail="Öğrenci bulunamadı")
+    if student.get('ogretmen_id'):
+        teacher = await db.teachers.find_one({"id": student['ogretmen_id']})
+        if teacher:
+            await db.teachers.update_one(
+                {"id": student['ogretmen_id']},
+                {"$inc": {"ogrenci_sayisi": -1, "yapilmasi_gereken_odeme": -student.get('ogretmene_yapilacak_odeme', 0)},
+                 "$pull": {"atanan_ogrenciler": student_id}}
+            )
+    await db.students.delete_one({"id": student_id})
+    return {"message": "Öğrenci başarıyla silindi"}
+
+@api_router.post("/courses", response_model=Course)
+async def create_course(course_data: CourseCreate):
+    course = Course(**course_data.dict())
+    await db.courses.insert_one(prepare_for_mongo(course.dict()))
+    return course
+
+@api_router.get("/courses", response_model=List[Course])
+async def get_courses():
+    courses = await db.courses.find().to_list(length=None)
+    return [Course(**parse_from_mongo(c)) for c in courses]
+
+@api_router.get("/courses/{course_id}", response_model=Course)
+async def get_course(course_id: str):
+    course = await db.courses.find_one({"id": course_id})
+    if not course:
+        raise HTTPException(status_code=404, detail="Kurs bulunamadı")
+    return Course(**parse_from_mongo(course))
+
+@api_router.put("/courses/{course_id}", response_model=Course)
+async def update_course(course_id: str, course_update: CourseUpdate):
+    update_data = course_update.dict(exclude_unset=True)
+    if not update_data:
+        raise HTTPException(status_code=400, detail="Güncellenecek veri bulunamadı")
+    result = await db.courses.update_one({"id": course_id}, {"$set": update_data})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Kurs bulunamadı")
+    course = await db.courses.find_one({"id": course_id})
+    return Course(**parse_from_mongo(course))
+
+@api_router.delete("/courses/{course_id}")
+async def delete_course(course_id: str):
+    result = await db.courses.delete_one({"id": course_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Kurs bulunamadı")
+    return {"message": "Kurs başarıyla silindi"}
+
+@api_router.post("/payments", response_model=Payment)
+async def create_payment(payment_data: PaymentCreate):
+    payment = Payment(**payment_data.dict())
+    await db.payments.insert_one(prepare_for_mongo(payment.dict()))
+    if payment.tip == "ogrenci":
+        await db.students.update_one({"id": payment.kisi_id}, {"$inc": {"yapilan_odeme": payment.miktar}})
+    elif payment.tip == "ogretmen":
+        await db.teachers.update_one({"id": payment.kisi_id}, {"$inc": {"yapilan_odeme": payment.miktar}})
+    return payment
+
+@api_router.get("/payments", response_model=List[Payment])
+async def get_payments():
+    payments = await db.payments.find().sort("tarih", -1).to_list(length=None)
+    return [Payment(**parse_from_mongo(p)) for p in payments]
+
+@api_router.delete("/payments/{payment_id}")
+async def delete_payment(payment_id: str):
+    payment = await db.payments.find_one({"id": payment_id})
+    if not payment:
+        raise HTTPException(status_code=404, detail="Ödeme bulunamadı")
+    if payment['tip'] == "ogrenci":
+        await db.students.update_one({"id": payment['kisi_id']}, {"$inc": {"yapilan_odeme": -payment['miktar']}})
+    elif payment['tip'] == "ogretmen":
+        await db.teachers.update_one({"id": payment['kisi_id']}, {"$inc": {"yapilan_odeme": -payment['miktar']}})
+    await db.payments.delete_one({"id": payment_id})
+    return {"message": "Ödeme başarıyla silindi"}
+
+@api_router.get("/export", response_model=ExportData)
+async def get_export_data():
+    teachers = await db.teachers.find().to_list(length=None)
+    teacher_export = [{"Ad": t.get('ad',''), "Soyad": t.get('soyad',''), "Branş": t.get('brans',''), "Telefon": t.get('telefon',''), "Seviye": t.get('seviye',''), "Öğrenci Sayısı": t.get('ogrenci_sayisi',0), "Yapılması Gereken Ödeme": t.get('yapilmasi_gereken_odeme',0), "Yapılan Ödeme": t.get('yapilan_odeme',0), "Borç": max(0, t.get('yapilmasi_gereken_odeme',0) - t.get('yapilan_odeme',0)) if (t.get('ogrenci_sayisi',0) > 0 or len(t.get('atanan_ogrenciler',[])) > 0) else 0} for t in teachers]
+    students = await db.students.find().to_list(length=None)
+    student_export = []
+    for s in students:
+        teacher = await db.teachers.find_one({"id": s.get('ogretmen_id')}) if s.get('ogretmen_id') else None
+        student_export.append({"Ad": s.get('ad',''), "Soyad": s.get('soyad',''), "Sınıf": s.get('sinif',''), "Veli Adı": s.get('veli_ad',''), "Veli Soyadı": s.get('veli_soyad',''), "Veli Telefon": s.get('veli_telefon',''), "Aldığı Eğitim": s.get('aldigi_egitim',''), "Kur": s.get('kur',''), "Yapılması Gereken Ödeme": s.get('yapilmasi_gereken_odeme',0), "Yapılan Ödeme": s.get('yapilan_odeme',0), "Öğretmene Yapılacak Ödeme": s.get('ogretmene_yapilacak_odeme',0), "Öğretmen": f"{teacher.get('ad','')} {teacher.get('soyad','')}" if teacher else 'Atanmamış', "Alacak": max(0, s.get('yapilmasi_gereken_odeme',0) - s.get('yapilan_odeme',0))})
+    courses = await db.courses.find().to_list(length=None)
+    course_export = [{"Kurs Adı": c.get('ad',''), "Fiyat": c.get('fiyat',0), "Süre (Saat)": c.get('sure',0), "Öğrenci Sayısı": c.get('ogrenci_sayisi',0)} for c in courses]
+    payments = await db.payments.find().sort("tarih", -1).to_list(length=None)
+    payment_export = []
+    for p in payments:
+        if p.get('tip') == 'ogrenci':
+            person = await db.students.find_one({"id": p.get('kisi_id')})
+        else:
+            person = await db.teachers.find_one({"id": p.get('kisi_id')})
+        payment_export.append({"Tarih": p.get('tarih',''), "Tip": 'Öğrenci' if p.get('tip') == 'ogrenci' else 'Öğretmen', "Kişi": f"{person.get('ad','')} {person.get('soyad','')}" if person else 'Bilinmiyor', "Miktar": p.get('miktar',0), "Açıklama": p.get('aciklama','')})
+    return ExportData(ogretmenler=teacher_export, ogrenciler=student_export, kurslar=course_export, odemeler=payment_export)
+
+@api_router.post("/backup/google-drive")
+async def backup_to_google_drive(backup_data: dict):
+    return {"success": True, "message": "Data queued for Google Drive backup", "backup_id": str(uuid.uuid4())}
+
+# ─────────────────────────────────────────────
+# APP SETUP
+# ─────────────────────────────────────────────
+
+app.include_router(api_router)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_credentials=True,
+    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+@app.on_event("shutdown")
+async def shutdown_db_client():
+    client.close()
