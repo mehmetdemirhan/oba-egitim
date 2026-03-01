@@ -1875,10 +1875,11 @@ function GelisimAlani({ user }) {
     } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
   };
 
-  const oyVer = async (onay, sebep = "") => {
-    if (!onay && !sebep) { setRedDialogIcerik(aktifIcerik || redDialogIcerik); return; }
+  const oyVer = async (onay, sebep = "", icerikObj = null) => {
+    const hedef = icerikObj || aktifIcerik || redDialogIcerik;
+    if (!onay && !sebep) { setRedDialogIcerik(hedef); return; }
     try {
-      const r = await axios.post(`${API}/gelisim/oy`, { icerik_id: (aktifIcerik || redDialogIcerik).id, onay, sebep });
+      const r = await axios.post(`${API}/gelisim/oy`, { icerik_id: hedef.id, onay, sebep });
       toast({ title: onay ? `✅ Onaylandı (+2 puan)` : "❌ Reddedildi", description: `Onay oranı: %${r.data.onay_orani}` });
       setRedDialogIcerik(null); setRedSebep(""); fetchAll();
     } catch(e) { toast({ title: "Hata", description: e.response?.data?.detail || "Hata", variant: "destructive" }); }
@@ -2134,7 +2135,7 @@ function GelisimAlani({ user }) {
                           </div>
                         ) : (
                           <div className="flex gap-2">
-                            <Button size="sm" onClick={() => oyVer(true)} className="bg-green-600 hover:bg-green-700 text-white flex-1">✅ Onayla (+2 puan)</Button>
+                            <Button size="sm" onClick={() => oyVer(true, "", icerik)} className="bg-green-600 hover:bg-green-700 text-white flex-1">✅ Onayla (+2 puan)</Button>
                             <Button size="sm" variant="destructive" className="flex-1" onClick={() => { setRedDialogIcerik(icerik); }}>❌ Reddet</Button>
                           </div>
                         )}
