@@ -790,9 +790,24 @@ async def update_normlar(data: NormGuncelle, current_user=Depends(require_role(U
 
 @api_router.post("/diagnostic/texts/{metin_id}/admin-karar")
 async def metin_admin_karar(metin_id: str, karar: dict, current_user=Depends(require_role(UserRole.ADMIN))):
+    # karar: {"onay": True/False, "direkt": True/False}
+    # direkt=True → oylama atla, direkt havuza al
     onay = karar.get("onay", False)
-    yeni_durum = "oylama" if onay else "reddedildi"
-    await db.analiz_metinler.update_one({"id": metin_id}, {"$set": {"durum": yeni_durum}})
+    direkt = karar.get("direkt", False)
+    if not onay:
+        yeni_durum = "reddedildi"
+    elif direkt:
+        yeni_durum = "havuzda"
+        # Ekleyene +10 bonus puan (havuza direkt girince)
+        metin = await db.analiz_metinler.find_one({"id": metin_id})
+        if metin and metin.get("ekleyen_id"):
+            await db.users.update_one({"id": metin["ekleyen_id"]}, {"$inc": {"puan": 10}})
+    else:
+        yeni_durum = "oylama"
+    await db.analiz_metinler.update_one(
+        {"id": metin_id},
+        {"$set": {"durum": yeni_durum, **({"yayin_tarihi": datetime.utcnow().isoformat()} if yeni_durum == "havuzda" else {})}}
+    )
     return {"durum": yeni_durum}
 
 @api_router.post("/diagnostic/texts/oy")
@@ -1358,9 +1373,24 @@ async def get_metinler(current_user=Depends(get_current_user)):
 
 @api_router.post("/diagnostic/texts/{metin_id}/admin-karar")
 async def metin_admin_karar(metin_id: str, karar: dict, current_user=Depends(require_role(UserRole.ADMIN))):
+    # karar: {"onay": True/False, "direkt": True/False}
+    # direkt=True → oylama atla, direkt havuza al
     onay = karar.get("onay", False)
-    yeni_durum = "oylama" if onay else "reddedildi"
-    await db.analiz_metinler.update_one({"id": metin_id}, {"$set": {"durum": yeni_durum}})
+    direkt = karar.get("direkt", False)
+    if not onay:
+        yeni_durum = "reddedildi"
+    elif direkt:
+        yeni_durum = "havuzda"
+        # Ekleyene +10 bonus puan (havuza direkt girince)
+        metin = await db.analiz_metinler.find_one({"id": metin_id})
+        if metin and metin.get("ekleyen_id"):
+            await db.users.update_one({"id": metin["ekleyen_id"]}, {"$inc": {"puan": 10}})
+    else:
+        yeni_durum = "oylama"
+    await db.analiz_metinler.update_one(
+        {"id": metin_id},
+        {"$set": {"durum": yeni_durum, **({"yayin_tarihi": datetime.utcnow().isoformat()} if yeni_durum == "havuzda" else {})}}
+    )
     return {"durum": yeni_durum}
 
 @api_router.post("/diagnostic/texts/oy")
@@ -1772,11 +1802,21 @@ async def get_icerik_list(current_user=Depends(get_current_user)):
 # Admin onay/red (beklemede → oylama veya reddedildi)
 @api_router.post("/gelisim/icerik/{icerik_id}/admin-karar")
 async def admin_karar(icerik_id: str, karar: dict, current_user=Depends(require_role(UserRole.ADMIN))):
+    # direkt=True → oylama atla, direkt yayına al
     onay = karar.get("onay", False)
-    yeni_durum = "oylama" if onay else "reddedildi"
+    direkt = karar.get("direkt", False)
+    if not onay:
+        yeni_durum = "reddedildi"
+    elif direkt:
+        yeni_durum = "yayinda"
+        icerik = await db.gelisim_icerik.find_one({"id": icerik_id})
+        if icerik and icerik.get("ekleyen_id"):
+            await db.users.update_one({"id": icerik["ekleyen_id"]}, {"$inc": {"puan": 5}})
+    else:
+        yeni_durum = "oylama"
     await db.gelisim_icerik.update_one(
         {"id": icerik_id},
-        {"$set": {"durum": yeni_durum}}
+        {"$set": {"durum": yeni_durum, **({"yayin_tarihi": datetime.utcnow().isoformat()} if yeni_durum == "yayinda" else {})}}
     )
     return {"durum": yeni_durum}
 
