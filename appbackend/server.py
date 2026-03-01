@@ -1729,10 +1729,13 @@ class SoruModel(BaseModel):
 
 class IcerikCreate(BaseModel):
     baslik: str
-    tur: str  # hizmetici, film, kitap
+    tur: str  # hizmetici, film, kitap, makale
     aciklama: str = ""
     hedef_kitle: str  # ogretmen, ogrenci, hepsi
     sorular: List[SoruModel] = []
+    # Makale alanları
+    makale_link: Optional[str] = None
+    makale_dosya_turu: Optional[str] = None  # pdf, word, link
 
 class IcerikModel(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -1741,6 +1744,8 @@ class IcerikModel(BaseModel):
     aciklama: str = ""
     hedef_kitle: str
     sorular: List[SoruModel] = []
+    makale_link: Optional[str] = None
+    makale_dosya_turu: Optional[str] = None
     ekleyen_id: str = ""
     ekleyen_ad: str = ""
     durum: str = "beklemede"  # beklemede, oylama, yayinda, reddedildi
