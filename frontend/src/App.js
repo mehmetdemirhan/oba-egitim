@@ -1670,6 +1670,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
                         } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
                       }}>📄 Rapor</Button>
                     </TableCell>
+                  </TableRow>
                 );
               })}
             </TableBody>
@@ -1822,7 +1823,7 @@ function GelisimAlani({ user }) {
         <Button onClick={() => handleTamamla(true)}
           disabled={testCevaplari.filter(c => c !== undefined).length < aktifIcerik.sorular.length}
           className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-3">
-          Testi Tamamla ({testCevaplari.filter(c=>c!==undefined).length}/{aktifIcerik.sorular.length} cevaplandı)
+          Testi Tamamla ({testCevaplari.filter(c=>c!==undefined).length} / {aktifIcerik.sorular.length} cevaplandı)
         </Button>
       </div>
     );
