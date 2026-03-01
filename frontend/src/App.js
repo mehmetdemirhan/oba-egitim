@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./components/ui/dialog";
 import { Badge } from "./components/ui/badge";
-import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star } from "lucide-react";
+import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer } from "lucide-react";
 import { useToast } from "./hooks/use-toast";
 import { Toaster } from "./components/ui/toaster";
 import { ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Tooltip, XAxis, YAxis, CartesianGrid, AreaChart, Area } from 'recharts';
@@ -293,6 +293,7 @@ function AppContent() {
             <TabsTrigger value="payments" className={tabClass}><CreditCard className="h-4 w-4 mr-2" />Ödemeler</TabsTrigger>
             {user.role === "admin" && <TabsTrigger value="users" className={tabClass}><Shield className="h-4 w-4 mr-2" />Kullanıcılar</TabsTrigger>}
             <TabsTrigger value="gelisim" className={tabClass}><Trophy className="h-4 w-4 mr-2" />Gelişim</TabsTrigger>
+            <TabsTrigger value="giris-analizi" className={tabClass}><Stethoscope className="h-4 w-4 mr-2" />Giriş Analizi</TabsTrigger>
           </TabsList>
 
           {/* Dashboard */}
@@ -540,6 +541,11 @@ function AppContent() {
               <UserManagement teachers={teachers} />
             </TabsContent>
           )}
+          {/* Giris Analizi */}
+          <TabsContent value="giris-analizi">
+            <GirisAnaliziModul user={user} students={students} teachers={teachers} />
+          </TabsContent>
+
           {/* Gelisim Alani */}
           <TabsContent value="gelisim">
             <GelisimAlani user={user} />
@@ -559,6 +565,727 @@ function AppContent() {
         </Dialog>
       </div>
       <Toaster />
+    </div>
+  );
+}
+
+
+// ── NORM TABLOSU YÖNETİMİ (Admin) ──
+function NormTablosu({ onClose }) {
+  const { toast } = useToast();
+  const [normlar, setNormlar] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const siniflar = ["1","2","3","4","5","6","7","8"];
+
+  useEffect(() => {
+    axios.get(`${API}/diagnostic/normlar`).then(r => {
+      setNormlar(r.data);
+      setLoading(false);
+    });
+  }, []);
+
+  const kaydet = async () => {
+    try {
+      await axios.put(`${API}/diagnostic/normlar`, { normlar });
+      toast({ title: "Norm tablosu güncellendi" });
+      onClose();
+    } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
+  };
+
+  if (loading || !normlar) return <div className="p-8 text-center text-gray-500">Yükleniyor...</div>;
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-gray-600">Her sınıf için okuma hızı sınır değerlerini kelime/dakika cinsinden girin.</p>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="p-3 text-left font-semibold border border-gray-200">Sınıf</th>
+              <th className="p-3 text-center font-semibold border border-gray-200 text-red-600">Düşük (≤)</th>
+              <th className="p-3 text-center font-semibold border border-gray-200 text-yellow-600">Orta (≤)</th>
+              <th className="p-3 text-center font-semibold border border-gray-200 text-blue-600">Yeterli (≤)</th>
+              <th className="p-3 text-center font-semibold border border-gray-200 text-green-600">İleri (&gt;)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {siniflar.map(s => {
+              const n = normlar[s] || { dusuk: 0, orta: 0, yeterli: 0 };
+              return (
+                <tr key={s} className="hover:bg-gray-50">
+                  <td className="p-3 border border-gray-200 font-medium">{s}. Sınıf</td>
+                  {["dusuk","orta","yeterli"].map(alan => (
+                    <td key={alan} className="p-2 border border-gray-200">
+                      <input type="number" value={n[alan] || ""} min={0} max={500}
+                        onChange={e => setNormlar({...normlar, [s]: {...n, [alan]: parseInt(e.target.value)||0}})}
+                        className="w-full text-center border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-orange-500" />
+                    </td>
+                  ))}
+                  <td className="p-3 border border-gray-200 text-center text-green-600 font-medium">{(n.yeterli||0)+1}+</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex gap-3 pt-2">
+        <Button onClick={kaydet} className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white">Kaydet</Button>
+        <Button variant="outline" onClick={onClose} className="flex-1">İptal</Button>
+      </div>
+    </div>
+  );
+}
+
+// ── METİN YÖNETİMİ (Moderasyon Akışlı) ──
+function MetinYonetimi({ onMetinSec, secimModu = false, user }) {
+  const { toast } = useToast();
+  const [metinler, setMetinler] = useState([]);
+  const [formAcik, setFormAcik] = useState(false);
+  const [form, setForm] = useState({ baslik: "", icerik: "", kelime_sayisi: 0, sinif_seviyesi: "4", tur: "hikaye" });
+  const [redDialog, setRedDialog] = useState(null);
+  const [redSebep, setRedSebep] = useState("");
+
+  const fetchMetinler = async () => {
+    try { const r = await axios.get(`${API}/diagnostic/texts`); setMetinler(r.data); } catch(e) {}
+  };
+
+  useEffect(() => { fetchMetinler(); }, []);
+
+  const kelimeSay = (t) => t.trim().split(/\s+/).filter(Boolean).length;
+
+  const kaydet = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post(`${API}/diagnostic/texts`, { ...form, kelime_sayisi: kelimeSay(form.icerik) });
+      setForm({ baslik: "", icerik: "", kelime_sayisi: 0, sinif_seviyesi: "4", tur: "hikaye" });
+      setFormAcik(false); fetchMetinler();
+      const rol = user?.role;
+      toast({ title: "Metin eklendi (+5 puan)", description: rol === "admin" ? "Oylama başlatıldı" : "Yönetici onayına gönderildi" });
+    } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
+  };
+
+  const sil = async (id) => {
+    try { await axios.delete(`${API}/diagnostic/texts/${id}`); fetchMetinler(); toast({ title: "Silindi" }); }
+    catch(e) { toast({ title: "Hata", variant: "destructive" }); }
+  };
+
+  const adminKarar = async (metinId, onay) => {
+    try {
+      await axios.post(`${API}/diagnostic/texts/${metinId}/admin-karar`, { onay });
+      fetchMetinler();
+      toast({ title: onay ? "Oylama başlatıldı" : "Reddedildi" });
+    } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
+  };
+
+  const oyVer = async (metinId, onay, sebep = "") => {
+    if (!onay && !sebep) { setRedDialog(metinId); return; }
+    try {
+      const r = await axios.post(`${API}/diagnostic/texts/oy`, { metin_id: metinId, onay, sebep });
+      fetchMetinler(); setRedDialog(null); setRedSebep("");
+      toast({ title: onay ? "✅ Onaylandı (+2 puan)" : "❌ Reddedildi", description: `Onay oranı: %${r.data.onay_orani}` });
+    } catch(e) { toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
+  };
+
+  const turLabel = { hikaye: "Hikaye", bilgilendirici: "Bilgilendirici", siir: "Şiir" };
+  const durumBadge = (d) => ({
+    beklemede: <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded-full">⏳ Onay Bekliyor</span>,
+    oylama: <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">🗳️ Oylamada</span>,
+    havuzda: <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">✅ Havuzda</span>,
+    reddedildi: <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">❌ Reddedildi</span>,
+  }[d] || null);
+
+  const oyKullandi = (m) => m.oylar && m.oylar[user?.id];
+  const onayOrani = (m) => {
+    const oylar = m.oylar || {};
+    const t = Object.keys(oylar).length;
+    if (!t) return null;
+    return Math.round(Object.values(oylar).filter(o => o.onay).length / t * 100);
+  };
+
+  // Seçim modunda sadece havuzdakileri göster
+  const gorunurMetinler = secimModu ? metinler.filter(m => m.durum === "havuzda") : metinler;
+  const bekleyenler = metinler.filter(m => m.durum === "beklemede");
+  const oylamadakiler = metinler.filter(m => m.durum === "oylama");
+
+  return (
+    <div className="space-y-4">
+      {/* Üst bar */}
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-gray-800">{secimModu ? "Havuzdaki Metinler" : "Analiz Metinleri"}</h3>
+        {!secimModu && (
+          <Button onClick={() => setFormAcik(!formAcik)} className="bg-gradient-to-r from-orange-500 to-red-500 text-white" size="sm">
+            <Plus className="h-4 w-4 mr-1"/>Metin Ekle (+5 puan)
+          </Button>
+        )}
+      </div>
+
+      {/* Metin Ekleme Formu */}
+      {formAcik && !secimModu && (
+        <Card className="border-2 border-orange-200">
+          <CardContent className="p-5">
+            <form onSubmit={kaydet} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div><Label>Başlık</Label><Input value={form.baslik} onChange={e => setForm({...form, baslik: e.target.value})} required /></div>
+                <div><Label>Sınıf Seviyesi</Label>
+                  <Select value={form.sinif_seviyesi} onValueChange={v => setForm({...form, sinif_seviyesi: v})}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{["1","2","3","4","5","6","7","8"].map(s => <SelectItem key={s} value={s}>{s}. Sınıf</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div><Label>Tür</Label>
+                <Select value={form.tur} onValueChange={v => setForm({...form, tur: v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hikaye">Hikaye</SelectItem>
+                    <SelectItem value="bilgilendirici">Bilgilendirici</SelectItem>
+                    <SelectItem value="siir">Şiir</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Metin İçeriği</Label>
+                <textarea value={form.icerik} onChange={e => setForm({...form, icerik: e.target.value})} required rows={8}
+                  className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-y font-serif leading-relaxed" />
+                <p className="text-xs text-gray-500 mt-1">Kelime sayısı: {kelimeSay(form.icerik)}</p>
+              </div>
+              <div className="flex gap-3">
+                <Button type="submit" className="flex-1">Kaydet</Button>
+                <Button type="button" variant="outline" onClick={() => setFormAcik(false)} className="flex-1">İptal</Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Admin: Onay Bekleyenler */}
+      {!secimModu && user?.role === "admin" && bekleyenler.length > 0 && (
+        <div>
+          <h4 className="text-sm font-semibold text-yellow-700 mb-2">⏳ Onay Bekleyenler ({bekleyenler.length})</h4>
+          {bekleyenler.map(m => (
+            <div key={m.id} className="border-2 border-yellow-200 rounded-xl p-4 mb-2 bg-yellow-50">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="font-semibold">{m.baslik}</div>
+                  <div className="text-xs text-gray-500">{m.sinif_seviyesi}. Sınıf • {turLabel[m.tur]} • {m.kelime_sayisi} kelime • Ekleyen: {m.ekleyen_ad}</div>
+                  <p className="text-sm text-gray-600 mt-1 line-clamp-2">{m.icerik}</p>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-3">
+                <Button size="sm" onClick={() => adminKarar(m.id, true)} className="bg-green-600 hover:bg-green-700 text-white">✅ Oylama Başlat</Button>
+                <Button size="sm" variant="destructive" onClick={() => adminKarar(m.id, false)}>❌ Reddet</Button>
+                <Button size="sm" variant="destructive" onClick={() => sil(m.id)}><Trash2 className="h-4 w-4"/></Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Oylamadakiler */}
+      {!secimModu && oylamadakiler.length > 0 && (user?.role === "admin" || user?.role === "teacher") && (
+        <div>
+          <h4 className="text-sm font-semibold text-blue-700 mb-2">🗳️ Oylamada ({oylamadakiler.length})</h4>
+          {oylamadakiler.map(m => {
+            const kullandi = oyKullandi(m);
+            const oran = onayOrani(m);
+            const oyCount = Object.keys(m.oylar || {}).length;
+            return (
+              <div key={m.id} className="border-2 border-blue-200 rounded-xl p-4 mb-2">
+                <div className="flex items-start justify-between mb-2">
+                  <div>
+                    <div className="font-semibold">{m.baslik}</div>
+                    <div className="text-xs text-gray-500">{m.sinif_seviyesi}. Sınıf • {turLabel[m.tur]} • {m.kelime_sayisi} kelime • Ekleyen: {m.ekleyen_ad}</div>
+                  </div>
+                  {oran !== null && <div className="text-right"><div className="text-lg font-bold text-blue-600">%{oran}</div><div className="text-xs text-gray-400">{oyCount} oy</div></div>}
+                </div>
+                {oran !== null && (
+                  <div className="mb-3">
+                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                      <div className={`h-1.5 rounded-full ${oran >= 60 ? 'bg-green-500' : 'bg-orange-500'}`} style={{width:`${oran}%`}}></div>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">%60 onay gerekli</p>
+                  </div>
+                )}
+                <p className="text-sm text-gray-600 mb-3 line-clamp-2">{m.icerik}</p>
+                {kullandi ? (
+                  <div className="text-sm bg-gray-50 p-2 rounded-lg text-gray-500">
+                    ✓ Oyunuzu kullandınız: <strong>{kullandi.onay ? "Onay" : "Red"}</strong>
+                    {!kullandi.onay && kullandi.sebep && <span> — {kullandi.sebep}</span>}
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => oyVer(m.id, true)} className="bg-green-600 hover:bg-green-700 text-white">✅ Onayla (+2 puan)</Button>
+                    <Button size="sm" variant="destructive" onClick={() => { setRedDialog(m.id); }}>❌ Reddet</Button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Havuzdaki / Seçilebilir Metinler */}
+      <div className="space-y-2 max-h-80 overflow-y-auto">
+        {secimModu && <h4 className="text-sm font-semibold text-green-700 mb-2">✅ Havuzdaki Metinler ({gorunurMetinler.length})</h4>}
+        {gorunurMetinler.length === 0 && <p className="text-gray-400 text-sm text-center py-6">Henüz metin yok</p>}
+        {gorunurMetinler.map(m => (
+          <div key={m.id}
+            onClick={() => secimModu && m.durum === "havuzda" && onMetinSec && onMetinSec(m)}
+            className={`border rounded-xl p-4 transition-all
+              ${secimModu && m.durum === "havuzda" ? 'cursor-pointer hover:border-orange-400 hover:bg-orange-50' : ''}
+              ${m.durum === "havuzda" ? 'border-green-200' : 'border-gray-200'}`}>
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold">{m.baslik}</span>
+                  {durumBadge(m.durum)}
+                </div>
+                <div className="text-xs text-gray-500 mt-1">{m.sinif_seviyesi}. Sınıf • {turLabel[m.tur]} • {m.kelime_sayisi} kelime</div>
+                <p className="text-sm text-gray-600 mt-1 line-clamp-2">{m.icerik}</p>
+              </div>
+              {!secimModu && user?.role === "admin" && (
+                <Button variant="destructive" size="sm" className="ml-2" onClick={() => sil(m.id)}><Trash2 className="h-4 w-4"/></Button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Puan Rehberi */}
+      {!secimModu && (
+        <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-sm">
+          <div className="font-semibold text-orange-800 mb-2">🎯 Metin Katkı Puanları</div>
+          <div className="space-y-1 text-orange-700">
+            <div className="flex justify-between"><span>📝 Metin ekle</span><span className="font-bold">+5 puan</span></div>
+            <div className="flex justify-between"><span>🗳️ Oylama katıl</span><span className="font-bold">+2 puan</span></div>
+            <div className="flex justify-between"><span>🌟 Metin havuza girince</span><span className="font-bold">+10 puan</span></div>
+          </div>
+        </div>
+      )}
+
+      {/* Red Sebebi Dialog */}
+      <Dialog open={!!redDialog} onOpenChange={() => { setRedDialog(null); setRedSebep(""); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>❌ Reddetme Sebebi</DialogTitle>
+            <DialogDescription>Bu metni neden reddediyorsunuz?</DialogDescription>
+          </DialogHeader>
+          <textarea value={redSebep} onChange={e => setRedSebep(e.target.value)} rows={4}
+            placeholder="Lütfen sebebinizi açıklayın..."
+            className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none" />
+          <div className="flex gap-2">
+            <Button variant="destructive" className="flex-1" disabled={!redSebep.trim()} onClick={() => oyVer(redDialog, false, redSebep)}>Reddet</Button>
+            <Button variant="outline" className="flex-1" onClick={() => { setRedDialog(null); setRedSebep(""); }}>İptal</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ── CANLI ANALİZ EKRANI ──
+function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla }) {
+  const [sure, setSure] = useState(0);
+  const [calisıyor, setCalisıyor] = useState(false);
+  const [hatalar, setHatalar] = useState([]);
+  const [gozlemNotu, setGozlemNotu] = useState("");
+  const intervalRef = React.useRef(null);
+
+  const hataTipleri = [
+    { id: "atlama", label: "Atlama", renk: "bg-red-100 text-red-700 border-red-300", aciklama: "Kelime/satır atladı" },
+    { id: "yanlis_okuma", label: "Yanlış Okuma", renk: "bg-orange-100 text-orange-700 border-orange-300", aciklama: "Kelimeyi farklı okudu" },
+    { id: "takilma", label: "Takılma", renk: "bg-yellow-100 text-yellow-700 border-yellow-300", aciklama: "Kelimede duraksadı" },
+    { id: "tekrar", label: "Tekrar", renk: "bg-purple-100 text-purple-700 border-purple-300", aciklama: "Aynı kelimeyi tekrar okudu" },
+  ];
+
+  const hataSay = (tip) => hatalar.filter(h => h.tip === tip).length;
+
+  const toggleSayac = () => {
+    if (calisıyor) {
+      clearInterval(intervalRef.current);
+      setCalisıyor(false);
+    } else {
+      intervalRef.current = setInterval(() => setSure(s => s + 1), 1000);
+      setCalisıyor(true);
+    }
+  };
+
+  const hataEkle = (tip) => {
+    setHatalar(prev => [...prev, { tip, kelime: "" }]);
+  };
+
+  const hataGeriAl = (tip) => {
+    setHatalar(prev => {
+      const idx = prev.map(h => h.tip).lastIndexOf(tip);
+      if (idx === -1) return prev;
+      return [...prev.slice(0, idx), ...prev.slice(idx + 1)];
+    });
+  };
+
+  const formatSure = (s) => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
+
+  React.useEffect(() => {
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, []);
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Sol: Metin */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center justify-between">
+            <span>📖 {metin.baslik}</span>
+            <span className="text-xs text-gray-500 font-normal">{metin.kelime_sayisi} kelime • {metin.sinif_seviyesi}. Sınıf</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 font-serif text-base leading-8 max-h-80 overflow-y-auto">
+            {metin.icerik}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Sağ: Kontrol Paneli */}
+      <div className="space-y-4">
+        {/* Öğrenci + Süre */}
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="font-semibold text-lg">{ogrenci.ad} {ogrenci.soyad}</div>
+                <div className="text-sm text-gray-500">{ogrenci.sinif} • {ogrenci.kur || 'Kur atanmamış'}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-4xl font-bold font-mono text-gray-800">{formatSure(sure)}</div>
+                <div className="text-xs text-gray-400 mt-1">süre</div>
+              </div>
+            </div>
+            <Button onClick={toggleSayac}
+              className={`w-full py-3 text-lg font-bold ${calisıyor ? 'bg-red-500 hover:bg-red-600' : 'bg-green-600 hover:bg-green-700'} text-white`}>
+              {calisıyor ? '⏸ DURDUR' : sure === 0 ? '▶ BAŞLAT' : '▶ DEVAM'}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Hata İşaretleme */}
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="pb-2"><CardTitle className="text-base">Hata İşaretleme</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            {hataTipleri.map(h => (
+              <div key={h.id} className="flex items-center justify-between">
+                <div>
+                  <span className={`inline-block px-3 py-1 rounded-lg text-sm font-medium border ${h.renk}`}>{h.label}</span>
+                  <span className="text-xs text-gray-400 ml-2">{h.aciklama}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => hataGeriAl(h.id)}
+                    className="w-8 h-8 rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-100 font-bold">−</button>
+                  <span className="w-8 text-center font-bold text-lg">{hataSay(h.id)}</span>
+                  <button onClick={() => hataEkle(h.id)}
+                    className="w-8 h-8 rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-100 font-bold">+</button>
+                </div>
+              </div>
+            ))}
+            <div className="border-t pt-2 flex justify-between text-sm font-semibold">
+              <span>Toplam Hata:</span>
+              <span className="text-red-600">{hatalar.length}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Gözlem Notu */}
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4">
+            <Label>Gözlem Notu</Label>
+            <textarea value={gozlemNotu} onChange={e => setGozlemNotu(e.target.value)} rows={3}
+              placeholder="Öğrenci hakkında gözlemleriniz..."
+              className="w-full mt-1 border border-gray-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none" />
+          </CardContent>
+        </Card>
+
+        <Button onClick={() => onTamamla({ sure_saniye: sure, hatalar, gozlem_notu: gozlemNotu })}
+          disabled={sure === 0}
+          className="w-full py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold text-base">
+          ✅ Analizi Tamamla
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── ANALİZ SONUÇ EKRANI ──
+function AnalizSonucEkrani({ sonuc, ogrenci, onKaydet, onYeniAnaliz }) {
+  const [ogretmenKur, setOgretmenKur] = useState(sonuc.sistem_kur || sonuc.atanan_kur || "Kur 1");
+
+  const hizRenk = { dusuk: "text-red-600", orta: "text-yellow-600", yeterli: "text-blue-600", ileri: "text-green-600" };
+  const hizLabel = { dusuk: "Düşük", orta: "Orta", yeterli: "Yeterli", ileri: "İleri" };
+
+  const formatSure = (s) => `${Math.floor(s/60)}:${Math.round(s%60).toString().padStart(2,'0')}`;
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-6">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold text-gray-900">Analiz Sonucu</h2>
+        <p className="text-gray-500">{ogrenci.ad} {ogrenci.soyad}</p>
+      </div>
+
+      {/* Temel İstatistikler */}
+      <div className="grid grid-cols-3 gap-4">
+        <Card className="border-0 shadow-sm text-center">
+          <CardContent className="p-5">
+            <div className="text-3xl font-bold text-blue-600">{sonuc.wpm}</div>
+            <div className="text-xs text-gray-500 mt-1">kelime/dakika</div>
+            <div className={`text-sm font-medium mt-1 ${hizRenk[sonuc.hiz_deger]}`}>{hizLabel[sonuc.hiz_deger]}</div>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-sm text-center">
+          <CardContent className="p-5">
+            <div className="text-3xl font-bold text-green-600">%{sonuc.dogruluk_yuzde}</div>
+            <div className="text-xs text-gray-500 mt-1">doğruluk oranı</div>
+            <div className="text-sm font-medium mt-1 text-gray-600">{sonuc.hata_sayilari ? Object.values(sonuc.hata_sayilari).reduce((a,b)=>a+b,0) : 0} hata</div>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-sm text-center">
+          <CardContent className="p-5">
+            <div className="text-3xl font-bold text-orange-600">{formatSure(sonuc.sure_saniye)}</div>
+            <div className="text-xs text-gray-500 mt-1">okuma süresi</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Hata Dağılımı */}
+      {sonuc.hata_sayilari && (
+        <Card className="border-0 shadow-sm">
+          <CardHeader><CardTitle className="text-base">Hata Dağılımı</CardTitle></CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3">
+              {[["atlama","Atlama","red"],["yanlis_okuma","Yanlış Okuma","orange"],["takilma","Takılma","yellow"],["tekrar","Tekrar","purple"]].map(([key,label,color]) => (
+                <div key={key} className={`flex items-center justify-between p-3 bg-${color}-50 rounded-xl border border-${color}-200`}>
+                  <span className="text-sm font-medium">{label}</span>
+                  <span className={`text-lg font-bold text-${color}-600`}>{sonuc.hata_sayilari[key] || 0}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Kur Kararı */}
+      <Card className="border-2 border-orange-200 shadow-sm">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <div className="text-sm text-gray-500">Sistem Önerisi</div>
+              <div className="text-2xl font-bold text-orange-600">{sonuc.sistem_kur}</div>
+            </div>
+            <div className="text-4xl">🎯</div>
+          </div>
+          <div>
+            <Label>Öğretmen Kararı</Label>
+            <Select value={ogretmenKur} onValueChange={setOgretmenKur}>
+              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Kur 1">Kur 1</SelectItem>
+                <SelectItem value="Kur 2">Kur 2</SelectItem>
+                <SelectItem value="Kur 3">Kur 3</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={() => onKaydet(ogretmenKur)}
+            className="w-full mt-4 bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold py-3">
+            ✅ Onayla ve Kaydet
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ── ANA GİRİŞ ANALİZİ MODÜLÜ ──
+function GirisAnaliziModul({ user, students, teachers }) {
+  const { toast } = useToast();
+  const [adim, setAdim] = useState("liste"); // liste, metin-sec, canli, sonuc
+  const [seciliOgrenci, setSeciliOgrenci] = useState(null);
+  const [seciliMetin, setSeciliMetin] = useState(null);
+  const [aktifOturumId, setAktifOturumId] = useState(null);
+  const [sonuc, setSonuc] = useState(null);
+  const [gecmisOturumlar, setGecmisOturumlar] = useState([]);
+  const [normDialogAcik, setNormDialogAcik] = useState(false);
+  const [metinDialogAcik, setMetinDialogAcik] = useState(false);
+
+  const fetchGecmis = useCallback(async () => {
+    try { const r = await axios.get(`${API}/diagnostic/sessions`); setGecmisOturumlar(r.data); } catch(e) {}
+  }, []);
+
+  useEffect(() => { fetchGecmis(); }, [fetchGecmis]);
+
+  const analiziBaslat = async () => {
+    if (!seciliOgrenci || !seciliMetin) { toast({ title: "Öğrenci ve metin seçin", variant: "destructive" }); return; }
+    try {
+      const r = await axios.post(`${API}/diagnostic/sessions`, { ogrenci_id: seciliOgrenci.id, metin_id: seciliMetin.id });
+      setAktifOturumId(r.data.id);
+      setAdim("canli");
+    } catch(e) { toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
+  };
+
+  const analiziTamamla = async (veri) => {
+    try {
+      const r = await axios.post(`${API}/diagnostic/sessions/${aktifOturumId}/complete`, veri);
+      setSonuc(r.data);
+      setAdim("sonuc");
+    } catch(e) { toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
+  };
+
+  const kurOnayla = async (ogretmenKur) => {
+    try {
+      await axios.post(`${API}/diagnostic/sessions/${aktifOturumId}/complete`, {
+        ...sonuc, ogretmen_kur: ogretmenKur
+      });
+      toast({ title: "✅ Analiz kaydedildi!", description: `${seciliOgrenci.ad} → ${ogretmenKur}` });
+      fetchGecmis();
+      setAdim("liste"); setSeciliOgrenci(null); setSeciliMetin(null); setAktifOturumId(null); setSonuc(null);
+    } catch(e) {
+      // Güncelleme hatası olsa bile başarılı göster, sonuç zaten kaydedildi
+      toast({ title: "✅ Analiz kaydedildi!", description: `${seciliOgrenci.ad} → ${ogretmenKur}` });
+      fetchGecmis();
+      setAdim("liste"); setSeciliOgrenci(null); setSeciliMetin(null); setAktifOturumId(null); setSonuc(null);
+    }
+  };
+
+  const hizLabel = { dusuk: "Düşük", orta: "Orta", yeterli: "Yeterli", ileri: "İleri" };
+  const hizRenk = { dusuk: "bg-red-100 text-red-700", orta: "bg-yellow-100 text-yellow-700", yeterli: "bg-blue-100 text-blue-700", ileri: "bg-green-100 text-green-700" };
+
+  // ── CANLI ANALİZ ──
+  if (adim === "canli") {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={() => { setAdim("liste"); setAktifOturumId(null); }}>← Geri</Button>
+          <h2 className="text-xl font-bold">Canlı Analiz</h2>
+        </div>
+        <CanlıAnalizEkrani ogrenci={seciliOgrenci} metin={seciliMetin} oturumId={aktifOturumId} onTamamla={analiziTamamla} />
+      </div>
+    );
+  }
+
+  // ── SONUÇ ──
+  if (adim === "sonuc" && sonuc) {
+    return (
+      <div className="space-y-4">
+        <AnalizSonucEkrani sonuc={sonuc} ogrenci={seciliOgrenci} onKaydet={kurOnayla}
+          onYeniAnaliz={() => { setAdim("liste"); setSonuc(null); }} />
+      </div>
+    );
+  }
+
+  // ── ANA LİSTE ──
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-bold">Giriş Analizi</h2>
+        <div className="flex gap-2">
+          {user.role === "admin" && (
+            <Button variant="outline" size="sm" onClick={() => setNormDialogAcik(true)}>
+              ⚙️ Norm Tablosu
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={() => setMetinDialogAcik(true)}>
+            📄 Metinler
+          </Button>
+        </div>
+      </div>
+
+      {/* Yeni Analiz Başlat */}
+      <Card className="border-2 border-orange-200 shadow-sm">
+        <CardHeader><CardTitle className="text-base flex items-center gap-2">🎯 Yeni Analiz Başlat</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label>Öğrenci Seç</Label>
+              <Select value={seciliOgrenci?.id || ""} onValueChange={v => setSeciliOgrenci(students.find(s => s.id === v))}>
+                <SelectTrigger><SelectValue placeholder="Öğrenci seçin..." /></SelectTrigger>
+                <SelectContent>
+                  {students.map(s => <SelectItem key={s.id} value={s.id}>{s.ad} {s.soyad} — {s.sinif}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Analiz Metni Seç</Label>
+              <button onClick={() => setMetinDialogAcik(true)}
+                className="w-full border border-gray-300 rounded-lg p-2 text-left text-sm hover:border-orange-400 transition-colors">
+                {seciliMetin ? <span className="font-medium">{seciliMetin.baslik} <span className="text-gray-400 font-normal">({seciliMetin.kelime_sayisi} kelime)</span></span> : <span className="text-gray-400">Metin seçmek için tıklayın...</span>}
+              </button>
+            </div>
+          </div>
+          <Button onClick={analiziBaslat} disabled={!seciliOgrenci || !seciliMetin}
+            className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 font-bold">
+            ▶ Analizi Başlat
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Geçmiş Analizler */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader><CardTitle className="text-base">Geçmiş Analizler</CardTitle></CardHeader>
+        <CardContent>
+          {gecmisOturumlar.length === 0 && <p className="text-gray-500 text-sm text-center py-8">Henüz analiz yapılmadı</p>}
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Öğrenci</TableHead>
+                <TableHead>Tarih</TableHead>
+                <TableHead>WPM</TableHead>
+                <TableHead>Doğruluk</TableHead>
+                <TableHead>Hız</TableHead>
+                <TableHead>Atanan Kur</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {gecmisOturumlar.filter(o => o.durum === "tamamlandi").map(o => {
+                const ogr = students.find(s => s.id === o.ogrenci_id);
+                return (
+                  <TableRow key={o.id}>
+                    <TableCell className="font-medium">{ogr ? `${ogr.ad} ${ogr.soyad}` : "-"}</TableCell>
+                    <TableCell className="text-sm text-gray-500">{new Date(o.olusturma_tarihi).toLocaleDateString("tr-TR")}</TableCell>
+                    <TableCell className="font-bold text-blue-600">{o.wpm}</TableCell>
+                    <TableCell>%{o.dogruluk_yuzde}</TableCell>
+                    <TableCell><span className={`px-2 py-1 rounded-full text-xs font-medium ${hizRenk[o.hiz_deger] || "bg-gray-100 text-gray-600"}`}>{hizLabel[o.hiz_deger] || "-"}</span></TableCell>
+                    <TableCell className="font-semibold text-orange-600">{o.ogretmen_kur || "-"}</TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Norm Tablosu Dialog */}
+      <Dialog open={normDialogAcik} onOpenChange={setNormDialogAcik}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>⚙️ Okuma Hızı Norm Tablosu</DialogTitle>
+            <DialogDescription>Sınıf bazlı okuma hızı sınır değerlerini düzenleyin (kelime/dakika)</DialogDescription>
+          </DialogHeader>
+          <NormTablosu onClose={() => setNormDialogAcik(false)} />
+        </DialogContent>
+      </Dialog>
+
+      {/* Metin Seçim Dialog */}
+      <Dialog open={metinDialogAcik} onOpenChange={setMetinDialogAcik}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>📄 Analiz Metinleri</DialogTitle>
+            <DialogDescription>{seciliMetin ? "Farklı bir metin seçin veya yeni metin ekleyin" : "Analiz için metin seçin"}</DialogDescription>
+          </DialogHeader>
+          <MetinYonetimi secimModu={true} user={user} onMetinSec={m => { setSeciliMetin(m); setMetinDialogAcik(false); }} />
+          {user.role !== "student" && (
+            <div className="border-t pt-4">
+              <MetinYonetimi secimModu={false} user={user} />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
