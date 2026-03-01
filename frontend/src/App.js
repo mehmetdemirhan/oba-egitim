@@ -540,12 +540,12 @@ function AppContent() {
               <UserManagement teachers={teachers} />
             </TabsContent>
           )}
-        </Tabs>
-
           {/* Gelisim Alani */}
           <TabsContent value="gelisim">
             <GelisimAlani user={user} />
           </TabsContent>
+
+        </Tabs>
 
         {/* Edit Dialog */}
         <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
