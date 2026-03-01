@@ -178,6 +178,7 @@ function AppContent() {
 
   const fetchAll = useCallback(async () => {
     try { const r = await axios.get(`${API}/dashboard`); setDashboardStats(r.data); } catch(e) {}
+    try { if (user?.role === 'admin') { const r = await axios.get(`${API}/dashboard/bekleyenler`); setBekleyenler(r.data); } } catch(e) { setBekleyenler({ metin_bekleyen:[], metin_oylama:[], gelisim_bekleyen:[], gelisim_oylama:[], toplam:0 }); }
     try { const r = await axios.get(`${API}/stats/weekly`); setWeeklyStats(r.data); } catch(e) {}
     try { const r = await axios.get(`${API}/stats/monthly`); setMonthlyStats(r.data); } catch(e) {}
     try { const r = await axios.get(`${API}/teachers`); setTeachers(r.data); } catch(e) {}
