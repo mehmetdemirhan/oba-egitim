@@ -1102,15 +1102,392 @@ function AnalizSonucEkrani({ sonuc, ogrenci, onKaydet, onYeniAnaliz }) {
   );
 }
 
+// ── RAPOR FORMU (Analiz Sonrası) ──
+function RaporFormu({ oturum, sonuc, ogrenci, metin, onRaporTamamla }) {
+  const { toast } = useToast();
+
+  const seviyeler = ["zayif", "orta", "iyi"];
+  const seviyeLabel = { zayif: "Zayıf", orta: "Orta", iyi: "İyi" };
+  const seviyeRenk = {
+    zayif: "border-red-300 bg-red-50 text-red-700",
+    orta:  "border-yellow-300 bg-yellow-50 text-yellow-700",
+    iyi:   "border-green-300 bg-green-50 text-green-700",
+  };
+
+  const [anlama, setAnlama] = useState({
+    cumle_anlama: "orta", bilinmeyen_sozcuk: "orta", baglac_zamir: "orta",
+    ana_fikir: "orta", yardimci_fikir: "orta", konu: "orta", baslik_onerme: "orta",
+    neden_sonuc: "orta", cikarim: "orta", ipuclari: "orta", yorumlama: "orta",
+    gorus_bildirme: "orta", yazar_amaci: "orta", alternatif_fikir: "orta", guncelle_hayat: "orta",
+    bilgi: "iyi", kavrama: "iyi", uygulama: "iyi", analiz: "iyi", sentez: "iyi", degerlendirme: "iyi",
+    genel_yuzde: 0,
+  });
+  const [prozodik, setProzodik] = useState({ noktalama: 3, vurgu: 3, tonlama: 3, akicilik: 3, anlamli_gruplama: 3 });
+  const [ogretmenNotu, setOgretmenNotu] = useState("");
+
+  const prozodikToplam = Object.values(prozodik).reduce((a, b) => a + b, 0);
+
+  const SeviyeSecici = ({ alan, etiket }) => (
+    <div className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+      <span className="text-sm text-gray-700 flex-1">{etiket}</span>
+      <div className="flex gap-1">
+        {seviyeler.map(s => (
+          <button key={s} onClick={() => setAnlama({ ...anlama, [alan]: s })}
+            className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all ${anlama[alan] === s ? seviyeRenk[s] : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'}`}>
+            {seviyeLabel[s]}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  const ProzodikSatir = ({ alan, etiket, aciklama1, aciklama2, aciklama3, aciklama4 }) => (
+    <div className="py-3 border-b border-gray-100 last:border-0">
+      <div className="font-medium text-sm text-gray-800 mb-2">{etiket}</div>
+      <div className="grid grid-cols-4 gap-1">
+        {[1,2,3,4].map(p => (
+          <button key={p} onClick={() => setProzodik({ ...prozodik, [alan]: p })}
+            className={`p-2 rounded-lg text-xs border text-center transition-all leading-tight ${prozodik[alan] === p ? 'border-orange-400 bg-orange-50 text-orange-700 font-medium' : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'}`}>
+            <div className="font-bold text-sm mb-1">{p} puan</div>
+            <div>{[aciklama1, aciklama2, aciklama3, aciklama4][p-1]}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  const kaydet = async () => {
+    try {
+      const r = await axios.post(`${API}/diagnostic/rapor`, {
+        oturum_id: oturum.id,
+        anlama,
+        prozodik,
+        ogretmen_notu: ogretmenNotu,
+      });
+      toast({ title: "✅ Rapor oluşturuldu!" });
+      onRaporTamamla(r.data);
+    } catch(e) {
+      toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" });
+    }
+  };
+
+  return (
+    <div className="space-y-6 max-w-3xl mx-auto">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold">Rapor Doldur</h2>
+        <p className="text-gray-500">{ogrenci.ad} {ogrenci.soyad} — {ogrenci.sinif}</p>
+      </div>
+
+      {/* Özet bilgiler */}
+      <div className="grid grid-cols-3 gap-3">
+        <Card className="border-0 shadow-sm text-center"><CardContent className="p-4">
+          <div className="text-2xl font-bold text-blue-600">{sonuc.wpm}</div>
+          <div className="text-xs text-gray-500">kelime/dk</div>
+        </CardContent></Card>
+        <Card className="border-0 shadow-sm text-center"><CardContent className="p-4">
+          <div className="text-2xl font-bold text-green-600">%{sonuc.dogruluk_yuzde}</div>
+          <div className="text-xs text-gray-500">doğruluk</div>
+        </CardContent></Card>
+        <Card className="border-0 shadow-sm text-center"><CardContent className="p-4">
+          <div className="text-2xl font-bold text-orange-600">{sonuc.atanan_kur || sonuc.sistem_kur}</div>
+          <div className="text-xs text-gray-500">atanan kur</div>
+        </CardContent></Card>
+      </div>
+
+      {/* 4. Okuduğunu Anlama */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader><CardTitle className="text-base">4. Okuduğunu Anlama Becerileri</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <h4 className="text-sm font-semibold text-gray-600 mb-2 bg-gray-50 p-2 rounded-lg">4.1 Sözcük Düzeyinde Anlama</h4>
+            <SeviyeSecici alan="cumle_anlama" etiket="Cümle anlamını kavrama" />
+            <SeviyeSecici alan="bilinmeyen_sozcuk" etiket="Bilinmeyen sözcük tahmini" />
+            <SeviyeSecici alan="baglac_zamir" etiket="Bağlaç ve zamirleri anlama" />
+          </div>
+          <div>
+            <h4 className="text-sm font-semibold text-gray-600 mb-2 bg-gray-50 p-2 rounded-lg">4.2 Metnin Ana Yapısını Anlama</h4>
+            <SeviyeSecici alan="ana_fikir" etiket="Ana fikir belirleme" />
+            <SeviyeSecici alan="yardimci_fikir" etiket="Yardımcı fikirleri ifade etme" />
+            <SeviyeSecici alan="konu" etiket="Metnin konusunu ifade etme" />
+            <SeviyeSecici alan="baslik_onerme" etiket="Başlık önerme" />
+          </div>
+          <div>
+            <h4 className="text-sm font-semibold text-gray-600 mb-2 bg-gray-50 p-2 rounded-lg">4.3 Metinler Arasılık ve Derin Anlama</h4>
+            <SeviyeSecici alan="neden_sonuc" etiket="Neden-sonuç ilişkisini belirleme" />
+            <SeviyeSecici alan="cikarim" etiket="Çıkarım yapma" />
+            <SeviyeSecici alan="ipuclari" etiket="Metindeki ipuçlarını kullanma" />
+            <SeviyeSecici alan="yorumlama" etiket="Yorumlama" />
+          </div>
+          <div>
+            <h4 className="text-sm font-semibold text-gray-600 mb-2 bg-gray-50 p-2 rounded-lg">4.4 Eleştirel ve Yaratıcı Okuma</h4>
+            <SeviyeSecici alan="gorus_bildirme" etiket="Metne yönelik görüş bildirme" />
+            <SeviyeSecici alan="yazar_amaci" etiket="Yazarın amacını sezme" />
+            <SeviyeSecici alan="alternatif_fikir" etiket="Alternatif son / fikir üretme" />
+            <SeviyeSecici alan="guncelle_hayat" etiket="Metni günlük hayatla ilişkilendirme" />
+          </div>
+          <div>
+            <h4 className="text-sm font-semibold text-gray-600 mb-2 bg-gray-50 p-2 rounded-lg">4.5 Soru Performans Analizi</h4>
+            <SeviyeSecici alan="bilgi" etiket="Bilgi" />
+            <SeviyeSecici alan="kavrama" etiket="Kavrama" />
+            <SeviyeSecici alan="uygulama" etiket="Uygulama" />
+            <SeviyeSecici alan="analiz" etiket="Analiz" />
+            <SeviyeSecici alan="sentez" etiket="Sentez" />
+            <SeviyeSecici alan="degerlendirme" etiket="Değerlendirme" />
+          </div>
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+            <Label>Genel Anlama Yüzdesi (%)</Label>
+            <div className="flex items-center gap-3 mt-2">
+              <input type="number" min="0" max="100" value={anlama.genel_yuzde}
+                onChange={e => setAnlama({...anlama, genel_yuzde: parseInt(e.target.value)||0})}
+                className="w-24 border border-blue-300 rounded-lg p-2 text-center text-lg font-bold focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              <span className="text-sm text-gray-500">0 bırakırsanız sistem otomatik hesaplar</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 5. Prozodik Okuma */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-base flex items-center justify-between">
+            <span>5. Prozodik Okuma Ölçeği</span>
+            <span className="text-lg font-bold text-orange-600">Toplam: {prozodikToplam}/20</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ProzodikSatir alan="noktalama" etiket="Noktalama ve Duraklama"
+            aciklama1="Uymuyor" aciklama2="Kısmen uyuyor" aciklama3="Çoğunlukla" aciklama4="Tam ve bilinçli" />
+          <ProzodikSatir alan="vurgu" etiket="Vurgu"
+            aciklama1="Tek düze" aciklama2="Yer yer vurgu" aciklama3="Anlama uygun" aciklama4="Etkili ve bilinçli" />
+          <ProzodikSatir alan="tonlama" etiket="Tonlama"
+            aciklama1="Monoton" aciklama2="Sınırlı" aciklama3="Metne uygun" aciklama4="Doğal ve etkileyici" />
+          <ProzodikSatir alan="akicilik" etiket="Akıcılık"
+            aciklama1="Sık duraklama" aciklama2="Kısmi akış" aciklama3="Genel olarak akıcı" aciklama4="Kesintisiz akıcı" />
+          <ProzodikSatir alan="anlamli_gruplama" etiket="Anlamlı Gruplama"
+            aciklama1="Sözcük sözcük" aciklama2="Kısmen gruplama" aciklama3="Çoğunlukla doğru" aciklama4="Tam ve tutarlı" />
+        </CardContent>
+      </Card>
+
+      {/* Öğretmen Notu */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader><CardTitle className="text-base">6. Öğretmen Notu</CardTitle></CardHeader>
+        <CardContent>
+          <textarea value={ogretmenNotu} onChange={e => setOgretmenNotu(e.target.value)} rows={5}
+            placeholder="Öğrenciye ilişkin genel değerlendirme ve önerilerinizi yazın..."
+            className="w-full border border-gray-300 rounded-xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none leading-relaxed" />
+        </CardContent>
+      </Card>
+
+      <Button onClick={kaydet} className="w-full py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold text-lg">
+        📄 Raporu Oluştur
+      </Button>
+    </div>
+  );
+}
+
+// ── RAPOR GÖRÜNTÜLE ──
+function RaporGoruntule({ rapor, ogrenci, onGeri }) {
+  const hizLabel = { dusuk: "Düşük", orta: "Orta", yeterli: "Yeterli", ileri: "İleri" };
+  const seviyeRenk = { zayif: "text-red-600", orta: "text-yellow-600", iyi: "text-green-600" };
+  const seviyeLabel = { zayif: "Zayıf", orta: "Orta", iyi: "İyi" };
+  const prozodikSeviye = (t) => t >= 18 ? "Çok İyi" : t >= 14 ? "İyi" : t >= 10 ? "Orta" : "Geliştirilmeli";
+  const formatTarih = (t) => new Date(t).toLocaleDateString("tr-TR");
+  const formatSure = (s) => `${Math.floor(s/60)}:${Math.round(s%60).toString().padStart(2,'0')}`;
+
+  const AnlamaTablosu = ({ baslik, satirlar }) => (
+    <div className="mb-4">
+      <div className="bg-gray-100 px-3 py-2 rounded-t-lg font-semibold text-sm text-gray-700">{baslik}</div>
+      <table className="w-full border border-gray-200 rounded-b-lg overflow-hidden text-sm">
+        <thead><tr className="bg-gray-50">
+          <th className="text-left p-2 border-b border-gray-200 font-medium">Ölçüt</th>
+          <th className="p-2 border-b border-gray-200 w-20 text-center font-medium">Zayıf</th>
+          <th className="p-2 border-b border-gray-200 w-20 text-center font-medium">Orta</th>
+          <th className="p-2 border-b border-gray-200 w-20 text-center font-medium">İyi</th>
+        </tr></thead>
+        <tbody>
+          {satirlar.map(([etiket, alan]) => {
+            const deger = rapor.anlama?.[alan] || "orta";
+            return (
+              <tr key={alan} className="border-b border-gray-100 last:border-0">
+                <td className="p-2 text-gray-700">{etiket}</td>
+                {["zayif","orta","iyi"].map(s => (
+                  <td key={s} className="p-2 text-center text-orange-500 font-bold">{deger === s ? "+" : ""}</td>
+                ))}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-6">
+      <div className="flex items-center gap-3">
+        <Button variant="outline" size="sm" onClick={onGeri}>← Geri</Button>
+        <h2 className="text-xl font-bold">Okuma Becerileri Ölçüm Raporu</h2>
+      </div>
+
+      {/* 1. Öğrenci Bilgileri */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader><CardTitle className="text-base bg-gray-800 text-white p-3 rounded-lg -m-1">1. ÖĞRENCİ BİLGİLERİ</CardTitle></CardHeader>
+        <CardContent className="p-0">
+          <table className="w-full text-sm">
+            <tbody>
+              <tr className="border-b"><td className="p-3 font-semibold w-48 bg-gray-50">Adı Soyadı:</td><td className="p-3">{rapor.ogrenci_ad}</td></tr>
+              <tr className="border-b"><td className="p-3 font-semibold bg-gray-50">Sınıfı:</td><td className="p-3">{rapor.ogrenci_sinif}</td></tr>
+              <tr className="border-b"><td className="p-3 font-semibold bg-gray-50">Değerlendirme Tarihi:</td><td className="p-3">{formatTarih(rapor.olusturma_tarihi)}</td></tr>
+              <tr><td className="p-3 font-semibold bg-gray-50">Değerlendirmeyi Yapan:</td><td className="p-3">{rapor.ogretmen_ad}</td></tr>
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+
+      {/* 2. Metin */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader><CardTitle className="text-base bg-gray-800 text-white p-3 rounded-lg -m-1">2. METİN</CardTitle></CardHeader>
+        <CardContent className="p-0">
+          <table className="w-full text-sm">
+            <tbody>
+              <tr className="border-b"><td className="p-3 font-semibold w-48 bg-gray-50">Metnin Adı:</td><td className="p-3 uppercase">{rapor.metin_adi}</td></tr>
+              <tr className="border-b"><td className="p-3 font-semibold bg-gray-50">Metnin Türü:</td><td className="p-3 uppercase">{rapor.metin_turu}</td></tr>
+              <tr className="border-b"><td className="p-3 font-semibold bg-gray-50">Toplam Kelime Sayısı:</td><td className="p-3">{rapor.kelime_sayisi}</td></tr>
+              <tr className="border-b"><td className="p-3 font-semibold bg-gray-50">Doğru Okunan Kelime:</td><td className="p-3">{Math.round(rapor.kelime_sayisi * rapor.dogruluk_yuzde / 100)}</td></tr>
+              <tr className="border-b"><td className="p-3 font-semibold bg-gray-50">Yanlış Okunan Kelime:</td><td className="p-3">{rapor.kelime_sayisi - Math.round(rapor.kelime_sayisi * rapor.dogruluk_yuzde / 100)}</td></tr>
+              <tr><td className="p-3 font-semibold bg-gray-50">Tamamlama Süresi:</td><td className="p-3">{formatSure(rapor.sure_saniye)} ({rapor.sure_saniye} sn)</td></tr>
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+
+      {/* 3. Okuma Hızı */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader><CardTitle className="text-base bg-gray-800 text-white p-3 rounded-lg -m-1">3. OKUMA HIZI</CardTitle></CardHeader>
+        <CardContent className="pt-4">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="text-4xl font-bold text-blue-600">{rapor.wpm}</div>
+            <div>
+              <div className="text-sm text-gray-500">kelime/dakika</div>
+              <div className={`font-semibold ${rapor.hiz_deger === "ileri" ? "text-green-600" : rapor.hiz_deger === "yeterli" ? "text-blue-600" : rapor.hiz_deger === "orta" ? "text-yellow-600" : "text-red-600"}`}>
+                {hizLabel[rapor.hiz_deger]} Düzey
+              </div>
+            </div>
+          </div>
+          <p className="text-sm text-gray-700 leading-relaxed bg-blue-50 p-3 rounded-xl">
+            Öğrencinin okuma hızı dakikada <strong>{rapor.wpm} kelime</strong>dir. Bu okuma hızı, öğrencinin bulunduğu sınıf düzeyi normlarına göre <strong>{hizLabel[rapor.hiz_deger]?.toLowerCase()} düzeydedir</strong>.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* 4. Okuduğunu Anlama */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-base bg-gray-800 text-white p-3 rounded-lg -m-1">
+            4. OKUDUĞUNU ANLAMA BECERİLERİ — %{rapor.anlama_yuzde}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4 space-y-4">
+          <AnlamaTablosu baslik="4.1 Sözcük Düzeyinde Anlama" satirlar={[
+            ["Cümle anlamını kavrama","cumle_anlama"],
+            ["Bilinmeyen sözcük tahmini","bilinmeyen_sozcuk"],
+            ["Bağlaç ve zamirleri anlama","baglac_zamir"],
+          ]} />
+          <AnlamaTablosu baslik="4.2 Metnin Ana Yapısını Anlama" satirlar={[
+            ["Ana fikir belirleme","ana_fikir"],
+            ["Yardımcı fikirleri ifade etme","yardimci_fikir"],
+            ["Metnin konusunu ifade etme","konu"],
+            ["Başlık önerme","baslik_onerme"],
+          ]} />
+          <AnlamaTablosu baslik="4.3 Metinler Arasılık ve Derin Anlama" satirlar={[
+            ["Neden-sonuç ilişkisini belirleme","neden_sonuc"],
+            ["Çıkarım yapma","cikarim"],
+            ["Metindeki ipuçlarını kullanma","ipuclari"],
+            ["Yorumlama","yorumlama"],
+          ]} />
+          <AnlamaTablosu baslik="4.4 Eleştirel ve Yaratıcı Okuma" satirlar={[
+            ["Metne yönelik görüş bildirme","gorus_bildirme"],
+            ["Yazarın amacını sezme","yazar_amaci"],
+            ["Alternatif son / fikir üretme","alternatif_fikir"],
+            ["Metni günlük hayatla ilişkilendirme","guncelle_hayat"],
+          ]} />
+          <AnlamaTablosu baslik="4.5 Soru Performans Analizi" satirlar={[
+            ["Bilgi","bilgi"],["Kavrama","kavrama"],["Uygulama","uygulama"],
+            ["Analiz","analiz"],["Sentez","sentez"],["Değerlendirme","degerlendirme"],
+          ]} />
+        </CardContent>
+      </Card>
+
+      {/* 5. Prozodik Okuma */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader><CardTitle className="text-base bg-gray-800 text-white p-3 rounded-lg -m-1">5. PROZODİK OKUMA ÖLÇEĞİ</CardTitle></CardHeader>
+        <CardContent className="pt-4">
+          <table className="w-full text-sm border border-gray-200 rounded-xl overflow-hidden mb-4">
+            <thead><tr className="bg-gray-100">
+              <th className="text-left p-3 font-semibold">Ölçüt</th>
+              <th className="text-center p-3 font-semibold w-24">1 puan</th>
+              <th className="text-center p-3 font-semibold w-24">2 puan</th>
+              <th className="text-center p-3 font-semibold w-24">3 puan</th>
+              <th className="text-center p-3 font-semibold w-24">4 puan</th>
+              <th className="text-center p-3 font-semibold w-24">Puan</th>
+            </tr></thead>
+            <tbody>
+              {[
+                ["Noktalama ve Duraklama","noktalama",["Uymuyor","Kısmen","Çoğunlukla","Tam ve bilinçli"]],
+                ["Vurgu","vurgu",["Tek düze","Yer yer","Anlama uygun","Etkili ve bilinçli"]],
+                ["Tonlama","tonlama",["Monoton","Sınırlı","Metne uygun","Doğal ve etkileyici"]],
+                ["Akıcılık","akicilik",["Sık duraklama","Kısmi akış","Genel akıcı","Kesintisiz"]],
+                ["Anlamlı Gruplama","anlamli_gruplama",["Sözcük sözcük","Kısmen","Çoğunlukla","Tam ve tutarlı"]],
+              ].map(([etiket, alan, aciklamalar]) => (
+                <tr key={alan} className="border-t border-gray-100">
+                  <td className="p-3 font-medium">{etiket}</td>
+                  {aciklamalar.map((a, i) => (
+                    <td key={i} className={`p-2 text-center text-xs ${rapor.prozodik?.[alan] === i+1 ? 'bg-orange-100 font-bold text-orange-700' : 'text-gray-500'}`}>{a}</td>
+                  ))}
+                  <td className="p-3 text-center font-bold text-orange-600">{rapor.prozodik?.[alan]}</td>
+                </tr>
+              ))}
+              <tr className="bg-gray-50 border-t-2 border-gray-300">
+                <td colSpan="5" className="p-3 font-bold text-right">Toplam</td>
+                <td className="p-3 text-center font-bold text-xl text-orange-600">{rapor.prozodik_toplam}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div className="bg-orange-50 p-3 rounded-xl text-sm text-gray-700">
+            Prozodik okuma performansı: <strong>{prozodikSeviye(rapor.prozodik_toplam)}</strong> (Toplam {rapor.prozodik_toplam}/20)
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 6. Sonuç */}
+      {rapor.ogretmen_notu && (
+        <Card className="border-0 shadow-sm">
+          <CardHeader><CardTitle className="text-base bg-gray-800 text-white p-3 rounded-lg -m-1">6. SONUÇ VE GENEL YORUM</CardTitle></CardHeader>
+          <CardContent className="pt-4">
+            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{rapor.ogretmen_notu}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="flex gap-3 pb-8">
+        <Button onClick={() => window.print()} variant="outline" className="flex-1">🖨️ Yazdır / PDF</Button>
+        <Button onClick={onGeri} variant="outline" className="flex-1">← Geri</Button>
+      </div>
+    </div>
+  );
+}
+
+
 // ── ANA GİRİŞ ANALİZİ MODÜLÜ ──
 function GirisAnaliziModul({ user, students, teachers }) {
   const { toast } = useToast();
-  const [adim, setAdim] = useState("liste"); // liste, metin-sec, canli, sonuc
+  const [adim, setAdim] = useState("liste"); // liste, metin-sec, canli, sonuc, rapor-form, rapor-goruntule
   const [seciliOgrenci, setSeciliOgrenci] = useState(null);
   const [seciliMetin, setSeciliMetin] = useState(null);
   const [aktifOturumId, setAktifOturumId] = useState(null);
   const [sonuc, setSonuc] = useState(null);
   const [gecmisOturumlar, setGecmisOturumlar] = useState([]);
+  const [aktifRapor, setAktifRapor] = useState(null);
+  const [aktifOturum, setAktifOturum] = useState(null);
   const [normDialogAcik, setNormDialogAcik] = useState(false);
   const [metinDialogAcik, setMetinDialogAcik] = useState(false);
 
@@ -1139,17 +1516,18 @@ function GirisAnaliziModul({ user, students, teachers }) {
 
   const kurOnayla = async (ogretmenKur) => {
     try {
-      await axios.post(`${API}/diagnostic/sessions/${aktifOturumId}/complete`, {
+      const r = await axios.post(`${API}/diagnostic/sessions/${aktifOturumId}/complete`, {
         ...sonuc, ogretmen_kur: ogretmenKur
       });
-      toast({ title: "✅ Analiz kaydedildi!", description: `${seciliOgrenci.ad} → ${ogretmenKur}` });
+      toast({ title: "✅ Analiz kaydedildi!", description: `${seciliOgrenci.ad} → ${ogretmenKur} — Raporu doldurun` });
       fetchGecmis();
-      setAdim("liste"); setSeciliOgrenci(null); setSeciliMetin(null); setAktifOturumId(null); setSonuc(null);
+      setAktifOturum({ id: aktifOturumId, ...r.data, ogretmen_kur: ogretmenKur });
+      setSonuc({ ...r.data, atanan_kur: ogretmenKur });
+      setAdim("rapor-form");
     } catch(e) {
-      // Güncelleme hatası olsa bile başarılı göster, sonuç zaten kaydedildi
-      toast({ title: "✅ Analiz kaydedildi!", description: `${seciliOgrenci.ad} → ${ogretmenKur}` });
-      fetchGecmis();
-      setAdim("liste"); setSeciliOgrenci(null); setSeciliMetin(null); setAktifOturumId(null); setSonuc(null);
+      // Güncelleme hatası olsa bile rapor formuna geç
+      setAktifOturum({ id: aktifOturumId });
+      setAdim("rapor-form");
     }
   };
 
@@ -1166,6 +1544,36 @@ function GirisAnaliziModul({ user, students, teachers }) {
         </div>
         <CanlıAnalizEkrani ogrenci={seciliOgrenci} metin={seciliMetin} oturumId={aktifOturumId} onTamamla={analiziTamamla} />
       </div>
+    );
+  }
+
+  // ── RAPOR FORMU ──
+  if (adim === "rapor-form") {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={() => { setAdim("liste"); setSonuc(null); setSeciliOgrenci(null); setSeciliMetin(null); setAktifOturumId(null); }}>← Listeye Dön</Button>
+          <span className="text-sm text-gray-500">Raporu doldurup kaydedin veya atlayın</span>
+        </div>
+        <RaporFormu
+          oturum={aktifOturum || { id: aktifOturumId }}
+          sonuc={sonuc || {}}
+          ogrenci={seciliOgrenci || {}}
+          metin={seciliMetin || {}}
+          onRaporTamamla={(r) => { setAktifRapor(r); setAdim("rapor-goruntule"); }}
+        />
+      </div>
+    );
+  }
+
+  // ── RAPOR GÖRÜNTÜLE ──
+  if (adim === "rapor-goruntule" && aktifRapor) {
+    return (
+      <RaporGoruntule
+        rapor={aktifRapor}
+        ogrenci={seciliOgrenci || {}}
+        onGeri={() => { setAdim("liste"); setAktifRapor(null); setSonuc(null); setSeciliOgrenci(null); setSeciliMetin(null); setAktifOturumId(null); }}
+      />
     );
   }
 
@@ -1239,6 +1647,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
                 <TableHead>Doğruluk</TableHead>
                 <TableHead>Hız</TableHead>
                 <TableHead>Atanan Kur</TableHead>
+                <TableHead>Rapor</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1252,7 +1661,15 @@ function GirisAnaliziModul({ user, students, teachers }) {
                     <TableCell>%{o.dogruluk_yuzde}</TableCell>
                     <TableCell><span className={`px-2 py-1 rounded-full text-xs font-medium ${hizRenk[o.hiz_deger] || "bg-gray-100 text-gray-600"}`}>{hizLabel[o.hiz_deger] || "-"}</span></TableCell>
                     <TableCell className="font-semibold text-orange-600">{o.ogretmen_kur || "-"}</TableCell>
-                  </TableRow>
+                    <TableCell>
+                      <Button size="sm" variant="outline" onClick={async () => {
+                        try { const r = await axios.get(`${API}/diagnostic/rapor/ogrenci/${o.ogrenci_id}`);
+                          const ogrRapor = r.data.find(rp => rp.oturum_id === o.id);
+                          if (ogrRapor) { setAktifRapor(ogrRapor); setSeciliOgrenci(students.find(s => s.id === o.ogrenci_id) || {}); setAdim("rapor-goruntule"); }
+                          else { toast({ title: "Bu analiz için rapor bulunamadı" }); }
+                        } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
+                      }}>📄 Rapor</Button>
+                    </TableCell>
                 );
               })}
             </TableBody>
