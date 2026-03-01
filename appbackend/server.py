@@ -1041,6 +1041,131 @@ async def tamamla_oturum(oturum_id: str, data: AnalizTamamla, current_user=Depen
     }
 
 
+
+# ── Rapor Sistemi ──
+class AnlamaVeri(BaseModel):
+    # 4.1 Sözcük düzeyinde
+    cumle_anlama: str = "orta"          # zayif / orta / iyi
+    bilinmeyen_sozcuk: str = "orta"
+    baglac_zamir: str = "orta"
+    # 4.2 Ana yapı
+    ana_fikir: str = "orta"
+    yardimci_fikir: str = "orta"
+    konu: str = "orta"
+    baslik_onerme: str = "orta"
+    # 4.3 Derin anlama
+    neden_sonuc: str = "orta"
+    cikarim: str = "orta"
+    ipuclari: str = "orta"
+    yorumlama: str = "orta"
+    # 4.4 Eleştirel
+    gorus_bildirme: str = "orta"
+    yazar_amaci: str = "orta"
+    alternatif_fikir: str = "orta"
+    guncelle_hayat: str = "orta"
+    # 4.5 Soru performansı
+    bilgi: str = "iyi"
+    kavrama: str = "iyi"
+    uygulama: str = "iyi"
+    analiz: str = "iyi"
+    sentez: str = "iyi"
+    degerlendirme: str = "iyi"
+    genel_yuzde: int = 0
+
+class ProzodikVeri(BaseModel):
+    noktalama: int = 3    # 1-4 puan
+    vurgu: int = 3
+    tonlama: int = 3
+    akicilik: int = 3
+    anlamli_gruplama: int = 3
+
+class RaporOlusturCreate(BaseModel):
+    oturum_id: str
+    anlama: AnlamaVeri
+    prozodik: ProzodikVeri
+    ogretmen_notu: str = ""
+
+def anlama_yuzde(anlama: AnlamaVeri) -> int:
+    alanlar = [
+        anlama.cumle_anlama, anlama.bilinmeyen_sozcuk, anlama.baglac_zamir,
+        anlama.ana_fikir, anlama.yardimci_fikir, anlama.konu, anlama.baslik_onerme,
+        anlama.neden_sonuc, anlama.cikarim, anlama.ipuclari, anlama.yorumlama,
+        anlama.gorus_bildirme, anlama.yazar_amaci, anlama.alternatif_fikir, anlama.guncelle_hayat,
+        anlama.bilgi, anlama.kavrama, anlama.uygulama, anlama.analiz, anlama.sentez, anlama.degerlendirme
+    ]
+    puan_map = {"zayif": 0, "orta": 1, "iyi": 2}
+    toplam = sum(puan_map.get(a, 1) for a in alanlar)
+    return round(toplam / (len(alanlar) * 2) * 100)
+
+def hiz_metni(hiz_deger: str) -> str:
+    return {"dusuk": "düşük", "orta": "orta", "yeterli": "yeterli", "ileri": "ileri"}.get(hiz_deger, "orta")
+
+def prozodik_seviye(toplam: int) -> str:
+    if toplam >= 18: return "çok iyi"
+    elif toplam >= 14: return "iyi"
+    elif toplam >= 10: return "orta"
+    else: return "geliştirilmeli"
+
+def anlama_seviye(pct: int) -> str:
+    if pct >= 85: return "iyi"
+    elif pct >= 70: return "orta"
+    else: return "zayıf"
+
+@api_router.post("/diagnostic/rapor")
+async def olustur_rapor(data: RaporOlusturCreate, current_user=Depends(get_current_user)):
+    oturum = await db.diagnostic_oturumlar.find_one({"id": data.oturum_id})
+    if not oturum:
+        raise HTTPException(status_code=404, detail="Oturum bulunamadı")
+
+    metin = await db.analiz_metinler.find_one({"id": oturum.get("metin_id")})
+    ogrenci = await db.students.find_one({"id": oturum.get("ogrenci_id")})
+    ogretmen = await db.users.find_one({"id": oturum.get("ogretmen_id")})
+
+    prozodik_toplam = data.prozodik.noktalama + data.prozodik.vurgu + data.prozodik.tonlama + data.prozodik.akicilik + data.prozodik.anlamli_gruplama
+    anlama_pct = data.anlama.genel_yuzde if data.anlama.genel_yuzde > 0 else anlama_yuzde(data.anlama)
+
+    rapor_data = {
+        "id": str(uuid.uuid4()),
+        "oturum_id": data.oturum_id,
+        "ogrenci_id": oturum.get("ogrenci_id"),
+        "ogretmen_id": oturum.get("ogretmen_id"),
+        "ogrenci_ad": f"{ogrenci.get('ad','')} {ogrenci.get('soyad','')}" if ogrenci else "",
+        "ogrenci_sinif": ogrenci.get("sinif", "") if ogrenci else "",
+        "ogretmen_ad": f"{ogretmen.get('ad','')} {ogretmen.get('soyad','')}" if ogretmen else "",
+        "metin_adi": metin.get("baslik", "") if metin else "",
+        "metin_turu": metin.get("tur", "") if metin else "",
+        "kelime_sayisi": metin.get("kelime_sayisi", 0) if metin else 0,
+        "sure_saniye": oturum.get("sure_saniye", 0),
+        "wpm": oturum.get("wpm", 0),
+        "dogruluk_yuzde": oturum.get("dogruluk_yuzde", 0),
+        "hiz_deger": oturum.get("hiz_deger", ""),
+        "atanan_kur": oturum.get("ogretmen_kur", ""),
+        "hata_sayilari": oturum.get("hatalar", []),
+        "anlama": data.anlama.dict(),
+        "anlama_yuzde": anlama_pct,
+        "prozodik": data.prozodik.dict(),
+        "prozodik_toplam": prozodik_toplam,
+        "ogretmen_notu": data.ogretmen_notu,
+        "olusturma_tarihi": datetime.utcnow().isoformat(),
+    }
+    await db.diagnostic_raporlar.insert_one(rapor_data)
+    rapor_data.pop("_id", None)
+    return rapor_data
+
+@api_router.get("/diagnostic/rapor/ogrenci/{ogrenci_id}")
+async def get_ogrenci_raporlari(ogrenci_id: str, current_user=Depends(get_current_user)):
+    items = await db.diagnostic_raporlar.find({"ogrenci_id": ogrenci_id}).sort("olusturma_tarihi", -1).to_list(length=None)
+    for i in items: i.pop("_id", None)
+    return items
+
+@api_router.get("/diagnostic/rapor/{rapor_id}")
+async def get_rapor(rapor_id: str, current_user=Depends(get_current_user)):
+    rapor = await db.diagnostic_raporlar.find_one({"id": rapor_id})
+    if not rapor:
+        raise HTTPException(status_code=404, detail="Rapor bulunamadı")
+    rapor.pop("_id", None)
+    return rapor
+
 # ─────────────────────────────────────────────
 # GELİŞİM ALANI
 # ─────────────────────────────────────────────
@@ -1483,6 +1608,131 @@ async def tamamla_oturum(oturum_id: str, data: AnalizTamamla, current_user=Depen
         "sure_saniye": data.sure_saniye
     }
 
+
+
+# ── Rapor Sistemi ──
+class AnlamaVeri(BaseModel):
+    # 4.1 Sözcük düzeyinde
+    cumle_anlama: str = "orta"          # zayif / orta / iyi
+    bilinmeyen_sozcuk: str = "orta"
+    baglac_zamir: str = "orta"
+    # 4.2 Ana yapı
+    ana_fikir: str = "orta"
+    yardimci_fikir: str = "orta"
+    konu: str = "orta"
+    baslik_onerme: str = "orta"
+    # 4.3 Derin anlama
+    neden_sonuc: str = "orta"
+    cikarim: str = "orta"
+    ipuclari: str = "orta"
+    yorumlama: str = "orta"
+    # 4.4 Eleştirel
+    gorus_bildirme: str = "orta"
+    yazar_amaci: str = "orta"
+    alternatif_fikir: str = "orta"
+    guncelle_hayat: str = "orta"
+    # 4.5 Soru performansı
+    bilgi: str = "iyi"
+    kavrama: str = "iyi"
+    uygulama: str = "iyi"
+    analiz: str = "iyi"
+    sentez: str = "iyi"
+    degerlendirme: str = "iyi"
+    genel_yuzde: int = 0
+
+class ProzodikVeri(BaseModel):
+    noktalama: int = 3    # 1-4 puan
+    vurgu: int = 3
+    tonlama: int = 3
+    akicilik: int = 3
+    anlamli_gruplama: int = 3
+
+class RaporOlusturCreate(BaseModel):
+    oturum_id: str
+    anlama: AnlamaVeri
+    prozodik: ProzodikVeri
+    ogretmen_notu: str = ""
+
+def anlama_yuzde(anlama: AnlamaVeri) -> int:
+    alanlar = [
+        anlama.cumle_anlama, anlama.bilinmeyen_sozcuk, anlama.baglac_zamir,
+        anlama.ana_fikir, anlama.yardimci_fikir, anlama.konu, anlama.baslik_onerme,
+        anlama.neden_sonuc, anlama.cikarim, anlama.ipuclari, anlama.yorumlama,
+        anlama.gorus_bildirme, anlama.yazar_amaci, anlama.alternatif_fikir, anlama.guncelle_hayat,
+        anlama.bilgi, anlama.kavrama, anlama.uygulama, anlama.analiz, anlama.sentez, anlama.degerlendirme
+    ]
+    puan_map = {"zayif": 0, "orta": 1, "iyi": 2}
+    toplam = sum(puan_map.get(a, 1) for a in alanlar)
+    return round(toplam / (len(alanlar) * 2) * 100)
+
+def hiz_metni(hiz_deger: str) -> str:
+    return {"dusuk": "düşük", "orta": "orta", "yeterli": "yeterli", "ileri": "ileri"}.get(hiz_deger, "orta")
+
+def prozodik_seviye(toplam: int) -> str:
+    if toplam >= 18: return "çok iyi"
+    elif toplam >= 14: return "iyi"
+    elif toplam >= 10: return "orta"
+    else: return "geliştirilmeli"
+
+def anlama_seviye(pct: int) -> str:
+    if pct >= 85: return "iyi"
+    elif pct >= 70: return "orta"
+    else: return "zayıf"
+
+@api_router.post("/diagnostic/rapor")
+async def olustur_rapor(data: RaporOlusturCreate, current_user=Depends(get_current_user)):
+    oturum = await db.diagnostic_oturumlar.find_one({"id": data.oturum_id})
+    if not oturum:
+        raise HTTPException(status_code=404, detail="Oturum bulunamadı")
+
+    metin = await db.analiz_metinler.find_one({"id": oturum.get("metin_id")})
+    ogrenci = await db.students.find_one({"id": oturum.get("ogrenci_id")})
+    ogretmen = await db.users.find_one({"id": oturum.get("ogretmen_id")})
+
+    prozodik_toplam = data.prozodik.noktalama + data.prozodik.vurgu + data.prozodik.tonlama + data.prozodik.akicilik + data.prozodik.anlamli_gruplama
+    anlama_pct = data.anlama.genel_yuzde if data.anlama.genel_yuzde > 0 else anlama_yuzde(data.anlama)
+
+    rapor_data = {
+        "id": str(uuid.uuid4()),
+        "oturum_id": data.oturum_id,
+        "ogrenci_id": oturum.get("ogrenci_id"),
+        "ogretmen_id": oturum.get("ogretmen_id"),
+        "ogrenci_ad": f"{ogrenci.get('ad','')} {ogrenci.get('soyad','')}" if ogrenci else "",
+        "ogrenci_sinif": ogrenci.get("sinif", "") if ogrenci else "",
+        "ogretmen_ad": f"{ogretmen.get('ad','')} {ogretmen.get('soyad','')}" if ogretmen else "",
+        "metin_adi": metin.get("baslik", "") if metin else "",
+        "metin_turu": metin.get("tur", "") if metin else "",
+        "kelime_sayisi": metin.get("kelime_sayisi", 0) if metin else 0,
+        "sure_saniye": oturum.get("sure_saniye", 0),
+        "wpm": oturum.get("wpm", 0),
+        "dogruluk_yuzde": oturum.get("dogruluk_yuzde", 0),
+        "hiz_deger": oturum.get("hiz_deger", ""),
+        "atanan_kur": oturum.get("ogretmen_kur", ""),
+        "hata_sayilari": oturum.get("hatalar", []),
+        "anlama": data.anlama.dict(),
+        "anlama_yuzde": anlama_pct,
+        "prozodik": data.prozodik.dict(),
+        "prozodik_toplam": prozodik_toplam,
+        "ogretmen_notu": data.ogretmen_notu,
+        "olusturma_tarihi": datetime.utcnow().isoformat(),
+    }
+    await db.diagnostic_raporlar.insert_one(rapor_data)
+    rapor_data.pop("_id", None)
+    return rapor_data
+
+@api_router.get("/diagnostic/rapor/ogrenci/{ogrenci_id}")
+async def get_ogrenci_raporlari(ogrenci_id: str, current_user=Depends(get_current_user)):
+    items = await db.diagnostic_raporlar.find({"ogrenci_id": ogrenci_id}).sort("olusturma_tarihi", -1).to_list(length=None)
+    for i in items: i.pop("_id", None)
+    return items
+
+@api_router.get("/diagnostic/rapor/{rapor_id}")
+async def get_rapor(rapor_id: str, current_user=Depends(get_current_user)):
+    rapor = await db.diagnostic_raporlar.find_one({"id": rapor_id})
+    if not rapor:
+        raise HTTPException(status_code=404, detail="Rapor bulunamadı")
+    rapor.pop("_id", None)
+    return rapor
 
 # ─────────────────────────────────────────────
 # GELİŞİM ALANI - Tam İş Akışı
