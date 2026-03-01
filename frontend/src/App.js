@@ -160,6 +160,7 @@ function AppContent() {
   const [courses, setCourses] = useState([]);
   const [payments, setPayments] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
+  const [bekleyenler, setBekleyenler] = useState(null);
   const [weeklyStats, setWeeklyStats] = useState([]);
   const [monthlyStats, setMonthlyStats] = useState([]);
   const [teacherStudents, setTeacherStudents] = useState({});
@@ -569,6 +570,118 @@ function AppContent() {
   );
 }
 
+
+
+// ── DASHBOARD: ONAY BEKLEYENLERKarti ──
+function BekleyenlerKarti({ bekleyenler, onRefresh, onTabChange }) {
+  const { toast } = useToast();
+
+  const adminKararMetin = async (id, onay, direkt = false) => {
+    try {
+      await axios.post(`${API}/diagnostic/texts/${id}/admin-karar`, { onay, direkt });
+      toast({ title: direkt ? "✅ Direkt havuza alındı" : onay ? "🗳️ Oylama başlatıldı" : "❌ Reddedildi" });
+      onRefresh();
+    } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
+  };
+
+  const adminKararGelisim = async (id, onay, direkt = false) => {
+    try {
+      await axios.post(`${API}/gelisim/icerik/${id}/admin-karar`, { onay, direkt });
+      toast({ title: direkt ? "✅ Direkt yayına alındı" : onay ? "🗳️ Oylama başlatıldı" : "❌ Reddedildi" });
+      onRefresh();
+    } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
+  };
+
+  const turLabel = { hikaye: "Hikaye", bilgilendirici: "Bilgilendirici", siir: "Şiir", hizmetici: "Hizmetiçi", film: "Film", kitap: "Kitap" };
+
+  const satir = (item, tip) => {
+    const isMetin = tip === "metin";
+    const isBekleyen = (isMetin ? item.durum : item.durum) === "beklemede";
+    return (
+      <div key={item.id} className={`flex items-center justify-between p-3 rounded-xl border ${isBekleyen ? 'border-yellow-200 bg-yellow-50' : 'border-blue-100 bg-blue-50'}`}>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${isBekleyen ? 'bg-yellow-200 text-yellow-800' : 'bg-blue-200 text-blue-800'}`}>
+              {isMetin ? "📄 Metin" : "📚 Gelişim"}
+            </span>
+            <span className={`text-xs px-2 py-0.5 rounded-full ${isBekleyen ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'}`}>
+              {isBekleyen ? "⏳ Onay Bekliyor" : "🗳️ Oylamada"}
+            </span>
+          </div>
+          <div className="font-semibold text-sm text-gray-800 mt-1 truncate">{item.baslik}</div>
+          <div className="text-xs text-gray-500">
+            {item.ekleyen_ad} •{" "}
+            {isMetin ? `${item.sinif_seviyesi}. Sınıf • ${turLabel[item.tur] || item.tur}` : turLabel[item.tur] || item.tur}
+            {" • "}{new Date(item.olusturma_tarihi).toLocaleDateString("tr-TR")}
+          </div>
+        </div>
+        {isBekleyen && (
+          <div className="flex gap-1 ml-3 shrink-0">
+            <button onClick={() => isMetin ? adminKararMetin(item.id, true, true) : adminKararGelisim(item.id, true, true)}
+              className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-medium transition-colors">
+              ✅ Direkt
+            </button>
+            <button onClick={() => isMetin ? adminKararMetin(item.id, true, false) : adminKararGelisim(item.id, true, false)}
+              className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors">
+              🗳️ Oylama
+            </button>
+            <button onClick={() => isMetin ? adminKararMetin(item.id, false) : adminKararGelisim(item.id, false)}
+              className="px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-medium transition-colors">
+              ❌
+            </button>
+          </div>
+        )}
+        {!isBekleyen && (
+          <div className="ml-3 text-xs text-blue-600 font-medium shrink-0">
+            {Object.keys(item.oylar || {}).length} oy
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const tumListe = [
+    ...bekleyenler.metin_bekleyen.map(i => ({ ...i, _tip: "metin" })),
+    ...bekleyenler.gelisim_bekleyen.map(i => ({ ...i, _tip: "gelisim" })),
+    ...bekleyenler.metin_oylama.map(i => ({ ...i, _tip: "metin" })),
+    ...bekleyenler.gelisim_oylama.map(i => ({ ...i, _tip: "gelisim" })),
+  ];
+
+  return (
+    <Card className="border-2 border-orange-200 shadow-sm">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-red-500 rounded-xl flex items-center justify-center">
+              <span className="text-white font-bold text-sm">{bekleyenler.toplam}</span>
+            </div>
+            <div>
+              <div className="text-base font-bold">Onay Bekleyenler</div>
+              <div className="text-xs text-gray-500 font-normal">
+                {bekleyenler.metin_bekleyen.length + bekleyenler.gelisim_bekleyen.length} karar bekliyor •{" "}
+                {bekleyenler.metin_oylama.length + bekleyenler.gelisim_oylama.length} oylamada
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => onTabChange("giris-analizi")}
+              className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+              📄 Metinler
+            </button>
+            <button onClick={() => onTabChange("gelisim")}
+              className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+              📚 Gelişim
+            </button>
+          </div>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2 max-h-80 overflow-y-auto">
+        {tumListe.length === 0 && <p className="text-gray-400 text-sm text-center py-4">Bekleyen içerik yok</p>}
+        {tumListe.map(item => satir(item, item._tip))}
+      </CardContent>
+    </Card>
+  );
+}
 
 // ── NORM TABLOSU YÖNETİMİ (Admin) ──
 function NormTablosu({ onClose }) {
