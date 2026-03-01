@@ -1078,130 +1078,254 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user }) {
 }
 
 // ── CANLI ANALİZ EKRANI ──
-function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla }) {
+// user.role === "student" → tam ekran metin (salt okunur)
+// user.role === "teacher"/"admin" → üstte rapor formu, altta metin + kontroller
+function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
   const [sure, setSure] = useState(0);
   const [calisıyor, setCalisıyor] = useState(false);
   const [hatalar, setHatalar] = useState([]);
   const [gozlemNotu, setGozlemNotu] = useState("");
-  const intervalRef = React.useRef(null);
+  const intervalRef = useRef(null);
 
-  const hataTipleri = [
-    { id: "atlama", label: "Atlama", renk: "bg-red-100 text-red-700 border-red-300", aciklama: "Kelime/satır atladı" },
-    { id: "yanlis_okuma", label: "Yanlış Okuma", renk: "bg-orange-100 text-orange-700 border-orange-300", aciklama: "Kelimeyi farklı okudu" },
-    { id: "takilma", label: "Takılma", renk: "bg-yellow-100 text-yellow-700 border-yellow-300", aciklama: "Kelimede duraksadı" },
-    { id: "tekrar", label: "Tekrar", renk: "bg-purple-100 text-purple-700 border-purple-300", aciklama: "Aynı kelimeyi tekrar okudu" },
-  ];
+  // Rapor form state (öğretmen için)
+  const [anlama, setAnlama] = useState({
+    cumle_anlama:"orta", bilinmeyen_sozcuk:"orta", baglac_zamir:"orta",
+    ana_fikir:"orta", yardimci_fikir:"orta", konu:"orta", baslik_onerme:"orta",
+    neden_sonuc:"orta", cikarim:"orta", ipuclari:"orta", yorumlama:"orta",
+    gorus_bildirme:"orta", yazar_amaci:"orta", alternatif_fikir:"orta", guncelle_hayat:"orta",
+    bilgi:"iyi", kavrama:"iyi", uygulama:"iyi", analiz:"iyi", sentez:"iyi", degerlendirme:"iyi",
+    genel_yuzde: 0,
+  });
+  const [prozodik, setProzodik] = useState({ noktalama:3, vurgu:3, tonlama:3, akicilik:3, anlamli_gruplama:3 });
+  const [ogretmenNotu, setOgretmenNotu] = useState("");
+  const [kurKarari, setKurKarari] = useState("");
+  const [raporAdim, setRaporAdim] = useState(0); // 0=analiz, 1=anlama, 2=prozodik, 3=kur+bitir
 
-  const hataSay = (tip) => hatalar.filter(h => h.tip === tip).length;
+  useEffect(() => () => clearInterval(intervalRef.current), []);
 
   const toggleSayac = () => {
-    if (calisıyor) {
-      clearInterval(intervalRef.current);
-      setCalisıyor(false);
-    } else {
-      intervalRef.current = setInterval(() => setSure(s => s + 1), 1000);
-      setCalisıyor(true);
-    }
+    if (calisıyor) { clearInterval(intervalRef.current); setCalisıyor(false); }
+    else { intervalRef.current = setInterval(() => setSure(s => s + 1), 1000); setCalisıyor(true); }
   };
 
-  const hataEkle = (tip) => {
-    setHatalar(prev => [...prev, { tip, kelime: "" }]);
+  const hataEkle = (tip) => setHatalar(h => [...h, { tip, kelime: "" }]);
+  const hataGeriAl = (tip) => setHatalar(h => { const idx = [...h].map(x=>x.tip).lastIndexOf(tip); return idx>=0 ? [...h.slice(0,idx), ...h.slice(idx+1)] : h; });
+  const hataSay = (tip) => hatalar.filter(h => h.tip === tip).length;
+
+  const formatSure = (s) => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+  const prozodikToplam = Object.values(prozodik).reduce((a,b) => a+b, 0);
+
+  const isOgretmen = user?.role === "admin" || user?.role === "teacher";
+
+  const tamamla = () => {
+    if (sure === 0) return;
+    clearInterval(intervalRef.current);
+    setCalisıyor(false);
+    onTamamla({ sure_saniye: sure, hatalar, gozlem_notu: gozlemNotu, anlama, prozodik, ogretmen_notu: ogretmenNotu, ogretmen_kur: kurKarari });
   };
 
-  const hataGeriAl = (tip) => {
-    setHatalar(prev => {
-      const idx = prev.map(h => h.tip).lastIndexOf(tip);
-      if (idx === -1) return prev;
-      return [...prev.slice(0, idx), ...prev.slice(idx + 1)];
-    });
+  const hataRenk = { atlama:"bg-red-100 text-red-700 border-red-200", yanlis_okuma:"bg-orange-100 text-orange-700 border-orange-200", takilma:"bg-yellow-100 text-yellow-700 border-yellow-200", tekrar:"bg-purple-100 text-purple-700 border-purple-200" };
+  const hataTipler = [
+    { tip:"atlama", etiket:"Atlama" },
+    { tip:"yanlis_okuma", etiket:"Yanlış Okuma" },
+    { tip:"takilma", etiket:"Takılma" },
+    { tip:"tekrar", etiket:"Tekrar" },
+  ];
+
+  const SeviyeSecici = ({ alan, etiket, state, setState }) => {
+    const sevRenk = { zayif:"border-red-300 bg-red-50 text-red-700", orta:"border-yellow-300 bg-yellow-50 text-yellow-700", iyi:"border-green-300 bg-green-50 text-green-700" };
+    return (
+      <div className="flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0">
+        <span className="text-xs text-gray-700 flex-1">{etiket}</span>
+        <div className="flex gap-1">
+          {["zayif","orta","iyi"].map(s => (
+            <button key={s} onClick={() => setState({...state, [alan]: s})}
+              className={`px-2 py-0.5 rounded text-xs border transition-all ${state[alan]===s ? sevRenk[s] : 'border-gray-200 text-gray-400 hover:bg-gray-50'}`}>
+              {s==="zayif"?"Zayıf":s==="orta"?"Orta":"İyi"}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
   };
 
-  const formatSure = (s) => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
-
-  React.useEffect(() => {
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, []);
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* Sol: Metin */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center justify-between">
-            <span>📖 {metin.baslik}</span>
-            <span className="text-xs text-gray-500 font-normal">{metin.kelime_sayisi} kelime • {metin.sinif_seviyesi}. Sınıf</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 font-serif text-base leading-8 max-h-80 overflow-y-auto">
+  // ── ÖĞRENCİ: Tam ekran metin ──
+  if (!isOgretmen) {
+    return (
+      <div className="fixed inset-0 bg-amber-50 z-50 overflow-auto">
+        <div className="max-w-3xl mx-auto p-8">
+          <div className="text-center mb-6">
+            <h2 className="text-2xl font-bold text-gray-800">{metin.baslik}</h2>
+            <p className="text-sm text-gray-500">{metin.sinif_seviyesi}. Sınıf • {metin.kelime_sayisi} kelime</p>
+          </div>
+          <div className="bg-white rounded-2xl shadow-sm p-8 font-serif text-lg leading-loose text-gray-800 whitespace-pre-wrap">
             {metin.icerik}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
+    );
+  }
 
-      {/* Sağ: Kontrol Paneli */}
-      <div className="space-y-4">
-        {/* Öğrenci + Süre */}
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <div className="font-semibold text-lg">{ogrenci.ad} {ogrenci.soyad}</div>
-                <div className="text-sm text-gray-500">{ogrenci.sinif} • {ogrenci.kur || 'Kur atanmamış'}</div>
-              </div>
-              <div className="text-right">
-                <div className="text-4xl font-bold font-mono text-gray-800">{formatSure(sure)}</div>
-                <div className="text-xs text-gray-400 mt-1">süre</div>
-              </div>
-            </div>
-            <Button onClick={toggleSayac}
-              className={`w-full py-3 text-lg font-bold ${calisıyor ? 'bg-red-500 hover:bg-red-600' : 'bg-green-600 hover:bg-green-700'} text-white`}>
-              {calisıyor ? '⏸ DURDUR' : sure === 0 ? '▶ BAŞLAT' : '▶ DEVAM'}
-            </Button>
-          </CardContent>
-        </Card>
+  // ── ÖĞRETMEN/ADMİN: Bölünmüş ekran ──
+  return (
+    <div className="fixed inset-0 bg-gray-100 z-50 flex flex-col overflow-hidden">
+      {/* Üst bar */}
+      <div className="bg-white border-b px-4 py-2 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-4">
+          <span className="font-semibold text-gray-800">{ogrenci.ad} {ogrenci.soyad}</span>
+          <span className="text-sm text-gray-500">{metin.baslik} • {metin.kelime_sayisi} kelime</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="text-3xl font-mono font-bold text-gray-800 tabular-nums">{formatSure(sure)}</div>
+          <button onClick={toggleSayac}
+            className={`px-4 py-2 rounded-xl text-white font-medium transition-all ${calisıyor ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}>
+            {calisıyor ? "⏸ Durdur" : "▶ Başlat"}
+          </button>
+        </div>
+      </div>
 
-        {/* Hata İşaretleme */}
-        <Card className="border-0 shadow-sm">
-          <CardHeader className="pb-2"><CardTitle className="text-base">Hata İşaretleme</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            {hataTipleri.map(h => (
-              <div key={h.id} className="flex items-center justify-between">
-                <div>
-                  <span className={`inline-block px-3 py-1 rounded-lg text-sm font-medium border ${h.renk}`}>{h.label}</span>
-                  <span className="text-xs text-gray-400 ml-2">{h.aciklama}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => hataGeriAl(h.id)}
-                    className="w-8 h-8 rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-100 font-bold">−</button>
-                  <span className="w-8 text-center font-bold text-lg">{hataSay(h.id)}</span>
-                  <button onClick={() => hataEkle(h.id)}
-                    className="w-8 h-8 rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-100 font-bold">+</button>
-                </div>
-              </div>
+      {/* Ana içerik: sol metin, sağ panel */}
+      <div className="flex flex-1 overflow-hidden">
+
+        {/* Sol: Metin */}
+        <div className="flex-1 overflow-y-auto bg-amber-50 p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4 text-center">{metin.baslik}</h3>
+          <div className="font-serif text-base leading-loose text-gray-800 whitespace-pre-wrap max-w-xl mx-auto">
+            {metin.icerik}
+          </div>
+        </div>
+
+        {/* Sağ panel: sekmeli form */}
+        <div className="w-96 bg-white border-l overflow-y-auto flex flex-col">
+          {/* Adım sekmeleri */}
+          <div className="flex border-b shrink-0">
+            {["Hata Takibi","Anlama","Prozodik","Kur & Bitir"].map((label, i) => (
+              <button key={i} onClick={() => setRaporAdim(i)}
+                className={`flex-1 py-2 text-xs font-medium transition-all ${raporAdim===i ? 'border-b-2 border-orange-500 text-orange-600' : 'text-gray-400 hover:text-gray-600'}`}>
+                {label}
+              </button>
             ))}
-            <div className="border-t pt-2 flex justify-between text-sm font-semibold">
-              <span>Toplam Hata:</span>
-              <span className="text-red-600">{hatalar.length}</span>
-            </div>
-          </CardContent>
-        </Card>
+          </div>
 
-        {/* Gözlem Notu */}
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4">
-            <Label>Gözlem Notu</Label>
-            <textarea value={gozlemNotu} onChange={e => setGozlemNotu(e.target.value)} rows={3}
-              placeholder="Öğrenci hakkında gözlemleriniz..."
-              className="w-full mt-1 border border-gray-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none" />
-          </CardContent>
-        </Card>
+          <div className="flex-1 overflow-y-auto p-4">
 
-        <Button onClick={() => onTamamla({ sure_saniye: sure, hatalar, gozlem_notu: gozlemNotu })}
-          disabled={sure === 0}
-          className="w-full py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold text-base">
-          ✅ Analizi Tamamla
-        </Button>
+            {/* Adım 0: Hata Takibi */}
+            {raporAdim === 0 && (
+              <div className="space-y-3">
+                {hataTipler.map(({tip, etiket}) => (
+                  <div key={tip} className={`flex items-center justify-between p-3 rounded-xl border ${hataRenk[tip]}`}>
+                    <span className="font-medium text-sm">{etiket}</span>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => hataGeriAl(tip)} className="w-7 h-7 rounded-lg bg-white/60 font-bold text-sm hover:bg-white">−</button>
+                      <span className="w-8 text-center font-bold text-lg tabular-nums">{hataSay(tip)}</span>
+                      <button onClick={() => hataEkle(tip)} className="w-7 h-7 rounded-lg bg-white/60 font-bold text-sm hover:bg-white">+</button>
+                    </div>
+                  </div>
+                ))}
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Gözlem Notu</label>
+                  <textarea value={gozlemNotu} onChange={e => setGozlemNotu(e.target.value)} rows={3}
+                    className="w-full mt-1 border border-gray-200 rounded-xl p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                </div>
+              </div>
+            )}
+
+            {/* Adım 1: Anlama */}
+            {raporAdim === 1 && (
+              <div className="space-y-3">
+                {[
+                  ["4.1 Sözcük Düzeyi", [["cumle_anlama","Cümle anlamı"],["bilinmeyen_sozcuk","Bilinmeyen sözcük"],["baglac_zamir","Bağlaç/zamir"]]],
+                  ["4.2 Ana Yapı", [["ana_fikir","Ana fikir"],["yardimci_fikir","Yardımcı fikir"],["konu","Konu"],["baslik_onerme","Başlık önerme"]]],
+                  ["4.3 Derin Anlama", [["neden_sonuc","Neden-sonuç"],["cikarim","Çıkarım"],["ipuclari","İpuçları"],["yorumlama","Yorumlama"]]],
+                  ["4.4 Eleştirel", [["gorus_bildirme","Görüş bildirme"],["yazar_amaci","Yazar amacı"],["alternatif_fikir","Alternatif fikir"],["guncelle_hayat","Günlük hayat"]]],
+                  ["4.5 Soru Performansı", [["bilgi","Bilgi"],["kavrama","Kavrama"],["uygulama","Uygulama"],["analiz","Analiz"],["sentez","Sentez"],["degerlendirme","Değerlendirme"]]],
+                ].map(([baslik, alanlar]) => (
+                  <div key={baslik}>
+                    <div className="text-xs font-semibold text-gray-500 bg-gray-50 px-2 py-1 rounded mb-1">{baslik}</div>
+                    {alanlar.map(([alan, etiket]) => (
+                      <SeviyeSecici key={alan} alan={alan} etiket={etiket} state={anlama} setState={setAnlama} />
+                    ))}
+                  </div>
+                ))}
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
+                  <label className="text-xs font-medium text-blue-700">Genel Anlama % (0 = otomatik)</label>
+                  <input type="number" min="0" max="100" value={anlama.genel_yuzde}
+                    onChange={e => setAnlama({...anlama, genel_yuzde: parseInt(e.target.value)||0})}
+                    className="w-full mt-1 border border-blue-200 rounded-lg p-2 text-center text-lg font-bold focus:outline-none" />
+                </div>
+              </div>
+            )}
+
+            {/* Adım 2: Prozodik */}
+            {raporAdim === 2 && (
+              <div className="space-y-3">
+                {[
+                  ["noktalama","Noktalama/Duraklama",["Uymuyor","Kısmen","Çoğunlukla","Tam/bilinçli"]],
+                  ["vurgu","Vurgu",["Tek düze","Yer yer","Anlama uygun","Etkili/bilinçli"]],
+                  ["tonlama","Tonlama",["Monoton","Sınırlı","Metne uygun","Doğal/etkileyici"]],
+                  ["akicilik","Akıcılık",["Sık duraklama","Kısmi akış","Genel akıcı","Kesintisiz"]],
+                  ["anlamli_gruplama","Anlamlı Gruplama",["Sözcük sözcük","Kısmen","Çoğunlukla","Tam/tutarlı"]],
+                ].map(([alan, etiket, aciklamalar]) => (
+                  <div key={alan} className="border border-gray-100 rounded-xl p-3">
+                    <div className="text-xs font-semibold text-gray-700 mb-2">{etiket}</div>
+                    <div className="grid grid-cols-4 gap-1">
+                      {[1,2,3,4].map(p => (
+                        <button key={p} onClick={() => setProzodik({...prozodik, [alan]: p})}
+                          className={`p-1.5 rounded-lg text-xs border text-center transition-all ${prozodik[alan]===p ? 'border-orange-400 bg-orange-50 text-orange-700 font-bold' : 'border-gray-200 text-gray-400 hover:bg-gray-50'}`}>
+                          <div className="font-bold">{p}</div>
+                          <div className="text-[10px] leading-tight">{aciklamalar[p-1]}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-center">
+                  <div className="text-sm text-orange-700 font-medium">Toplam: <span className="text-2xl font-bold">{prozodikToplam}</span>/20</div>
+                </div>
+              </div>
+            )}
+
+            {/* Adım 3: Kur & Bitir */}
+            {raporAdim === 3 && (
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Öğretmen Notu</label>
+                  <textarea value={ogretmenNotu} onChange={e => setOgretmenNotu(e.target.value)} rows={4}
+                    placeholder="Genel değerlendirme ve öneriler..."
+                    className="w-full mt-1 border border-gray-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Kur Kararı</label>
+                  <div className="grid grid-cols-3 gap-2 mt-2">
+                    {["Kur 1","Kur 2","Kur 3"].map(k => (
+                      <button key={k} onClick={() => setKurKarari(k)}
+                        className={`py-3 rounded-xl border-2 font-bold text-sm transition-all ${kurKarari===k ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-500 hover:border-orange-300'}`}>
+                        {k}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="text-xs text-gray-500 bg-gray-50 rounded-xl p-3 space-y-1">
+                  <div>⏱ Süre: <strong>{formatSure(sure)}</strong></div>
+                  <div>❌ Toplam hata: <strong>{hatalar.length}</strong></div>
+                  <div>📊 Prozodik: <strong>{prozodikToplam}/20</strong></div>
+                </div>
+                <button onClick={tamamla} disabled={sure===0 || !kurKarari}
+                  className="w-full py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-all">
+                  {sure===0 ? "Önce süre sayacını başlatın" : !kurKarari ? "Kur kararı seçin" : "✅ Analizi Tamamla ve Raporu Oluştur"}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Alt navigasyon */}
+          <div className="flex border-t p-3 gap-2 shrink-0">
+            <button onClick={() => setRaporAdim(a => Math.max(0, a-1))} disabled={raporAdim===0}
+              className="flex-1 py-2 text-sm border border-gray-200 rounded-xl disabled:opacity-30 hover:bg-gray-50">← Geri</button>
+            <button onClick={() => setRaporAdim(a => Math.min(3, a+1))} disabled={raporAdim===3}
+              className="flex-1 py-2 text-sm bg-orange-500 text-white rounded-xl disabled:opacity-30 hover:bg-orange-600">İleri →</button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1703,11 +1827,31 @@ function GirisAnaliziModul({ user, students, teachers }) {
   };
 
   const analiziTamamla = async (veri) => {
+    // veri: { sure_saniye, hatalar, gozlem_notu, anlama, prozodik, ogretmen_notu, ogretmen_kur }
     try {
-      const r = await axios.post(`${API}/diagnostic/sessions/${aktifOturumId}/complete`, veri);
-      setSonuc(r.data);
-      setAdim("sonuc");
-    } catch(e) { console.error('Session error:', e.response?.data); toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
+      const r = await axios.post(`${API}/diagnostic/sessions/${aktifOturumId}/complete`, {
+        sure_saniye: veri.sure_saniye,
+        hatalar: veri.hatalar,
+        gozlem_notu: veri.gozlem_notu,
+        ogretmen_kur: veri.ogretmen_kur,
+      });
+      setSonuc({ ...r.data, atanan_kur: veri.ogretmen_kur });
+      fetchGecmis();
+      if (veri.anlama && veri.prozodik) {
+        try {
+          const rRapor = await axios.post(`${API}/diagnostic/rapor`, {
+            oturum_id: aktifOturumId,
+            anlama: veri.anlama,
+            prozodik: veri.prozodik,
+            ogretmen_notu: veri.ogretmen_notu || "",
+          });
+          setAktifRapor(rRapor.data);
+          setAdim("rapor-goruntule");
+        } catch(e2) { setAdim("sonuc"); }
+      } else { setAdim("sonuc"); }
+    } catch(e) {
+      toast({ title: "Hata", description: e.response?.data?.detail || "Analiz tamamlanamadı", variant: "destructive" });
+    }
   };
 
   const kurOnayla = async (ogretmenKur) => {
@@ -1738,7 +1882,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
           <Button variant="outline" size="sm" onClick={() => { setAdim("liste"); setAktifOturumId(null); }}>← Geri</Button>
           <h2 className="text-xl font-bold">Canlı Analiz</h2>
         </div>
-        <CanlıAnalizEkrani ogrenci={seciliOgrenci} metin={seciliMetin} oturumId={aktifOturumId} onTamamla={analiziTamamla} />
+        <CanlıAnalizEkrani ogrenci={seciliOgrenci} metin={seciliMetin} oturumId={aktifOturumId} onTamamla={analiziTamamla} user={user} />
       </div>
     );
   }
