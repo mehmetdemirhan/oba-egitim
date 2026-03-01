@@ -726,6 +726,321 @@ async def get_export_data():
 async def backup_to_google_drive(backup_data: dict):
     return {"success": True, "message": "Data queued for Google Drive backup", "backup_id": str(uuid.uuid4())}
 
+
+# ─────────────────────────────────────────────
+# GİRİŞ ANALİZİ (FAZ 1A)
+# ─────────────────────────────────────────────
+
+# Varsayılan norm tablosu (admin değiştirebilir)
+VARSAYILAN_NORMLAR = {
+    "1": {"dusuk": 25, "orta": 40, "yeterli": 60},
+    "2": {"dusuk": 55, "orta": 75, "yeterli": 95},
+    "3": {"dusuk": 65, "orta": 90, "yeterli": 115},
+    "4": {"dusuk": 80, "orta": 110, "yeterli": 140},
+    "5": {"dusuk": 90, "orta": 120, "yeterli": 150},
+    "6": {"dusuk": 100, "orta": 135, "yeterli": 170},
+    "7": {"dusuk": 110, "orta": 150, "yeterli": 185},
+    "8": {"dusuk": 120, "orta": 160, "yeterli": 200},
+}
+
+async def get_norm_tablosu():
+    doc = await db.sistem_ayarlari.find_one({"tip": "okuma_hizi_normlari"})
+    if doc:
+        return doc.get("normlar", VARSAYILAN_NORMLAR)
+    return VARSAYILAN_NORMLAR
+
+async def hiz_degerlendirme(sinif: str, wpm: float) -> str:
+    normlar = await get_norm_tablosu()
+    sinif_no = sinif.replace("-", "").replace(".", "").strip()[:1]
+    n = normlar.get(sinif_no, normlar.get("4", VARSAYILAN_NORMLAR["4"]))
+    if wpm <= n["dusuk"]:
+        return "dusuk"
+    elif wpm <= n["orta"]:
+        return "orta"
+    elif wpm <= n["yeterli"]:
+        return "yeterli"
+    else:
+        return "ileri"
+
+async def kur_onerisi_hesapla(wpm: float, dogruluk: float, sinif: str) -> str:
+    hiz = await hiz_degerlendirme(sinif, wpm)
+    if dogruluk >= 97 and hiz in ("yeterli", "ileri"):
+        return "Kur 3"
+    elif dogruluk >= 93 and hiz in ("orta", "yeterli", "ileri"):
+        return "Kur 2"
+    else:
+        return "Kur 1"
+
+# ── Norm Tablosu Yönetimi ──
+class NormGuncelle(BaseModel):
+    normlar: dict  # {"1": {"dusuk": 25, "orta": 40, "yeterli": 60}, ...}
+
+@api_router.get("/diagnostic/normlar")
+async def get_normlar(current_user=Depends(get_current_user)):
+    return await get_norm_tablosu()
+
+@api_router.put("/diagnostic/normlar")
+async def update_normlar(data: NormGuncelle, current_user=Depends(require_role(UserRole.ADMIN))):
+    await db.sistem_ayarlari.update_one(
+        {"tip": "okuma_hizi_normlari"},
+        {"$set": {"tip": "okuma_hizi_normlari", "normlar": data.normlar}},
+        upsert=True
+    )
+    return {"message": "Norm tablosu güncellendi", "normlar": data.normlar}
+
+# ── Analiz Metinleri (Moderasyon Akışlı) ──
+class AnalizMetinCreate(BaseModel):
+    baslik: str
+    icerik: str
+    kelime_sayisi: int
+    sinif_seviyesi: str
+    tur: str = "hikaye"  # hikaye, bilgilendirici, siir
+
+class AnalizMetin(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    baslik: str
+    icerik: str
+    kelime_sayisi: int
+    sinif_seviyesi: str
+    tur: str = "hikaye"
+    ekleyen_id: str = ""
+    ekleyen_ad: str = ""
+    durum: str = "beklemede"  # beklemede, oylama, havuzda, reddedildi
+    oylar: dict = Field(default_factory=dict)  # {user_id: {"onay": True/False, "sebep": ""}}
+    olusturma_tarihi: datetime = Field(default_factory=datetime.utcnow)
+    yayin_tarihi: Optional[datetime] = None
+
+class MetinOyCreate(BaseModel):
+    metin_id: str
+    onay: bool
+    sebep: str = ""
+
+@api_router.post("/diagnostic/texts")
+async def create_metin(metin: AnalizMetinCreate, current_user=Depends(get_current_user)):
+    role = current_user.get("role", "")
+    if role not in ["admin", "teacher"]:
+        raise HTTPException(status_code=403, detail="Yetkisiz")
+    # Kelime sayısını otomatik hesapla
+    ks = len(metin.icerik.strip().split()) if metin.icerik else metin.kelime_sayisi
+    # Admin eklerse direkt oylama, öğretmen eklerse beklemede
+    durum = "oylama" if role == "admin" else "beklemede"
+    model = AnalizMetin(
+        **{**metin.dict(), "kelime_sayisi": ks},
+        ekleyen_id=current_user["id"],
+        ekleyen_ad=f"{current_user.get('ad','')} {current_user.get('soyad','')}",
+        durum=durum
+    )
+    data = model.dict()
+    data["olusturma_tarihi"] = data["olusturma_tarihi"].isoformat()
+    data["yayin_tarihi"] = None
+    await db.analiz_metinler.insert_one(data)
+    # Metin ekleme katkı puanı: +5
+    await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": 5}})
+    return data
+
+@api_router.get("/diagnostic/texts")
+async def get_metinler(current_user=Depends(get_current_user)):
+    role = current_user.get("role", "")
+    user_id = current_user.get("id", "")
+    items = await db.analiz_metinler.find().sort("olusturma_tarihi", -1).to_list(length=None)
+    result = []
+    for item in items:
+        item.pop("_id", None)
+        durum = item.get("durum", "")
+        if role == "admin":
+            result.append(item)
+        elif role == "teacher":
+            # Kendi eklediği + oylama bekleyenler + havuzdakiler
+            if item.get("ekleyen_id") == user_id or durum in ("oylama", "havuzda"):
+                result.append(item)
+        else:
+            if durum == "havuzda":
+                result.append(item)
+    return result
+
+@api_router.post("/diagnostic/texts/{metin_id}/admin-karar")
+async def metin_admin_karar(metin_id: str, karar: dict, current_user=Depends(require_role(UserRole.ADMIN))):
+    onay = karar.get("onay", False)
+    yeni_durum = "oylama" if onay else "reddedildi"
+    await db.analiz_metinler.update_one({"id": metin_id}, {"$set": {"durum": yeni_durum}})
+    return {"durum": yeni_durum}
+
+@api_router.post("/diagnostic/texts/oy")
+async def metin_oy_ver(oy: MetinOyCreate, current_user=Depends(get_current_user)):
+    role = current_user.get("role", "")
+    if role not in ["admin", "teacher"]:
+        raise HTTPException(status_code=403, detail="Sadece öğretmenler oy verebilir")
+    if not oy.onay and not oy.sebep:
+        raise HTTPException(status_code=400, detail="Red için sebep belirtmelisiniz")
+    metin = await db.analiz_metinler.find_one({"id": oy.metin_id})
+    if not metin:
+        raise HTTPException(status_code=404, detail="Metin bulunamadı")
+    if metin.get("durum") != "oylama":
+        raise HTTPException(status_code=400, detail="Bu metin oylamada değil")
+    user_id = current_user["id"]
+    oylar = metin.get("oylar", {})
+    if user_id in oylar:
+        raise HTTPException(status_code=400, detail="Zaten oy kullandınız")
+    oylar[user_id] = {"onay": oy.onay, "sebep": oy.sebep}
+    await db.analiz_metinler.update_one({"id": oy.metin_id}, {"$set": {"oylar": oylar}})
+    # Oy veren öğretmene +2 puan
+    await db.users.update_one({"id": user_id}, {"$inc": {"puan": 2}})
+    # %60 kontrolü
+    ogretmenler = await db.users.find({"role": {"$in": ["teacher", "admin"]}}).to_list(length=None)
+    toplam = len(ogretmenler)
+    onay_sayisi = sum(1 for v in oylar.values() if v.get("onay"))
+    oy_sayisi = len(oylar)
+    yeni_durum = metin.get("durum")
+    if toplam > 0:
+        onay_orani = onay_sayisi / toplam
+        if onay_orani >= 0.6:
+            yeni_durum = "havuzda"
+            await db.analiz_metinler.update_one(
+                {"id": oy.metin_id},
+                {"$set": {"durum": "havuzda", "yayin_tarihi": datetime.utcnow().isoformat()}}
+            )
+            # Metni ekleyene +10 bonus puan (havuza girince)
+            ekleyen_id = metin.get("ekleyen_id")
+            if ekleyen_id:
+                await db.users.update_one({"id": ekleyen_id}, {"$inc": {"puan": 10}})
+        elif oy_sayisi == toplam and onay_orani < 0.6:
+            yeni_durum = "reddedildi"
+            await db.analiz_metinler.update_one({"id": oy.metin_id}, {"$set": {"durum": "reddedildi"}})
+    return {
+        "mesaj": "Oyunuz kaydedildi (+2 puan)",
+        "durum": yeni_durum,
+        "onay_orani": round(onay_sayisi / max(toplam, 1) * 100),
+        "oy_sayisi": oy_sayisi,
+        "toplam": toplam
+    }
+
+@api_router.delete("/diagnostic/texts/{metin_id}")
+async def delete_metin(metin_id: str, current_user=Depends(require_role(UserRole.ADMIN))):
+    await db.analiz_metinler.delete_one({"id": metin_id})
+    return {"message": "Silindi"}
+
+# ── Analiz Oturumları ──
+class HataKaydi(BaseModel):
+    tip: str  # atlama, yanlis_okuma, takilma, tekrar
+    kelime: str = ""
+
+class AnalizOturumBaslat(BaseModel):
+    ogrenci_id: str
+    metin_id: str
+
+class AnalizTamamla(BaseModel):
+    sure_saniye: float
+    hatalar: List[HataKaydi]
+    gozlem_notu: str = ""
+    ogretmen_kur: str = ""
+
+class DiagnosticOturum(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    ogrenci_id: str
+    metin_id: str
+    ogretmen_id: str
+    durum: str = "devam"
+    sure_saniye: float = 0
+    hatalar: List[dict] = []
+    gozlem_notu: str = ""
+    wpm: float = 0
+    dogruluk_yuzde: float = 0
+    hiz_deger: str = ""
+    sistem_kur: str = ""
+    ogretmen_kur: str = ""
+    olusturma_tarihi: datetime = Field(default_factory=datetime.utcnow)
+    tamamlama_tarihi: Optional[datetime] = None
+
+@api_router.post("/diagnostic/sessions")
+async def baslat_oturum(data: AnalizOturumBaslat, current_user=Depends(get_current_user)):
+    if current_user.get("role") not in ["admin", "teacher"]:
+        raise HTTPException(status_code=403, detail="Yetkisiz")
+    metin = await db.analiz_metinler.find_one({"id": data.metin_id})
+    if not metin:
+        raise HTTPException(status_code=404, detail="Metin bulunamadı")
+    oturum = DiagnosticOturum(
+        ogrenci_id=data.ogrenci_id,
+        metin_id=data.metin_id,
+        ogretmen_id=current_user["id"]
+    )
+    d = oturum.dict()
+    d["olusturma_tarihi"] = d["olusturma_tarihi"].isoformat()
+    d["tamamlama_tarihi"] = None
+    await db.diagnostic_oturumlar.insert_one(d)
+    return d
+
+@api_router.get("/diagnostic/sessions")
+async def get_oturumlar(current_user=Depends(get_current_user)):
+    q = {}
+    if current_user.get("role") == "teacher":
+        q["ogretmen_id"] = current_user["id"]
+    items = await db.diagnostic_oturumlar.find(q).sort("olusturma_tarihi", -1).to_list(length=None)
+    for i in items: i.pop("_id", None)
+    return items
+
+@api_router.get("/diagnostic/sessions/student/{ogrenci_id}")
+async def get_ogrenci_oturumlari(ogrenci_id: str, current_user=Depends(get_current_user)):
+    items = await db.diagnostic_oturumlar.find({"ogrenci_id": ogrenci_id}).sort("olusturma_tarihi", -1).to_list(length=None)
+    for i in items: i.pop("_id", None)
+    return items
+
+@api_router.post("/diagnostic/sessions/{oturum_id}/complete")
+async def tamamla_oturum(oturum_id: str, data: AnalizTamamla, current_user=Depends(get_current_user)):
+    oturum = await db.diagnostic_oturumlar.find_one({"id": oturum_id})
+    if not oturum:
+        raise HTTPException(status_code=404, detail="Oturum bulunamadı")
+
+    metin = await db.analiz_metinler.find_one({"id": oturum["metin_id"]})
+    kelime_sayisi = metin.get("kelime_sayisi", 100) if metin else 100
+    sinif_seviyesi = metin.get("sinif_seviyesi", "4") if metin else "4"
+
+    # Hesaplamalar
+    sure_dakika = data.sure_saniye / 60 if data.sure_saniye > 0 else 1
+    wpm = round(kelime_sayisi / sure_dakika, 1)
+
+    toplam_hata = len(data.hatalar)
+    dogruluk = round(max(0, (kelime_sayisi - toplam_hata) / kelime_sayisi * 100), 1)
+
+    hiz_deger = await hiz_degerlendirme(sinif_seviyesi, wpm)
+    sistem_kur = await kur_onerisi_hesapla(wpm, dogruluk, sinif_seviyesi)
+    atanan_kur = data.ogretmen_kur if data.ogretmen_kur else sistem_kur
+
+    # Hata dağılımı
+    hata_sayilari = {"atlama": 0, "yanlis_okuma": 0, "takilma": 0, "tekrar": 0}
+    for h in data.hatalar:
+        tip = h.tip if hasattr(h, "tip") else h.get("tip", "")
+        if tip in hata_sayilari:
+            hata_sayilari[tip] += 1
+
+    now = datetime.utcnow().isoformat()
+    guncelle = {
+        "durum": "tamamlandi",
+        "sure_saniye": data.sure_saniye,
+        "hatalar": [h.dict() if hasattr(h, "dict") else h for h in data.hatalar],
+        "gozlem_notu": data.gozlem_notu,
+        "wpm": wpm,
+        "dogruluk_yuzde": dogruluk,
+        "hiz_deger": hiz_deger,
+        "sistem_kur": sistem_kur,
+        "ogretmen_kur": atanan_kur,
+        "tamamlama_tarihi": now
+    }
+    await db.diagnostic_oturumlar.update_one({"id": oturum_id}, {"$set": guncelle})
+
+    # Öğrencinin kurunu güncelle
+    await db.students.update_one({"id": oturum["ogrenci_id"]}, {"$set": {"kur": atanan_kur}})
+
+    return {
+        "wpm": wpm,
+        "dogruluk_yuzde": dogruluk,
+        "hiz_deger": hiz_deger,
+        "sistem_kur": sistem_kur,
+        "atanan_kur": atanan_kur,
+        "hata_sayilari": hata_sayilari,
+        "sure_saniye": data.sure_saniye
+    }
+
+
 # ─────────────────────────────────────────────
 # GELİŞİM ALANI
 # ─────────────────────────────────────────────
@@ -852,6 +1167,321 @@ async def get_puan_tablosu(current_user=Depends(get_current_user)):
         tablo.append({"ad": u.get('ad',''), "soyad": u.get('soyad',''), "role": u.get('role',''), "puan": u.get('puan', 0)})
     tablo.sort(key=lambda x: x['puan'], reverse=True)
     return tablo
+
+
+
+# ─────────────────────────────────────────────
+# GİRİŞ ANALİZİ (FAZ 1A)
+# ─────────────────────────────────────────────
+
+# Varsayılan norm tablosu (admin değiştirebilir)
+VARSAYILAN_NORMLAR = {
+    "1": {"dusuk": 25, "orta": 40, "yeterli": 60},
+    "2": {"dusuk": 55, "orta": 75, "yeterli": 95},
+    "3": {"dusuk": 65, "orta": 90, "yeterli": 115},
+    "4": {"dusuk": 80, "orta": 110, "yeterli": 140},
+    "5": {"dusuk": 90, "orta": 120, "yeterli": 150},
+    "6": {"dusuk": 100, "orta": 135, "yeterli": 170},
+    "7": {"dusuk": 110, "orta": 150, "yeterli": 185},
+    "8": {"dusuk": 120, "orta": 160, "yeterli": 200},
+}
+
+async def get_norm_tablosu():
+    doc = await db.sistem_ayarlari.find_one({"tip": "okuma_hizi_normlari"})
+    if doc:
+        return doc.get("normlar", VARSAYILAN_NORMLAR)
+    return VARSAYILAN_NORMLAR
+
+async def hiz_degerlendirme(sinif: str, wpm: float) -> str:
+    normlar = await get_norm_tablosu()
+    sinif_no = sinif.replace("-", "").replace(".", "").strip()[:1]
+    n = normlar.get(sinif_no, normlar.get("4", VARSAYILAN_NORMLAR["4"]))
+    if wpm <= n["dusuk"]:
+        return "dusuk"
+    elif wpm <= n["orta"]:
+        return "orta"
+    elif wpm <= n["yeterli"]:
+        return "yeterli"
+    else:
+        return "ileri"
+
+async def kur_onerisi_hesapla(wpm: float, dogruluk: float, sinif: str) -> str:
+    hiz = await hiz_degerlendirme(sinif, wpm)
+    if dogruluk >= 97 and hiz in ("yeterli", "ileri"):
+        return "Kur 3"
+    elif dogruluk >= 93 and hiz in ("orta", "yeterli", "ileri"):
+        return "Kur 2"
+    else:
+        return "Kur 1"
+
+# ── Norm Tablosu Yönetimi ──
+class NormGuncelle(BaseModel):
+    normlar: dict  # {"1": {"dusuk": 25, "orta": 40, "yeterli": 60}, ...}
+
+@api_router.get("/diagnostic/normlar")
+async def get_normlar(current_user=Depends(get_current_user)):
+    return await get_norm_tablosu()
+
+@api_router.put("/diagnostic/normlar")
+async def update_normlar(data: NormGuncelle, current_user=Depends(require_role(UserRole.ADMIN))):
+    await db.sistem_ayarlari.update_one(
+        {"tip": "okuma_hizi_normlari"},
+        {"$set": {"tip": "okuma_hizi_normlari", "normlar": data.normlar}},
+        upsert=True
+    )
+    return {"message": "Norm tablosu güncellendi", "normlar": data.normlar}
+
+# ── Analiz Metinleri (Moderasyon Akışlı) ──
+class AnalizMetinCreate(BaseModel):
+    baslik: str
+    icerik: str
+    kelime_sayisi: int
+    sinif_seviyesi: str
+    tur: str = "hikaye"  # hikaye, bilgilendirici, siir
+
+class AnalizMetin(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    baslik: str
+    icerik: str
+    kelime_sayisi: int
+    sinif_seviyesi: str
+    tur: str = "hikaye"
+    ekleyen_id: str = ""
+    ekleyen_ad: str = ""
+    durum: str = "beklemede"  # beklemede, oylama, havuzda, reddedildi
+    oylar: dict = Field(default_factory=dict)  # {user_id: {"onay": True/False, "sebep": ""}}
+    olusturma_tarihi: datetime = Field(default_factory=datetime.utcnow)
+    yayin_tarihi: Optional[datetime] = None
+
+class MetinOyCreate(BaseModel):
+    metin_id: str
+    onay: bool
+    sebep: str = ""
+
+@api_router.post("/diagnostic/texts")
+async def create_metin(metin: AnalizMetinCreate, current_user=Depends(get_current_user)):
+    role = current_user.get("role", "")
+    if role not in ["admin", "teacher"]:
+        raise HTTPException(status_code=403, detail="Yetkisiz")
+    # Kelime sayısını otomatik hesapla
+    ks = len(metin.icerik.strip().split()) if metin.icerik else metin.kelime_sayisi
+    # Admin eklerse direkt oylama, öğretmen eklerse beklemede
+    durum = "oylama" if role == "admin" else "beklemede"
+    model = AnalizMetin(
+        **{**metin.dict(), "kelime_sayisi": ks},
+        ekleyen_id=current_user["id"],
+        ekleyen_ad=f"{current_user.get('ad','')} {current_user.get('soyad','')}",
+        durum=durum
+    )
+    data = model.dict()
+    data["olusturma_tarihi"] = data["olusturma_tarihi"].isoformat()
+    data["yayin_tarihi"] = None
+    await db.analiz_metinler.insert_one(data)
+    # Metin ekleme katkı puanı: +5
+    await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": 5}})
+    return data
+
+@api_router.get("/diagnostic/texts")
+async def get_metinler(current_user=Depends(get_current_user)):
+    role = current_user.get("role", "")
+    user_id = current_user.get("id", "")
+    items = await db.analiz_metinler.find().sort("olusturma_tarihi", -1).to_list(length=None)
+    result = []
+    for item in items:
+        item.pop("_id", None)
+        durum = item.get("durum", "")
+        if role == "admin":
+            result.append(item)
+        elif role == "teacher":
+            # Kendi eklediği + oylama bekleyenler + havuzdakiler
+            if item.get("ekleyen_id") == user_id or durum in ("oylama", "havuzda"):
+                result.append(item)
+        else:
+            if durum == "havuzda":
+                result.append(item)
+    return result
+
+@api_router.post("/diagnostic/texts/{metin_id}/admin-karar")
+async def metin_admin_karar(metin_id: str, karar: dict, current_user=Depends(require_role(UserRole.ADMIN))):
+    onay = karar.get("onay", False)
+    yeni_durum = "oylama" if onay else "reddedildi"
+    await db.analiz_metinler.update_one({"id": metin_id}, {"$set": {"durum": yeni_durum}})
+    return {"durum": yeni_durum}
+
+@api_router.post("/diagnostic/texts/oy")
+async def metin_oy_ver(oy: MetinOyCreate, current_user=Depends(get_current_user)):
+    role = current_user.get("role", "")
+    if role not in ["admin", "teacher"]:
+        raise HTTPException(status_code=403, detail="Sadece öğretmenler oy verebilir")
+    if not oy.onay and not oy.sebep:
+        raise HTTPException(status_code=400, detail="Red için sebep belirtmelisiniz")
+    metin = await db.analiz_metinler.find_one({"id": oy.metin_id})
+    if not metin:
+        raise HTTPException(status_code=404, detail="Metin bulunamadı")
+    if metin.get("durum") != "oylama":
+        raise HTTPException(status_code=400, detail="Bu metin oylamada değil")
+    user_id = current_user["id"]
+    oylar = metin.get("oylar", {})
+    if user_id in oylar:
+        raise HTTPException(status_code=400, detail="Zaten oy kullandınız")
+    oylar[user_id] = {"onay": oy.onay, "sebep": oy.sebep}
+    await db.analiz_metinler.update_one({"id": oy.metin_id}, {"$set": {"oylar": oylar}})
+    # Oy veren öğretmene +2 puan
+    await db.users.update_one({"id": user_id}, {"$inc": {"puan": 2}})
+    # %60 kontrolü
+    ogretmenler = await db.users.find({"role": {"$in": ["teacher", "admin"]}}).to_list(length=None)
+    toplam = len(ogretmenler)
+    onay_sayisi = sum(1 for v in oylar.values() if v.get("onay"))
+    oy_sayisi = len(oylar)
+    yeni_durum = metin.get("durum")
+    if toplam > 0:
+        onay_orani = onay_sayisi / toplam
+        if onay_orani >= 0.6:
+            yeni_durum = "havuzda"
+            await db.analiz_metinler.update_one(
+                {"id": oy.metin_id},
+                {"$set": {"durum": "havuzda", "yayin_tarihi": datetime.utcnow().isoformat()}}
+            )
+            # Metni ekleyene +10 bonus puan (havuza girince)
+            ekleyen_id = metin.get("ekleyen_id")
+            if ekleyen_id:
+                await db.users.update_one({"id": ekleyen_id}, {"$inc": {"puan": 10}})
+        elif oy_sayisi == toplam and onay_orani < 0.6:
+            yeni_durum = "reddedildi"
+            await db.analiz_metinler.update_one({"id": oy.metin_id}, {"$set": {"durum": "reddedildi"}})
+    return {
+        "mesaj": "Oyunuz kaydedildi (+2 puan)",
+        "durum": yeni_durum,
+        "onay_orani": round(onay_sayisi / max(toplam, 1) * 100),
+        "oy_sayisi": oy_sayisi,
+        "toplam": toplam
+    }
+
+@api_router.delete("/diagnostic/texts/{metin_id}")
+async def delete_metin(metin_id: str, current_user=Depends(require_role(UserRole.ADMIN))):
+    await db.analiz_metinler.delete_one({"id": metin_id})
+    return {"message": "Silindi"}
+
+# ── Analiz Oturumları ──
+class HataKaydi(BaseModel):
+    tip: str  # atlama, yanlis_okuma, takilma, tekrar
+    kelime: str = ""
+
+class AnalizOturumBaslat(BaseModel):
+    ogrenci_id: str
+    metin_id: str
+
+class AnalizTamamla(BaseModel):
+    sure_saniye: float
+    hatalar: List[HataKaydi]
+    gozlem_notu: str = ""
+    ogretmen_kur: str = ""
+
+class DiagnosticOturum(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    ogrenci_id: str
+    metin_id: str
+    ogretmen_id: str
+    durum: str = "devam"
+    sure_saniye: float = 0
+    hatalar: List[dict] = []
+    gozlem_notu: str = ""
+    wpm: float = 0
+    dogruluk_yuzde: float = 0
+    hiz_deger: str = ""
+    sistem_kur: str = ""
+    ogretmen_kur: str = ""
+    olusturma_tarihi: datetime = Field(default_factory=datetime.utcnow)
+    tamamlama_tarihi: Optional[datetime] = None
+
+@api_router.post("/diagnostic/sessions")
+async def baslat_oturum(data: AnalizOturumBaslat, current_user=Depends(get_current_user)):
+    if current_user.get("role") not in ["admin", "teacher"]:
+        raise HTTPException(status_code=403, detail="Yetkisiz")
+    metin = await db.analiz_metinler.find_one({"id": data.metin_id})
+    if not metin:
+        raise HTTPException(status_code=404, detail="Metin bulunamadı")
+    oturum = DiagnosticOturum(
+        ogrenci_id=data.ogrenci_id,
+        metin_id=data.metin_id,
+        ogretmen_id=current_user["id"]
+    )
+    d = oturum.dict()
+    d["olusturma_tarihi"] = d["olusturma_tarihi"].isoformat()
+    d["tamamlama_tarihi"] = None
+    await db.diagnostic_oturumlar.insert_one(d)
+    return d
+
+@api_router.get("/diagnostic/sessions")
+async def get_oturumlar(current_user=Depends(get_current_user)):
+    q = {}
+    if current_user.get("role") == "teacher":
+        q["ogretmen_id"] = current_user["id"]
+    items = await db.diagnostic_oturumlar.find(q).sort("olusturma_tarihi", -1).to_list(length=None)
+    for i in items: i.pop("_id", None)
+    return items
+
+@api_router.get("/diagnostic/sessions/student/{ogrenci_id}")
+async def get_ogrenci_oturumlari(ogrenci_id: str, current_user=Depends(get_current_user)):
+    items = await db.diagnostic_oturumlar.find({"ogrenci_id": ogrenci_id}).sort("olusturma_tarihi", -1).to_list(length=None)
+    for i in items: i.pop("_id", None)
+    return items
+
+@api_router.post("/diagnostic/sessions/{oturum_id}/complete")
+async def tamamla_oturum(oturum_id: str, data: AnalizTamamla, current_user=Depends(get_current_user)):
+    oturum = await db.diagnostic_oturumlar.find_one({"id": oturum_id})
+    if not oturum:
+        raise HTTPException(status_code=404, detail="Oturum bulunamadı")
+
+    metin = await db.analiz_metinler.find_one({"id": oturum["metin_id"]})
+    kelime_sayisi = metin.get("kelime_sayisi", 100) if metin else 100
+    sinif_seviyesi = metin.get("sinif_seviyesi", "4") if metin else "4"
+
+    # Hesaplamalar
+    sure_dakika = data.sure_saniye / 60 if data.sure_saniye > 0 else 1
+    wpm = round(kelime_sayisi / sure_dakika, 1)
+
+    toplam_hata = len(data.hatalar)
+    dogruluk = round(max(0, (kelime_sayisi - toplam_hata) / kelime_sayisi * 100), 1)
+
+    hiz_deger = await hiz_degerlendirme(sinif_seviyesi, wpm)
+    sistem_kur = await kur_onerisi_hesapla(wpm, dogruluk, sinif_seviyesi)
+    atanan_kur = data.ogretmen_kur if data.ogretmen_kur else sistem_kur
+
+    # Hata dağılımı
+    hata_sayilari = {"atlama": 0, "yanlis_okuma": 0, "takilma": 0, "tekrar": 0}
+    for h in data.hatalar:
+        tip = h.tip if hasattr(h, "tip") else h.get("tip", "")
+        if tip in hata_sayilari:
+            hata_sayilari[tip] += 1
+
+    now = datetime.utcnow().isoformat()
+    guncelle = {
+        "durum": "tamamlandi",
+        "sure_saniye": data.sure_saniye,
+        "hatalar": [h.dict() if hasattr(h, "dict") else h for h in data.hatalar],
+        "gozlem_notu": data.gozlem_notu,
+        "wpm": wpm,
+        "dogruluk_yuzde": dogruluk,
+        "hiz_deger": hiz_deger,
+        "sistem_kur": sistem_kur,
+        "ogretmen_kur": atanan_kur,
+        "tamamlama_tarihi": now
+    }
+    await db.diagnostic_oturumlar.update_one({"id": oturum_id}, {"$set": guncelle})
+
+    # Öğrencinin kurunu güncelle
+    await db.students.update_one({"id": oturum["ogrenci_id"]}, {"$set": {"kur": atanan_kur}})
+
+    return {
+        "wpm": wpm,
+        "dogruluk_yuzde": dogruluk,
+        "hiz_deger": hiz_deger,
+        "sistem_kur": sistem_kur,
+        "atanan_kur": atanan_kur,
+        "hata_sayilari": hata_sayilari,
+        "sure_saniye": data.sure_saniye
+    }
 
 
 # ─────────────────────────────────────────────
