@@ -292,7 +292,7 @@ function AppContent() {
             <TabsTrigger value="teachers" className={tabClass}><UserCheck className="h-4 w-4 mr-2" />Öğretmenler</TabsTrigger>
             <TabsTrigger value="students" className={tabClass}><Users className="h-4 w-4 mr-2" />Öğrenciler</TabsTrigger>
             <TabsTrigger value="courses" className={tabClass}><BookOpen className="h-4 w-4 mr-2" />Kurslar</TabsTrigger>
-            <TabsTrigger value="payments" className={tabClass}><CreditCard className="h-4 w-4 mr-2" />Ödemeler</TabsTrigger>
+            <TabsTrigger value="payments" className={tabClass}><CreditCard className="h-4 w-4 mr-2" />Muhasebe</TabsTrigger>
             {user.role === "admin" && <TabsTrigger value="users" className={tabClass}><Shield className="h-4 w-4 mr-2" />Kullanıcılar</TabsTrigger>}
             <TabsTrigger value="gelisim" className={tabClass}><Trophy className="h-4 w-4 mr-2" />Gelişim</TabsTrigger>
             <TabsTrigger value="giris-analizi" className={tabClass}><Stethoscope className="h-4 w-4 mr-2" />Giriş Analizi</TabsTrigger>
@@ -371,16 +371,55 @@ function AppContent() {
                             </div>
                           </div>
                         </div>
-                        {expandedTeachers.has(t.id) && (
-                          <div className="border-t border-gray-100 bg-gray-50 p-4">
-                            {teacherStudents[t.id] ? teacherStudents[t.id].map(s => (
-                              <div key={s.id} className="bg-white p-3 rounded-xl border border-gray-100 mb-2">
-                                <div className="font-medium text-sm">{s.ad} {s.soyad}</div>
-                                <div className="text-xs text-gray-500">Kur: {s.kur} • Sınıf: {s.sinif}</div>
+                        {expandedTeachers.has(t.id) && (() => {
+                          const ogretmenOdemeleri = payments.filter(p => p.tip === 'ogretmen' && p.kisi_id === t.id);
+                          const toplamOdenen = ogretmenOdemeleri.reduce((sum, p) => sum + (p.miktar || 0), 0);
+                          const kalanAlacak = Math.max(0, (t.yapilmasi_gereken_odeme || 0) - toplamOdenen);
+                          return (
+                          <div className="border-t border-gray-100 bg-gray-50 p-4 space-y-4">
+                            {/* Ödeme Özeti */}
+                            <div className="grid grid-cols-3 gap-3">
+                              <div className="bg-white rounded-xl p-3 border border-gray-200 text-center">
+                                <div className="text-xs text-gray-500 mb-1">Yapılacak Ödeme</div>
+                                <div className="font-bold text-orange-600">₺{(t.yapilmasi_gereken_odeme || 0).toLocaleString('tr-TR')}</div>
                               </div>
-                            )) : <p className="text-sm text-gray-500">Yükleniyor...</p>}
+                              <div className="bg-white rounded-xl p-3 border border-gray-200 text-center">
+                                <div className="text-xs text-gray-500 mb-1">Toplam Ödenen</div>
+                                <div className="font-bold text-green-600">₺{toplamOdenen.toLocaleString('tr-TR')}</div>
+                              </div>
+                              <div className="bg-white rounded-xl p-3 border border-gray-200 text-center">
+                                <div className="text-xs text-gray-500 mb-1">Kalan Alacak</div>
+                                <div className={`font-bold ${kalanAlacak > 0 ? 'text-red-600' : 'text-green-600'}`}>₺{kalanAlacak.toLocaleString('tr-TR')}</div>
+                              </div>
+                            </div>
+                            {/* Ödeme Geçmişi */}
+                            {ogretmenOdemeleri.length > 0 && (
+                              <div>
+                                <div className="text-xs font-semibold text-gray-500 mb-2">📤 Ödeme Geçmişi</div>
+                                {ogretmenOdemeleri.slice(0,5).map(p => (
+                                  <div key={p.id} className="flex justify-between items-center bg-white p-2 rounded-lg border border-gray-100 mb-1 text-sm">
+                                    <span className="text-gray-500">{formatDate(p.tarih)}</span>
+                                    <span className="text-gray-700">{p.aciklama || '—'}</span>
+                                    <span className="font-semibold text-green-600">₺{(p.miktar||0).toLocaleString('tr-TR')}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {/* Öğrenci Listesi */}
+                            {teacherStudents[t.id] && teacherStudents[t.id].length > 0 && (
+                              <div>
+                                <div className="text-xs font-semibold text-gray-500 mb-2">👨‍🎓 Öğrenciler</div>
+                                {teacherStudents[t.id].map(s => (
+                                  <div key={s.id} className="bg-white p-2 rounded-lg border border-gray-100 mb-1 flex justify-between text-sm">
+                                    <span className="font-medium">{s.ad} {s.soyad}</span>
+                                    <span className="text-gray-500">Kur: {s.kur} • {s.sinif}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                        )}
+                          );
+                        })()}
                       </div>
                     ))}
                   </div>
@@ -491,29 +530,32 @@ function AppContent() {
           <TabsContent value="payments">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <Card className="lg:col-span-1 border-0 shadow-sm">
-                <CardHeader><CardTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />Yeni Ödeme</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />Yeni Kayıt</CardTitle></CardHeader>
                 <CardContent>
                   <form onSubmit={createPayment} className="space-y-4">
-                    <div><Label>Tip</Label>
-                      <Select value={paymentForm.tip} onValueChange={v => setPaymentForm({...paymentForm, tip:v})}>
+                    <div><Label>İşlem Türü</Label>
+                      <Select value={paymentForm.tip} onValueChange={v => setPaymentForm({...paymentForm, tip:v, kisi_id:""})}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent><SelectItem value="ogrenci">Öğrenci</SelectItem><SelectItem value="ogretmen">Öğretmen</SelectItem></SelectContent>
+                        <SelectContent position="popper">
+                          <SelectItem value="ogrenci">📥 Alacak (Öğrenci Ödemesi)</SelectItem>
+                          <SelectItem value="ogretmen">📤 Ödeme (Öğretmene)</SelectItem>
+                        </SelectContent>
                       </Select>
                     </div>
                     <div><Label>{paymentForm.tip === 'ogrenci' ? 'Öğrenci' : 'Öğretmen'}</Label>
                       <Select value={paymentForm.kisi_id} onValueChange={v => setPaymentForm({...paymentForm, kisi_id:v})}>
                         <SelectTrigger><SelectValue placeholder="Seçin" /></SelectTrigger>
-                        <SelectContent>{(paymentForm.tip === 'ogrenci' ? students : teachers).map(p => <SelectItem key={p.id} value={p.id}>{p.ad} {p.soyad}</SelectItem>)}</SelectContent>
+                        <SelectContent position="popper">{(paymentForm.tip === 'ogrenci' ? students : teachers).map(p => <SelectItem key={p.id} value={p.id}>{p.ad} {p.soyad}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
                     <div><Label>Miktar (₺)</Label><Input type="number" step="0.01" value={paymentForm.miktar} onChange={e => setPaymentForm({...paymentForm, miktar:parseFloat(e.target.value)||0})} required /></div>
                     <div><Label>Açıklama</Label><Input value={paymentForm.aciklama} onChange={e => setPaymentForm({...paymentForm, aciklama:e.target.value})} /></div>
-                    <Button type="submit" disabled={loadingAction} className="w-full">Ekle</Button>
+                    <Button type="submit" disabled={loadingAction} className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white">Kaydet</Button>
                   </form>
                 </CardContent>
               </Card>
               <Card className="lg:col-span-2 border-0 shadow-sm">
-                <CardHeader><CardTitle>Ödemeler</CardTitle></CardHeader>
+                <CardHeader><CardTitle>Muhasebe Kayıtları</CardTitle></CardHeader>
                 <CardContent>
                   <Table>
                     <TableHeader><TableRow><TableHead>Tarih</TableHead><TableHead>Tip</TableHead><TableHead>Kişi</TableHead><TableHead>Miktar</TableHead><TableHead>Açıklama</TableHead></TableRow></TableHeader>
@@ -523,7 +565,7 @@ function AppContent() {
                         return (
                           <TableRow key={p.id}>
                             <TableCell>{formatDate(p.tarih)}</TableCell>
-                            <TableCell><Badge variant={p.tip === 'ogrenci' ? 'default' : 'secondary'}>{p.tip === 'ogrenci' ? 'Öğrenci' : 'Öğretmen'}</Badge></TableCell>
+                            <TableCell><Badge variant={p.tip === 'ogrenci' ? 'default' : 'secondary'}>{p.tip === 'ogrenci' ? '📥 Alacak' : '📤 Ödeme'}</Badge></TableCell>
                             <TableCell>{person ? `${person.ad} ${person.soyad}` : '-'}</TableCell>
                             <TableCell className="font-semibold text-green-600">{formatCurrency(p.miktar)}</TableCell>
                             <TableCell>{p.aciklama || '-'}</TableCell>
@@ -684,6 +726,42 @@ function BekleyenlerKarti({ bekleyenler, onRefresh, onTabChange }) {
   );
 }
 
+
+// ── Sadece havuzdaki metinleri listele (analiz için) ──
+function MetinSecimListesi({ onMetinSec }) {
+  const [metinler, setMetinler] = useState([]);
+  const [yukleniyor, setYukleniyor] = useState(true);
+  const turLabel = { hikaye: "Hikaye", bilgilendirici: "Bilgilendirici", siir: "Şiir" };
+
+  useEffect(() => {
+    axios.get(`${API}/diagnostic/texts`)
+      .then(r => setMetinler(r.data.filter(m => m.durum === "havuzda")))
+      .catch(() => {})
+      .finally(() => setYukleniyor(false));
+  }, []);
+
+  if (yukleniyor) return <div className="text-center py-8 text-gray-400">Yükleniyor...</div>;
+  if (metinler.length === 0) return (
+    <div className="text-center py-8 text-gray-400">
+      <p>Henüz onaylı metin yok.</p>
+      <p className="text-sm mt-1">Metinler sekmesinden metin ekleyip onaylayın.</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+      {metinler.map(m => (
+        <div key={m.id} onClick={() => onMetinSec(m)}
+          className="border border-gray-200 rounded-xl p-4 cursor-pointer hover:border-orange-400 hover:bg-orange-50 transition-all">
+          <div className="font-semibold text-gray-800">{m.baslik}</div>
+          <div className="text-xs text-gray-500 mt-1">{m.sinif_seviyesi}. Sınıf • {turLabel[m.tur] || m.tur} • {m.kelime_sayisi} kelime</div>
+          <p className="text-sm text-gray-600 mt-2 line-clamp-2">{m.icerik}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── NORM TABLOSU YÖNETİMİ (Admin) ──
 function NormTablosu({ onClose }) {
   const { toast } = useToast();
@@ -798,7 +876,7 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user }) {
       const r = await axios.post(`${API}/diagnostic/texts/oy`, { metin_id: metinId, onay, sebep });
       fetchMetinler(); setRedDialog(null); setRedSebep("");
       toast({ title: onay ? "✅ Onaylandı (+2 puan)" : "❌ Reddedildi", description: `Onay oranı: %${r.data.onay_orani}` });
-    } catch(e) { toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
+    } catch(e) { console.error('Session error:', e.response?.data); toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
   };
 
   const turLabel = { hikaye: "Hikaye", bilgilendirici: "Bilgilendirici", siir: "Şiir" };
@@ -1614,11 +1692,14 @@ function GirisAnaliziModul({ user, students, teachers }) {
 
   const analiziBaslat = async () => {
     if (!seciliOgrenci || !seciliMetin) { toast({ title: "Öğrenci ve metin seçin", variant: "destructive" }); return; }
+    if (!seciliOgrenci.id) { toast({ title: "Geçersiz öğrenci seçimi", variant: "destructive" }); return; }
+    if (!seciliMetin.id) { toast({ title: "Geçersiz metin seçimi", variant: "destructive" }); return; }
     try {
       const r = await axios.post(`${API}/diagnostic/sessions`, { ogrenci_id: seciliOgrenci.id, metin_id: seciliMetin.id });
+      if (!r.data?.id) throw new Error('Oturum ID alınamadı');
       setAktifOturumId(r.data.id);
       setAdim("canli");
-    } catch(e) { toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
+    } catch(e) { console.error('Session error:', e.response?.data); toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
   };
 
   const analiziTamamla = async (veri) => {
@@ -1626,7 +1707,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
       const r = await axios.post(`${API}/diagnostic/sessions/${aktifOturumId}/complete`, veri);
       setSonuc(r.data);
       setAdim("sonuc");
-    } catch(e) { toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
+    } catch(e) { console.error('Session error:', e.response?.data); toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
   };
 
   const kurOnayla = async (ogretmenKur) => {
@@ -1728,8 +1809,8 @@ function GirisAnaliziModul({ user, students, teachers }) {
               <Label>Öğrenci Seç</Label>
               <Select value={seciliOgrenci?.id || ""} onValueChange={v => setSeciliOgrenci(students.find(s => s.id === v))}>
                 <SelectTrigger><SelectValue placeholder="Öğrenci seçin..." /></SelectTrigger>
-                <SelectContent>
-                  {students.map(s => <SelectItem key={s.id} value={s.id}>{s.ad} {s.soyad} — {s.sinif}</SelectItem>)}
+                <SelectContent position="popper" sideOffset={4} className="max-h-60 overflow-y-auto z-50">
+                  {(students || []).map(s => <SelectItem key={s.id} value={s.id}>{s.ad} {s.soyad} — {s.sinif}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -1812,11 +1893,6 @@ function GirisAnaliziModul({ user, students, teachers }) {
             <DialogDescription>{seciliMetin ? "Farklı bir metin seçin veya yeni metin ekleyin" : "Analiz için metin seçin"}</DialogDescription>
           </DialogHeader>
           <MetinYonetimi secimModu={true} user={user} onMetinSec={m => { setSeciliMetin(m); setMetinDialogAcik(false); }} />
-          {user.role !== "student" && (
-            <div className="border-t pt-4">
-              <MetinYonetimi secimModu={false} user={user} />
-            </div>
-          )}
         </DialogContent>
       </Dialog>
     </div>
@@ -1835,7 +1911,7 @@ function GelisimAlani({ user }) {
   const [sonuc, setSonuc] = useState(null);
   const [redSebep, setRedSebep] = useState("");
   const [redDialogIcerik, setRedDialogIcerik] = useState(null);
-  const [adminForm, setAdminForm] = useState({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [] });
+  const [adminForm, setAdminForm] = useState({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [], makale_link: "", makale_dosya_turu: "link" });
   const [yeniSoru, setYeniSoru] = useState({ soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0 });
 
   const fetchAll = useCallback(async () => {
@@ -1846,9 +1922,9 @@ function GelisimAlani({ user }) {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  const turIcon = (tur) => ({ hizmetici: <GraduationCap className="h-5 w-5"/>, film: <Film className="h-5 w-5"/>, kitap: <BookMarked className="h-5 w-5"/> }[tur] || <BookOpen className="h-5 w-5"/>);
-  const turLabel = (tur) => ({ hizmetici: "Hizmetiçi Eğitim", film: "Film", kitap: "Kitap" }[tur] || tur);
-  const turColor = (tur) => ({ hizmetici: "bg-blue-100 text-blue-600", film: "bg-purple-100 text-purple-600", kitap: "bg-green-100 text-green-600" }[tur] || "bg-gray-100 text-gray-600");
+  const turIcon = (tur) => ({ hizmetici: <GraduationCap className="h-5 w-5"/>, film: <Film className="h-5 w-5"/>, kitap: <BookMarked className="h-5 w-5"/>, makale: <FileText className="h-5 w-5"/> }[tur] || <BookOpen className="h-5 w-5"/>);
+  const turLabel = (tur) => ({ hizmetici: "Hizmetiçi Eğitim", film: "Film", kitap: "Kitap", makale: "Makale" }[tur] || tur);
+  const turColor = (tur) => ({ hizmetici: "bg-blue-100 text-blue-600", film: "bg-purple-100 text-purple-600", kitap: "bg-green-100 text-green-600", makale: "bg-orange-100 text-orange-600" }[tur] || "bg-gray-100 text-gray-600");
   const durumBadge = (d) => ({
     beklemede: <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full font-medium">⏳ Yönetici Onayı Bekliyor</span>,
     oylama: <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">🗳️ Öğretmen Oylamasında</span>,
@@ -1882,7 +1958,7 @@ function GelisimAlani({ user }) {
       const r = await axios.post(`${API}/gelisim/oy`, { icerik_id: hedef.id, onay, sebep });
       toast({ title: onay ? `✅ Onaylandı (+2 puan)` : "❌ Reddedildi", description: `Onay oranı: %${r.data.onay_orani}` });
       setRedDialogIcerik(null); setRedSebep(""); fetchAll();
-    } catch(e) { toast({ title: "Hata", description: e.response?.data?.detail || "Hata", variant: "destructive" }); }
+    } catch(e) { console.error('Session error:', e.response?.data); toast({ title: "Hata", description: e.response?.data?.detail || "Hata", variant: "destructive" }); }
   };
 
   const handleTamamla = async (testYapildi) => {
@@ -1892,7 +1968,7 @@ function GelisimAlani({ user }) {
       const r = await axios.post(`${API}/gelisim/tamamla`, data);
       setSonuc(r.data); setGorunum("sonuc"); fetchAll();
       toast({ title: `+${r.data.puan} puan kazandınız!` });
-    } catch(e) { toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
+    } catch(e) { console.error('Session error:', e.response?.data); toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
   };
 
   const soruEkle = () => {
@@ -1907,7 +1983,7 @@ function GelisimAlani({ user }) {
     e.preventDefault();
     try {
       await axios.post(`${API}/gelisim/icerik`, adminForm);
-      setAdminForm({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [] });
+      setAdminForm({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [], makale_link: "", makale_dosya_turu: "link" });
       setGorunum("liste"); fetchAll();
       toast({ title: user.role === "admin" ? "İçerik oylama aşamasına alındı" : "İçerik yönetici onayına gönderildi" });
     } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
@@ -1982,17 +2058,18 @@ function GelisimAlani({ user }) {
                 <div><Label>Tür</Label>
                   <Select value={adminForm.tur} onValueChange={v => setAdminForm({...adminForm, tur: v})}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="hizmetici">📚 Hizmetiçi Eğitim</SelectItem>
+                    <SelectContent position="popper" sideOffset={4} className="z-[200]">
+                      <SelectItem value="hizmetici">🎓 Hizmetiçi Eğitim</SelectItem>
                       <SelectItem value="film">🎬 Film</SelectItem>
-                      <SelectItem value="kitap">📖 Kitap</SelectItem>
+                      <SelectItem value="kitap">📚 Kitap</SelectItem>
+                      <SelectItem value="makale">📄 Makale</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div><Label>Hedef Kitle</Label>
                   <Select value={adminForm.hedef_kitle} onValueChange={v => setAdminForm({...adminForm, hedef_kitle: v})}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
+                    <SelectContent position="popper" sideOffset={4} className="z-[200]">
                       <SelectItem value="hepsi">👥 Herkes</SelectItem>
                       <SelectItem value="ogretmen">👩‍🏫 Öğretmenler</SelectItem>
                       <SelectItem value="ogrenci">🎓 Öğrenciler</SelectItem>
@@ -2001,6 +2078,28 @@ function GelisimAlani({ user }) {
                 </div>
               </div>
               <div><Label>Açıklama</Label><Input value={adminForm.aciklama} onChange={e => setAdminForm({...adminForm, aciklama: e.target.value})} placeholder="Kısa açıklama..." /></div>
+
+              {/* Makale alanları */}
+              {adminForm.tur === "makale" && (
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl space-y-3">
+                  <div className="font-semibold text-sm text-blue-800">📎 Makale Kaynağı</div>
+                  <div><Label>Dosya Türü</Label>
+                    <Select value={adminForm.makale_dosya_turu || "link"} onValueChange={v => setAdminForm({...adminForm, makale_dosya_turu: v})}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent position="popper" sideOffset={4} className="z-[200]">
+                        <SelectItem value="link">🔗 Web Linki</SelectItem>
+                        <SelectItem value="pdf">📕 PDF</SelectItem>
+                        <SelectItem value="word">📘 Word</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>{(adminForm.makale_dosya_turu || "link") === "link" ? "URL" : "Paylaşım Linki (Drive/Dropbox)"}</Label>
+                    <Input value={adminForm.makale_link || ""} onChange={e => setAdminForm({...adminForm, makale_link: e.target.value})} placeholder="https://..." />
+                    {(adminForm.makale_dosya_turu || "link") !== "link" && <p className="text-xs text-gray-500 mt-1">Dosyayı Google Drive'a yükleyip "Herkesle paylaş" linkini yapıştırın.</p>}
+                  </div>
+                </div>
+              )}
 
               {/* Soru Ekleme */}
               <div className="border-2 border-dashed border-gray-200 rounded-xl p-4 space-y-4">
