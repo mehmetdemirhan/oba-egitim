@@ -1,81 +1,7 @@
-// ─────────────────────────────────────────────────────────────
-// src/App.js — Auth eklenmiş versiyon
-// Mevcut App.js'in başına ve sonuna eklenmesi gereken kısımlar
-// ─────────────────────────────────────────────────────────────
-
-// ★ 1. Bu import'ları mevcut import listesine EKLE:
-// import { AuthProvider, useAuth } from "./context/AuthContext";
-// import LoginPage from "./pages/LoginPage";
-// import { LogOut, User } from "lucide-react"; // zaten var
-
-// ★ 2. App() fonksiyonunun içine, return'den ÖNCE şunu EKLE:
-/*
-  const { user, logout, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="spinner w-8 h-8 border-4" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <LoginPage />;
-  }
-*/
-
-// ★ 3. Header'daki mevcut Button'un yanına şunu EKLE:
-/*
-  <div className="flex items-center gap-3">
-    <div className="text-right hidden sm:block">
-      <div className="text-sm font-medium text-gray-900">{user.ad} {user.soyad}</div>
-      <div className="text-xs text-gray-500">{roleLabel(user.role)}</div>
-    </div>
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={logout}
-      className="flex items-center gap-2"
-    >
-      <LogOut className="h-4 w-4" />
-      Çıkış
-    </Button>
-  </div>
-*/
-
-// ★ 4. App() fonksiyonunun DIŞINA bu yardımcı fonksiyonu EKLE:
-/*
-function roleLabel(role) {
-  const labels = {
-    admin: "Yönetici",
-    teacher: "Öğretmen",
-    student: "Öğrenci",
-    parent: "Veli"
-  };
-  return labels[role] || role;
-}
-*/
-
-// ★ 5. src/index.js'de App'i AuthProvider ile sar:
-/*
-  root.render(
-    <React.StrictMode>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
-    </React.StrictMode>
-  );
-*/
-
-// ─────────────────────────────────────────────────────────────
-// TAM ENTEGRE App.js (kopyala-yapıştır versiyonu)
-// ─────────────────────────────────────────────────────────────
-
 import React, { useState, useEffect } from "react";
 import "./App.css";
 import axios from "axios";
-import { AuthProvider, useAuth } from "./context/AuthContext";
+import { useAuth } from "./context/AuthContext";
 import LoginPage from "./pages/LoginPage";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Button } from "./components/ui/button";
@@ -109,7 +35,6 @@ function roleLabel(role) {
   return labels[role] || role;
 }
 
-// ─── Admin Kullanıcı Yönetimi Ekranı ───────────────────────────
 function UserManagement({ teachers }) {
   const { toast } = useToast();
   const [users, setUsers] = useState([]);
@@ -120,9 +45,7 @@ function UserManagement({ teachers }) {
     try {
       const res = await axios.get(`${API}/auth/users`);
       setUsers(res.data);
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) { console.error(e); }
   };
 
   useEffect(() => { fetchUsers(); }, []);
@@ -158,28 +81,15 @@ function UserManagement({ teachers }) {
       <Card className="lg:col-span-1 border-0 shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-gray-900">
-            <Plus className="h-5 w-5" />
-            Yeni Kullanıcı Ekle
+            <Plus className="h-5 w-5" />Yeni Kullanıcı Ekle
           </CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={createUser} className="space-y-4">
-            <div>
-              <Label>Ad</Label>
-              <Input value={form.ad} onChange={e => setForm({ ...form, ad: e.target.value })} required />
-            </div>
-            <div>
-              <Label>Soyad</Label>
-              <Input value={form.soyad} onChange={e => setForm({ ...form, soyad: e.target.value })} required />
-            </div>
-            <div>
-              <Label>E-posta</Label>
-              <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required />
-            </div>
-            <div>
-              <Label>Şifre</Label>
-              <Input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} required minLength={6} />
-            </div>
+            <div><Label>Ad</Label><Input value={form.ad} onChange={e => setForm({ ...form, ad: e.target.value })} required /></div>
+            <div><Label>Soyad</Label><Input value={form.soyad} onChange={e => setForm({ ...form, soyad: e.target.value })} required /></div>
+            <div><Label>E-posta</Label><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required /></div>
+            <div><Label>Şifre</Label><Input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} required minLength={6} /></div>
             <div>
               <Label>Rol</Label>
               <Select value={form.role} onValueChange={v => setForm({ ...form, role: v })}>
@@ -198,9 +108,7 @@ function UserManagement({ teachers }) {
                 <Select value={form.linked_id} onValueChange={v => setForm({ ...form, linked_id: v })}>
                   <SelectTrigger><SelectValue placeholder="Öğretmen seçin" /></SelectTrigger>
                   <SelectContent>
-                    {teachers.map(t => (
-                      <SelectItem key={t.id} value={t.id}>{t.ad} {t.soyad}</SelectItem>
-                    ))}
+                    {teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.ad} {t.soyad}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -211,11 +119,8 @@ function UserManagement({ teachers }) {
           </form>
         </CardContent>
       </Card>
-
       <Card className="lg:col-span-2 border-0 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-gray-900">Kullanıcılar</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle className="text-gray-900">Kullanıcılar</CardTitle></CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
@@ -251,7 +156,6 @@ function UserManagement({ teachers }) {
   );
 }
 
-// ─── Ana App (auth ile) ─────────────────────────────────────────
 function AppContent() {
   const { user, logout, loading } = useAuth();
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -277,7 +181,6 @@ function AppContent() {
   const availableCourses = ["Okuma Becerileri Temel", "Okuma Becerileri İleri", "Hızlı Okuma", "Anlama Becerileri", "Yazım Kuralları", "Dikkat Geliştirme", "Kelime Dağarcığı", "Metin Analizi"];
   const availableClasses = ["1-A","1-B","1-C","2-A","2-B","2-C","3-A","3-B","3-C","4-A","4-B","4-C","5-A","5-B","5-C","6-A","6-B","6-C","7-A","7-B","7-C","8-A","8-B","8-C"];
 
-  // Loading ekranı
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -285,40 +188,21 @@ function AppContent() {
           <div className="w-16 h-16 bg-gradient-to-br from-orange-400 to-red-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <BookOpen className="h-8 w-8 text-white" />
           </div>
-          <div className="spinner mx-auto" />
         </div>
       </div>
     );
   }
 
-  // Login ekranı
   if (!user) return <LoginPage />;
 
-  // Fetch fonksiyonları
-  const fetchDashboard = async () => {
-    try { const r = await axios.get(`${API}/dashboard`); setDashboardStats(r.data); } catch (e) { console.error(e); }
-  };
-  const fetchWeeklyStats = async () => {
-    try { const r = await axios.get(`${API}/stats/weekly`); setWeeklyStats(r.data); } catch (e) { console.error(e); }
-  };
-  const fetchMonthlyStats = async () => {
-    try { const r = await axios.get(`${API}/stats/monthly`); setMonthlyStats(r.data); } catch (e) { console.error(e); }
-  };
-  const fetchTeachers = async () => {
-    try { const r = await axios.get(`${API}/teachers`); setTeachers(r.data); } catch (e) { console.error(e); }
-  };
-  const fetchStudents = async () => {
-    try { const r = await axios.get(`${API}/students`); setStudents(r.data); } catch (e) { console.error(e); }
-  };
-  const fetchCourses = async () => {
-    try { const r = await axios.get(`${API}/courses`); setCourses(r.data); } catch (e) { console.error(e); }
-  };
-  const fetchPayments = async () => {
-    try { const r = await axios.get(`${API}/payments`); setPayments(r.data); } catch (e) { console.error(e); }
-  };
-  const fetchTeacherStudents = async (teacherId) => {
-    try { const r = await axios.get(`${API}/teachers/${teacherId}/students`); setTeacherStudents(prev => ({ ...prev, [teacherId]: r.data })); } catch (e) { console.error(e); }
-  };
+  const fetchDashboard = async () => { try { const r = await axios.get(`${API}/dashboard`); setDashboardStats(r.data); } catch (e) { console.error(e); } };
+  const fetchWeeklyStats = async () => { try { const r = await axios.get(`${API}/stats/weekly`); setWeeklyStats(r.data); } catch (e) { console.error(e); } };
+  const fetchMonthlyStats = async () => { try { const r = await axios.get(`${API}/stats/monthly`); setMonthlyStats(r.data); } catch (e) { console.error(e); } };
+  const fetchTeachers = async () => { try { const r = await axios.get(`${API}/teachers`); setTeachers(r.data); } catch (e) { console.error(e); } };
+  const fetchStudents = async () => { try { const r = await axios.get(`${API}/students`); setStudents(r.data); } catch (e) { console.error(e); } };
+  const fetchCourses = async () => { try { const r = await axios.get(`${API}/courses`); setCourses(r.data); } catch (e) { console.error(e); } };
+  const fetchPayments = async () => { try { const r = await axios.get(`${API}/payments`); setPayments(r.data); } catch (e) { console.error(e); } };
+  const fetchTeacherStudents = async (teacherId) => { try { const r = await axios.get(`${API}/teachers/${teacherId}/students`); setTeacherStudents(prev => ({ ...prev, [teacherId]: r.data })); } catch (e) { console.error(e); } };
 
   const toggleTeacherExpansion = (id) => {
     const next = new Set(expandedTeachers);
@@ -402,8 +286,6 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto p-4">
-
-        {/* Header */}
         <div className="bg-white rounded-3xl shadow-sm p-6 mb-6 border border-gray-100">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -430,7 +312,6 @@ function AppContent() {
           </div>
         </div>
 
-        {/* Navigation */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="inline-flex h-12 items-center justify-center rounded-2xl bg-white p-1 text-gray-500 shadow-sm border border-gray-200 flex-wrap gap-1">
             <TabsTrigger value="dashboard" className={tabTriggerClass}><BarChart3 className="h-4 w-4 mr-2" />Dashboard</TabsTrigger>
@@ -443,7 +324,6 @@ function AppContent() {
             )}
           </TabsList>
 
-          {/* Dashboard */}
           <TabsContent value="dashboard" className="mt-6">
             {dashboardStats && (
               <div className="space-y-6">
@@ -479,7 +359,6 @@ function AppContent() {
             )}
           </TabsContent>
 
-          {/* Teachers, Students, Courses, Payments tabları öncekiyle aynı - buraya taşındı */}
           <TabsContent value="teachers" className="mt-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <Card className="lg:col-span-1 border-0 shadow-sm">
@@ -653,7 +532,6 @@ function AppContent() {
             </div>
           </TabsContent>
 
-          {/* Kullanıcı Yönetimi - sadece admin */}
           {user.role === "admin" && (
             <TabsContent value="users" className="mt-6">
               <UserManagement teachers={teachers} />
@@ -661,7 +539,6 @@ function AppContent() {
           )}
         </Tabs>
 
-        {/* Edit Dialog */}
         <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
@@ -684,7 +561,6 @@ function AppContent() {
             )}
           </DialogContent>
         </Dialog>
-
       </div>
       <Toaster />
     </div>
@@ -727,11 +603,6 @@ function SimpleEditForm({ item, teachers, courses, classes, onSave, onCancel }) 
   );
 }
 
-// Ana export — AuthProvider ile sarılı
 export default function App() {
-  return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
-  );
+  return <AppContent />;
 }
