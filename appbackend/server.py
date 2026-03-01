@@ -147,6 +147,7 @@ class UserResponse(BaseModel):
     role: UserRole
     linked_id: Optional[str] = None
     olusturma_tarihi: datetime
+    puan: int = 0
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -179,7 +180,8 @@ async def login(credentials: UserLogin):
         email=user["email"],
         role=user["role"],
         linked_id=user.get("linked_id"),
-        olusturma_tarihi=datetime.fromisoformat(user["olusturma_tarihi"]) if isinstance(user.get("olusturma_tarihi"), str) else user.get("olusturma_tarihi", datetime.now(timezone.utc))
+        olusturma_tarihi=datetime.fromisoformat(user["olusturma_tarihi"]) if isinstance(user.get("olusturma_tarihi"), str) else user.get("olusturma_tarihi", datetime.now(timezone.utc)),
+        puan=user.get("puan", 0)
     )
     
     return TokenResponse(access_token=token, user=user_response)
@@ -193,7 +195,8 @@ async def get_me(current_user=Depends(get_current_user)):
         email=current_user["email"],
         role=current_user["role"],
         linked_id=current_user.get("linked_id"),
-        olusturma_tarihi=datetime.fromisoformat(current_user["olusturma_tarihi"]) if isinstance(current_user.get("olusturma_tarihi"), str) else current_user.get("olusturma_tarihi", datetime.now(timezone.utc))
+        olusturma_tarihi=datetime.fromisoformat(current_user["olusturma_tarihi"]) if isinstance(current_user.get("olusturma_tarihi"), str) else current_user.get("olusturma_tarihi", datetime.now(timezone.utc)),
+        puan=current_user.get("puan", 0)
     )
 
 @api_router.post("/auth/change-password")
@@ -253,7 +256,8 @@ async def list_users(current_user=Depends(require_role(UserRole.ADMIN))):
             email=u["email"],
             role=u["role"],
             linked_id=u.get("linked_id"),
-            olusturma_tarihi=datetime.fromisoformat(u["olusturma_tarihi"]) if isinstance(u.get("olusturma_tarihi"), str) else datetime.now(timezone.utc)
+            olusturma_tarihi=datetime.fromisoformat(u["olusturma_tarihi"]) if isinstance(u.get("olusturma_tarihi"), str) else datetime.now(timezone.utc),
+            puan=u.get("puan", 0)
         ))
     return result
 
@@ -721,6 +725,379 @@ async def get_export_data():
 @api_router.post("/backup/google-drive")
 async def backup_to_google_drive(backup_data: dict):
     return {"success": True, "message": "Data queued for Google Drive backup", "backup_id": str(uuid.uuid4())}
+
+# ─────────────────────────────────────────────
+# GELİŞİM ALANI
+# ─────────────────────────────────────────────
+
+class SoruModel(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    soru: str
+    secenekler: List[str]
+    dogru_cevap: int
+
+class IcerikCreate(BaseModel):
+    baslik: str
+    tur: str  # hizmetici, film, kitap
+    aciklama: str = ""
+    hedef_kitle: str  # ogretmen, ogrenci, hepsi
+    sorular: List[SoruModel] = []
+
+class IcerikModel(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    baslik: str
+    tur: str
+    aciklama: str = ""
+    hedef_kitle: str
+    sorular: List[SoruModel] = []
+    olusturma_tarihi: datetime = Field(default_factory=datetime.utcnow)
+
+class TamamlamaCreate(BaseModel):
+    icerik_id: str
+    kullanici_id: str
+    test_cevaplari: Optional[List[int]] = None
+
+class TamamlamaModel(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    kullanici_id: str
+    icerik_id: str
+    test_yapildi: bool = False
+    dogru_sayisi: int = 0
+    toplam_soru: int = 0
+    kazanilan_puan: int = 0
+    tarih: datetime = Field(default_factory=datetime.utcnow)
+
+@api_router.post("/gelisim/icerik")
+async def create_icerik(icerik: IcerikCreate, current_user=Depends(require_role(UserRole.ADMIN))):
+    model = IcerikModel(**icerik.dict())
+    data = model.dict()
+    data['olusturma_tarihi'] = data['olusturma_tarihi'].isoformat()
+    await db.gelisim_icerik.insert_one(data)
+    return model
+
+@api_router.get("/gelisim/icerik")
+async def get_icerik_list(current_user=Depends(get_current_user)):
+    items = await db.gelisim_icerik.find().sort("olusturma_tarihi", -1).to_list(length=None)
+    result = []
+    for item in items:
+        item.pop('_id', None)
+        # Filtrele: hedef kitle
+        hedef = item.get('hedef_kitle', 'hepsi')
+        rol = current_user.get('role', '')
+        if hedef == 'hepsi' or (hedef == 'ogretmen' and rol == 'teacher') or (hedef == 'ogrenci' and rol == 'student') or rol == 'admin':
+            result.append(item)
+    return result
+
+@api_router.delete("/gelisim/icerik/{icerik_id}")
+async def delete_icerik(icerik_id: str, current_user=Depends(require_role(UserRole.ADMIN))):
+    await db.gelisim_icerik.delete_one({"id": icerik_id})
+    return {"message": "Silindi"}
+
+@api_router.post("/gelisim/tamamla")
+async def tamamla_icerik(data: TamamlamaCreate, current_user=Depends(get_current_user)):
+    # Daha önce tamamladı mı?
+    existing = await db.gelisim_tamamlama.find_one({"kullanici_id": data.kullanici_id, "icerik_id": data.icerik_id})
+    if existing:
+        raise HTTPException(status_code=400, detail="Bu içerik zaten tamamlandı")
+    
+    icerik = await db.gelisim_icerik.find_one({"id": data.icerik_id})
+    if not icerik:
+        raise HTTPException(status_code=404, detail="İçerik bulunamadı")
+    
+    sorular = icerik.get('sorular', [])
+    toplam = len(sorular)
+    dogru = 0
+    test_yapildi = False
+    puan = 1  # Sadece tamamlandı puanı
+    
+    if data.test_cevaplari and toplam > 0:
+        test_yapildi = True
+        for i, cevap in enumerate(data.test_cevaplari):
+            if i < toplam and cevap == sorular[i].get('dogru_cevap'):
+                dogru += 1
+        # Puan: doğru sayısı / toplam * 10 (min 1, max 10)
+        puan = max(1, round((dogru / toplam) * 10)) if toplam > 0 else 1
+    
+    tamamlama = TamamlamaModel(
+        kullanici_id=data.kullanici_id,
+        icerik_id=data.icerik_id,
+        test_yapildi=test_yapildi,
+        dogru_sayisi=dogru,
+        toplam_soru=toplam,
+        kazanilan_puan=puan
+    )
+    tamamlama_data = tamamlama.dict()
+    tamamlama_data['tarih'] = tamamlama_data['tarih'].isoformat()
+    await db.gelisim_tamamlama.insert_one(tamamlama_data)
+    
+    # Kullanıcı puanını güncelle
+    await db.users.update_one({"id": data.kullanici_id}, {"$inc": {"puan": puan}})
+    
+    return {"puan": puan, "dogru": dogru, "toplam": toplam, "test_yapildi": test_yapildi}
+
+@api_router.get("/gelisim/tamamlama/{kullanici_id}")
+async def get_tamamlamalar(kullanici_id: str, current_user=Depends(get_current_user)):
+    items = await db.gelisim_tamamlama.find({"kullanici_id": kullanici_id}).to_list(length=None)
+    for item in items:
+        item.pop('_id', None)
+    return items
+
+@api_router.get("/gelisim/puan-tablosu")
+async def get_puan_tablosu(current_user=Depends(get_current_user)):
+    users = await db.users.find().to_list(length=None)
+    tablo = []
+    for u in users:
+        u.pop('_id', None)
+        u.pop('hashed_password', None)
+        tablo.append({"ad": u.get('ad',''), "soyad": u.get('soyad',''), "role": u.get('role',''), "puan": u.get('puan', 0)})
+    tablo.sort(key=lambda x: x['puan'], reverse=True)
+    return tablo
+
+
+# ─────────────────────────────────────────────
+# GELİŞİM ALANI - Tam İş Akışı
+# ─────────────────────────────────────────────
+
+class SoruModel(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    soru: str
+    secenekler: List[str]
+    dogru_cevap: int
+
+class IcerikCreate(BaseModel):
+    baslik: str
+    tur: str  # hizmetici, film, kitap
+    aciklama: str = ""
+    hedef_kitle: str  # ogretmen, ogrenci, hepsi
+    sorular: List[SoruModel] = []
+
+class IcerikModel(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    baslik: str
+    tur: str
+    aciklama: str = ""
+    hedef_kitle: str
+    sorular: List[SoruModel] = []
+    ekleyen_id: str = ""
+    ekleyen_ad: str = ""
+    durum: str = "beklemede"  # beklemede, oylama, yayinda, reddedildi
+    oylar: dict = Field(default_factory=dict)  # {user_id: {"oy": True/False, "sebep": ""}}
+    olusturma_tarihi: datetime = Field(default_factory=datetime.utcnow)
+    yayin_tarihi: Optional[datetime] = None
+
+class OyCreate(BaseModel):
+    icerik_id: str
+    onay: bool
+    sebep: str = ""  # Red durumunda zorunlu
+
+class TamamlamaCreate(BaseModel):
+    icerik_id: str
+    kullanici_id: str
+    test_cevaplari: Optional[List[int]] = None
+
+class TamamlamaModel(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    kullanici_id: str
+    icerik_id: str
+    test_yapildi: bool = False
+    dogru_sayisi: int = 0
+    toplam_soru: int = 0
+    kazanilan_puan: int = 0
+    tarih: datetime = Field(default_factory=datetime.utcnow)
+
+# İçerik ekleme (admin veya öğretmen)
+@api_router.post("/gelisim/icerik")
+async def create_icerik(icerik: IcerikCreate, current_user=Depends(get_current_user)):
+    role = current_user.get("role", "")
+    if role not in ["admin", "teacher"]:
+        raise HTTPException(status_code=403, detail="Yetkisiz")
+    
+    # Admin eklerse direkt oylama, öğretmen eklerse beklemede
+    durum = "oylama" if role == "admin" else "beklemede"
+    
+    model = IcerikModel(
+        **icerik.dict(),
+        ekleyen_id=current_user["id"],
+        ekleyen_ad=f"{current_user.get('ad','')} {current_user.get('soyad','')}",
+        durum=durum
+    )
+    data = model.dict()
+    data["olusturma_tarihi"] = data["olusturma_tarihi"].isoformat()
+    if data.get("yayin_tarihi"):
+        data["yayin_tarihi"] = data["yayin_tarihi"].isoformat()
+    await db.gelisim_icerik.insert_one(data)
+    return data
+
+# İçerikleri listele
+@api_router.get("/gelisim/icerik")
+async def get_icerik_list(current_user=Depends(get_current_user)):
+    role = current_user.get("role", "")
+    user_id = current_user.get("id", "")
+    
+    items = await db.gelisim_icerik.find().sort("olusturma_tarihi", -1).to_list(length=None)
+    result = []
+    for item in items:
+        item.pop("_id", None)
+        durum = item.get("durum", "")
+        hedef = item.get("hedef_kitle", "hepsi")
+        
+        # Admin her şeyi görür
+        if role == "admin":
+            result.append(item)
+        # Öğretmen: kendi eklediği + oylama bekleyenler + yayındakiler
+        elif role == "teacher":
+            if item.get("ekleyen_id") == user_id:
+                result.append(item)
+            elif durum == "oylama":
+                result.append(item)
+            elif durum == "yayinda" and hedef in ["hepsi", "ogretmen"]:
+                result.append(item)
+        # Öğrenci: sadece yayındakiler
+        elif role == "student":
+            if durum == "yayinda" and hedef in ["hepsi", "ogrenci"]:
+                result.append(item)
+    
+    return result
+
+# Admin onay/red (beklemede → oylama veya reddedildi)
+@api_router.post("/gelisim/icerik/{icerik_id}/admin-karar")
+async def admin_karar(icerik_id: str, karar: dict, current_user=Depends(require_role(UserRole.ADMIN))):
+    onay = karar.get("onay", False)
+    yeni_durum = "oylama" if onay else "reddedildi"
+    await db.gelisim_icerik.update_one(
+        {"id": icerik_id},
+        {"$set": {"durum": yeni_durum}}
+    )
+    return {"durum": yeni_durum}
+
+# Öğretmen oylama
+@api_router.post("/gelisim/oy")
+async def oy_ver(oy: OyCreate, current_user=Depends(get_current_user)):
+    role = current_user.get("role", "")
+    if role not in ["admin", "teacher"]:
+        raise HTTPException(status_code=403, detail="Sadece öğretmenler oy verebilir")
+    
+    if not oy.onay and not oy.sebep:
+        raise HTTPException(status_code=400, detail="Red için sebep belirtmelisiniz")
+    
+    icerik = await db.gelisim_icerik.find_one({"id": oy.icerik_id})
+    if not icerik:
+        raise HTTPException(status_code=404, detail="İçerik bulunamadı")
+    if icerik.get("durum") != "oylama":
+        raise HTTPException(status_code=400, detail="Bu içerik oylamada değil")
+    
+    user_id = current_user["id"]
+    oylar = icerik.get("oylar", {})
+    
+    if user_id in oylar:
+        raise HTTPException(status_code=400, detail="Zaten oy kullandınız")
+    
+    # Oyu kaydet
+    oylar[user_id] = {"onay": oy.onay, "sebep": oy.sebep}
+    await db.gelisim_icerik.update_one({"id": oy.icerik_id}, {"$set": {"oylar": oylar}})
+    
+    # Oy veren öğretmene +2 puan
+    await db.users.update_one({"id": user_id}, {"$inc": {"puan": 2}})
+    
+    # %60 kontrolü
+    ogretmenler = await db.users.find({"role": {"$in": ["teacher", "admin"]}}).to_list(length=None)
+    toplam_ogretmen = len(ogretmenler)
+    onay_sayisi = sum(1 for v in oylar.values() if v.get("onay"))
+    oy_sayisi = len(oylar)
+    
+    yeni_durum = icerik.get("durum")
+    
+    if toplam_ogretmen > 0:
+        onay_orani = onay_sayisi / toplam_ogretmen
+        # Herkes oy kullandı veya onay oranı %60 geçti
+        if onay_orani >= 0.6:
+            yeni_durum = "yayinda"
+            await db.gelisim_icerik.update_one(
+                {"id": oy.icerik_id},
+                {"$set": {"durum": "yayinda", "yayin_tarihi": datetime.utcnow().isoformat()}}
+            )
+            # İçerik ekleyene +5 bonus puan
+            ekleyen_id = icerik.get("ekleyen_id")
+            if ekleyen_id:
+                await db.users.update_one({"id": ekleyen_id}, {"$inc": {"puan": 5}})
+        elif oy_sayisi == toplam_ogretmen and onay_orani < 0.6:
+            yeni_durum = "reddedildi"
+            await db.gelisim_icerik.update_one({"id": oy.icerik_id}, {"$set": {"durum": "reddedildi"}})
+    
+    return {
+        "mesaj": "Oyunuz kaydedildi (+2 puan)",
+        "durum": yeni_durum,
+        "onay_orani": round(onay_sayisi / max(toplam_ogretmen, 1) * 100),
+        "oy_sayisi": oy_sayisi,
+        "toplam": toplam_ogretmen
+    }
+
+# Tamamlama
+@api_router.post("/gelisim/tamamla")
+async def tamamla_icerik(data: TamamlamaCreate, current_user=Depends(get_current_user)):
+    existing = await db.gelisim_tamamlama.find_one({"kullanici_id": data.kullanici_id, "icerik_id": data.icerik_id})
+    if existing:
+        raise HTTPException(status_code=400, detail="Bu içerik zaten tamamlandı")
+    
+    icerik = await db.gelisim_icerik.find_one({"id": data.icerik_id})
+    if not icerik:
+        raise HTTPException(status_code=404, detail="İçerik bulunamadı")
+    
+    sorular = icerik.get("sorular", [])
+    toplam = len(sorular)
+    dogru = 0
+    test_yapildi = False
+    puan = 1
+    
+    if data.test_cevaplari and toplam > 0:
+        test_yapildi = True
+        for i, cevap in enumerate(data.test_cevaplari):
+            if i < toplam and cevap == sorular[i].get("dogru_cevap"):
+                dogru += 1
+        puan = max(1, round((dogru / toplam) * 10))
+    
+    tamamlama = TamamlamaModel(
+        kullanici_id=data.kullanici_id,
+        icerik_id=data.icerik_id,
+        test_yapildi=test_yapildi,
+        dogru_sayisi=dogru,
+        toplam_soru=toplam,
+        kazanilan_puan=puan
+    )
+    t_data = tamamlama.dict()
+    t_data["tarih"] = t_data["tarih"].isoformat()
+    await db.gelisim_tamamlama.insert_one(t_data)
+    await db.users.update_one({"id": data.kullanici_id}, {"$inc": {"puan": puan}})
+    
+    return {"puan": puan, "dogru": dogru, "toplam": toplam, "test_yapildi": test_yapildi}
+
+# Kullanıcının tamamlamaları
+@api_router.get("/gelisim/tamamlama/{kullanici_id}")
+async def get_tamamlamalar(kullanici_id: str, current_user=Depends(get_current_user)):
+    items = await db.gelisim_tamamlama.find({"kullanici_id": kullanici_id}).to_list(length=None)
+    for item in items:
+        item.pop("_id", None)
+    return items
+
+# Puan tablosu
+@api_router.get("/gelisim/puan-tablosu")
+async def get_puan_tablosu(current_user=Depends(get_current_user)):
+    users = await db.users.find().to_list(length=None)
+    tablo = []
+    for u in users:
+        tablo.append({
+            "ad": u.get("ad", ""), "soyad": u.get("soyad", ""),
+            "role": u.get("role", ""), "puan": u.get("puan", 0)
+        })
+    tablo.sort(key=lambda x: x["puan"], reverse=True)
+    return tablo
+
+# İçerik sil
+@api_router.delete("/gelisim/icerik/{icerik_id}")
+async def delete_icerik(icerik_id: str, current_user=Depends(require_role(UserRole.ADMIN))):
+    await db.gelisim_icerik.delete_one({"id": icerik_id})
+    return {"message": "Silindi"}
+
 
 # ─────────────────────────────────────────────
 # APP SETUP
