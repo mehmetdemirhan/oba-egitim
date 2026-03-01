@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./components/ui/dialog";
 import { Badge } from "./components/ui/badge";
-import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield } from "lucide-react";
+import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star } from "lucide-react";
 import { useToast } from "./hooks/use-toast";
 import { Toaster } from "./components/ui/toaster";
 import { ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Tooltip, XAxis, YAxis, CartesianGrid, AreaChart, Area } from 'recharts';
@@ -292,6 +292,7 @@ function AppContent() {
             <TabsTrigger value="courses" className={tabClass}><BookOpen className="h-4 w-4 mr-2" />Kurslar</TabsTrigger>
             <TabsTrigger value="payments" className={tabClass}><CreditCard className="h-4 w-4 mr-2" />Ödemeler</TabsTrigger>
             {user.role === "admin" && <TabsTrigger value="users" className={tabClass}><Shield className="h-4 w-4 mr-2" />Kullanıcılar</TabsTrigger>}
+            <TabsTrigger value="gelisim" className={tabClass}><Trophy className="h-4 w-4 mr-2" />Gelişim</TabsTrigger>
           </TabsList>
 
           {/* Dashboard */}
@@ -541,6 +542,11 @@ function AppContent() {
           )}
         </Tabs>
 
+          {/* Gelisim Alani */}
+          <TabsContent value="gelisim">
+            <GelisimAlani user={user} />
+          </TabsContent>
+
         {/* Edit Dialog */}
         <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
           <DialogContent className="max-w-md">
@@ -556,6 +562,444 @@ function AppContent() {
     </div>
   );
 }
+
+
+function GelisimAlani({ user }) {
+  const { toast } = useToast();
+  const [icerikler, setIcerikler] = useState([]);
+  const [tamamlananlar, setTamamlananlar] = useState([]);
+  const [puanTablosu, setPuanTablosu] = useState([]);
+  const [aktifIcerik, setAktifIcerik] = useState(null);
+  const [gorunum, setGorunum] = useState("liste"); // liste, test, sonuc, icerikEkle
+  const [testCevaplari, setTestCevaplari] = useState([]);
+  const [sonuc, setSonuc] = useState(null);
+  const [redSebep, setRedSebep] = useState("");
+  const [redDialogIcerik, setRedDialogIcerik] = useState(null);
+  const [adminForm, setAdminForm] = useState({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [] });
+  const [yeniSoru, setYeniSoru] = useState({ soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0 });
+
+  const fetchAll = useCallback(async () => {
+    try { const r = await axios.get(`${API}/gelisim/icerik`); setIcerikler(r.data); } catch(e) {}
+    try { const r = await axios.get(`${API}/gelisim/tamamlama/${user.id}`); setTamamlananlar(r.data); } catch(e) {}
+    try { const r = await axios.get(`${API}/gelisim/puan-tablosu`); setPuanTablosu(r.data); } catch(e) {}
+  }, [user.id]);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  const turIcon = (tur) => ({ hizmetici: <GraduationCap className="h-5 w-5"/>, film: <Film className="h-5 w-5"/>, kitap: <BookMarked className="h-5 w-5"/> }[tur] || <BookOpen className="h-5 w-5"/>);
+  const turLabel = (tur) => ({ hizmetici: "Hizmetiçi Eğitim", film: "Film", kitap: "Kitap" }[tur] || tur);
+  const turColor = (tur) => ({ hizmetici: "bg-blue-100 text-blue-600", film: "bg-purple-100 text-purple-600", kitap: "bg-green-100 text-green-600" }[tur] || "bg-gray-100 text-gray-600");
+  const durumBadge = (d) => ({
+    beklemede: <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full font-medium">⏳ Yönetici Onayı Bekliyor</span>,
+    oylama: <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">🗳️ Öğretmen Oylamasında</span>,
+    yayinda: <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium">✅ Yayında</span>,
+    reddedildi: <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full font-medium">❌ Reddedildi</span>,
+  }[d] || null);
+
+  const isTamamlandi = (id) => tamamlananlar.some(t => t.icerik_id === id);
+  const getPuan = (id) => { const t = tamamlananlar.find(t => t.icerik_id === id); return t ? t.kazanilan_puan : null; };
+  const oyKullandi = (icerik) => icerik.oylar && icerik.oylar[user.id];
+  const onayOrani = (icerik) => {
+    const oylar = icerik.oylar || {};
+    const toplam = Object.keys(oylar).length;
+    if (toplam === 0) return null;
+    const onay = Object.values(oylar).filter(o => o.onay).length;
+    return Math.round(onay / toplam * 100);
+  };
+
+  const adminKarar = async (icerikId, onay) => {
+    try {
+      await axios.post(`${API}/gelisim/icerik/${icerikId}/admin-karar`, { onay });
+      toast({ title: onay ? "Oylama başlatıldı" : "İçerik reddedildi" });
+      fetchAll();
+    } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
+  };
+
+  const oyVer = async (onay, sebep = "") => {
+    if (!onay && !sebep) { setRedDialogIcerik(aktifIcerik || redDialogIcerik); return; }
+    try {
+      const r = await axios.post(`${API}/gelisim/oy`, { icerik_id: (aktifIcerik || redDialogIcerik).id, onay, sebep });
+      toast({ title: onay ? `✅ Onaylandı (+2 puan)` : "❌ Reddedildi", description: `Onay oranı: %${r.data.onay_orani}` });
+      setRedDialogIcerik(null); setRedSebep(""); fetchAll();
+    } catch(e) { toast({ title: "Hata", description: e.response?.data?.detail || "Hata", variant: "destructive" }); }
+  };
+
+  const handleTamamla = async (testYapildi) => {
+    try {
+      const data = { icerik_id: aktifIcerik.id, kullanici_id: user.id };
+      if (testYapildi) data.test_cevaplari = testCevaplari;
+      const r = await axios.post(`${API}/gelisim/tamamla`, data);
+      setSonuc(r.data); setGorunum("sonuc"); fetchAll();
+      toast({ title: `+${r.data.puan} puan kazandınız!` });
+    } catch(e) { toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
+  };
+
+  const soruEkle = () => {
+    if (!yeniSoru.soru || yeniSoru.secenekler.some(s => !s)) {
+      toast({ title: "Uyarı", description: "Soru ve tüm seçenekler dolu olmalı", variant: "destructive" }); return;
+    }
+    setAdminForm({ ...adminForm, sorular: [...adminForm.sorular, { ...yeniSoru, id: Date.now().toString() }] });
+    setYeniSoru({ soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0 });
+  };
+
+  const icerikKaydet = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post(`${API}/gelisim/icerik`, adminForm);
+      setAdminForm({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [] });
+      setGorunum("liste"); fetchAll();
+      toast({ title: user.role === "admin" ? "İçerik oylama aşamasına alındı" : "İçerik yönetici onayına gönderildi" });
+    } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
+  };
+
+  // ── TEST GÖRÜNÜMÜ ──
+  if (gorunum === "test" && aktifIcerik) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-6">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={() => { setGorunum("liste"); setTestCevaplari([]); }}>← Geri</Button>
+          <h2 className="text-xl font-bold">{aktifIcerik.baslik} — Test</h2>
+        </div>
+        {aktifIcerik.sorular.map((soru, i) => (
+          <Card key={i} className="border-0 shadow-sm">
+            <CardContent className="p-6">
+              <p className="font-medium mb-4">{i + 1}. {soru.soru}</p>
+              <div className="space-y-2">
+                {soru.secenekler.map((s, j) => (
+                  <button key={j} onClick={() => { const c=[...testCevaplari]; c[i]=j; setTestCevaplari(c); }}
+                    className={`w-full text-left p-3 rounded-xl border-2 transition-all ${testCevaplari[i]===j ? 'border-orange-500 bg-orange-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                    <span className="font-medium mr-2">{['A','B','C','D'][j]})</span>{s}
+                  </button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+        <Button onClick={() => handleTamamla(true)}
+          disabled={testCevaplari.filter(c => c !== undefined).length < aktifIcerik.sorular.length}
+          className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-3">
+          Testi Tamamla ({testCevaplari.filter(c=>c!==undefined).length}/{aktifIcerik.sorular.length} cevaplandı)
+        </Button>
+      </div>
+    );
+  }
+
+  // ── SONUÇ GÖRÜNÜMÜ ──
+  if (gorunum === "sonuc" && sonuc) {
+    return (
+      <div className="max-w-md mx-auto text-center space-y-6 py-12">
+        <div className="w-24 h-24 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto">
+          <Trophy className="h-12 w-12 text-white" />
+        </div>
+        <div>
+          <h2 className="text-4xl font-bold text-gray-900">+{sonuc.puan} Puan!</h2>
+          {sonuc.test_yapildi
+            ? <p className="text-gray-600 mt-2 text-lg">{sonuc.dogru} / {sonuc.toplam} doğru cevap</p>
+            : <p className="text-gray-500 mt-2">Test çözülmeden tamamlandı</p>}
+        </div>
+        <Button onClick={() => { setGorunum("liste"); setSonuc(null); setAktifIcerik(null); }}
+          className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-8">
+          Listeye Dön
+        </Button>
+      </div>
+    );
+  }
+
+  // ── İÇERİK EKLEME GÖRÜNÜMÜ ──
+  if (gorunum === "icerikEkle") {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="flex items-center gap-3 mb-6">
+          <Button variant="outline" size="sm" onClick={() => setGorunum("liste")}>← Geri</Button>
+          <h2 className="text-xl font-bold">Yeni İçerik Ekle</h2>
+        </div>
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-6">
+            <form onSubmit={icerikKaydet} className="space-y-5">
+              <div><Label>Başlık *</Label><Input value={adminForm.baslik} onChange={e => setAdminForm({...adminForm, baslik: e.target.value})} required /></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><Label>Tür</Label>
+                  <Select value={adminForm.tur} onValueChange={v => setAdminForm({...adminForm, tur: v})}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="hizmetici">📚 Hizmetiçi Eğitim</SelectItem>
+                      <SelectItem value="film">🎬 Film</SelectItem>
+                      <SelectItem value="kitap">📖 Kitap</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div><Label>Hedef Kitle</Label>
+                  <Select value={adminForm.hedef_kitle} onValueChange={v => setAdminForm({...adminForm, hedef_kitle: v})}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="hepsi">👥 Herkes</SelectItem>
+                      <SelectItem value="ogretmen">👩‍🏫 Öğretmenler</SelectItem>
+                      <SelectItem value="ogrenci">🎓 Öğrenciler</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div><Label>Açıklama</Label><Input value={adminForm.aciklama} onChange={e => setAdminForm({...adminForm, aciklama: e.target.value})} placeholder="Kısa açıklama..." /></div>
+
+              {/* Soru Ekleme */}
+              <div className="border-2 border-dashed border-gray-200 rounded-xl p-4 space-y-4">
+                <h4 className="font-semibold text-gray-700">Test Soruları ({adminForm.sorular.length} soru eklendi)</h4>
+                {adminForm.sorular.map((s, i) => (
+                  <div key={i} className="bg-green-50 p-3 rounded-lg text-sm flex items-start justify-between">
+                    <span><strong>{i+1}.</strong> {s.soru}</span>
+                    <button type="button" onClick={() => setAdminForm({...adminForm, sorular: adminForm.sorular.filter((_,idx)=>idx!==i)})}
+                      className="text-red-500 ml-2 text-xs">✕</button>
+                  </div>
+                ))}
+                <div className="space-y-3 border-t pt-4">
+                  <Input placeholder="Soru metni" value={yeniSoru.soru} onChange={e => setYeniSoru({...yeniSoru, soru: e.target.value})} />
+                  {yeniSoru.secenekler.map((s, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="text-sm font-bold w-5">{['A','B','C','D'][i]}</span>
+                      <Input placeholder={`${['A','B','C','D'][i]} seçeneği`} value={s} onChange={e => { const sec=[...yeniSoru.secenekler]; sec[i]=e.target.value; setYeniSoru({...yeniSoru, secenekler:sec}); }} />
+                      <input type="radio" name="dogru" checked={yeniSoru.dogru_cevap===i} onChange={() => setYeniSoru({...yeniSoru, dogru_cevap:i})} className="w-4 h-4 accent-orange-500" title="Doğru cevap" />
+                    </div>
+                  ))}
+                  <p className="text-xs text-gray-500">● Doğru cevabı radyo butonuyla işaretleyin</p>
+                  <Button type="button" variant="outline" size="sm" onClick={soruEkle} className="w-full">+ Soru Ekle</Button>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <Button type="submit" className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white">
+                  {user.role === "admin" ? "Oylama Başlat" : "Yöneticiye Gönder"}
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setGorunum("liste")} className="flex-1">İptal</Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // ── ANA LİSTE GÖRÜNÜMÜ ──
+  const bekleyenler = icerikler.filter(i => i.durum === "beklemede");
+  const oylamadakiler = icerikler.filter(i => i.durum === "oylama");
+  const yayindakiler = icerikler.filter(i => i.durum === "yayinda");
+  const reddedilenler = icerikler.filter(i => i.durum === "reddedildi");
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          {/* Başlık */}
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold">Gelişim Alanı</h2>
+            {(user.role === "admin" || user.role === "teacher") && (
+              <Button onClick={() => setGorunum("icerikEkle")} className="bg-gradient-to-r from-orange-500 to-red-500 text-white">
+                <Plus className="h-4 w-4 mr-2"/>İçerik Ekle
+              </Button>
+            )}
+          </div>
+
+          {/* Yönetici onayı bekleyenler */}
+          {user.role === "admin" && bekleyenler.length > 0 && (
+            <div>
+              <h3 className="font-semibold text-yellow-700 mb-3">⏳ Onay Bekleyenler ({bekleyenler.length})</h3>
+              <div className="space-y-3">
+                {bekleyenler.map(icerik => (
+                  <Card key={icerik.id} className="border-2 border-yellow-200 shadow-sm">
+                    <CardContent className="p-5">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${turColor(icerik.tur)}`}>{turIcon(icerik.tur)}</div>
+                          <div>
+                            <div className="font-semibold">{icerik.baslik}</div>
+                            <div className="text-xs text-gray-500">{turLabel(icerik.tur)} • Ekleyen: {icerik.ekleyen_ad} • {icerik.sorular?.length || 0} soru</div>
+                          </div>
+                        </div>
+                      </div>
+                      {icerik.aciklama && <p className="text-sm text-gray-600 mb-3">{icerik.aciklama}</p>}
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={() => adminKarar(icerik.id, true)} className="bg-green-600 hover:bg-green-700 text-white">✅ Oylama Başlat</Button>
+                        <Button size="sm" variant="destructive" onClick={() => adminKarar(icerik.id, false)}>❌ Reddet</Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Oylama bekleyenler */}
+          {oylamadakiler.length > 0 && (user.role === "admin" || user.role === "teacher") && (
+            <div>
+              <h3 className="font-semibold text-blue-700 mb-3">🗳️ Oylaması Bekleyenler ({oylamadakiler.length})</h3>
+              <div className="space-y-3">
+                {oylamadakiler.map(icerik => {
+                  const kullandi = oyKullandi(icerik);
+                  const oran = onayOrani(icerik);
+                  const oyCount = Object.keys(icerik.oylar || {}).length;
+                  return (
+                    <Card key={icerik.id} className="border-2 border-blue-200 shadow-sm">
+                      <CardContent className="p-5">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${turColor(icerik.tur)}`}>{turIcon(icerik.tur)}</div>
+                            <div>
+                              <div className="font-semibold">{icerik.baslik}</div>
+                              <div className="text-xs text-gray-500">{turLabel(icerik.tur)} • Ekleyen: {icerik.ekleyen_ad}</div>
+                            </div>
+                          </div>
+                          {oran !== null && (
+                            <div className="text-right">
+                              <div className="text-lg font-bold text-blue-600">%{oran}</div>
+                              <div className="text-xs text-gray-500">{oyCount} oy</div>
+                            </div>
+                          )}
+                        </div>
+                        {icerik.aciklama && <p className="text-sm text-gray-600 mb-3">{icerik.aciklama}</p>}
+
+                        {/* Oy bar */}
+                        {oran !== null && (
+                          <div className="mb-3">
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div className={`h-2 rounded-full transition-all ${oran >= 60 ? 'bg-green-500' : 'bg-orange-500'}`} style={{width:`${oran}%`}}></div>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">%60 onay gerekli • Şu an %{oran}</p>
+                          </div>
+                        )}
+
+                        {kullandi ? (
+                          <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
+                            ✓ Oyunuzu kullandınız: <strong>{kullandi.onay ? "Onay ✅" : "Red ❌"}</strong>
+                            {!kullandi.onay && kullandi.sebep && <span className="text-gray-600"> — {kullandi.sebep}</span>}
+                          </div>
+                        ) : (
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={() => oyVer(true)} className="bg-green-600 hover:bg-green-700 text-white flex-1">✅ Onayla (+2 puan)</Button>
+                            <Button size="sm" variant="destructive" className="flex-1" onClick={() => { setRedDialogIcerik(icerik); }}>❌ Reddet</Button>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Yayındaki içerikler */}
+          {yayindakiler.length > 0 && (
+            <div>
+              <h3 className="font-semibold text-green-700 mb-3">✅ Yayındaki İçerikler ({yayindakiler.length})</h3>
+              <div className="space-y-3">
+                {yayindakiler.map(icerik => {
+                  const tamamlandi = isTamamlandi(icerik.id);
+                  const puan = getPuan(icerik.id);
+                  return (
+                    <Card key={icerik.id} className={`border-0 shadow-sm ${tamamlandi ? 'opacity-75' : ''}`}>
+                      <CardContent className="p-5">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${turColor(icerik.tur)}`}>{turIcon(icerik.tur)}</div>
+                            <div>
+                              <div className="font-semibold">{icerik.baslik}</div>
+                              <div className="text-xs text-gray-500">{turLabel(icerik.tur)} • {icerik.sorular?.length || 0} soru</div>
+                              {icerik.aciklama && <div className="text-sm text-gray-600 mt-1">{icerik.aciklama}</div>}
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-2">
+                            {tamamlandi && <span className="flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium"><CheckCircle className="h-4 w-4"/>+{puan} puan</span>}
+                            {user.role === "admin" && <Button variant="destructive" size="sm" onClick={async () => { try { await axios.delete(`${API}/gelisim/icerik/${icerik.id}`); fetchAll(); toast({title:"Silindi"}); } catch(e){} }}><Trash2 className="h-4 w-4"/></Button>}
+                          </div>
+                        </div>
+                        {!tamamlandi && (
+                          <div className="flex gap-2 mt-4">
+                            {icerik.sorular?.length > 0 && (
+                              <Button size="sm" onClick={() => { setAktifIcerik(icerik); setGorunum("test"); setTestCevaplari([]); }}
+                                className="bg-gradient-to-r from-orange-500 to-red-500 text-white">
+                                📝 Testi Çöz (+10 puan)
+                              </Button>
+                            )}
+                            <Button size="sm" variant="outline" onClick={() => { setAktifIcerik(icerik); handleTamamla(false); }}>
+                              ✓ Tamamlandı (+1 puan)
+                            </Button>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {icerikler.length === 0 && (
+            <div className="text-center py-16 text-gray-500">
+              <Trophy className="h-16 w-16 mx-auto mb-4 text-gray-300"/>
+              <p className="text-lg">Henüz içerik yok</p>
+              <p className="text-sm">İlk içeriği eklemek için yukarıdaki butona tıklayın</p>
+            </div>
+          )}
+        </div>
+
+        {/* Puan Tablosu */}
+        <div className="space-y-4">
+          <Card className="border-0 shadow-sm">
+            <CardHeader><CardTitle className="flex items-center gap-2"><Trophy className="h-5 w-5 text-yellow-500"/>Puan Tablosu</CardTitle></CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {puanTablosu.slice(0, 10).map((u, i) => (
+                  <div key={i} className={`flex items-center justify-between p-3 rounded-xl ${u.ad === user.ad && u.soyad === user.soyad ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50'}`}>
+                    <div className="flex items-center gap-2">
+                      <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold ${i===0?'bg-yellow-400 text-white':i===1?'bg-gray-300 text-gray-700':i===2?'bg-orange-300 text-white':'bg-gray-100 text-gray-600'}`}>{i+1}</span>
+                      <div>
+                        <div className="text-sm font-medium">{u.ad} {u.soyad}</div>
+                        <div className="text-xs text-gray-400">{roleLabel(u.role)}</div>
+                      </div>
+                    </div>
+                    <span className="font-bold text-orange-600">{u.puan} puan</span>
+                  </div>
+                ))}
+                {puanTablosu.length === 0 && <p className="text-sm text-gray-400 text-center py-4">Henüz puan yok</p>}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Puan Rehberi */}
+          <Card className="border-0 shadow-sm bg-gradient-to-br from-orange-50 to-yellow-50">
+            <CardContent className="p-5">
+              <h4 className="font-semibold text-gray-800 mb-3">🎯 Puan Rehberi</h4>
+              <div className="space-y-2 text-sm text-gray-600">
+                <div className="flex justify-between"><span>✅ İçerik tamamla</span><span className="font-bold text-orange-600">+1</span></div>
+                <div className="flex justify-between"><span>📝 Test çöz (tam puan)</span><span className="font-bold text-orange-600">+10</span></div>
+                <div className="flex justify-between"><span>🗳️ Oylama katıl</span><span className="font-bold text-orange-600">+2</span></div>
+                <div className="flex justify-between"><span>🌟 İçeriğin yayına girdi</span><span className="font-bold text-orange-600">+5</span></div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Red Sebebi Dialog */}
+      <Dialog open={!!redDialogIcerik} onOpenChange={() => { setRedDialogIcerik(null); setRedSebep(""); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>❌ Reddetme Sebebi</DialogTitle>
+            <DialogDescription>{redDialogIcerik?.baslik} içeriğini neden reddediyorsunuz?</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <textarea value={redSebep} onChange={e => setRedSebep(e.target.value)}
+              placeholder="Lütfen reddetme sebebinizi açıklayın..." rows={4}
+              className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none" />
+            <div className="flex gap-2">
+              <Button variant="destructive" className="flex-1" disabled={!redSebep.trim()} onClick={() => oyVer(false, redSebep)}>Reddet</Button>
+              <Button variant="outline" className="flex-1" onClick={() => { setRedDialogIcerik(null); setRedSebep(""); }}>İptal</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 
 export default function App() {
   return <AppContent />;
