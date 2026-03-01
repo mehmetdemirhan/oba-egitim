@@ -478,6 +478,29 @@ async def get_dashboard_stats():
         bu_ay_odenen_toplam=monthly_total
     )
 
+
+@api_router.get("/dashboard/bekleyenler")
+async def get_bekleyenler(current_user=Depends(require_role(UserRole.ADMIN))):
+    # Analiz metinleri - beklemede olanlar
+    metin_bekleyen = await db.analiz_metinler.find({"durum": "beklemede"}).sort("olusturma_tarihi", -1).to_list(length=None)
+    metin_oylama = await db.analiz_metinler.find({"durum": "oylama"}).sort("olusturma_tarihi", -1).to_list(length=None)
+    # Gelişim araçları - beklemede olanlar
+    gelisim_bekleyen = await db.gelisim_icerik.find({"durum": "beklemede"}).sort("olusturma_tarihi", -1).to_list(length=None)
+    gelisim_oylama = await db.gelisim_icerik.find({"durum": "oylama"}).sort("olusturma_tarihi", -1).to_list(length=None)
+
+    for lst in [metin_bekleyen, metin_oylama, gelisim_bekleyen, gelisim_oylama]:
+        for item in lst:
+            item.pop("_id", None)
+            item.pop("icerik", None)  # İçerik metnini kırp, sadece meta
+
+    return {
+        "metin_bekleyen": metin_bekleyen,
+        "metin_oylama": metin_oylama,
+        "gelisim_bekleyen": gelisim_bekleyen,
+        "gelisim_oylama": gelisim_oylama,
+        "toplam": len(metin_bekleyen) + len(metin_oylama) + len(gelisim_bekleyen) + len(gelisim_oylama)
+    }
+
 @api_router.get("/stats/weekly", response_model=List[WeeklyStats])
 async def get_weekly_stats():
     from datetime import timedelta
