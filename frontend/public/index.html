@@ -7,6 +7,29 @@
     <meta name="description" content="Okuma Becerileri Akademisi - Eğitim Yönetim Sistemi" />
     <title>Okuma Becerileri Akademisi</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      [data-radix-dialog-overlay] {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        background-color: rgba(0, 0, 0, 0.7);
+      }
+      [data-radix-dialog-content] {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        z-index: 51;
+        transform: translate(-50%, -50%);
+        background: white;
+        border-radius: 8px;
+        padding: 24px;
+        box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+        max-width: 28rem;
+        width: 100%;
+      }
+      .bg-background { background-color: white; }
+      .text-muted-foreground { color: #6b7280; }
+    </style>
   </head>
   <body>
     <noscript>Bu uygulamayı çalıştırmak için JavaScript gereklidir.</noscript>
