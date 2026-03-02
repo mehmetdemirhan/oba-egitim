@@ -175,10 +175,11 @@ class UserCreate(BaseModel):
     email: str
     password: str
     role: UserRole
+    telefon: Optional[str] = None
     linked_id: Optional[str] = None  # teacher_id, student_id or parent's student_id
 
 class UserLogin(BaseModel):
-    email: str
+    email_or_phone: str
     password: str
 
 class UserResponse(BaseModel):
@@ -187,6 +188,7 @@ class UserResponse(BaseModel):
     soyad: str
     email: str
     role: UserRole
+    telefon: Optional[str] = None
     linked_id: Optional[str] = None
     olusturma_tarihi: datetime
     puan: int = 0
@@ -206,11 +208,15 @@ class ChangePassword(BaseModel):
 
 @api_router.post("/auth/login", response_model=TokenResponse)
 async def login(credentials: UserLogin):
-    user = await db.users.find_one({"email": credentials.email.lower().strip()})
+    girdi = credentials.email_or_phone.lower().strip()
+    # Email veya telefon ile kullanıcı bul
+    user = await db.users.find_one({"email": girdi})
+    if not user:
+        user = await db.users.find_one({"telefon": girdi})
     if not user or not verify_password(credentials.password, user.get("password_hash", "")):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="E-posta veya şifre hatalı"
+            detail="E-posta/telefon veya şifre hatalı"
         )
     
     token = create_access_token({"sub": user["id"], "role": user["role"]})
@@ -221,6 +227,7 @@ async def login(credentials: UserLogin):
         soyad=user["soyad"],
         email=user["email"],
         role=user["role"],
+        telefon=user.get("telefon"),
         linked_id=user.get("linked_id"),
         olusturma_tarihi=datetime.fromisoformat(user["olusturma_tarihi"]) if isinstance(user.get("olusturma_tarihi"), str) else user.get("olusturma_tarihi", datetime.now(timezone.utc)),
         puan=user.get("puan", 0)
@@ -236,10 +243,36 @@ async def get_me(current_user=Depends(get_current_user)):
         soyad=current_user["soyad"],
         email=current_user["email"],
         role=current_user["role"],
+        telefon=current_user.get("telefon"),
         linked_id=current_user.get("linked_id"),
         olusturma_tarihi=datetime.fromisoformat(current_user["olusturma_tarihi"]) if isinstance(current_user.get("olusturma_tarihi"), str) else current_user.get("olusturma_tarihi", datetime.now(timezone.utc)),
         puan=current_user.get("puan", 0)
     )
+
+@api_router.post("/auth/forgot-password")
+async def forgot_password(data: dict = Body(...)):
+    email_or_phone = data.get("email_or_phone", "").lower().strip()
+    if not email_or_phone:
+        raise HTTPException(status_code=400, detail="E-posta veya telefon giriniz")
+    user = await db.users.find_one({"email": email_or_phone})
+    if not user:
+        user = await db.users.find_one({"telefon": email_or_phone})
+    if not user:
+        raise HTTPException(status_code=404, detail="Bu bilgilerle kayıtlı kullanıcı bulunamadı")
+    # 6 haneli geçici şifre oluştur
+    import random
+    gecici_sifre = str(random.randint(100000, 999999))
+    new_hash = hash_password(gecici_sifre)
+    await db.users.update_one({"id": user["id"]}, {"$set": {"password_hash": new_hash}})
+    # NOT: Gerçek uygulamada burada e-posta veya SMS gönderilir
+    # Şimdilik geçici şifreyi response'da döndürüyoruz (geliştirme aşaması)
+    return {
+        "message": f"Geçici şifre oluşturuldu",
+        "gecici_sifre": gecici_sifre,
+        "kullanici": f"{user['ad']} {user['soyad']}",
+        "email": user.get("email", ""),
+        "telefon": user.get("telefon", ""),
+    }
 
 @api_router.post("/auth/change-password")
 async def change_password(data: ChangePassword, current_user=Depends(get_current_user)):
@@ -269,6 +302,7 @@ async def create_user(
         "ad": user_data.ad,
         "soyad": user_data.soyad,
         "email": user_data.email.lower().strip(),
+        "telefon": user_data.telefon.strip() if user_data.telefon else None,
         "password_hash": hash_password(user_data.password),
         "role": user_data.role.value,
         "linked_id": user_data.linked_id,
@@ -297,6 +331,7 @@ async def list_users(current_user=Depends(require_role(UserRole.ADMIN))):
             soyad=u["soyad"],
             email=u["email"],
             role=u["role"],
+            telefon=u.get("telefon"),
             linked_id=u.get("linked_id"),
             olusturma_tarihi=datetime.fromisoformat(u["olusturma_tarihi"]) if isinstance(u.get("olusturma_tarihi"), str) else datetime.now(timezone.utc),
             puan=u.get("puan", 0)
