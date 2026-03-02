@@ -1316,6 +1316,29 @@ def anlama_seviye(pct: int) -> str:
     elif pct >= 70: return "orta"
     else: return "zayıf"
 
+def _hata_sayilari_hesapla(hatalar_raw):
+    """Ham hata listesinden [{tur, sayi}] formatına çevir"""
+    if not hatalar_raw:
+        return []
+    # Eğer zaten {tur, sayi} formatındaysa dokunma
+    if hatalar_raw and isinstance(hatalar_raw[0], dict) and "sayi" in hatalar_raw[0]:
+        return hatalar_raw
+    # Ham liste: [{tip: "atlama", kelime: "x"}, ...] → sayılarla topla
+    sayac = {}
+    for h in hatalar_raw:
+        tip = h.get("tip", "") if isinstance(h, dict) else ""
+        if tip:
+            sayac[tip] = sayac.get(tip, 0) + 1
+    hata_labels = {"atlama": "Atlama", "yanlis_okuma": "Yanlış Okuma", "takilma": "Takılma", "tekrar": "Tekrar"}
+    result = []
+    for tip, sayi in sayac.items():
+        result.append({"tur": tip, "sayi": sayi})
+    # Eğer hiç hata yoksa standart 4 türü 0 olarak göster
+    if not result:
+        for tip in ["atlama", "yanlis_okuma", "takilma", "tekrar"]:
+            result.append({"tur": tip, "sayi": 0})
+    return result
+
 @api_router.post("/diagnostic/rapor")
 async def olustur_rapor(data: RaporOlusturCreate, current_user=Depends(get_current_user)):
     oturum = await db.diagnostic_oturumlar.find_one({"id": data.oturum_id})
@@ -1345,7 +1368,7 @@ async def olustur_rapor(data: RaporOlusturCreate, current_user=Depends(get_curre
         "dogruluk_yuzde": oturum.get("dogruluk_yuzde", 0),
         "hiz_deger": oturum.get("hiz_deger", ""),
         "atanan_kur": oturum.get("ogretmen_kur", ""),
-        "hata_sayilari": oturum.get("hatalar", []),
+        "hata_sayilari": _hata_sayilari_hesapla(oturum.get("hatalar", [])),
         "anlama": data.anlama.dict(),
         "anlama_yuzde": anlama_pct,
         "prozodik": data.prozodik.dict(),
@@ -1372,6 +1395,13 @@ async def get_rapor(rapor_id: str, current_user=Depends(get_current_user)):
     return rapor
 
 # ── PDF Rapor Üretimi ──
+def _tr_upper(text):
+    """Türkçe büyük harf çevirimi (i→İ, ı→I)"""
+    if not text:
+        return text
+    tr_map = str.maketrans("abcçdefgğhıijklmnoöprsştuüvyz", "ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZ")
+    return text.translate(tr_map)
+
 @api_router.get("/diagnostic/rapor/{rapor_id}/pdf")
 async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     rapor = await db.diagnostic_raporlar.find_one({"id": rapor_id})
@@ -1479,8 +1509,8 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     sure_dk = int(sure_sn_total) // 60
     sure_sn = int(sure_sn_total) % 60
     metin_info = [
-        ["Metnin Adı:", rapor.get("metin_adi", "-").upper()],
-        ["Metnin Türü:", rapor.get("metin_turu", "-").upper()],
+        ["Metnin Adı:", _tr_upper(rapor.get("metin_adi", "-"))],
+        ["Metnin Türü:", _tr_upper(rapor.get("metin_turu", "-"))],
         ["Toplam Kelime Sayısı:", str(kelime_s)],
         ["Doğru Okunan Kelime:", str(dogru_k)],
         ["Yanlış Okunan Kelime:", str(yanlis_k)],
@@ -1513,10 +1543,13 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     el.append(RLPara("3.1. Doğru Okuma Oranı", styles['SubSectOBA']))
     el.append(RLPara(f"Doğruluk: <b>%{round(dogruluk)}</b>", styles['BodyOBA']))
     hatalar = rapor.get("hata_sayilari", [])
+    # Dict formatındaysa listeye çevir: {"atlama": 2, ...} → [{"tur": "atlama", "sayi": 2}]
+    if isinstance(hatalar, dict):
+        hatalar = [{"tur": k, "sayi": v} for k, v in hatalar.items()]
     if hatalar:
-        hata_labels = {"atlama": "Atlama", "yanlis": "Yanlış Okuma", "takilma": "Takılma", "tekrar": "Tekrar"}
+        hata_labels = {"atlama": "Atlama", "yanlis_okuma": "Yanlış Okuma", "yanlis": "Yanlış Okuma", "takilma": "Takılma", "tekrar": "Tekrar"}
+        hata_desc = {"atlama": "Kelime veya satır atlama", "yanlis_okuma": "Kelimeyi farklı okuma", "yanlis": "Kelimeyi farklı okuma", "takilma": "Kelimede duraksama", "tekrar": "Aynı kelimeyi tekrar okuma"}
         hata_rows = [["Hata Türü", "Açıklama", "Sayı"]]
-        hata_desc = {"atlama": "Kelime veya satır atlama", "yanlis": "Kelimeyi farklı okuma", "takilma": "Kelimede duraksama", "tekrar": "Aynı kelimeyi tekrar okuma"}
         toplam_hata = 0
         for h in hatalar:
             tur = h.get("tur", "")
