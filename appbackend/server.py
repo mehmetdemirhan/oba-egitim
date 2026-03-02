@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -874,6 +874,34 @@ async def update_normlar(data: NormGuncelle, current_user=Depends(require_role(U
     )
     return {"message": "Norm tablosu güncellendi", "normlar": data.normlar}
 
+# ── Puan Ayarları ──
+VARSAYILAN_PUANLAR = {
+    "metin_ekleme": 5,
+    "oylama_katilim": 2,
+    "metin_havuza_girme": 10,
+    "icerik_ekleme": 5,
+    "icerik_oylama": 2,
+}
+
+async def get_puan_ayarlari():
+    doc = await db.sistem_ayarlari.find_one({"tip": "puan_ayarlari"})
+    if doc:
+        return doc.get("puanlar", VARSAYILAN_PUANLAR)
+    return VARSAYILAN_PUANLAR
+
+@api_router.get("/ayarlar/puanlar")
+async def get_puanlar(current_user=Depends(get_current_user)):
+    return await get_puan_ayarlari()
+
+@api_router.put("/ayarlar/puanlar")
+async def update_puanlar(data: dict = Body(...), current_user=Depends(require_role(UserRole.ADMIN))):
+    await db.sistem_ayarlari.update_one(
+        {"tip": "puan_ayarlari"},
+        {"$set": {"tip": "puan_ayarlari", "puanlar": data}},
+        upsert=True
+    )
+    return {"message": "Puan ayarları güncellendi", "puanlar": data}
+
 
 # ─────────────────────────────────────────────
 # ★ EKSİK MODELLER VE ENDPOINT'LER (EKLENDİ)
@@ -925,8 +953,9 @@ async def create_metin(data: MetinCreate, current_user=Depends(get_current_user)
     }
     await db.analiz_metinler.insert_one(metin_doc)
 
-    # Ekleyene +5 puan
-    await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": 5}})
+    # Ekleyene puan ver (dinamik)
+    puanlar = await get_puan_ayarlari()
+    await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": puanlar.get("metin_ekleme", 5)}})
 
     metin_doc.pop("_id", None)
     return metin_doc
@@ -975,10 +1004,11 @@ async def metin_admin_karar(metin_id: str, karar: dict, current_user=Depends(req
         yeni_durum = "reddedildi"
     elif direkt:
         yeni_durum = "havuzda"
-        # Ekleyene +10 bonus puan (havuza direkt girince)
+        # Ekleyene bonus puan (havuza direkt girince - dinamik)
+        puanlar = await get_puan_ayarlari()
         metin = await db.analiz_metinler.find_one({"id": metin_id})
         if metin and metin.get("ekleyen_id"):
-            await db.users.update_one({"id": metin["ekleyen_id"]}, {"$inc": {"puan": 10}})
+            await db.users.update_one({"id": metin["ekleyen_id"]}, {"$inc": {"puan": puanlar.get("metin_havuza_girme", 10)}})
     else:
         yeni_durum = "oylama"
     await db.analiz_metinler.update_one(
@@ -1005,8 +1035,9 @@ async def metin_oy_ver(oy: MetinOyCreate, current_user=Depends(get_current_user)
         raise HTTPException(status_code=400, detail="Zaten oy kullandınız")
     oylar[user_id] = {"onay": oy.onay, "sebep": oy.sebep}
     await db.analiz_metinler.update_one({"id": oy.metin_id}, {"$set": {"oylar": oylar}})
-    # Oy veren öğretmene +2 puan
-    await db.users.update_one({"id": user_id}, {"$inc": {"puan": 2}})
+    # Oy veren öğretmene puan (dinamik)
+    puanlar = await get_puan_ayarlari()
+    await db.users.update_one({"id": user_id}, {"$inc": {"puan": puanlar.get("oylama_katilim", 2)}})
     # %60 kontrolü
     ogretmenler = await db.users.find({"role": {"$in": ["teacher", "admin"]}}).to_list(length=None)
     toplam = len(ogretmenler)
@@ -1021,15 +1052,15 @@ async def metin_oy_ver(oy: MetinOyCreate, current_user=Depends(get_current_user)
                 {"id": oy.metin_id},
                 {"$set": {"durum": "havuzda", "yayin_tarihi": datetime.utcnow().isoformat()}}
             )
-            # Metni ekleyene +10 bonus puan (havuza girince)
+            # Metni ekleyene bonus puan (havuza girince - dinamik)
             ekleyen_id = metin.get("ekleyen_id")
             if ekleyen_id:
-                await db.users.update_one({"id": ekleyen_id}, {"$inc": {"puan": 10}})
+                await db.users.update_one({"id": ekleyen_id}, {"$inc": {"puan": puanlar.get("metin_havuza_girme", 10)}})
         elif oy_sayisi == toplam and onay_orani < 0.6:
             yeni_durum = "reddedildi"
             await db.analiz_metinler.update_one({"id": oy.metin_id}, {"$set": {"durum": "reddedildi"}})
     return {
-        "mesaj": "Oyunuz kaydedildi (+2 puan)",
+        "mesaj": f"Oyunuz kaydedildi (+{puanlar.get('oylama_katilim', 2)} puan)",
         "durum": yeni_durum,
         "onay_orani": round(onay_sayisi / max(toplam, 1) * 100),
         "oy_sayisi": oy_sayisi,
@@ -1452,8 +1483,9 @@ async def admin_karar(icerik_id: str, karar: dict, current_user=Depends(require_
     elif direkt:
         yeni_durum = "yayinda"
         icerik = await db.gelisim_icerik.find_one({"id": icerik_id})
+        puanlar = await get_puan_ayarlari()
         if icerik and icerik.get("ekleyen_id"):
-            await db.users.update_one({"id": icerik["ekleyen_id"]}, {"$inc": {"puan": 5}})
+            await db.users.update_one({"id": icerik["ekleyen_id"]}, {"$inc": {"puan": puanlar.get("icerik_ekleme", 5)}})
     else:
         yeni_durum = "oylama"
     await db.gelisim_icerik.update_one(
@@ -1488,8 +1520,9 @@ async def oy_ver(oy: OyCreate, current_user=Depends(get_current_user)):
     oylar[user_id] = {"onay": oy.onay, "sebep": oy.sebep}
     await db.gelisim_icerik.update_one({"id": oy.icerik_id}, {"$set": {"oylar": oylar}})
     
-    # Oy veren öğretmene +2 puan
-    await db.users.update_one({"id": user_id}, {"$inc": {"puan": 2}})
+    # Oy veren öğretmene puan (dinamik)
+    puanlar = await get_puan_ayarlari()
+    await db.users.update_one({"id": user_id}, {"$inc": {"puan": puanlar.get("icerik_oylama", 2)}})
     
     # %60 kontrolü
     ogretmenler = await db.users.find({"role": {"$in": ["teacher", "admin"]}}).to_list(length=None)
@@ -1508,10 +1541,10 @@ async def oy_ver(oy: OyCreate, current_user=Depends(get_current_user)):
                 {"id": oy.icerik_id},
                 {"$set": {"durum": "yayinda", "yayin_tarihi": datetime.utcnow().isoformat()}}
             )
-            # İçerik ekleyene +5 bonus puan
+            # İçerik ekleyene bonus puan (dinamik)
             ekleyen_id = icerik.get("ekleyen_id")
             if ekleyen_id:
-                await db.users.update_one({"id": ekleyen_id}, {"$inc": {"puan": 5}})
+                await db.users.update_one({"id": ekleyen_id}, {"$inc": {"puan": puanlar.get("icerik_ekleme", 5)}})
         elif oy_sayisi == toplam_ogretmen and onay_orani < 0.6:
             yeni_durum = "reddedildi"
             await db.gelisim_icerik.update_one({"id": oy.icerik_id}, {"$set": {"durum": "reddedildi"}})
