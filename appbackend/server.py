@@ -34,6 +34,21 @@ security = HTTPBearer()
 # Create the main app without a prefix
 app = FastAPI(title="Okuma Becerileri Akademisi API")
 
+# ★ CORS — app oluşturulduktan hemen sonra, her şeyden ÖNCE eklenmeli
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://oba-egitim-frontend.onrender.com",
+        "http://localhost:3000",
+        "http://localhost:3001",
+    ],
+    allow_origin_regex=r"https://.*\.onrender\.com",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
+
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
@@ -1531,14 +1546,8 @@ async def delete_icerik(icerik_id: str, current_user=Depends(require_role(UserRo
 # APP SETUP
 # ─────────────────────────────────────────────
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
+# ★ CORS middleware yukarıda (app oluşturulduktan hemen sonra) eklendi
+# Router'ı burada dahil ediyoruz
 app.include_router(api_router)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
