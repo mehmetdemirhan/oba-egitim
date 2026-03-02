@@ -1816,10 +1816,13 @@ function GirisAnaliziModul({ user, students, teachers }) {
 
   const analiziBaslat = async () => {
     if (!seciliOgrenci || !seciliMetin) { toast({ title: "Öğrenci ve metin seçin", variant: "destructive" }); return; }
-    if (!seciliOgrenci.id) { toast({ title: "Geçersiz öğrenci seçimi", variant: "destructive" }); return; }
-    if (!seciliMetin.id) { toast({ title: "Geçersiz metin seçimi", variant: "destructive" }); return; }
+    if (!seciliOgrenci?.id) { toast({ title: "Geçersiz öğrenci", description: "Lütfen listeden tekrar seçin", variant: "destructive" }); return; }
+    if (!seciliMetin?.id) { toast({ title: "Geçersiz metin", description: "Lütfen metni tekrar seçin", variant: "destructive" }); return; }
     try {
-      const r = await axios.post(`${API}/diagnostic/sessions`, { ogrenci_id: seciliOgrenci.id, metin_id: seciliMetin.id });
+      const payload = { ogrenci_id: seciliOgrenci.id, metin_id: seciliMetin.id };
+      console.log("Session başlatılıyor:", payload);
+      const r = await axios.post(`${API}/diagnostic/sessions`, payload);
+      console.log("Session response:", r.data);
       if (!r.data?.id) throw new Error('Oturum ID alınamadı');
       setAktifOturumId(r.data.id);
       setAdim("canli");
