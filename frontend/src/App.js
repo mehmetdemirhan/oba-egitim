@@ -539,7 +539,7 @@ function AppContent() {
               </Card>
               <Card className="border-0 shadow-sm bg-gradient-to-br from-red-50 to-orange-100">
                 <CardContent className="p-5 text-center">
-                  <div className="text-sm text-red-700 font-medium mb-1">📤 Toplam Ödenecek</div>
+                  <div className="text-sm text-red-700 font-medium mb-1">📤 Toplam Ödenen</div>
                   <div className="text-3xl font-bold text-red-700">{formatCurrency(payments.filter(p => p.tip === 'ogretmen').reduce((s, p) => s + (p.miktar || 0), 0))}</div>
                   <div className="text-xs text-red-600 mt-1">{payments.filter(p => p.tip === 'ogretmen').length} kayıt</div>
                 </CardContent>
@@ -550,21 +550,59 @@ function AppContent() {
                   <div className={`text-3xl font-bold ${(payments.filter(p => p.tip === 'ogrenci').reduce((s, p) => s + (p.miktar || 0), 0) - payments.filter(p => p.tip === 'ogretmen').reduce((s, p) => s + (p.miktar || 0), 0)) >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
                     {formatCurrency(payments.filter(p => p.tip === 'ogrenci').reduce((s, p) => s + (p.miktar || 0), 0) - payments.filter(p => p.tip === 'ogretmen').reduce((s, p) => s + (p.miktar || 0), 0))}
                   </div>
-                  <div className="text-xs text-blue-600 mt-1">Alacak − Ödenecek</div>
+                  <div className="text-xs text-blue-600 mt-1">Alacak − Ödenen</div>
                 </CardContent>
               </Card>
             </div>
 
             {/* İki Sütunlu Tablo */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* SOL: Alacaklar */}
+              {/* SOL: Alacaklar (Öğrenci Tahsilatları) */}
               <Card className="border-0 shadow-sm border-t-4" style={{borderTopColor: '#27ae60'}}>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2 text-green-700">
-                    📥 Alacaklar (Öğrenci Ödemeleri)
+                  <CardTitle className="text-base flex items-center justify-between">
+                    <span className="text-green-700">📥 Alacaklar (Öğrenci Ödemeleri)</span>
+                    <button onClick={() => setPaymentForm({...paymentForm, _alacakFormAcik: !paymentForm._alacakFormAcik})}
+                      className="text-xs px-3 py-1 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 border border-green-200">
+                      {paymentForm._alacakFormAcik ? '✕ Kapat' : '+ Tahsilat Ekle'}
+                    </button>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
+                  {/* Tahsilat Ekleme Formu */}
+                  {paymentForm._alacakFormAcik && (
+                    <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4 space-y-3">
+                      <div className="text-sm font-semibold text-green-800">Öğrenci Tahsilatı Kaydet</div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-xs">Öğrenci</Label>
+                          <Select value={paymentForm.kisi_id} onValueChange={v => setPaymentForm({...paymentForm, kisi_id:v, tip:'ogrenci'})}>
+                            <SelectTrigger className="h-9"><SelectValue placeholder="Seçin" /></SelectTrigger>
+                            <SelectContent position="popper">{students.map(s => <SelectItem key={s.id} value={s.id}>{s.ad} {s.soyad}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-xs">Miktar (₺)</Label>
+                          <Input type="number" step="0.01" className="h-9" value={paymentForm.miktar} onChange={e => setPaymentForm({...paymentForm, miktar:parseFloat(e.target.value)||0})} />
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-xs">Açıklama</Label>
+                        <Input className="h-9" value={paymentForm.aciklama} onChange={e => setPaymentForm({...paymentForm, aciklama:e.target.value})} placeholder="Ör: Mart ayı ödemesi" />
+                      </div>
+                      <Button size="sm" className="w-full bg-green-600 hover:bg-green-700 text-white" disabled={!paymentForm.kisi_id || !paymentForm.miktar}
+                        onClick={async () => {
+                          try {
+                            await axios.post(`${API}/payments`, {tip:'ogrenci', kisi_id:paymentForm.kisi_id, miktar:paymentForm.miktar, aciklama:paymentForm.aciklama});
+                            setPaymentForm({tip:'ogrenci',kisi_id:'',miktar:0,aciklama:'',_alacakFormAcik:false,_odemeFormAcik:false});
+                            fetchPayments(); fetchStudents(); fetchDashboard();
+                            toast({title:"✅ Tahsilat kaydedildi"});
+                          } catch(e) { toast({title:"Hata", variant:"destructive"}); }
+                        }}>
+                        💰 Tahsilatı Kaydet
+                      </Button>
+                    </div>
+                  )}
                   <div className="max-h-96 overflow-y-auto">
                     <Table>
                       <TableHeader>
@@ -600,14 +638,52 @@ function AppContent() {
                 </CardContent>
               </Card>
 
-              {/* SAĞ: Ödenecekler */}
+              {/* SAĞ: Ödenecekler (Öğretmen Ödemeleri) */}
               <Card className="border-0 shadow-sm border-t-4" style={{borderTopColor: '#e74c3c'}}>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2 text-red-700">
-                    📤 Ödenecekler (Öğretmen Ücretleri)
+                  <CardTitle className="text-base flex items-center justify-between">
+                    <span className="text-red-700">📤 Ödemeler (Öğretmen Ücretleri)</span>
+                    <button onClick={() => setPaymentForm({...paymentForm, _odemeFormAcik: !paymentForm._odemeFormAcik})}
+                      className="text-xs px-3 py-1 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 border border-red-200">
+                      {paymentForm._odemeFormAcik ? '✕ Kapat' : '+ Ödeme Ekle'}
+                    </button>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
+                  {/* Ödeme Ekleme Formu */}
+                  {paymentForm._odemeFormAcik && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4 space-y-3">
+                      <div className="text-sm font-semibold text-red-800">Öğretmen Ödemesi Kaydet</div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-xs">Öğretmen</Label>
+                          <Select value={paymentForm.kisi_id} onValueChange={v => setPaymentForm({...paymentForm, kisi_id:v, tip:'ogretmen'})}>
+                            <SelectTrigger className="h-9"><SelectValue placeholder="Seçin" /></SelectTrigger>
+                            <SelectContent position="popper">{teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.ad} {t.soyad}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-xs">Miktar (₺)</Label>
+                          <Input type="number" step="0.01" className="h-9" value={paymentForm.miktar} onChange={e => setPaymentForm({...paymentForm, miktar:parseFloat(e.target.value)||0})} />
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-xs">Açıklama</Label>
+                        <Input className="h-9" value={paymentForm.aciklama} onChange={e => setPaymentForm({...paymentForm, aciklama:e.target.value})} placeholder="Ör: Mart ayı öğretmen ücreti" />
+                      </div>
+                      <Button size="sm" className="w-full bg-red-600 hover:bg-red-700 text-white" disabled={!paymentForm.kisi_id || !paymentForm.miktar}
+                        onClick={async () => {
+                          try {
+                            await axios.post(`${API}/payments`, {tip:'ogretmen', kisi_id:paymentForm.kisi_id, miktar:paymentForm.miktar, aciklama:paymentForm.aciklama});
+                            setPaymentForm({tip:'ogrenci',kisi_id:'',miktar:0,aciklama:'',_alacakFormAcik:false,_odemeFormAcik:false});
+                            fetchPayments(); fetchTeachers(); fetchDashboard();
+                            toast({title:"✅ Ödeme kaydedildi"});
+                          } catch(e) { toast({title:"Hata", variant:"destructive"}); }
+                        }}>
+                        💳 Ödemeyi Kaydet
+                      </Button>
+                    </div>
+                  )}
                   <div className="max-h-96 overflow-y-auto">
                     <Table>
                       <TableHeader>
@@ -637,7 +713,7 @@ function AppContent() {
                     </Table>
                   </div>
                   <div className="border-t-2 border-red-200 mt-3 pt-3 flex justify-between items-center">
-                    <span className="text-sm font-semibold text-red-700">Toplam Ödenecek:</span>
+                    <span className="text-sm font-semibold text-red-700">Toplam Ödenen:</span>
                     <span className="text-lg font-bold text-red-700">{formatCurrency(payments.filter(p => p.tip === 'ogretmen').reduce((s, p) => s + (p.miktar || 0), 0))}</span>
                   </div>
                 </CardContent>
@@ -655,7 +731,7 @@ function AppContent() {
                     <TableRow className="bg-gray-50">
                       <TableHead className="font-semibold">Ay</TableHead>
                       <TableHead className="font-semibold text-right text-green-700">Alacak</TableHead>
-                      <TableHead className="font-semibold text-right text-red-700">Ödenecek</TableHead>
+                      <TableHead className="font-semibold text-right text-red-700">Ödenen</TableHead>
                       <TableHead className="font-semibold text-right text-blue-700">Net</TableHead>
                     </TableRow>
                   </TableHeader>
