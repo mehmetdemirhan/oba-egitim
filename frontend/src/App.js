@@ -904,16 +904,14 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user }) {
     <div className="space-y-4">
       {/* Üst bar */}
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-gray-800">{secimModu ? "Havuzdaki Metinler" : "Analiz Metinleri"}</h3>
-        {!secimModu && (
-          <Button onClick={() => setFormAcik(!formAcik)} className="bg-gradient-to-r from-orange-500 to-red-500 text-white" size="sm">
-            <Plus className="h-4 w-4 mr-1"/>Metin Ekle (+5 puan)
-          </Button>
-        )}
+        <h3 className="font-semibold text-gray-800">{secimModu ? "Analiz Metinleri" : "Analiz Metinleri"}</h3>
+        <Button onClick={() => setFormAcik(!formAcik)} className="bg-gradient-to-r from-orange-500 to-red-500 text-white" size="sm">
+          <Plus className="h-4 w-4 mr-1"/>{formAcik ? "İptal" : "Metin Ekle (+5 puan)"}
+        </Button>
       </div>
 
       {/* Metin Ekleme Formu */}
-      {formAcik && !secimModu && (
+      {formAcik && (
         <Card className="border-2 border-orange-200">
           <CardContent className="p-5">
             <form onSubmit={kaydet} className="space-y-4">
@@ -952,7 +950,7 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user }) {
       )}
 
       {/* Admin: Onay Bekleyenler */}
-      {!secimModu && user?.role === "admin" && bekleyenler.length > 0 && (
+      {user?.role === "admin" && bekleyenler.length > 0 && (
         <div>
           <h4 className="text-sm font-semibold text-yellow-700 mb-2">⏳ Onay Bekleyenler ({bekleyenler.length})</h4>
           {bekleyenler.map(m => (
@@ -976,7 +974,7 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user }) {
       )}
 
       {/* Oylamadakiler */}
-      {!secimModu && oylamadakiler.length > 0 && (user?.role === "admin" || user?.role === "teacher") && (
+      {oylamadakiler.length > 0 && (user?.role === "admin" || user?.role === "teacher") && (
         <div>
           <h4 className="text-sm font-semibold text-blue-700 mb-2">🗳️ Oylamada ({oylamadakiler.length})</h4>
           {oylamadakiler.map(m => {
@@ -1020,9 +1018,9 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user }) {
 
       {/* Havuzdaki / Seçilebilir Metinler */}
       <div className="space-y-2 max-h-80 overflow-y-auto">
-        {secimModu && <h4 className="text-sm font-semibold text-green-700 mb-2">✅ Havuzdaki Metinler ({gorunurMetinler.length})</h4>}
-        {gorunurMetinler.length === 0 && <p className="text-gray-400 text-sm text-center py-6">Henüz metin yok</p>}
-        {gorunurMetinler.map(m => (
+        <h4 className="text-sm font-semibold text-green-700 mb-2">✅ Havuzdaki Metinler ({metinler.filter(m => m.durum === "havuzda").length})</h4>
+        {metinler.filter(m => m.durum === "havuzda").length === 0 && <p className="text-gray-400 text-sm text-center py-6">Henüz havuzda metin yok. Metin ekleyip onaylayın.</p>}
+        {metinler.filter(m => m.durum === "havuzda").map(m => (
           <div key={m.id}
             onClick={() => secimModu && m.durum === "havuzda" && onMetinSec && onMetinSec(m)}
             className={`border rounded-xl p-4 transition-all
@@ -1037,8 +1035,8 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user }) {
                 <div className="text-xs text-gray-500 mt-1">{m.sinif_seviyesi}. Sınıf • {turLabel[m.tur]} • {m.kelime_sayisi} kelime</div>
                 <p className="text-sm text-gray-600 mt-1 line-clamp-2">{m.icerik}</p>
               </div>
-              {!secimModu && user?.role === "admin" && (
-                <Button variant="destructive" size="sm" className="ml-2" onClick={() => sil(m.id)}><Trash2 className="h-4 w-4"/></Button>
+              {user?.role === "admin" && (
+                <Button variant="destructive" size="sm" className="ml-2" onClick={(e) => { e.stopPropagation(); sil(m.id); }}><Trash2 className="h-4 w-4"/></Button>
               )}
             </div>
           </div>
@@ -1046,8 +1044,7 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user }) {
       </div>
 
       {/* Puan Rehberi */}
-      {!secimModu && (
-        <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-sm">
+      <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-sm">
           <div className="font-semibold text-orange-800 mb-2">🎯 Metin Katkı Puanları</div>
           <div className="space-y-1 text-orange-700">
             <div className="flex justify-between"><span>📝 Metin ekle</span><span className="font-bold">+5 puan</span></div>
@@ -1055,7 +1052,6 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user }) {
             <div className="flex justify-between"><span>🌟 Metin havuza girince</span><span className="font-bold">+10 puan</span></div>
           </div>
         </div>
-      )}
 
       {/* Red Sebebi Dialog */}
       <Dialog open={!!redDialog} onOpenChange={() => { setRedDialog(null); setRedSebep(""); }}>
