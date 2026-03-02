@@ -1419,7 +1419,13 @@ function AnalizSonucEkrani({ sonuc, ogrenci, onKaydet, onYeniAnaliz }) {
   );
 }
 
-// ── RAPOR FORMU (Analiz Sonrası) ──
+
+// ── RAPOR FORMU (AI Destekli, Ölçüt Eklenebilir, Yorum Düzenlenebilir) ──
+// ══════════════════════════════════════════════
+// RaporFormu — AI Destekli, Ölçüt Eklenebilir, Yorum Düzenlenebilir
+// Bu fonksiyonu App.js'deki eski RaporFormu ile değiştirin
+// ══════════════════════════════════════════════
+
 function RaporFormu({ oturum, sonuc, ogrenci, metin, onRaporTamamla }) {
   const { toast } = useToast();
 
@@ -1431,6 +1437,7 @@ function RaporFormu({ oturum, sonuc, ogrenci, metin, onRaporTamamla }) {
     iyi:   "border-green-300 bg-green-50 text-green-700",
   };
 
+  // ── State ──
   const [anlama, setAnlama] = useState({
     cumle_anlama: "orta", bilinmeyen_sozcuk: "orta", baglac_zamir: "orta",
     ana_fikir: "orta", yardimci_fikir: "orta", konu: "orta", baslik_onerme: "orta",
@@ -1442,29 +1449,91 @@ function RaporFormu({ oturum, sonuc, ogrenci, metin, onRaporTamamla }) {
   const [prozodik, setProzodik] = useState({ noktalama: 3, vurgu: 3, tonlama: 3, akicilik: 3, anlamli_gruplama: 3 });
   const [ogretmenNotu, setOgretmenNotu] = useState("");
 
-  const prozodikToplam = Object.values(prozodik).reduce((a, b) => a + b, 0);
+  // ★ Ek ölçütler (el ile eklenen)
+  const [ekAnlamaOlcutleri, setEkAnlamaOlcutleri] = useState([]); // [{id, etiket, kategori, value}]
+  const [ekProzodikOlcutleri, setEkProzodikOlcutleri] = useState([]); // [{id, etiket, aciklamalar, puan}]
+  const [yeniAnlamaAdi, setYeniAnlamaAdi] = useState("");
+  const [yeniAnlamaKat, setYeniAnlamaKat] = useState("sozcuk");
+  const [yeniProzodikAdi, setYeniProzodikAdi] = useState("");
+  const [anlamaEkleAcik, setAnlamaEkleAcik] = useState(false);
+  const [prozodikEkleAcik, setProzodikEkleAcik] = useState(false);
 
-  const SeviyeSecici = ({ alan, etiket }) => (
+  // ★ AI yorumları (her bölüm için)
+  const [aiYorumlar, setAiYorumlar] = useState({
+    hiz: "",
+    dogruluk: "",
+    anlama: "",
+    prozodik: "",
+    sonuc: "",
+    oneriler: "",
+  });
+  const [aiYukleniyor, setAiYukleniyor] = useState(false);
+  const [aiOlusturuldu, setAiOlusturuldu] = useState(false);
+
+  const prozodikToplam = Object.values(prozodik).reduce((a, b) => a + b, 0)
+    + ekProzodikOlcutleri.reduce((a, b) => a + (b.puan || 0), 0);
+
+  const anlamaKategoriler = {
+    sozcuk: "4.1 Sözcük Düzeyinde Anlama",
+    ana_yapi: "4.2 Metnin Ana Yapısını Anlama",
+    derin: "4.3 Metinler Arasılık ve Derin Anlama",
+    elestirel: "4.4 Eleştirel ve Yaratıcı Okuma",
+    soru: "4.5 Soru Performans Analizi",
+  };
+
+  // ── Anlama seviye seçici ──
+  const SeviyeSecici = ({ alan, etiket, isEk, ekId }) => (
     <div className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
       <span className="text-sm text-gray-700 flex-1">{etiket}</span>
-      <div className="flex gap-1">
+      <div className="flex gap-1 items-center">
         {seviyeler.map(s => (
-          <button key={s} onClick={() => setAnlama({ ...anlama, [alan]: s })}
-            className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all ${anlama[alan] === s ? seviyeRenk[s] : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'}`}>
+          <button key={s} onClick={() => {
+            if (isEk) {
+              setEkAnlamaOlcutleri(prev => prev.map(o => o.id === ekId ? {...o, value: s} : o));
+            } else {
+              setAnlama({ ...anlama, [alan]: s });
+            }
+          }}
+            className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all ${
+              (isEk ? ekAnlamaOlcutleri.find(o=>o.id===ekId)?.value : anlama[alan]) === s
+                ? seviyeRenk[s]
+                : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
+            }`}>
             {seviyeLabel[s]}
           </button>
         ))}
+        {isEk && (
+          <button onClick={() => setEkAnlamaOlcutleri(prev => prev.filter(o => o.id !== ekId))}
+            className="ml-2 text-red-400 hover:text-red-600 text-xs">✕</button>
+        )}
       </div>
     </div>
   );
 
-  const ProzodikSatir = ({ alan, etiket, aciklama1, aciklama2, aciklama3, aciklama4 }) => (
+  // ── Prozodik satır ──
+  const ProzodikSatir = ({ alan, etiket, aciklama1, aciklama2, aciklama3, aciklama4, isEk, ekId }) => (
     <div className="py-3 border-b border-gray-100 last:border-0">
-      <div className="font-medium text-sm text-gray-800 mb-2">{etiket}</div>
+      <div className="flex items-center justify-between">
+        <div className="font-medium text-sm text-gray-800 mb-2">{etiket}</div>
+        {isEk && (
+          <button onClick={() => setEkProzodikOlcutleri(prev => prev.filter(o => o.id !== ekId))}
+            className="text-red-400 hover:text-red-600 text-xs mb-2">✕ Kaldır</button>
+        )}
+      </div>
       <div className="grid grid-cols-4 gap-1">
         {[1,2,3,4].map(p => (
-          <button key={p} onClick={() => setProzodik({ ...prozodik, [alan]: p })}
-            className={`p-2 rounded-lg text-xs border text-center transition-all leading-tight ${prozodik[alan] === p ? 'border-orange-400 bg-orange-50 text-orange-700 font-medium' : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'}`}>
+          <button key={p} onClick={() => {
+            if (isEk) {
+              setEkProzodikOlcutleri(prev => prev.map(o => o.id === ekId ? {...o, puan: p} : o));
+            } else {
+              setProzodik({ ...prozodik, [alan]: p });
+            }
+          }}
+            className={`p-2 rounded-lg text-xs border text-center transition-all leading-tight ${
+              (isEk ? ekProzodikOlcutleri.find(o=>o.id===ekId)?.puan : prozodik[alan]) === p
+                ? 'border-orange-400 bg-orange-50 text-orange-700 font-medium'
+                : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
+            }`}>
             <div className="font-bold text-sm mb-1">{p} puan</div>
             <div>{[aciklama1, aciklama2, aciklama3, aciklama4][p-1]}</div>
           </button>
@@ -1473,16 +1542,172 @@ function RaporFormu({ oturum, sonuc, ogrenci, metin, onRaporTamamla }) {
     </div>
   );
 
+  // ── Ölçüt ekleme ──
+  const anlamaOlcutEkle = () => {
+    if (!yeniAnlamaAdi.trim()) return;
+    const id = `ek_${Date.now()}`;
+    setEkAnlamaOlcutleri(prev => [...prev, { id, etiket: yeniAnlamaAdi.trim(), kategori: yeniAnlamaKat, value: "orta" }]);
+    setYeniAnlamaAdi("");
+    setAnlamaEkleAcik(false);
+  };
+
+  const prozodikOlcutEkle = () => {
+    if (!yeniProzodikAdi.trim()) return;
+    const id = `ekp_${Date.now()}`;
+    setEkProzodikOlcutleri(prev => [...prev, {
+      id, etiket: yeniProzodikAdi.trim(),
+      aciklamalar: ["Yetersiz", "Kısmen yeterli", "Yeterli", "Çok iyi"],
+      puan: 3,
+    }]);
+    setYeniProzodikAdi("");
+    setProzodikEkleAcik(false);
+  };
+
+  // ══════════════════════════════════════════
+  // ★★★ AI YORUM OLUŞTURMA ★★★
+  // ══════════════════════════════════════════
+  const aiYorumlariOlustur = async () => {
+    setAiYukleniyor(true);
+    try {
+      const hizSev = { dusuk: "düşük", orta: "orta", yeterli: "yeterli", ileri: "ileri" }[sonuc?.hiz_deger] || "orta";
+      const prozSev = prozodikToplam >= 18 ? "çok iyi" : prozodikToplam >= 14 ? "iyi" : prozodikToplam >= 10 ? "orta" : "geliştirilmeli";
+      const anlamaSev = (anlama.genel_yuzde || hesaplaAnlamaYuzde()) >= 85 ? "iyi" : (anlama.genel_yuzde || hesaplaAnlamaYuzde()) >= 70 ? "orta" : "zayıf";
+
+      const ekAnlamaStr = ekAnlamaOlcutleri.length > 0
+        ? `\nEk ölçütler: ${ekAnlamaOlcutleri.map(o => `${o.etiket}: ${seviyeLabel[o.value]}`).join(", ")}`
+        : "";
+
+      const ekProzodikStr = ekProzodikOlcutleri.length > 0
+        ? `\nEk prozodik ölçütler: ${ekProzodikOlcutleri.map(o => `${o.etiket}: ${o.puan}/4`).join(", ")}`
+        : "";
+
+      const prompt = `Sen bir okuma becerileri uzmanısın. Aşağıdaki verilere göre her bölüm için profesyonel değerlendirme metni yaz. Türkçe yaz, akademik ama anlaşılır bir dil kullan.
+
+ÖĞRENCİ: ${ogrenci?.ad || ""} ${ogrenci?.soyad || ""}, Sınıf: ${ogrenci?.sinif || ""}
+METİN: ${metin?.baslik || ""} (${metin?.kelime_sayisi || 0} kelime, Tür: ${metin?.tur || ""})
+
+VERİLER:
+- Okuma Hızı: ${sonuc?.wpm || 0} kelime/dk (${hizSev} düzey)
+- Doğruluk: %${sonuc?.dogruluk_yuzde || 0}
+- Hata dağılımı: Atlama: ${sonuc?.hata_sayilari?.atlama || 0}, Yanlış okuma: ${sonuc?.hata_sayilari?.yanlis_okuma || 0}, Takılma: ${sonuc?.hata_sayilari?.takilma || 0}, Tekrar: ${sonuc?.hata_sayilari?.tekrar || 0}
+- Anlama yüzdesi: %${anlama.genel_yuzde || hesaplaAnlamaYuzde()} (${anlamaSev})
+- Anlama detay: Cümle anlama: ${seviyeLabel[anlama.cumle_anlama]}, Bilinmeyen sözcük: ${seviyeLabel[anlama.bilinmeyen_sozcuk]}, Bağlaç/zamir: ${seviyeLabel[anlama.baglac_zamir]}, Ana fikir: ${seviyeLabel[anlama.ana_fikir]}, Yardımcı fikir: ${seviyeLabel[anlama.yardimci_fikir]}, Konu: ${seviyeLabel[anlama.konu]}, Başlık önerme: ${seviyeLabel[anlama.baslik_onerme]}, Neden-sonuç: ${seviyeLabel[anlama.neden_sonuc]}, Çıkarım: ${seviyeLabel[anlama.cikarim]}, İpuçları: ${seviyeLabel[anlama.ipuclari]}, Yorumlama: ${seviyeLabel[anlama.yorumlama]}, Görüş bildirme: ${seviyeLabel[anlama.gorus_bildirme]}, Yazar amacı: ${seviyeLabel[anlama.yazar_amaci]}, Alternatif fikir: ${seviyeLabel[anlama.alternatif_fikir]}, Günlük hayat: ${seviyeLabel[anlama.guncelle_hayat]}${ekAnlamaStr}
+- Prozodik toplam: ${prozodikToplam}/20 (${prozSev}), Noktalama: ${prozodik.noktalama}/4, Vurgu: ${prozodik.vurgu}/4, Tonlama: ${prozodik.tonlama}/4, Akıcılık: ${prozodik.akicilik}/4, Anlamlı gruplama: ${prozodik.anlamli_gruplama}/4${ekProzodikStr}
+- Önerilen kur: ${sonuc?.atanan_kur || sonuc?.sistem_kur || ""}
+
+JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
+{
+  "hiz": "Okuma hızı değerlendirmesi (2-3 cümle)",
+  "dogruluk": "Doğru okuma oranı ve hata analizi değerlendirmesi (3-4 cümle)",
+  "anlama": "Okuduğunu anlama becerileri genel değerlendirmesi (4-5 cümle, alt boyutlara değin)",
+  "prozodik": "Prozodik okuma değerlendirmesi (2-3 cümle)",
+  "sonuc": "Sonuç ve genel yorum (4-5 cümle, tüm boyutları birlikte değerlendir)",
+  "oneriler": "Eğitsel ve ev temelli gelişim önerileri (6-8 cümle, okul ve ev için ayrı öneriler)"
+}`;
+
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+
+      const data = await response.json();
+      const text = data.content?.map(c => c.text || "").join("") || "";
+      const cleaned = text.replace(/```json|```/g, "").trim();
+      const parsed = JSON.parse(cleaned);
+
+      setAiYorumlar(parsed);
+      setAiOlusturuldu(true);
+      toast({ title: "✅ AI yorumları oluşturuldu!", description: "İnceleyip düzenleyebilirsiniz." });
+    } catch (err) {
+      console.error("AI yorum hatası:", err);
+      toast({ title: "AI Hatası", description: "Yorumlar oluşturulamadı. Lütfen tekrar deneyin.", variant: "destructive" });
+    } finally {
+      setAiYukleniyor(false);
+    }
+  };
+
+  // ── Anlama yüzdesi hesapla ──
+  const hesaplaAnlamaYuzde = () => {
+    const alanlar = [
+      anlama.cumle_anlama, anlama.bilinmeyen_sozcuk, anlama.baglac_zamir,
+      anlama.ana_fikir, anlama.yardimci_fikir, anlama.konu, anlama.baslik_onerme,
+      anlama.neden_sonuc, anlama.cikarim, anlama.ipuclari, anlama.yorumlama,
+      anlama.gorus_bildirme, anlama.yazar_amaci, anlama.alternatif_fikir, anlama.guncelle_hayat,
+      anlama.bilgi, anlama.kavrama, anlama.uygulama, anlama.analiz, anlama.sentez, anlama.degerlendirme,
+      ...ekAnlamaOlcutleri.map(o => o.value),
+    ];
+    const puanMap = { zayif: 0, orta: 1, iyi: 2 };
+    const toplam = alanlar.reduce((s, a) => s + (puanMap[a] || 1), 0);
+    return Math.round(toplam / (alanlar.length * 2) * 100);
+  };
+
+  // ── Düzenlenebilir yorum bileşeni ──
+  const YorumAlani = ({ baslik, alan, placeholder }) => (
+    <div className="mb-4">
+      <label className="text-sm font-semibold text-gray-700 mb-1 block">{baslik}</label>
+      <textarea
+        value={aiYorumlar[alan]}
+        onChange={e => setAiYorumlar({ ...aiYorumlar, [alan]: e.target.value })}
+        rows={4}
+        placeholder={placeholder || "AI ile oluşturun veya el ile yazın..."}
+        className="w-full border border-gray-300 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none leading-relaxed"
+      />
+    </div>
+  );
+
+  // ── Kaydet ──
   const kaydet = async () => {
     try {
+      // Ek ölçütleri anlama objesine ekle
+      const anlamaFull = { ...anlama };
+      ekAnlamaOlcutleri.forEach(o => { anlamaFull[o.id] = o.value; });
+
+      // Ek prozodik ölçütleri prozodik objesine ekle
+      const prozodikFull = { ...prozodik };
+      ekProzodikOlcutleri.forEach(o => { prozodikFull[o.id] = o.puan; });
+
+      // AI yorumlarını öğretmen notuna birleştir
+      let tamNot = "";
+      if (aiOlusturuldu || Object.values(aiYorumlar).some(v => v)) {
+        const bolumler = [
+          { baslik: "OKUMA HIZI DEĞERLENDİRMESİ", icerik: aiYorumlar.hiz },
+          { baslik: "DOĞRU OKUMA ORANI DEĞERLENDİRMESİ", icerik: aiYorumlar.dogruluk },
+          { baslik: "OKUDUĞUNU ANLAMA DEĞERLENDİRMESİ", icerik: aiYorumlar.anlama },
+          { baslik: "PROZODİK OKUMA DEĞERLENDİRMESİ", icerik: aiYorumlar.prozodik },
+          { baslik: "SONUÇ VE GENEL YORUM", icerik: aiYorumlar.sonuc },
+          { baslik: "EĞİTSEL VE EV TEMELLİ GELİŞİM ÖNERİLERİ", icerik: aiYorumlar.oneriler },
+        ];
+        tamNot = bolumler.filter(b => b.icerik).map(b => `${b.baslik}:\n${b.icerik}`).join("\n\n");
+        if (ogretmenNotu) tamNot += `\n\nÖĞRETMEN EK NOTU:\n${ogretmenNotu}`;
+      } else {
+        tamNot = ogretmenNotu;
+      }
+
+      // Ek ölçüt bilgilerini de nota ekle
+      if (ekAnlamaOlcutleri.length > 0) {
+        tamNot += `\n\nEK ANLAMA ÖLÇÜTLERİ: ${ekAnlamaOlcutleri.map(o => `${o.etiket}: ${seviyeLabel[o.value]}`).join(", ")}`;
+      }
+      if (ekProzodikOlcutleri.length > 0) {
+        tamNot += `\nEK PROZODİK ÖLÇÜTLER: ${ekProzodikOlcutleri.map(o => `${o.etiket}: ${o.puan}/4`).join(", ")}`;
+      }
+
       const r = await axios.post(`${API}/diagnostic/rapor`, {
         oturum_id: oturum.id,
-        anlama,
-        prozodik,
-        ogretmen_notu: ogretmenNotu,
+        anlama: anlamaFull,
+        prozodik: prozodikFull,
+        ogretmen_notu: tamNot,
       });
+
+      // AI yorumlarını rapor verisine ekle (DOCX oluşturucu için)
+      const raporData = { ...r.data, ai_yorumlar: aiYorumlar, ek_anlama: ekAnlamaOlcutleri, ek_prozodik: ekProzodikOlcutleri };
+
       toast({ title: "✅ Rapor oluşturuldu!" });
-      onRaporTamamla(r.data);
+      onRaporTamamla(raporData);
     } catch(e) {
       toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" });
     }
@@ -1511,37 +1736,88 @@ function RaporFormu({ oturum, sonuc, ogrenci, metin, onRaporTamamla }) {
         </CardContent></Card>
       </div>
 
-      {/* 4. Okuduğunu Anlama */}
+      {/* ══ 4. Okuduğunu Anlama ══ */}
       <Card className="border-0 shadow-sm">
-        <CardHeader><CardTitle className="text-base">4. Okuduğunu Anlama Becerileri</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center justify-between">
+            <span>4. Okuduğunu Anlama Becerileri</span>
+            <button onClick={() => setAnlamaEkleAcik(!anlamaEkleAcik)}
+              className="text-xs px-3 py-1 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all border border-blue-200">
+              + Ölçüt Ekle
+            </button>
+          </CardTitle>
+        </CardHeader>
         <CardContent className="space-y-4">
+          {/* Ölçüt ekleme formu */}
+          {anlamaEkleAcik && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
+              <div className="text-sm font-semibold text-blue-700">Yeni Anlama Ölçütü Ekle</div>
+              <input value={yeniAnlamaAdi} onChange={e => setYeniAnlamaAdi(e.target.value)}
+                placeholder="Ölçüt adı (ör: Metafor anlama)"
+                className="w-full border border-blue-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              <select value={yeniAnlamaKat} onChange={e => setYeniAnlamaKat(e.target.value)}
+                className="w-full border border-blue-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                {Object.entries(anlamaKategoriler).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
+              <div className="flex gap-2">
+                <button onClick={anlamaOlcutEkle}
+                  className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">Ekle</button>
+                <button onClick={() => setAnlamaEkleAcik(false)}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300">İptal</button>
+              </div>
+            </div>
+          )}
+
+          {/* 4.1 Sözcük */}
           <div>
             <h4 className="text-sm font-semibold text-gray-600 mb-2 bg-gray-50 p-2 rounded-lg">4.1 Sözcük Düzeyinde Anlama</h4>
             <SeviyeSecici alan="cumle_anlama" etiket="Cümle anlamını kavrama" />
             <SeviyeSecici alan="bilinmeyen_sozcuk" etiket="Bilinmeyen sözcük tahmini" />
             <SeviyeSecici alan="baglac_zamir" etiket="Bağlaç ve zamirleri anlama" />
+            {ekAnlamaOlcutleri.filter(o => o.kategori === "sozcuk").map(o => (
+              <SeviyeSecici key={o.id} isEk ekId={o.id} etiket={o.etiket} />
+            ))}
           </div>
+
+          {/* 4.2 Ana yapı */}
           <div>
             <h4 className="text-sm font-semibold text-gray-600 mb-2 bg-gray-50 p-2 rounded-lg">4.2 Metnin Ana Yapısını Anlama</h4>
             <SeviyeSecici alan="ana_fikir" etiket="Ana fikir belirleme" />
             <SeviyeSecici alan="yardimci_fikir" etiket="Yardımcı fikirleri ifade etme" />
             <SeviyeSecici alan="konu" etiket="Metnin konusunu ifade etme" />
             <SeviyeSecici alan="baslik_onerme" etiket="Başlık önerme" />
+            {ekAnlamaOlcutleri.filter(o => o.kategori === "ana_yapi").map(o => (
+              <SeviyeSecici key={o.id} isEk ekId={o.id} etiket={o.etiket} />
+            ))}
           </div>
+
+          {/* 4.3 Derin anlama */}
           <div>
             <h4 className="text-sm font-semibold text-gray-600 mb-2 bg-gray-50 p-2 rounded-lg">4.3 Metinler Arasılık ve Derin Anlama</h4>
             <SeviyeSecici alan="neden_sonuc" etiket="Neden-sonuç ilişkisini belirleme" />
             <SeviyeSecici alan="cikarim" etiket="Çıkarım yapma" />
             <SeviyeSecici alan="ipuclari" etiket="Metindeki ipuçlarını kullanma" />
             <SeviyeSecici alan="yorumlama" etiket="Yorumlama" />
+            {ekAnlamaOlcutleri.filter(o => o.kategori === "derin").map(o => (
+              <SeviyeSecici key={o.id} isEk ekId={o.id} etiket={o.etiket} />
+            ))}
           </div>
+
+          {/* 4.4 Eleştirel */}
           <div>
             <h4 className="text-sm font-semibold text-gray-600 mb-2 bg-gray-50 p-2 rounded-lg">4.4 Eleştirel ve Yaratıcı Okuma</h4>
             <SeviyeSecici alan="gorus_bildirme" etiket="Metne yönelik görüş bildirme" />
             <SeviyeSecici alan="yazar_amaci" etiket="Yazarın amacını sezme" />
             <SeviyeSecici alan="alternatif_fikir" etiket="Alternatif son / fikir üretme" />
             <SeviyeSecici alan="guncelle_hayat" etiket="Metni günlük hayatla ilişkilendirme" />
+            {ekAnlamaOlcutleri.filter(o => o.kategori === "elestirel").map(o => (
+              <SeviyeSecici key={o.id} isEk ekId={o.id} etiket={o.etiket} />
+            ))}
           </div>
+
+          {/* 4.5 Soru performans */}
           <div>
             <h4 className="text-sm font-semibold text-gray-600 mb-2 bg-gray-50 p-2 rounded-lg">4.5 Soru Performans Analizi</h4>
             <SeviyeSecici alan="bilgi" etiket="Bilgi" />
@@ -1550,28 +1826,55 @@ function RaporFormu({ oturum, sonuc, ogrenci, metin, onRaporTamamla }) {
             <SeviyeSecici alan="analiz" etiket="Analiz" />
             <SeviyeSecici alan="sentez" etiket="Sentez" />
             <SeviyeSecici alan="degerlendirme" etiket="Değerlendirme" />
+            {ekAnlamaOlcutleri.filter(o => o.kategori === "soru").map(o => (
+              <SeviyeSecici key={o.id} isEk ekId={o.id} etiket={o.etiket} />
+            ))}
           </div>
+
+          {/* Anlama yüzdesi */}
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
             <Label>Genel Anlama Yüzdesi (%)</Label>
             <div className="flex items-center gap-3 mt-2">
               <input type="number" min="0" max="100" value={anlama.genel_yuzde}
                 onChange={e => setAnlama({...anlama, genel_yuzde: parseInt(e.target.value)||0})}
                 className="w-24 border border-blue-300 rounded-lg p-2 text-center text-lg font-bold focus:outline-none focus:ring-2 focus:ring-blue-400" />
-              <span className="text-sm text-gray-500">0 bırakırsanız sistem otomatik hesaplar</span>
+              <span className="text-sm text-gray-500">0 bırakırsanız otomatik hesaplanır: %{hesaplaAnlamaYuzde()}</span>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* 5. Prozodik Okuma */}
+      {/* ══ 5. Prozodik Okuma ══ */}
       <Card className="border-0 shadow-sm">
         <CardHeader>
           <CardTitle className="text-base flex items-center justify-between">
             <span>5. Prozodik Okuma Ölçeği</span>
-            <span className="text-lg font-bold text-orange-600">Toplam: {prozodikToplam}/20</span>
+            <div className="flex items-center gap-3">
+              <span className="text-lg font-bold text-orange-600">Toplam: {prozodikToplam}/{20 + ekProzodikOlcutleri.length * 4}</span>
+              <button onClick={() => setProzodikEkleAcik(!prozodikEkleAcik)}
+                className="text-xs px-3 py-1 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 transition-all border border-orange-200">
+                + Ölçüt Ekle
+              </button>
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {/* Prozodik ölçüt ekleme */}
+          {prozodikEkleAcik && (
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 space-y-3 mb-4">
+              <div className="text-sm font-semibold text-orange-700">Yeni Prozodik Ölçüt Ekle</div>
+              <input value={yeniProzodikAdi} onChange={e => setYeniProzodikAdi(e.target.value)}
+                placeholder="Ölçüt adı (ör: Diyalog ifadesi)"
+                className="w-full border border-orange-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+              <div className="flex gap-2">
+                <button onClick={prozodikOlcutEkle}
+                  className="px-4 py-2 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-700">Ekle</button>
+                <button onClick={() => setProzodikEkleAcik(false)}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300">İptal</button>
+              </div>
+            </div>
+          )}
+
           <ProzodikSatir alan="noktalama" etiket="Noktalama ve Duraklama"
             aciklama1="Uymuyor" aciklama2="Kısmen uyuyor" aciklama3="Çoğunlukla" aciklama4="Tam ve bilinçli" />
           <ProzodikSatir alan="vurgu" etiket="Vurgu"
@@ -1582,15 +1885,63 @@ function RaporFormu({ oturum, sonuc, ogrenci, metin, onRaporTamamla }) {
             aciklama1="Sık duraklama" aciklama2="Kısmi akış" aciklama3="Genel olarak akıcı" aciklama4="Kesintisiz akıcı" />
           <ProzodikSatir alan="anlamli_gruplama" etiket="Anlamlı Gruplama"
             aciklama1="Sözcük sözcük" aciklama2="Kısmen gruplama" aciklama3="Çoğunlukla doğru" aciklama4="Tam ve tutarlı" />
+
+          {/* Ek prozodik ölçütler */}
+          {ekProzodikOlcutleri.map(o => (
+            <ProzodikSatir key={o.id} isEk ekId={o.id} etiket={o.etiket}
+              aciklama1={o.aciklamalar[0]} aciklama2={o.aciklamalar[1]}
+              aciklama3={o.aciklamalar[2]} aciklama4={o.aciklamalar[3]} />
+          ))}
         </CardContent>
       </Card>
 
-      {/* Öğretmen Notu */}
+      {/* ══ 6. AI Yorumları ══ */}
       <Card className="border-0 shadow-sm">
-        <CardHeader><CardTitle className="text-base">6. Öğretmen Notu</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center justify-between">
+            <span>6. Değerlendirme Yorumları</span>
+            <button onClick={aiYorumlariOlustur} disabled={aiYukleniyor}
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                aiYukleniyor
+                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:from-purple-600 hover:to-blue-600 shadow-md'
+              }`}>
+              {aiYukleniyor ? (
+                <span className="flex items-center gap-2">
+                  <span className="animate-spin">⏳</span> AI Oluşturuyor...
+                </span>
+              ) : aiOlusturuldu ? "🔄 Yeniden Oluştur" : "🤖 AI ile Oluştur"}
+            </button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-1">
+          {!aiOlusturuldu && !Object.values(aiYorumlar).some(v => v) && (
+            <div className="text-center py-8 text-gray-400">
+              <div className="text-4xl mb-3">🤖</div>
+              <p className="text-sm">Önce yukarıdaki ölçütleri doldurun, sonra<br/><strong>"AI ile Oluştur"</strong> butonuna tıklayın</p>
+              <p className="text-xs mt-2 text-gray-400">AI, sayısal verilere göre her bölüm için profesyonel yorum yazacak.</p>
+              <p className="text-xs text-gray-400">Oluşturulan yorumları istediğiniz gibi düzenleyebilirsiniz.</p>
+            </div>
+          )}
+          {(aiOlusturuldu || Object.values(aiYorumlar).some(v => v)) && (
+            <>
+              <YorumAlani baslik="📊 Okuma Hızı Değerlendirmesi" alan="hiz" placeholder="Okuma hızına ilişkin değerlendirme..." />
+              <YorumAlani baslik="✅ Doğru Okuma Oranı Değerlendirmesi" alan="dogruluk" placeholder="Doğruluk ve hata analizi..." />
+              <YorumAlani baslik="📖 Okuduğunu Anlama Değerlendirmesi" alan="anlama" placeholder="Anlama becerileri değerlendirmesi..." />
+              <YorumAlani baslik="🎵 Prozodik Okuma Değerlendirmesi" alan="prozodik" placeholder="Prozodik okuma değerlendirmesi..." />
+              <YorumAlani baslik="📝 Sonuç ve Genel Yorum" alan="sonuc" placeholder="Genel sonuç ve yorum..." />
+              <YorumAlani baslik="🎯 Eğitsel ve Ev Temelli Gelişim Önerileri" alan="oneriler" placeholder="Gelişim önerileri..." />
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ══ 7. Öğretmen Ek Notu ══ */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader><CardTitle className="text-base">7. Öğretmen Ek Notu</CardTitle></CardHeader>
         <CardContent>
-          <textarea value={ogretmenNotu} onChange={e => setOgretmenNotu(e.target.value)} rows={5}
-            placeholder="Öğrenciye ilişkin genel değerlendirme ve önerilerinizi yazın..."
+          <textarea value={ogretmenNotu} onChange={e => setOgretmenNotu(e.target.value)} rows={4}
+            placeholder="Öğrenciye ilişkin ek değerlendirme ve notlarınızı yazın..."
             className="w-full border border-gray-300 rounded-xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none leading-relaxed" />
         </CardContent>
       </Card>
