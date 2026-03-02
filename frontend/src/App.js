@@ -528,52 +528,118 @@ function AppContent() {
 
           {/* Payments */}
           <TabsContent value="payments">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="lg:col-span-1 border-0 shadow-sm">
-                <CardHeader><CardTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />Yeni Kayıt</CardTitle></CardHeader>
-                <CardContent>
-                  <form onSubmit={createPayment} className="space-y-4">
-                    <div><Label>İşlem Türü</Label>
-                      <Select value={paymentForm.tip} onValueChange={v => setPaymentForm({...paymentForm, tip:v, kisi_id:""})}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent position="popper">
-                          <SelectItem value="ogrenci">📥 Alacak (Öğrenci Ödemesi)</SelectItem>
-                          <SelectItem value="ogretmen">📤 Ödeme (Öğretmene)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div><Label>{paymentForm.tip === 'ogrenci' ? 'Öğrenci' : 'Öğretmen'}</Label>
-                      <Select value={paymentForm.kisi_id} onValueChange={v => setPaymentForm({...paymentForm, kisi_id:v})}>
-                        <SelectTrigger><SelectValue placeholder="Seçin" /></SelectTrigger>
-                        <SelectContent position="popper">{(paymentForm.tip === 'ogrenci' ? students : teachers).map(p => <SelectItem key={p.id} value={p.id}>{p.ad} {p.soyad}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </div>
-                    <div><Label>Miktar (₺)</Label><Input type="number" step="0.01" value={paymentForm.miktar} onChange={e => setPaymentForm({...paymentForm, miktar:parseFloat(e.target.value)||0})} required /></div>
-                    <div><Label>Açıklama</Label><Input value={paymentForm.aciklama} onChange={e => setPaymentForm({...paymentForm, aciklama:e.target.value})} /></div>
-                    <Button type="submit" disabled={loadingAction} className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white">Kaydet</Button>
-                  </form>
+            {/* Özet Kartları */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <Card className="border-0 shadow-sm bg-gradient-to-br from-green-50 to-emerald-100">
+                <CardContent className="p-5 text-center">
+                  <div className="text-sm text-green-700 font-medium mb-1">📥 Toplam Alacak</div>
+                  <div className="text-3xl font-bold text-green-700">{formatCurrency(payments.filter(p => p.tip === 'ogrenci').reduce((s, p) => s + (p.miktar || 0), 0))}</div>
+                  <div className="text-xs text-green-600 mt-1">{payments.filter(p => p.tip === 'ogrenci').length} kayıt</div>
                 </CardContent>
               </Card>
-              <Card className="lg:col-span-2 border-0 shadow-sm">
-                <CardHeader><CardTitle>Muhasebe Kayıtları</CardTitle></CardHeader>
+              <Card className="border-0 shadow-sm bg-gradient-to-br from-red-50 to-orange-100">
+                <CardContent className="p-5 text-center">
+                  <div className="text-sm text-red-700 font-medium mb-1">📤 Toplam Ödenecek</div>
+                  <div className="text-3xl font-bold text-red-700">{formatCurrency(payments.filter(p => p.tip === 'ogretmen').reduce((s, p) => s + (p.miktar || 0), 0))}</div>
+                  <div className="text-xs text-red-600 mt-1">{payments.filter(p => p.tip === 'ogretmen').length} kayıt</div>
+                </CardContent>
+              </Card>
+              <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-indigo-100">
+                <CardContent className="p-5 text-center">
+                  <div className="text-sm text-blue-700 font-medium mb-1">💰 Net Bakiye</div>
+                  <div className={`text-3xl font-bold ${(payments.filter(p => p.tip === 'ogrenci').reduce((s, p) => s + (p.miktar || 0), 0) - payments.filter(p => p.tip === 'ogretmen').reduce((s, p) => s + (p.miktar || 0), 0)) >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
+                    {formatCurrency(payments.filter(p => p.tip === 'ogrenci').reduce((s, p) => s + (p.miktar || 0), 0) - payments.filter(p => p.tip === 'ogretmen').reduce((s, p) => s + (p.miktar || 0), 0))}
+                  </div>
+                  <div className="text-xs text-blue-600 mt-1">Alacak − Ödenecek</div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* İki Sütunlu Tablo */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* SOL: Alacaklar */}
+              <Card className="border-0 shadow-sm border-t-4" style={{borderTopColor: '#27ae60'}}>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2 text-green-700">
+                    📥 Alacaklar (Öğrenci Ödemeleri)
+                  </CardTitle>
+                </CardHeader>
                 <CardContent>
-                  <Table>
-                    <TableHeader><TableRow><TableHead>Tarih</TableHead><TableHead>Tip</TableHead><TableHead>Kişi</TableHead><TableHead>Miktar</TableHead><TableHead>Açıklama</TableHead></TableRow></TableHeader>
-                    <TableBody>
-                      {payments.map(p => {
-                        const person = p.tip === 'ogrenci' ? students.find(s => s.id === p.kisi_id) : teachers.find(t => t.id === p.kisi_id);
-                        return (
-                          <TableRow key={p.id}>
-                            <TableCell>{formatDate(p.tarih)}</TableCell>
-                            <TableCell><Badge variant={p.tip === 'ogrenci' ? 'default' : 'secondary'}>{p.tip === 'ogrenci' ? '📥 Alacak' : '📤 Ödeme'}</Badge></TableCell>
-                            <TableCell>{person ? `${person.ad} ${person.soyad}` : '-'}</TableCell>
-                            <TableCell className="font-semibold text-green-600">{formatCurrency(p.miktar)}</TableCell>
-                            <TableCell>{p.aciklama || '-'}</TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
+                  <div className="max-h-96 overflow-y-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-xs">Tarih</TableHead>
+                          <TableHead className="text-xs">Öğrenci</TableHead>
+                          <TableHead className="text-xs text-right">Miktar</TableHead>
+                          <TableHead className="text-xs">Açıklama</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {payments.filter(p => p.tip === 'ogrenci').length === 0 && (
+                          <TableRow><TableCell colSpan={4} className="text-center text-gray-400 py-8">Henüz alacak kaydı yok</TableCell></TableRow>
+                        )}
+                        {payments.filter(p => p.tip === 'ogrenci').map(p => {
+                          const person = students.find(s => s.id === p.kisi_id);
+                          return (
+                            <TableRow key={p.id}>
+                              <TableCell className="text-xs text-gray-500">{formatDate(p.tarih)}</TableCell>
+                              <TableCell className="text-sm font-medium">{person ? `${person.ad} ${person.soyad}` : '-'}</TableCell>
+                              <TableCell className="text-sm font-bold text-green-600 text-right">{formatCurrency(p.miktar)}</TableCell>
+                              <TableCell className="text-xs text-gray-500">{p.aciklama || '-'}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="border-t-2 border-green-200 mt-3 pt-3 flex justify-between items-center">
+                    <span className="text-sm font-semibold text-green-700">Toplam Alacak:</span>
+                    <span className="text-lg font-bold text-green-700">{formatCurrency(payments.filter(p => p.tip === 'ogrenci').reduce((s, p) => s + (p.miktar || 0), 0))}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* SAĞ: Ödenecekler */}
+              <Card className="border-0 shadow-sm border-t-4" style={{borderTopColor: '#e74c3c'}}>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2 text-red-700">
+                    📤 Ödenecekler (Öğretmen Ücretleri)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="max-h-96 overflow-y-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-xs">Tarih</TableHead>
+                          <TableHead className="text-xs">Öğretmen</TableHead>
+                          <TableHead className="text-xs text-right">Miktar</TableHead>
+                          <TableHead className="text-xs">Açıklama</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {payments.filter(p => p.tip === 'ogretmen').length === 0 && (
+                          <TableRow><TableCell colSpan={4} className="text-center text-gray-400 py-8">Henüz ödeme kaydı yok</TableCell></TableRow>
+                        )}
+                        {payments.filter(p => p.tip === 'ogretmen').map(p => {
+                          const person = teachers.find(t => t.id === p.kisi_id);
+                          return (
+                            <TableRow key={p.id}>
+                              <TableCell className="text-xs text-gray-500">{formatDate(p.tarih)}</TableCell>
+                              <TableCell className="text-sm font-medium">{person ? `${person.ad} ${person.soyad}` : '-'}</TableCell>
+                              <TableCell className="text-sm font-bold text-red-600 text-right">{formatCurrency(p.miktar)}</TableCell>
+                              <TableCell className="text-xs text-gray-500">{p.aciklama || '-'}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="border-t-2 border-red-200 mt-3 pt-3 flex justify-between items-center">
+                    <span className="text-sm font-semibold text-red-700">Toplam Ödenecek:</span>
+                    <span className="text-lg font-bold text-red-700">{formatCurrency(payments.filter(p => p.tip === 'ogretmen').reduce((s, p) => s + (p.miktar || 0), 0))}</span>
+                  </div>
                 </CardContent>
               </Card>
             </div>
