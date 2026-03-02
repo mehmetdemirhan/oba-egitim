@@ -88,6 +88,7 @@ class TeacherLevel(str, Enum):
 
 class UserRole(str, Enum):
     ADMIN = "admin"
+    COORDINATOR = "coordinator"
     TEACHER = "teacher"
     STUDENT = "student"
     PARENT = "parent"
@@ -521,7 +522,7 @@ async def get_dashboard_stats():
 
 
 @api_router.get("/dashboard/bekleyenler")
-async def get_bekleyenler(current_user=Depends(require_role(UserRole.ADMIN))):
+async def get_bekleyenler(current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     # Analiz metinleri - beklemede olanlar
     metin_bekleyen = await db.analiz_metinler.find({"durum": "beklemede"}).sort("olusturma_tarihi", -1).to_list(length=None)
     metin_oylama = await db.analiz_metinler.find({"durum": "oylama"}).sort("olusturma_tarihi", -1).to_list(length=None)
@@ -866,7 +867,7 @@ async def get_normlar(current_user=Depends(get_current_user)):
     return await get_norm_tablosu()
 
 @api_router.put("/diagnostic/normlar")
-async def update_normlar(data: NormGuncelle, current_user=Depends(require_role(UserRole.ADMIN))):
+async def update_normlar(data: NormGuncelle, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     await db.sistem_ayarlari.update_one(
         {"tip": "okuma_hizi_normlari"},
         {"$set": {"tip": "okuma_hizi_normlari", "normlar": data.normlar}},
@@ -926,7 +927,7 @@ class MetinOyCreate(BaseModel):
 @api_router.post("/diagnostic/texts")
 async def create_metin(data: MetinCreate, current_user=Depends(get_current_user)):
     role = current_user.get("role", "")
-    if role not in ["admin", "teacher"]:
+    if role not in ["admin", "coordinator", "teacher"]:
         raise HTTPException(status_code=403, detail="Yetkisiz")
 
     # Kelime sayısı otomatik hesapla (0 geldiyse)
@@ -934,8 +935,8 @@ async def create_metin(data: MetinCreate, current_user=Depends(get_current_user)
     if kelime_sayisi == 0 and data.icerik:
         kelime_sayisi = len(data.icerik.strip().split())
 
-    # Admin eklerse direkt oylama, öğretmen eklerse beklemede
-    durum = "oylama" if role == "admin" else "beklemede"
+    # Admin/Koordinatör eklerse direkt oylama, öğretmen eklerse beklemede
+    durum = "oylama" if role in ["admin", "coordinator"] else "beklemede"
 
     metin_doc = {
         "id": str(uuid.uuid4()),
@@ -995,7 +996,7 @@ async def get_metinler(current_user=Depends(get_current_user)):
 # ─────────────────────────────────────────────
 
 @api_router.post("/diagnostic/texts/{metin_id}/admin-karar")
-async def metin_admin_karar(metin_id: str, karar: dict, current_user=Depends(require_role(UserRole.ADMIN))):
+async def metin_admin_karar(metin_id: str, karar: dict, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     # karar: {"onay": True/False, "direkt": True/False}
     # direkt=True → oylama atla, direkt havuza al
     onay = karar.get("onay", False)
@@ -1020,7 +1021,7 @@ async def metin_admin_karar(metin_id: str, karar: dict, current_user=Depends(req
 @api_router.post("/diagnostic/texts/oy")
 async def metin_oy_ver(oy: MetinOyCreate, current_user=Depends(get_current_user)):
     role = current_user.get("role", "")
-    if role not in ["admin", "teacher"]:
+    if role not in ["admin", "coordinator", "teacher"]:
         raise HTTPException(status_code=403, detail="Sadece öğretmenler oy verebilir")
     if not oy.onay and not oy.sebep:
         raise HTTPException(status_code=400, detail="Red için sebep belirtmelisiniz")
@@ -1039,7 +1040,7 @@ async def metin_oy_ver(oy: MetinOyCreate, current_user=Depends(get_current_user)
     puanlar = await get_puan_ayarlari()
     await db.users.update_one({"id": user_id}, {"$inc": {"puan": puanlar.get("oylama_katilim", 2)}})
     # %60 kontrolü
-    ogretmenler = await db.users.find({"role": {"$in": ["teacher", "admin"]}}).to_list(length=None)
+    ogretmenler = await db.users.find({"role": {"$in": ["teacher", "coordinator", "admin"]}}).to_list(length=None)
     toplam = len(ogretmenler)
     onay_sayisi = sum(1 for v in oylar.values() if v.get("onay"))
     oy_sayisi = len(oylar)
@@ -1068,7 +1069,7 @@ async def metin_oy_ver(oy: MetinOyCreate, current_user=Depends(get_current_user)
     }
 
 @api_router.delete("/diagnostic/texts/{metin_id}")
-async def delete_metin(metin_id: str, current_user=Depends(require_role(UserRole.ADMIN))):
+async def delete_metin(metin_id: str, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     await db.analiz_metinler.delete_one({"id": metin_id})
     return {"message": "Silindi"}
 
@@ -1106,7 +1107,7 @@ class DiagnosticOturum(BaseModel):
 
 @api_router.post("/diagnostic/sessions")
 async def baslat_oturum(data: AnalizOturumBaslat, current_user=Depends(get_current_user)):
-    if current_user.get("role") not in ["admin", "teacher"]:
+    if current_user.get("role") not in ["admin", "coordinator", "teacher"]:
         raise HTTPException(status_code=403, detail="Yetkisiz")
     # Metni bul (id veya _id ile)
     metin = await db.analiz_metinler.find_one({"id": data.metin_id})
@@ -1422,11 +1423,11 @@ class TamamlamaModel(BaseModel):
 @api_router.post("/gelisim/icerik")
 async def create_icerik(icerik: IcerikCreate, current_user=Depends(get_current_user)):
     role = current_user.get("role", "")
-    if role not in ["admin", "teacher"]:
+    if role not in ["admin", "coordinator", "teacher"]:
         raise HTTPException(status_code=403, detail="Yetkisiz")
     
-    # Admin eklerse direkt oylama, öğretmen eklerse beklemede
-    durum = "oylama" if role == "admin" else "beklemede"
+    # Admin/Koordinatör eklerse direkt oylama, öğretmen eklerse beklemede
+    durum = "oylama" if role in ["admin", "coordinator"] else "beklemede"
     
     model = IcerikModel(
         **icerik.dict(),
@@ -1474,7 +1475,7 @@ async def get_icerik_list(current_user=Depends(get_current_user)):
 
 # Admin onay/red (beklemede → oylama veya reddedildi)
 @api_router.post("/gelisim/icerik/{icerik_id}/admin-karar")
-async def admin_karar(icerik_id: str, karar: dict, current_user=Depends(require_role(UserRole.ADMIN))):
+async def admin_karar(icerik_id: str, karar: dict, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     # direkt=True → oylama atla, direkt yayına al
     onay = karar.get("onay", False)
     direkt = karar.get("direkt", False)
@@ -1498,7 +1499,7 @@ async def admin_karar(icerik_id: str, karar: dict, current_user=Depends(require_
 @api_router.post("/gelisim/oy")
 async def oy_ver(oy: OyCreate, current_user=Depends(get_current_user)):
     role = current_user.get("role", "")
-    if role not in ["admin", "teacher"]:
+    if role not in ["admin", "coordinator", "teacher"]:
         raise HTTPException(status_code=403, detail="Sadece öğretmenler oy verebilir")
     
     if not oy.onay and not oy.sebep:
@@ -1525,7 +1526,7 @@ async def oy_ver(oy: OyCreate, current_user=Depends(get_current_user)):
     await db.users.update_one({"id": user_id}, {"$inc": {"puan": puanlar.get("icerik_oylama", 2)}})
     
     # %60 kontrolü
-    ogretmenler = await db.users.find({"role": {"$in": ["teacher", "admin"]}}).to_list(length=None)
+    ogretmenler = await db.users.find({"role": {"$in": ["teacher", "coordinator", "admin"]}}).to_list(length=None)
     toplam_ogretmen = len(ogretmenler)
     onay_sayisi = sum(1 for v in oylar.values() if v.get("onay"))
     oy_sayisi = len(oylar)
@@ -1619,7 +1620,7 @@ async def get_puan_tablosu(current_user=Depends(get_current_user)):
 
 # İçerik sil
 @api_router.delete("/gelisim/icerik/{icerik_id}")
-async def delete_icerik(icerik_id: str, current_user=Depends(require_role(UserRole.ADMIN))):
+async def delete_icerik(icerik_id: str, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     await db.gelisim_icerik.delete_one({"id": icerik_id})
     return {"message": "Silindi"}
 
