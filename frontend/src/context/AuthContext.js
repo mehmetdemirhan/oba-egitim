@@ -1,13 +1,10 @@
 // ─────────────────────────────────────────────────────────────
-// src/context/AuthContext.js
+// src/context/AuthContext.js  (DÜZELTİLMİŞ)
 // ─────────────────────────────────────────────────────────────
-// Bunu src/context/AuthContext.js olarak kaydedin
-
 import React, { createContext, useContext, useState, useEffect } from "react";
 import axios from "axios";
 
 const AuthContext = createContext(null);
-
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
@@ -16,7 +13,7 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(localStorage.getItem("oba_token"));
   const [loading, setLoading] = useState(true);
 
-  // Axios default header
+  // Token değişince header'ı set et
   useEffect(() => {
     if (token) {
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
@@ -25,30 +22,38 @@ export function AuthProvider({ children }) {
     }
   }, [token]);
 
-  // Token varsa kullanıcıyı doğrula
+  // ★ DÜZELTİLDİ: dependency [token] eklendi + header verify öncesi garanti set ediliyor
   useEffect(() => {
     const verifyToken = async () => {
       if (!token) {
         setLoading(false);
         return;
       }
+
+      // ★ Race condition düzeltmesi: header'ın kesinlikle set olduğundan emin ol
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+
       try {
         const response = await axios.get(`${API}/auth/me`);
         setUser(response.data);
-      } catch {
-        // Token geçersiz
-        logout();
+      } catch (error) {
+        console.error("Token doğrulama hatası:", error?.response?.status);
+        // ★ DÜZELTİLDİ: logout() yerine inline temizlik (stale closure riski yok)
+        localStorage.removeItem("oba_token");
+        delete axios.defaults.headers.common["Authorization"];
+        setToken(null);
+        setUser(null);
       } finally {
         setLoading(false);
       }
     };
     verifyToken();
-  }, []);
+  }, [token]); // ★ DÜZELTİLDİ: dependency eklendi
 
   const login = async (email, password) => {
     const response = await axios.post(`${API}/auth/login`, { email, password });
     const { access_token, user: userData } = response.data;
-    
+
     localStorage.setItem("oba_token", access_token);
     axios.defaults.headers.common["Authorization"] = `Bearer ${access_token}`;
     setToken(access_token);
