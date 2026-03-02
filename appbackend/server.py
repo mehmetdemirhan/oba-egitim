@@ -1072,6 +1072,7 @@ async def baslat_oturum(data: AnalizOturumBaslat, current_user=Depends(get_curre
     d["olusturma_tarihi"] = d["olusturma_tarihi"].isoformat()
     d["tamamlama_tarihi"] = None
     await db.diagnostic_oturumlar.insert_one(d)
+    d.pop("_id", None)
     return d
 
 @api_router.get("/diagnostic/sessions")
