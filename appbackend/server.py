@@ -1382,149 +1382,287 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     from reportlab.lib.pagesizes import A4
     from reportlab.lib import colors
     from reportlab.lib.units import cm, mm
-    from reportlab.platypus import SimpleDocTemplate, Paragraph as RLParagraph, Spacer, Table as RLTable, TableStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph as RLPara, Spacer, Table as RLTable, TableStyle, HRFlowable
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
 
+    # ── Türkçe Font Kaydı ──
+    font_paths = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    ]
+    font_registered = False
+    for fp in font_paths:
+        if os.path.exists(fp):
+            font_registered = True
+            break
+
+    if font_registered:
+        pdfmetrics.registerFont(TTFont("TRFont", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"))
+        pdfmetrics.registerFont(TTFont("TRFontBold", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"))
+        FONT = "TRFont"
+        FONTB = "TRFontBold"
+    else:
+        FONT = "Helvetica"
+        FONTB = "Helvetica-Bold"
+
     buffer = io.BytesIO()
     doc_pdf = SimpleDocTemplate(buffer, pagesize=A4, topMargin=1.5*cm, bottomMargin=1.5*cm, leftMargin=2*cm, rightMargin=2*cm)
 
     styles = getSampleStyleSheet()
-    styles.add(ParagraphStyle(name='TitleOBA', fontSize=18, leading=22, alignment=TA_CENTER, spaceAfter=6, textColor=colors.HexColor('#1F4E79'), fontName='Helvetica-Bold'))
-    styles.add(ParagraphStyle(name='SubtitleOBA', fontSize=10, leading=14, alignment=TA_CENTER, spaceAfter=20, textColor=colors.HexColor('#666666')))
-    styles.add(ParagraphStyle(name='SectionHead', fontSize=13, leading=16, spaceBefore=16, spaceAfter=8, textColor=colors.HexColor('#1F4E79'), fontName='Helvetica-Bold'))
-    styles.add(ParagraphStyle(name='BodyOBA', fontSize=10, leading=14, spaceAfter=6))
-    styles.add(ParagraphStyle(name='SmallOBA', fontSize=9, leading=12, textColor=colors.HexColor('#555555')))
+    styles.add(ParagraphStyle(name='TitleOBA', fontSize=18, leading=22, alignment=TA_CENTER, spaceAfter=4, textColor=colors.HexColor('#1F4E79'), fontName=FONTB))
+    styles.add(ParagraphStyle(name='SubOBA', fontSize=11, leading=14, alignment=TA_CENTER, spaceAfter=16, textColor=colors.HexColor('#666666'), fontName=FONT))
+    styles.add(ParagraphStyle(name='SectOBA', fontSize=12, leading=16, spaceBefore=14, spaceAfter=8, textColor=colors.HexColor('#1F4E79'), fontName=FONTB))
+    styles.add(ParagraphStyle(name='SubSectOBA', fontSize=10, leading=13, spaceBefore=10, spaceAfter=4, textColor=colors.HexColor('#333333'), fontName=FONTB))
+    styles.add(ParagraphStyle(name='BodyOBA', fontSize=9, leading=13, spaceAfter=4, fontName=FONT))
+    styles.add(ParagraphStyle(name='SmallOBA', fontSize=8, leading=11, textColor=colors.HexColor('#999999'), fontName=FONT))
+    styles.add(ParagraphStyle(name='BigNum', fontSize=28, leading=32, textColor=colors.HexColor('#1F4E79'), fontName=FONTB))
 
-    elements = []
+    el = []  # elements
 
-    # Başlık
-    elements.append(RLParagraph("Okuma Becerileri Akademisi", styles['TitleOBA']))
-    elements.append(RLParagraph("Giris Analizi Raporu", styles['SubtitleOBA']))
+    hdr_bg = colors.HexColor('#1F4E79')
+    alt_bg = colors.HexColor('#F2F7FB')
+    bdr = colors.HexColor('#CCCCCC')
+    ora = colors.HexColor('#E67E22')
 
-    # Öğrenci Bilgileri
-    elements.append(RLParagraph("1. Ogrenci Bilgileri", styles['SectionHead']))
-    info_data = [
-        ["Ogrenci:", rapor.get("ogrenci_ad", "-"), "Sinif:", rapor.get("ogrenci_sinif", "-")],
-        ["Egitimci:", rapor.get("ogretmen_ad", "-"), "Tarih:", rapor.get("olusturma_tarihi", "")[:10]],
-        ["Metin:", rapor.get("metin_adi", "-"), "Tur:", rapor.get("metin_turu", "-")],
+    def tbl_style(rows, has_header=True):
+        s = [
+            ('FONTNAME', (0,0), (-1,-1), FONT),
+            ('FONTSIZE', (0,0), (-1,-1), 9),
+            ('GRID', (0,0), (-1,-1), 0.5, bdr),
+            ('TOPPADDING', (0,0), (-1,-1), 5),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+            ('LEFTPADDING', (0,0), (-1,-1), 6),
+            ('RIGHTPADDING', (0,0), (-1,-1), 6),
+        ]
+        if has_header:
+            s += [
+                ('BACKGROUND', (0,0), (-1,0), hdr_bg),
+                ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+                ('FONTNAME', (0,0), (-1,0), FONTB),
+            ]
+        for i in range(1 if has_header else 0, rows):
+            if i % 2 == 0:
+                s.append(('BACKGROUND', (0,i), (-1,i), alt_bg))
+        return s
+
+    # ── BAŞLIK ──
+    el.append(RLPara("Okuma Becerileri Akademisi", styles['TitleOBA']))
+    el.append(RLPara("Giriş Analizi Raporu", styles['SubOBA']))
+
+    # ── 1. ÖĞRENCİ BİLGİLERİ ──
+    el.append(RLPara("1. Öğrenci Bilgileri", styles['SectOBA']))
+    w1, w2, w3, w4 = 3*cm, 5*cm, 3*cm, 5*cm
+    info = [
+        ["Adı Soyadı:", rapor.get("ogrenci_ad", "-"), "Sınıfı:", rapor.get("ogrenci_sinif", "-")],
+        ["Eğitimci:", rapor.get("ogretmen_ad", "-"), "Tarih:", rapor.get("olusturma_tarihi", "")[:10]],
     ]
-    t = RLTable(info_data, colWidths=[2.5*cm, 5.5*cm, 2.5*cm, 5.5*cm])
+    t = RLTable(info, colWidths=[w1, w2, w3, w4])
     t.setStyle(TableStyle([
+        ('FONTNAME', (0,0), (0,-1), FONTB), ('FONTNAME', (2,0), (2,-1), FONTB),
+        ('FONTNAME', (1,0), (1,-1), FONT), ('FONTNAME', (3,0), (3,-1), FONT),
         ('FONTSIZE', (0,0), (-1,-1), 9),
-        ('FONTNAME', (0,0), (0,-1), 'Helvetica-Bold'),
-        ('FONTNAME', (2,0), (2,-1), 'Helvetica-Bold'),
-        ('TEXTCOLOR', (0,0), (0,-1), colors.HexColor('#1F4E79')),
-        ('TEXTCOLOR', (2,0), (2,-1), colors.HexColor('#1F4E79')),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
-        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('TEXTCOLOR', (0,0), (0,-1), hdr_bg), ('TEXTCOLOR', (2,0), (2,-1), hdr_bg),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 5), ('TOPPADDING', (0,0), (-1,-1), 5),
     ]))
-    elements.append(t)
-    elements.append(Spacer(1, 8))
+    el.append(t)
 
-    # Okuma Hızı
-    elements.append(RLParagraph("2. Okuma Hizi", styles['SectionHead']))
-    sure_dk = rapor.get("sure_saniye", 0) // 60
-    sure_sn = rapor.get("sure_saniye", 0) % 60
-    hiz_label = {"dusuk": "Dusuk", "orta": "Orta", "yeterli": "Yeterli", "ileri": "Ileri"}.get(rapor.get("hiz_deger", ""), "?")
-    speed_data = [
-        ["Kelime Sayisi", "Sure", "Kelime/Dakika", "Seviye"],
-        [str(rapor.get("kelime_sayisi", 0)), f"{sure_dk}dk {sure_sn}sn", str(round(rapor.get("wpm", 0))), hiz_label],
+    # ── 2. METİN BİLGİLERİ ──
+    el.append(RLPara("2. Metin Bilgileri", styles['SectOBA']))
+    kelime_s = rapor.get("kelime_sayisi", 0)
+    dogruluk = rapor.get("dogruluk_yuzde", 0)
+    yanlis_k = round(kelime_s * (100 - dogruluk) / 100) if kelime_s else 0
+    dogru_k = kelime_s - yanlis_k
+    sure_sn_total = rapor.get("sure_saniye", 0)
+    sure_dk = int(sure_sn_total) // 60
+    sure_sn = int(sure_sn_total) % 60
+    metin_info = [
+        ["Metnin Adı:", rapor.get("metin_adi", "-").upper()],
+        ["Metnin Türü:", rapor.get("metin_turu", "-").upper()],
+        ["Toplam Kelime Sayısı:", str(kelime_s)],
+        ["Doğru Okunan Kelime:", str(dogru_k)],
+        ["Yanlış Okunan Kelime:", str(yanlis_k)],
+        ["Tamamlama Süresi:", f"{sure_dk}:{str(sure_sn).zfill(2)} ({sure_sn_total} sn)"],
     ]
-    t2 = RLTable(speed_data, colWidths=[4*cm, 4*cm, 4*cm, 4*cm])
+    t2 = RLTable(metin_info, colWidths=[5*cm, 11*cm])
     t2.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1F4E79')),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTNAME', (0,0), (0,-1), FONTB), ('FONTNAME', (1,0), (1,-1), FONT),
         ('FONTSIZE', (0,0), (-1,-1), 9),
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CCCCCC')),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
-        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('GRID', (0,0), (-1,-1), 0.5, bdr),
+        ('BACKGROUND', (0,0), (0,-1), alt_bg),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 5), ('TOPPADDING', (0,0), (-1,-1), 5),
+        ('LEFTPADDING', (0,0), (-1,-1), 6),
     ]))
-    elements.append(t2)
-    elements.append(Spacer(1, 8))
+    el.append(t2)
 
-    # Doğru Okuma
-    elements.append(RLParagraph("3. Dogru Okuma Orani", styles['SectionHead']))
-    elements.append(RLParagraph(f"Dogruluk: %{round(rapor.get('dogruluk_yuzde', 0))}", styles['BodyOBA']))
+    # ── 3. OKUMA HIZI ──
+    el.append(RLPara("3. Okuma Hızı", styles['SectOBA']))
+    wpm = round(rapor.get("wpm", 0))
+    hiz_map = {"dusuk": "Düşük", "orta": "Orta", "yeterli": "Yeterli", "ileri": "İleri"}
+    hiz_label = hiz_map.get(rapor.get("hiz_deger", ""), "?")
+    hiz_renk = {"dusuk": "#E74C3C", "orta": "#F39C12", "yeterli": "#27AE60", "ileri": "#2E86C1"}.get(rapor.get("hiz_deger", ""), "#333")
+    el.append(RLPara(f'<font size="28" color="{hiz_renk}"><b>{wpm}</b></font>  <font size="10">kelime/dakika</font>', styles['BodyOBA']))
+    el.append(RLPara(f'<font size="12" color="{hiz_renk}"><b>{hiz_label} Düzey</b></font>', styles['BodyOBA']))
+    el.append(Spacer(1, 4))
+    sinif = rapor.get("ogrenci_sinif", "")
+    el.append(RLPara(f"Öğrencinin okuma hızı dakikada <b>{wpm} kelime</b>dir. Bu okuma hızı, öğrencinin bulunduğu sınıf düzeyi normlarına göre <b>{hiz_label.lower()} düzeydedir</b>.", styles['BodyOBA']))
+
+    # ── 4. DOĞRU OKUMA ORANI ──
+    el.append(RLPara("3.1. Doğru Okuma Oranı", styles['SubSectOBA']))
+    el.append(RLPara(f"Doğruluk: <b>%{round(dogruluk)}</b>", styles['BodyOBA']))
     hatalar = rapor.get("hata_sayilari", [])
     if hatalar:
-        hata_labels = {"atlama": "Atlama", "yanlis": "Yanlis Okuma", "takilma": "Takilma", "tekrar": "Tekrar"}
-        hata_rows = [["Hata Turu", "Sayi"]]
+        hata_labels = {"atlama": "Atlama", "yanlis": "Yanlış Okuma", "takilma": "Takılma", "tekrar": "Tekrar"}
+        hata_rows = [["Hata Türü", "Açıklama", "Sayı"]]
+        hata_desc = {"atlama": "Kelime veya satır atlama", "yanlis": "Kelimeyi farklı okuma", "takilma": "Kelimede duraksama", "tekrar": "Aynı kelimeyi tekrar okuma"}
+        toplam_hata = 0
         for h in hatalar:
-            hata_rows.append([hata_labels.get(h.get("tur", ""), h.get("tur", "")), str(h.get("sayi", 0))])
-        t3 = RLTable(hata_rows, colWidths=[8*cm, 4*cm])
-        t3.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#E8F0FE')),
-            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0,0), (-1,-1), 9),
-            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CCCCCC')),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
-            ('TOPPADDING', (0,0), (-1,-1), 4),
+            tur = h.get("tur", "")
+            sayi = h.get("sayi", 0)
+            toplam_hata += sayi
+            hata_rows.append([hata_labels.get(tur, tur), hata_desc.get(tur, ""), str(sayi)])
+        hata_rows.append(["TOPLAM", "", str(toplam_hata)])
+        t3 = RLTable(hata_rows, colWidths=[3.5*cm, 6.5*cm, 2*cm])
+        t3.setStyle(TableStyle(tbl_style(len(hata_rows)) + [
+            ('FONTNAME', (0,-1), (-1,-1), FONTB),
+            ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor('#E8F0FE')),
+            ('ALIGN', (2,0), (2,-1), 'CENTER'),
         ]))
-        elements.append(t3)
-    elements.append(Spacer(1, 8))
+        el.append(t3)
 
-    # Anlama
-    elements.append(RLParagraph("4. Okudugunu Anlama", styles['SectionHead']))
+    # ── 5. OKUDUĞUNU ANLAMA ──
+    anlama = rapor.get("anlama", {})
     anlama_pct = rapor.get("anlama_yuzde", 0)
-    elements.append(RLParagraph(f"Genel anlama: %{anlama_pct} ({anlama_seviye(anlama_pct)})", styles['BodyOBA']))
-    elements.append(Spacer(1, 8))
+    anlama_sev = "İyi" if anlama_pct >= 85 else "Orta" if anlama_pct >= 70 else "Zayıf"
+    el.append(RLPara(f"4. Okuduğunu Anlama Becerileri — %{anlama_pct}", styles['SectOBA']))
 
-    # Prozodik
-    elements.append(RLParagraph("5. Prozodik Okuma", styles['SectionHead']))
+    # Anlama alt grupları
+    anlama_gruplari = [
+        ("4.1 Sözcük Düzeyinde Anlama", [
+            ("Cümle anlamını kavrama", "cumle_anlama"),
+            ("Bilinmeyen sözcük tahmini", "bilinmeyen_sozcuk"),
+            ("Bağlaç ve zamirleri anlama", "baglac_zamir"),
+        ]),
+        ("4.2 Metnin Ana Yapısını Anlama", [
+            ("Ana fikir belirleme", "ana_fikir"),
+            ("Yardımcı fikirleri ifade etme", "yardimci_fikir"),
+            ("Metnin konusunu ifade etme", "konu"),
+            ("Başlık önerme", "baslik_onerme"),
+        ]),
+        ("4.3 Metinler Arasılık ve Derin Anlama", [
+            ("Neden-sonuç ilişkisini belirleme", "neden_sonuc"),
+            ("Çıkarım yapma", "cikarim"),
+            ("Metindeki ipuçlarını kullanma", "ipuclari"),
+            ("Yorumlama", "yorumlama"),
+        ]),
+        ("4.4 Eleştirel ve Yaratıcı Okuma", [
+            ("Metne yönelik görüş bildirme", "gorus_bildirme"),
+            ("Yazarın amacını sezme", "yazar_amaci"),
+            ("Alternatif son / fikir üretme", "alternatif_fikir"),
+            ("Metni günlük hayatla ilişkilendirme", "guncelle_hayat"),
+        ]),
+        ("4.5 Soru Performans Analizi", [
+            ("Bilgi", "bilgi"),
+            ("Kavrama", "kavrama"),
+            ("Uygulama", "uygulama"),
+            ("Analiz", "analiz"),
+            ("Sentez", "sentez"),
+            ("Değerlendirme", "degerlendirme"),
+        ]),
+    ]
+
+    seviye_map = {"zayif": "Zayıf", "orta": "Orta", "iyi": "İyi"}
+    for grup_baslik, olcutler in anlama_gruplari:
+        el.append(RLPara(grup_baslik, styles['SubSectOBA']))
+        rows = [["Ölçüt", "Zayıf", "Orta", "İyi"]]
+        for label, key in olcutler:
+            val = anlama.get(key, "orta")
+            row = [label]
+            for s in ["zayif", "orta", "iyi"]:
+                row.append("+" if val == s else "")
+            rows.append(row)
+        t_a = RLTable(rows, colWidths=[7*cm, 3*cm, 3*cm, 3*cm])
+        st = tbl_style(len(rows))
+        # Renklendir: + işaretlerini turuncu yap
+        for ri in range(1, len(rows)):
+            for ci in range(1, 4):
+                if rows[ri][ci] == "+":
+                    st.append(('TEXTCOLOR', (ci, ri), (ci, ri), ora))
+                    st.append(('FONTNAME', (ci, ri), (ci, ri), FONTB))
+        st.append(('ALIGN', (1,0), (-1,-1), 'CENTER'))
+        t_a.setStyle(TableStyle(st))
+        el.append(t_a)
+
+    # ── 6. PROZODİK OKUMA ──
     proz = rapor.get("prozodik", {})
     proz_toplam = rapor.get("prozodik_toplam", 0)
-    proz_labels = {"noktalama": "Noktalama", "vurgu": "Vurgu", "tonlama": "Tonlama", "akicilik": "Akicilik", "anlamli_gruplama": "Anlamli Gruplama"}
-    proz_rows = [["Olcut", "Puan (1-4)"]]
-    for k, label in proz_labels.items():
-        proz_rows.append([label, str(proz.get(k, 0))])
-    proz_rows.append(["TOPLAM", f"{proz_toplam}/20 ({prozodik_seviye(proz_toplam)})"])
-    t4 = RLTable(proz_rows, colWidths=[8*cm, 4*cm])
-    t4.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1F4E79')),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor('#E8F0FE')),
-        ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,-1), 9),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CCCCCC')),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
-        ('TOPPADDING', (0,0), (-1,-1), 4),
-    ]))
-    elements.append(t4)
-    elements.append(Spacer(1, 8))
+    proz_sev = "Çok İyi" if proz_toplam >= 18 else "İyi" if proz_toplam >= 14 else "Orta" if proz_toplam >= 10 else "Geliştirilmeli"
+    el.append(RLPara("5. Prozodik Okuma Ölçeği", styles['SectOBA']))
 
-    # Kur
-    elements.append(RLParagraph("6. Atanan Kur", styles['SectionHead']))
-    elements.append(RLParagraph(f"Atanan Kur: {rapor.get('atanan_kur', '-')}", styles['BodyOBA']))
-    elements.append(Spacer(1, 8))
+    proz_desc = {
+        "noktalama": ["Uymuyor", "Kısmen", "Çoğunlukla", "Tam ve bilinçli"],
+        "vurgu": ["Tek düze", "Yer yer", "Anlama uygun", "Etkili ve bilinçli"],
+        "tonlama": ["Monoton", "Sınırlı", "Metne uygun", "Doğal ve etkileyici"],
+        "akicilik": ["Sık duraklama", "Kısmi akış", "Genel akıcı", "Kesintisiz"],
+        "anlamli_gruplama": ["Sözcük sözcük", "Kısmen", "Çoğunlukla", "Tam ve tutarlı"],
+    }
+    proz_labels = {"noktalama": "Noktalama ve Duraklama", "vurgu": "Vurgu", "tonlama": "Tonlama", "akicilik": "Akıcılık", "anlamli_gruplama": "Anlamlı Gruplama"}
 
-    # Öğretmen Notu
+    proz_rows = [["Ölçüt", "1 puan", "2 puan", "3 puan", "4 puan", "Puan"]]
+    for key in ["noktalama", "vurgu", "tonlama", "akicilik", "anlamli_gruplama"]:
+        puan = proz.get(key, 0)
+        descs = proz_desc.get(key, ["", "", "", ""])
+        row = [proz_labels.get(key, key)]
+        for pi in range(4):
+            row.append(descs[pi])
+        row.append(str(puan))
+        proz_rows.append(row)
+    proz_rows.append(["", "", "", "", "Toplam", str(proz_toplam)])
+
+    t_p = RLTable(proz_rows, colWidths=[2.8*cm, 2.5*cm, 2.5*cm, 2.5*cm, 2.8*cm, 1.5*cm])
+    ps = tbl_style(len(proz_rows))
+    # Seçili puanı turuncu yap
+    for ri in range(1, len(proz_rows) - 1):
+        key = list(proz_desc.keys())[ri - 1]
+        puan = proz.get(key, 0)
+        if 1 <= puan <= 4:
+            ps.append(('TEXTCOLOR', (puan, ri), (puan, ri), ora))
+            ps.append(('FONTNAME', (puan, ri), (puan, ri), FONTB))
+    ps.append(('ALIGN', (5, 0), (5, -1), 'CENTER'))
+    ps.append(('FONTNAME', (0, -1), (-1, -1), FONTB))
+    ps.append(('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#E8F0FE')))
+    t_p.setStyle(TableStyle(ps))
+    el.append(t_p)
+    el.append(RLPara(f"Prozodik okuma performansı: <b>{proz_sev}</b> (Toplam {proz_toplam}/20)", styles['BodyOBA']))
+
+    # ── 7. SONUÇ VE GENEL YORUM ──
+    el.append(RLPara("6. Sonuç ve Genel Yorum", styles['SectOBA']))
     if rapor.get("ogretmen_notu"):
-        elements.append(RLParagraph("7. Ogretmen Notu ve Oneriler", styles['SectionHead']))
         for line in rapor.get("ogretmen_notu", "").split("\n"):
             if line.strip():
-                elements.append(RLParagraph(line.strip(), styles['BodyOBA']))
-    
+                el.append(RLPara(line.strip(), styles['BodyOBA']))
+
     # AI Yorumları
     ai = rapor.get("ai_yorumlar", {})
     if ai:
-        elements.append(Spacer(1, 8))
-        elements.append(RLParagraph("8. Detayli Degerlendirme", styles['SectionHead']))
-        ai_labels = {"hiz": "Okuma Hizi", "dogruluk": "Dogru Okuma", "anlama": "Anlama", "prozodik": "Prozodik Okuma", "sonuc": "Sonuc", "oneriler": "Oneriler"}
+        el.append(Spacer(1, 6))
+        ai_labels = {"hiz": "Okuma Hızı", "dogruluk": "Doğru Okuma", "anlama": "Anlama", "prozodik": "Prozodik Okuma", "sonuc": "Sonuç", "oneriler": "Öneriler"}
         for key, label in ai_labels.items():
             if ai.get(key):
-                elements.append(RLParagraph(f"<b>{label}:</b> {ai[key]}", styles['BodyOBA']))
+                el.append(RLPara(f"<b>{label}:</b> {ai[key]}", styles['BodyOBA']))
 
-    # Alt bilgi
-    elements.append(Spacer(1, 20))
-    elements.append(RLParagraph("Bu rapor Okuma Becerileri Akademisi sistemi tarafindan olusturulmustur.", styles['SmallOBA']))
+    # ── KUR ──
+    el.append(Spacer(1, 8))
+    el.append(RLPara(f"Atanan Kur: <b>{rapor.get('atanan_kur', '-')}</b>", styles['BodyOBA']))
 
-    doc_pdf.build(elements)
+    # ── ALT BİLGİ ──
+    el.append(Spacer(1, 20))
+    el.append(HRFlowable(width="100%", thickness=0.5, color=bdr))
+    el.append(RLPara("Bu rapor Okuma Becerileri Akademisi sistemi tarafından oluşturulmuştur.", styles['SmallOBA']))
+
+    doc_pdf.build(el)
     buffer.seek(0)
 
     ogrenci_ad = rapor.get("ogrenci_ad", "ogrenci").replace(" ", "_")
