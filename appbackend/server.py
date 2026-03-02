@@ -1,14 +1,17 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
+import io
 import logging
 from pathlib import Path
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field
 from typing import List, Optional
 import uuid
+import random
 from datetime import datetime, timezone, timedelta
 from enum import Enum
 from passlib.context import CryptContext
@@ -260,7 +263,6 @@ async def forgot_password(data: dict = Body(...)):
     if not user:
         raise HTTPException(status_code=404, detail="Bu bilgilerle kayıtlı kullanıcı bulunamadı")
     # 6 haneli geçici şifre oluştur
-    import random
     gecici_sifre = str(random.randint(100000, 999999))
     new_hash = hash_password(gecici_sifre)
     await db.users.update_one({"id": user["id"]}, {"$set": {"password_hash": new_hash}})
@@ -1377,7 +1379,6 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
-    import io
 
     buffer = io.BytesIO()
     doc_pdf = SimpleDocTemplate(buffer, pagesize=A4, topMargin=1.5*cm, bottomMargin=1.5*cm, leftMargin=2*cm, rightMargin=2*cm)
@@ -1518,7 +1519,6 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     doc_pdf.build(elements)
     buffer.seek(0)
 
-    from fastapi.responses import StreamingResponse
     ogrenci_ad = rapor.get("ogrenci_ad", "ogrenci").replace(" ", "_")
     tarih = rapor.get("olusturma_tarihi", "")[:10]
     filename = f"Rapor_{ogrenci_ad}_{tarih}.pdf"
