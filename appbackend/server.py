@@ -34,20 +34,46 @@ security = HTTPBearer()
 # Create the main app without a prefix
 app = FastAPI(title="Okuma Becerileri Akademisi API")
 
-# ★ CORS — app oluşturulduktan hemen sonra, her şeyden ÖNCE eklenmeli
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "https://oba-egitim-frontend.onrender.com",
-        "http://localhost:3000",
-        "http://localhost:3001",
-    ],
-    allow_origin_regex=r"https://.*\.onrender\.com",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-)
+# ★ CORS — En güvenilir yapılandırma
+# NOT: allow_origins=["*"] ve allow_credentials=True birlikte kullanılamaz.
+# Bu yüzden ya credentials kapatılır ya da origin spesifik yazılır.
+# Render'da en güvenilir yol: origin'i dinamik olarak echo etmek.
+
+ALLOWED_ORIGINS = {
+    "https://oba-egitim-frontend.onrender.com",
+    "http://localhost:3000",
+    "http://localhost:3001",
+}
+
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
+
+class CustomCORSMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        origin = request.headers.get("origin", "")
+
+        # OPTIONS preflight — hemen yanıtla
+        if request.method == "OPTIONS":
+            response = Response(status_code=200)
+            if origin in ALLOWED_ORIGINS or origin.endswith(".onrender.com"):
+                response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Access-Control-Allow-Credentials"] = "true"
+                response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+                response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept, Origin, X-Requested-With"
+                response.headers["Access-Control-Max-Age"] = "86400"
+            return response
+
+        # Normal istek
+        response = await call_next(request)
+        if origin in ALLOWED_ORIGINS or origin.endswith(".onrender.com"):
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+            response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept, Origin, X-Requested-With"
+        return response
+
+app.add_middleware(CustomCORSMiddleware)
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
