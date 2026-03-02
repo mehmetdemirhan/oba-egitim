@@ -811,6 +811,97 @@ async def update_normlar(data: NormGuncelle, current_user=Depends(require_role(U
     )
     return {"message": "Norm tablosu güncellendi", "normlar": data.normlar}
 
+
+# ─────────────────────────────────────────────
+# ★ EKSİK MODELLER VE ENDPOINT'LER (EKLENDİ)
+# ─────────────────────────────────────────────
+
+# Metin oluşturma modeli — frontend MetinYonetimi bileşeni kullanıyor
+class MetinCreate(BaseModel):
+    baslik: str
+    icerik: str
+    kelime_sayisi: int = 0
+    sinif_seviyesi: str = "4"
+    tur: str = "hikaye"  # hikaye, bilgilendirici, siir
+
+# Metin oylama modeli — metin_oy_ver endpoint'i kullanıyor (NameError düzeltmesi)
+class MetinOyCreate(BaseModel):
+    metin_id: str
+    onay: bool
+    sebep: str = ""
+
+
+# ★ Metin ekleme endpoint'i (frontend: axios.post(`${API}/diagnostic/texts`, ...))
+@api_router.post("/diagnostic/texts")
+async def create_metin(data: MetinCreate, current_user=Depends(get_current_user)):
+    role = current_user.get("role", "")
+    if role not in ["admin", "teacher"]:
+        raise HTTPException(status_code=403, detail="Yetkisiz")
+
+    # Kelime sayısı otomatik hesapla (0 geldiyse)
+    kelime_sayisi = data.kelime_sayisi
+    if kelime_sayisi == 0 and data.icerik:
+        kelime_sayisi = len(data.icerik.strip().split())
+
+    # Admin eklerse direkt oylama, öğretmen eklerse beklemede
+    durum = "oylama" if role == "admin" else "beklemede"
+
+    metin_doc = {
+        "id": str(uuid.uuid4()),
+        "baslik": data.baslik,
+        "icerik": data.icerik,
+        "kelime_sayisi": kelime_sayisi,
+        "sinif_seviyesi": data.sinif_seviyesi,
+        "tur": data.tur,
+        "durum": durum,
+        "ekleyen_id": current_user["id"],
+        "ekleyen_ad": f"{current_user.get('ad', '')} {current_user.get('soyad', '')}",
+        "oylar": {},
+        "olusturma_tarihi": datetime.now(timezone.utc).isoformat(),
+        "yayin_tarihi": None,
+    }
+    await db.analiz_metinler.insert_one(metin_doc)
+
+    # Ekleyene +5 puan
+    await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": 5}})
+
+    metin_doc.pop("_id", None)
+    return metin_doc
+
+
+# ★ Metin listeleme endpoint'i (frontend: axios.get(`${API}/diagnostic/texts`))
+@api_router.get("/diagnostic/texts")
+async def get_metinler(current_user=Depends(get_current_user)):
+    role = current_user.get("role", "")
+    user_id = current_user.get("id", "")
+
+    items = await db.analiz_metinler.find().sort("olusturma_tarihi", -1).to_list(length=None)
+    result = []
+    for item in items:
+        item.pop("_id", None)
+        durum = item.get("durum", "")
+
+        # Admin her şeyi görür
+        if role == "admin":
+            result.append(item)
+        # Öğretmen: kendi eklediği + oylama bekleyenler + havuzdakiler
+        elif role == "teacher":
+            if item.get("ekleyen_id") == user_id:
+                result.append(item)
+            elif durum in ("oylama", "havuzda"):
+                result.append(item)
+        # Öğrenci/diğer: sadece havuzdakiler
+        else:
+            if durum == "havuzda":
+                result.append(item)
+
+    return result
+
+
+# ─────────────────────────────────────────────
+# MEVCUT GİRİŞ ANALİZİ ROUTE'LARI
+# ─────────────────────────────────────────────
+
 @api_router.post("/diagnostic/texts/{metin_id}/admin-karar")
 async def metin_admin_karar(metin_id: str, karar: dict, current_user=Depends(require_role(UserRole.ADMIN))):
     # karar: {"onay": True/False, "direkt": True/False}
