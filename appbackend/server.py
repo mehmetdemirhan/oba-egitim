@@ -55,11 +55,12 @@ from starlette.responses import Response
 class CustomCORSMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         origin = request.headers.get("origin", "")
+        is_allowed = origin in ALLOWED_ORIGINS or origin.endswith(".onrender.com")
 
         # OPTIONS preflight — hemen yanıtla
         if request.method == "OPTIONS":
             response = Response(status_code=200)
-            if origin in ALLOWED_ORIGINS or origin.endswith(".onrender.com"):
+            if is_allowed:
                 response.headers["Access-Control-Allow-Origin"] = origin
                 response.headers["Access-Control-Allow-Credentials"] = "true"
                 response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
@@ -67,9 +68,13 @@ class CustomCORSMiddleware(BaseHTTPMiddleware):
                 response.headers["Access-Control-Max-Age"] = "86400"
             return response
 
-        # Normal istek
-        response = await call_next(request)
-        if origin in ALLOWED_ORIGINS or origin.endswith(".onrender.com"):
+        # Normal istek — try/except ile 500 hatalarında da CORS header ekle
+        try:
+            response = await call_next(request)
+        except Exception as e:
+            logging.error(f"Unhandled error: {e}")
+            response = Response(content=str(e), status_code=500)
+        if is_allowed:
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Credentials"] = "true"
             response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
@@ -182,7 +187,8 @@ class UserCreate(BaseModel):
     linked_id: Optional[str] = None  # teacher_id, student_id or parent's student_id
 
 class UserLogin(BaseModel):
-    email_or_phone: str
+    email_or_phone: Optional[str] = None
+    email: Optional[str] = None  # eski frontend uyumluluğu
     password: str
 
 class UserResponse(BaseModel):
@@ -211,7 +217,9 @@ class ChangePassword(BaseModel):
 
 @api_router.post("/auth/login", response_model=TokenResponse)
 async def login(credentials: UserLogin):
-    girdi = credentials.email_or_phone.lower().strip()
+    girdi = (credentials.email_or_phone or credentials.email or "").lower().strip()
+    if not girdi:
+        raise HTTPException(status_code=400, detail="E-posta veya telefon gerekli")
     # Email veya telefon ile kullanıcı bul
     user = await db.users.find_one({"email": girdi})
     if not user:
