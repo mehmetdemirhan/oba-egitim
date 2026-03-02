@@ -170,6 +170,7 @@ function AppContent() {
   const [studentForm, setStudentForm] = useState({ ad: "", soyad: "", sinif: "", veli_ad: "", veli_soyad: "", veli_telefon: "", aldigi_egitim: "", kur: "", yapilmasi_gereken_odeme: 0, ogretmene_yapilacak_odeme: 0, ogretmen_id: "" });
   const [courseForm, setCourseForm] = useState({ ad: "", fiyat: 0, sure: 0 });
   const [paymentForm, setPaymentForm] = useState({ tip: "ogrenci", kisi_id: "", miktar: 0, aciklama: "" });
+  const [tahsilatDialog, setTahsilatDialog] = useState(null); // {tip: 'ogrenci'|'ogretmen', kisi: {id,ad,soyad}, miktar: 0, aciklama: ''}
   const [editingItem, setEditingItem] = useState(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
 
@@ -366,6 +367,7 @@ function AppContent() {
                           <div className="flex items-center gap-4">
                             <div className="text-center"><div className="text-sm font-medium">{t.ogrenci_sayisi}</div><div className="text-xs text-gray-500">Öğrenci</div></div>
                             <div className="flex gap-2">
+                              <Button variant="outline" size="sm" className="text-green-600 border-green-300 hover:bg-green-50" onClick={e => { e.stopPropagation(); setTahsilatDialog({tip:'ogretmen', kisi:t, miktar:0, aciklama:''}); }}><CreditCard className="h-4 w-4" /></Button>
                               <Button variant="outline" size="sm" onClick={e => { e.stopPropagation(); setEditingItem({type:'teacher',data:t}); setEditDialogOpen(true); }}><Edit2 className="h-4 w-4" /></Button>
                               <Button variant="destructive" size="sm" onClick={e => { e.stopPropagation(); deleteTeacher(t.id); }}><Trash2 className="h-4 w-4" /></Button>
                             </div>
@@ -480,7 +482,7 @@ function AppContent() {
                             <TableCell>{s.veli_ad} {s.veli_soyad}</TableCell>
                             <TableCell>{t ? `${t.ad} ${t.soyad}` : '-'}</TableCell>
                             <TableCell className="text-green-600 font-semibold">{formatCurrency(Math.max(0, s.yapilmasi_gereken_odeme - s.yapilan_odeme))}</TableCell>
-                            <TableCell><div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => { setEditingItem({type:'student',data:s}); setEditDialogOpen(true); }}><Edit2 className="h-4 w-4" /></Button><Button variant="destructive" size="sm" onClick={() => deleteStudent(s.id)}><Trash2 className="h-4 w-4" /></Button></div></TableCell>
+                            <TableCell><div className="flex gap-2"><Button variant="outline" size="sm" className="text-green-600 border-green-300 hover:bg-green-50" onClick={() => setTahsilatDialog({tip:'ogrenci', kisi:s, miktar:0, aciklama:''})}><CreditCard className="h-4 w-4" /></Button><Button variant="outline" size="sm" onClick={() => { setEditingItem({type:'student',data:s}); setEditDialogOpen(true); }}><Edit2 className="h-4 w-4" /></Button><Button variant="destructive" size="sm" onClick={() => deleteStudent(s.id)}><Trash2 className="h-4 w-4" /></Button></div></TableCell>
                           </TableRow>
                         );
                       })}
@@ -799,6 +801,72 @@ function AppContent() {
               <DialogDescription>Bilgileri güncelleyin</DialogDescription>
             </DialogHeader>
             {editingItem && <SimpleEditForm item={editingItem} teachers={teachers} courses={availableCourses} classes={availableClasses} onSave={handleEdit} onCancel={() => setEditDialogOpen(false)} />}
+          </DialogContent>
+        </Dialog>
+
+        {/* Tahsilat / Ödeme Dialog */}
+        <Dialog open={!!tahsilatDialog} onOpenChange={() => setTahsilatDialog(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                {tahsilatDialog?.tip === 'ogrenci' ? '💰 Öğrenci Tahsilatı' : '💳 Öğretmen Ödemesi'}
+              </DialogTitle>
+              <DialogDescription>
+                {tahsilatDialog?.kisi ? `${tahsilatDialog.kisi.ad} ${tahsilatDialog.kisi.soyad}` : ''}
+                {tahsilatDialog?.tip === 'ogrenci' && tahsilatDialog?.kisi?.yapilmasi_gereken_odeme > 0 && (
+                  <span className="block mt-1">
+                    Toplam borç: <strong>{formatCurrency(tahsilatDialog.kisi.yapilmasi_gereken_odeme)}</strong> — 
+                    Ödenen: <strong>{formatCurrency(tahsilatDialog.kisi.yapilan_odeme || 0)}</strong> — 
+                    Kalan: <strong className="text-red-600">{formatCurrency(Math.max(0, tahsilatDialog.kisi.yapilmasi_gereken_odeme - (tahsilatDialog.kisi.yapilan_odeme || 0)))}</strong>
+                  </span>
+                )}
+                {tahsilatDialog?.tip === 'ogretmen' && (
+                  <span className="block mt-1">
+                    Toplam alacak: <strong>{formatCurrency(tahsilatDialog.kisi?.yapilmasi_gereken_odeme || 0)}</strong>
+                  </span>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div>
+                <Label>Miktar (₺)</Label>
+                <Input type="number" step="0.01" autoFocus
+                  value={tahsilatDialog?.miktar || ''}
+                  onChange={e => setTahsilatDialog({...tahsilatDialog, miktar: parseFloat(e.target.value) || 0})}
+                  placeholder="Ör: 500"
+                  className="text-lg font-bold text-center mt-1" />
+              </div>
+              <div>
+                <Label>Açıklama</Label>
+                <Input
+                  value={tahsilatDialog?.aciklama || ''}
+                  onChange={e => setTahsilatDialog({...tahsilatDialog, aciklama: e.target.value})}
+                  placeholder={tahsilatDialog?.tip === 'ogrenci' ? 'Ör: Mart ayı taksiti' : 'Ör: Mart ayı öğretmen ücreti'}
+                  className="mt-1" />
+              </div>
+              <div className="flex gap-3">
+                <Button className={`flex-1 text-white font-bold ${tahsilatDialog?.tip === 'ogrenci' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
+                  disabled={!tahsilatDialog?.miktar}
+                  onClick={async () => {
+                    try {
+                      await axios.post(`${API}/payments`, {
+                        tip: tahsilatDialog.tip,
+                        kisi_id: tahsilatDialog.kisi.id,
+                        miktar: tahsilatDialog.miktar,
+                        aciklama: tahsilatDialog.aciklama || (tahsilatDialog.tip === 'ogrenci' ? `Tahsilat — ${tahsilatDialog.kisi.ad} ${tahsilatDialog.kisi.soyad}` : `Ödeme — ${tahsilatDialog.kisi.ad} ${tahsilatDialog.kisi.soyad}`),
+                      });
+                      setTahsilatDialog(null);
+                      fetchPayments(); fetchStudents(); fetchTeachers(); fetchDashboard();
+                      toast({ title: tahsilatDialog.tip === 'ogrenci' ? '✅ Tahsilat kaydedildi' : '✅ Ödeme kaydedildi' });
+                    } catch(e) {
+                      toast({ title: 'Hata', description: 'Kayıt oluşturulamadı', variant: 'destructive' });
+                    }
+                  }}>
+                  {tahsilatDialog?.tip === 'ogrenci' ? '💰 Tahsilatı Kaydet' : '💳 Ödemeyi Kaydet'}
+                </Button>
+                <Button variant="outline" className="flex-1" onClick={() => setTahsilatDialog(null)}>İptal</Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
