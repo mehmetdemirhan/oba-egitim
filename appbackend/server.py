@@ -1139,6 +1139,43 @@ async def get_rapor(rapor_id: str, current_user=Depends(get_current_user)):
     rapor.pop("_id", None)
     return rapor
 
+
+# ── Migration / Debug Endpoint ──
+@api_router.post("/admin/fix-ids")
+async def fix_missing_ids(current_user=Depends(require_role(UserRole.ADMIN))):
+    """Eksik id alanlarını düzelt"""
+    fixed = 0
+    # analiz_metinler
+    async for doc in db.analiz_metinler.find({"id": {"$exists": False}}):
+        new_id = str(uuid.uuid4())
+        await db.analiz_metinler.update_one({"_id": doc["_id"]}, {"$set": {"id": new_id}})
+        fixed += 1
+    # analiz_metinler - durum alanı yoksa ekle
+    await db.analiz_metinler.update_many({"durum": {"$exists": False}}, {"$set": {"durum": "havuzda"}})
+    # diagnostic_oturumlar
+    async for doc in db.diagnostic_oturumlar.find({"id": {"$exists": False}}):
+        await db.diagnostic_oturumlar.update_one({"_id": doc["_id"]}, {"$set": {"id": str(uuid.uuid4())}})
+    return {"fixed": fixed, "message": "ID düzeltme tamamlandı"}
+
+@api_router.get("/admin/debug-metinler")
+async def debug_metinler(current_user=Depends(require_role(UserRole.ADMIN))):
+    """Tüm metinleri ham haliyle göster"""
+    items = await db.analiz_metinler.find().to_list(length=None)
+    result = []
+    for item in items:
+        item.pop("_id", None)
+        result.append({"id": item.get("id","EKSİK"), "baslik": item.get("baslik","?"), "durum": item.get("durum","?")})
+    return result
+
+@api_router.get("/admin/debug-ogrenciler")
+async def debug_ogrenciler(current_user=Depends(require_role(UserRole.ADMIN))):
+    items = await db.students.find().to_list(length=None)
+    result = []
+    for item in items:
+        item.pop("_id", None)
+        result.append({"id": item.get("id","EKSİK"), "ad": item.get("ad","?"), "soyad": item.get("soyad","?")})
+    return result
+
 # ─────────────────────────────────────────────
 # GELİŞİM ALANI - Tam İş Akışı
 # ─────────────────────────────────────────────
@@ -1403,15 +1440,15 @@ async def delete_icerik(icerik_id: str, current_user=Depends(require_role(UserRo
 # APP SETUP
 # ─────────────────────────────────────────────
 
-app.include_router(api_router)
-
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(api_router)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
