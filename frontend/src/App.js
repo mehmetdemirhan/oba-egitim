@@ -1,3185 +1,1844 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import "./App.css";
-import axios from "axios";
-import { useAuth } from "./context/AuthContext";
-import LoginPage from "./pages/LoginPage";
-import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
-import { Button } from "./components/ui/button";
-import { Input } from "./components/ui/input";
-import { Label } from "./components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./components/ui/dialog";
-import { Badge } from "./components/ui/badge";
-import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText } from "lucide-react";
-import { useToast } from "./hooks/use-toast";
-import { Toaster } from "./components/ui/toaster";
-import { ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Tooltip, XAxis, YAxis, CartesianGrid, AreaChart, Area } from 'recharts';
-import * as XLSX from 'xlsx';
-import { saveAs } from 'file-saver';
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Body
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from dotenv import load_dotenv
+from starlette.middleware.cors import CORSMiddleware
+from motor.motor_asyncio import AsyncIOMotorClient
+import os
+import logging
+from pathlib import Path
+from pydantic import BaseModel, Field, EmailStr
+from typing import List, Optional
+import uuid
+from datetime import datetime, timezone, timedelta
+from enum import Enum
+from passlib.context import CryptContext
+from jose import JWTError, jwt
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+ROOT_DIR = Path(__file__).parent
+load_dotenv(ROOT_DIR / '.env')
 
-function roleLabel(role) {
-  const labels = { admin: "Yönetici", coordinator: "Koordinatör", teacher: "Öğretmen", student: "Öğrenci", parent: "Veli" };
-  return labels[role] || role;
+# MongoDB connection
+mongo_url = os.environ['MONGO_URL']
+client = AsyncIOMotorClient(mongo_url)
+db = client[os.environ['DB_NAME']]
+
+# JWT Config
+SECRET_KEY = os.environ.get('SECRET_KEY', 'okuma-becerileri-secret-key-change-in-production')
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get('ACCESS_TOKEN_EXPIRE_MINUTES', '60'))
+
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+security = HTTPBearer()
+
+# Create the main app without a prefix
+app = FastAPI(title="Okuma Becerileri Akademisi API")
+
+# ★ CORS — En güvenilir yapılandırma
+# NOT: allow_origins=["*"] ve allow_credentials=True birlikte kullanılamaz.
+# Bu yüzden ya credentials kapatılır ya da origin spesifik yazılır.
+# Render'da en güvenilir yol: origin'i dinamik olarak echo etmek.
+
+ALLOWED_ORIGINS = {
+    "https://oba-egitim-frontend.onrender.com",
+    "http://localhost:3000",
+    "http://localhost:3001",
 }
 
-function UserManagement({ teachers }) {
-  const { toast } = useToast();
-  const [users, setUsers] = useState([]);
-  const [form, setForm] = useState({ ad: "", soyad: "", email: "", telefon: "", password: "", role: "teacher", linked_id: "" });
-  const [loading, setLoading] = useState(false);
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
 
-  const fetchUsers = useCallback(async () => {
-    try { const res = await axios.get(`${API}/auth/users`); setUsers(res.data); } catch (e) { console.error(e); }
-  }, []);
+class CustomCORSMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        origin = request.headers.get("origin", "")
 
-  useEffect(() => { fetchUsers(); }, [fetchUsers]);
+        # OPTIONS preflight — hemen yanıtla
+        if request.method == "OPTIONS":
+            response = Response(status_code=200)
+            if origin in ALLOWED_ORIGINS or origin.endswith(".onrender.com"):
+                response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Access-Control-Allow-Credentials"] = "true"
+                response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+                response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept, Origin, X-Requested-With"
+                response.headers["Access-Control-Max-Age"] = "86400"
+            return response
 
-  const createUser = async (e) => {
-    e.preventDefault(); setLoading(true);
-    try {
-      await axios.post(`${API}/auth/users`, form);
-      setForm({ ad: "", soyad: "", email: "", telefon: "", password: "", role: "teacher", linked_id: "" });
-      fetchUsers();
-      toast({ title: "Başarılı", description: "Kullanıcı oluşturuldu" });
-    } catch (error) {
-      toast({ title: "Hata", description: error.response?.data?.detail || "Hata oluştu", variant: "destructive" });
+        # Normal istek
+        response = await call_next(request)
+        if origin in ALLOWED_ORIGINS or origin.endswith(".onrender.com"):
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+            response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept, Origin, X-Requested-With"
+        return response
+
+app.add_middleware(CustomCORSMiddleware)
+
+# Create a router with the /api prefix
+api_router = APIRouter(prefix="/api")
+
+# ─────────────────────────────────────────────
+# ENUMS
+# ─────────────────────────────────────────────
+
+class TeacherLevel(str, Enum):
+    YENI = "yeni"
+    UZMAN = "uzman"
+
+class UserRole(str, Enum):
+    ADMIN = "admin"
+    COORDINATOR = "coordinator"
+    TEACHER = "teacher"
+    STUDENT = "student"
+    PARENT = "parent"
+
+# ─────────────────────────────────────────────
+# HELPERS
+# ─────────────────────────────────────────────
+
+def prepare_for_mongo(data):
+    if isinstance(data, dict):
+        for key, value in data.items():
+            if isinstance(value, datetime):
+                data[key] = value.isoformat()
+            elif isinstance(value, dict):
+                data[key] = prepare_for_mongo(value)
+            elif isinstance(value, list):
+                data[key] = [prepare_for_mongo(item) if isinstance(item, dict) else item for item in value]
+    return data
+
+def parse_from_mongo(item):
+    if isinstance(item, dict):
+        for key, value in item.items():
+            if key.endswith('_tarihi') or key in ('olusturma_tarihi', 'tarih'):
+                if isinstance(value, str):
+                    try:
+                        item[key] = datetime.fromisoformat(value)
+                    except:
+                        pass
+            elif isinstance(value, dict):
+                item[key] = parse_from_mongo(value)
+            elif isinstance(value, list):
+                item[key] = [parse_from_mongo(s) if isinstance(s, dict) else s for s in value]
+    return item
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+def verify_password(plain: str, hashed: str) -> bool:
+    return pwd_context.verify(plain, hashed)
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def decode_token(token: str) -> dict:
+    try:
+        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Geçersiz veya süresi dolmuş token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    payload = decode_token(credentials.credentials)
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Geçersiz token")
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=401, detail="Kullanıcı bulunamadı")
+    return user
+
+def require_role(*roles: UserRole):
+    async def checker(current_user=Depends(get_current_user)):
+        if current_user.get("role") not in [r.value for r in roles]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bu işlem için yetkiniz yok"
+            )
+        return current_user
+    return checker
+
+# ─────────────────────────────────────────────
+# AUTH MODELS
+# ─────────────────────────────────────────────
+
+class UserCreate(BaseModel):
+    ad: str
+    soyad: str
+    email: str
+    password: str
+    role: UserRole
+    telefon: Optional[str] = None
+    linked_id: Optional[str] = None  # teacher_id, student_id or parent's student_id
+
+class UserLogin(BaseModel):
+    email_or_phone: str
+    password: str
+
+class UserResponse(BaseModel):
+    id: str
+    ad: str
+    soyad: str
+    email: str
+    role: UserRole
+    telefon: Optional[str] = None
+    linked_id: Optional[str] = None
+    olusturma_tarihi: datetime
+    puan: int = 0
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
+class ChangePassword(BaseModel):
+    old_password: str
+    new_password: str
+
+# ─────────────────────────────────────────────
+# AUTH ROUTES
+# ─────────────────────────────────────────────
+
+@api_router.post("/auth/login", response_model=TokenResponse)
+async def login(credentials: UserLogin):
+    girdi = credentials.email_or_phone.lower().strip()
+    # Email veya telefon ile kullanıcı bul
+    user = await db.users.find_one({"email": girdi})
+    if not user:
+        user = await db.users.find_one({"telefon": girdi})
+    if not user or not verify_password(credentials.password, user.get("password_hash", "")):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="E-posta/telefon veya şifre hatalı"
+        )
+    
+    token = create_access_token({"sub": user["id"], "role": user["role"]})
+    
+    user_response = UserResponse(
+        id=user["id"],
+        ad=user["ad"],
+        soyad=user["soyad"],
+        email=user["email"],
+        role=user["role"],
+        telefon=user.get("telefon"),
+        linked_id=user.get("linked_id"),
+        olusturma_tarihi=datetime.fromisoformat(user["olusturma_tarihi"]) if isinstance(user.get("olusturma_tarihi"), str) else user.get("olusturma_tarihi", datetime.now(timezone.utc)),
+        puan=user.get("puan", 0)
+    )
+    
+    return TokenResponse(access_token=token, user=user_response)
+
+@api_router.get("/auth/me", response_model=UserResponse)
+async def get_me(current_user=Depends(get_current_user)):
+    return UserResponse(
+        id=current_user["id"],
+        ad=current_user["ad"],
+        soyad=current_user["soyad"],
+        email=current_user["email"],
+        role=current_user["role"],
+        telefon=current_user.get("telefon"),
+        linked_id=current_user.get("linked_id"),
+        olusturma_tarihi=datetime.fromisoformat(current_user["olusturma_tarihi"]) if isinstance(current_user.get("olusturma_tarihi"), str) else current_user.get("olusturma_tarihi", datetime.now(timezone.utc)),
+        puan=current_user.get("puan", 0)
+    )
+
+@api_router.post("/auth/forgot-password")
+async def forgot_password(data: dict = Body(...)):
+    email_or_phone = data.get("email_or_phone", "").lower().strip()
+    if not email_or_phone:
+        raise HTTPException(status_code=400, detail="E-posta veya telefon giriniz")
+    user = await db.users.find_one({"email": email_or_phone})
+    if not user:
+        user = await db.users.find_one({"telefon": email_or_phone})
+    if not user:
+        raise HTTPException(status_code=404, detail="Bu bilgilerle kayıtlı kullanıcı bulunamadı")
+    # 6 haneli geçici şifre oluştur
+    import random
+    gecici_sifre = str(random.randint(100000, 999999))
+    new_hash = hash_password(gecici_sifre)
+    await db.users.update_one({"id": user["id"]}, {"$set": {"password_hash": new_hash}})
+    # NOT: Gerçek uygulamada burada e-posta veya SMS gönderilir
+    # Şimdilik geçici şifreyi response'da döndürüyoruz (geliştirme aşaması)
+    return {
+        "message": f"Geçici şifre oluşturuldu",
+        "gecici_sifre": gecici_sifre,
+        "kullanici": f"{user['ad']} {user['soyad']}",
+        "email": user.get("email", ""),
+        "telefon": user.get("telefon", ""),
     }
-    setLoading(false);
-  };
 
-  const deleteUser = async (id) => {
-    try { await axios.delete(`${API}/auth/users/${id}`); fetchUsers(); toast({ title: "Başarılı", description: "Kullanıcı silindi" }); }
-    catch (error) { toast({ title: "Hata", description: error.response?.data?.detail || "Hata oluştu", variant: "destructive" }); }
-  };
-
-  const roleBadgeColor = { admin: "bg-red-100 text-red-700", coordinator: "bg-orange-100 text-orange-700", teacher: "bg-blue-100 text-blue-700", student: "bg-green-100 text-green-700", parent: "bg-purple-100 text-purple-700" };
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <Card className="lg:col-span-1 border-0 shadow-sm">
-        <CardHeader><CardTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />Yeni Kullanıcı</CardTitle></CardHeader>
-        <CardContent>
-          <form onSubmit={createUser} className="space-y-4">
-            <div><Label>Ad</Label><Input value={form.ad} onChange={e => setForm({...form, ad: e.target.value})} required /></div>
-            <div><Label>Soyad</Label><Input value={form.soyad} onChange={e => setForm({...form, soyad: e.target.value})} required /></div>
-            <div><Label>E-posta</Label><Input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} required /></div>
-            <div><Label>Telefon</Label><Input type="tel" value={form.telefon} onChange={e => setForm({...form, telefon: e.target.value})} placeholder="05xx xxx xx xx" /></div>
-            <div><Label>Şifre</Label><Input type="password" value={form.password} onChange={e => setForm({...form, password: e.target.value})} required minLength={6} /></div>
-            <div><Label>Rol</Label>
-              <Select value={form.role} onValueChange={v => setForm({...form, role: v})}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="admin">Yönetici</SelectItem>
-                  <SelectItem value="coordinator">Koordinatör</SelectItem>
-                  <SelectItem value="teacher">Öğretmen</SelectItem>
-                  <SelectItem value="student">Öğrenci</SelectItem>
-                  <SelectItem value="parent">Veli</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <Button type="submit" disabled={loading} className="w-full">Oluştur</Button>
-          </form>
-        </CardContent>
-      </Card>
-      <Card className="lg:col-span-2 border-0 shadow-sm">
-        <CardHeader><CardTitle>Kullanıcılar</CardTitle></CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader><TableRow><TableHead>Ad Soyad</TableHead><TableHead>E-posta</TableHead><TableHead>Telefon</TableHead><TableHead>Rol</TableHead><TableHead>İşlem</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {users.map(u => (
-                <TableRow key={u.id}>
-                  <TableCell>{u.ad} {u.soyad}</TableCell>
-                  <TableCell>{u.email}</TableCell>
-                  <TableCell className="text-gray-500">{u.telefon || '-'}</TableCell>
-                  <TableCell><span className={`px-2 py-1 rounded-full text-xs font-medium ${roleBadgeColor[u.role] || 'bg-gray-100'}`}>{roleLabel(u.role)}</span></TableCell>
-                  <TableCell><Button variant="destructive" size="sm" onClick={() => deleteUser(u.id)}><Trash2 className="h-4 w-4" /></Button></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function SimpleEditForm({ item, teachers, courses, classes, onSave, onCancel }) {
-  const [data, setData] = useState(item.data);
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const changed = {};
-    Object.keys(data).forEach(k => { if (data[k] !== item.data[k]) changed[k] = data[k]; });
-    onSave(changed);
-  };
-  return (
-    <form onSubmit={handleSubmit} className="space-y-3 max-h-96 overflow-y-auto">
-      <div><Label>Ad</Label><Input value={data.ad||''} onChange={e => setData({...data,ad:e.target.value})} /></div>
-      <div><Label>Soyad</Label><Input value={data.soyad||''} onChange={e => setData({...data,soyad:e.target.value})} /></div>
-      {item.type === 'teacher' && <>
-        <div><Label>Branş</Label><Input value={data.brans||''} onChange={e => setData({...data,brans:e.target.value})} /></div>
-        <div><Label>Telefon</Label><Input value={data.telefon||''} onChange={e => setData({...data,telefon:e.target.value})} /></div>
-      </>}
-      {item.type === 'student' && <>
-        <div><Label>Sınıf</Label>
-          <Select value={data.sinif} onValueChange={v => setData({...data,sinif:v})}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>{classes.map(c=><SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-          </Select>
-        </div>
-        <div><Label>Veli Adı</Label><Input value={data.veli_ad||''} onChange={e => setData({...data,veli_ad:e.target.value})} /></div>
-        <div><Label>Kur</Label><Input value={data.kur||''} onChange={e => setData({...data,kur:e.target.value})} /></div>
-        <div><Label>Öğretmen</Label>
-          <Select value={data.ogretmen_id||''} onValueChange={v => setData({...data,ogretmen_id:v})}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>{teachers.map(t=><SelectItem key={t.id} value={t.id}>{t.ad} {t.soyad}</SelectItem>)}</SelectContent>
-          </Select>
-        </div>
-      </>}
-      {item.type === 'course' && <>
-        <div><Label>Fiyat (₺)</Label><Input type="number" value={data.fiyat||0} onChange={e => setData({...data,fiyat:parseFloat(e.target.value)||0})} /></div>
-        <div><Label>Süre (Saat)</Label><Input type="number" value={data.sure||0} onChange={e => setData({...data,sure:parseInt(e.target.value)||0})} /></div>
-      </>}
-      <div className="flex gap-2 pt-2">
-        <Button type="submit" className="flex-1">Kaydet</Button>
-        <Button type="button" variant="outline" onClick={onCancel} className="flex-1">İptal</Button>
-      </div>
-    </form>
-  );
-}
-
-function AppContent() {
-  // ── TÜM HOOK'LAR EN ÜSTTE ──
-  const { user, logout, loading } = useAuth();
-  const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("dashboard");
-  const [teachers, setTeachers] = useState([]);
-  const [students, setStudents] = useState([]);
-  const [courses, setCourses] = useState([]);
-  const [payments, setPayments] = useState([]);
-  const [dashboardStats, setDashboardStats] = useState(null);
-  const [bekleyenler, setBekleyenler] = useState(null);
-  const [weeklyStats, setWeeklyStats] = useState([]);
-  const [monthlyStats, setMonthlyStats] = useState([]);
-  const [teacherStudents, setTeacherStudents] = useState({});
-  const [expandedTeachers, setExpandedTeachers] = useState(new Set());
-  const [loadingAction, setLoadingAction] = useState(false);
-  const [teacherForm, setTeacherForm] = useState({ ad: "", soyad: "", brans: "", telefon: "", seviye: "yeni", yapilmasi_gereken_odeme: 0 });
-  const [studentForm, setStudentForm] = useState({ ad: "", soyad: "", sinif: "", veli_ad: "", veli_soyad: "", veli_telefon: "", aldigi_egitim: "", kur: "", yapilmasi_gereken_odeme: 0, ogretmene_yapilacak_odeme: 0, ogretmen_id: "" });
-  const [courseForm, setCourseForm] = useState({ ad: "", fiyat: 0, sure: 0 });
-  const [paymentForm, setPaymentForm] = useState({ tip: "ogrenci", kisi_id: "", miktar: 0, aciklama: "" });
-  const [tahsilatDialog, setTahsilatDialog] = useState(null); // {tip: 'ogrenci'|'ogretmen', kisi: {id,ad,soyad}, miktar: 0, aciklama: ''}
-  const [editingItem, setEditingItem] = useState(null);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-
-  const availableCourses = ["Okuma Becerileri Temel", "Okuma Becerileri İleri", "Hızlı Okuma", "Anlama Becerileri", "Yazım Kuralları", "Dikkat Geliştirme", "Kelime Dağarcığı", "Metin Analizi"];
-  const availableClasses = ["1-A","1-B","1-C","2-A","2-B","2-C","3-A","3-B","3-C","4-A","4-B","4-C","5-A","5-B","5-C","6-A","6-B","6-C","7-A","7-B","7-C","8-A","8-B","8-C"];
-
-  const fetchAll = useCallback(async () => {
-    try { const r = await axios.get(`${API}/dashboard`); setDashboardStats(r.data); } catch(e) {}
-    try { if ((user?.role === 'admin' || user?.role === 'coordinator')) { const r = await axios.get(`${API}/dashboard/bekleyenler`); setBekleyenler(r.data); } } catch(e) { setBekleyenler({ metin_bekleyen:[], metin_oylama:[], gelisim_bekleyen:[], gelisim_oylama:[], toplam:0 }); }
-    try { const r = await axios.get(`${API}/stats/weekly`); setWeeklyStats(r.data); } catch(e) {}
-    try { const r = await axios.get(`${API}/stats/monthly`); setMonthlyStats(r.data); } catch(e) {}
-    try { const r = await axios.get(`${API}/teachers`); setTeachers(r.data); } catch(e) {}
-    try { const r = await axios.get(`${API}/students`); setStudents(r.data); } catch(e) {}
-    try { const r = await axios.get(`${API}/courses`); setCourses(r.data); } catch(e) {}
-    try { const r = await axios.get(`${API}/payments`); setPayments(r.data); } catch(e) {}
-  }, []);
-
-  useEffect(() => {
-    if (user) fetchAll();
-  }, [user, fetchAll]);
-
-  // ── KOŞULLU RETURN'LER HOOK'LARDAN SONRA ──
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-16 h-16 bg-gradient-to-br from-orange-400 to-red-500 rounded-2xl flex items-center justify-center">
-          <BookOpen className="h-8 w-8 text-white" />
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) return <LoginPage />;
-
-  const fetchTeachers = async () => { try { const r = await axios.get(`${API}/teachers`); setTeachers(r.data); } catch(e) {} };
-  const fetchStudents = async () => { try { const r = await axios.get(`${API}/students`); setStudents(r.data); } catch(e) {} };
-  const fetchCourses = async () => { try { const r = await axios.get(`${API}/courses`); setCourses(r.data); } catch(e) {} };
-  const fetchPayments = async () => { try { const r = await axios.get(`${API}/payments`); setPayments(r.data); } catch(e) {} };
-  const fetchDashboard = async () => { try { const r = await axios.get(`${API}/dashboard`); setDashboardStats(r.data); } catch(e) {} };
-  const fetchTeacherStudents = async (id) => { try { const r = await axios.get(`${API}/teachers/${id}/students`); setTeacherStudents(p => ({...p, [id]: r.data})); } catch(e) {} };
-
-  const toggleTeacherExpansion = (id) => {
-    const next = new Set(expandedTeachers);
-    if (next.has(id)) { next.delete(id); } else { next.add(id); if (!teacherStudents[id]) fetchTeacherStudents(id); }
-    setExpandedTeachers(next);
-  };
-
-  const formatCurrency = (v) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(v);
-  const formatDate = (d) => new Date(d).toLocaleDateString('tr-TR');
-
-  const handleEdit = async (updatedData) => {
-    try {
-      if (editingItem.type === 'teacher') { await axios.put(`${API}/teachers/${editingItem.data.id}`, updatedData); fetchTeachers(); toast({ title: "Başarılı", description: "Güncellendi" }); }
-      else if (editingItem.type === 'student') { await axios.put(`${API}/students/${editingItem.data.id}`, updatedData); fetchStudents(); fetchTeachers(); setTeacherStudents({}); toast({ title: "Başarılı", description: "Güncellendi" }); }
-      else if (editingItem.type === 'course') { await axios.put(`${API}/courses/${editingItem.data.id}`, updatedData); fetchCourses(); toast({ title: "Başarılı", description: "Güncellendi" }); }
-      fetchDashboard(); setEditDialogOpen(false); setEditingItem(null);
-    } catch { toast({ title: "Hata", description: "Güncelleme hatası", variant: "destructive" }); }
-  };
-
-  const createTeacher = async (e) => { e.preventDefault(); setLoadingAction(true); try { await axios.post(`${API}/teachers`, teacherForm); setTeacherForm({ ad:"",soyad:"",brans:"",telefon:"",seviye:"yeni",yapilmasi_gereken_odeme:0 }); fetchTeachers(); fetchDashboard(); toast({ title:"Başarılı", description:"Öğretmen eklendi" }); } catch { toast({ title:"Hata", description:"Hata oluştu", variant:"destructive" }); } setLoadingAction(false); };
-  const createStudent = async (e) => { e.preventDefault(); setLoadingAction(true); try { await axios.post(`${API}/students`, studentForm); setStudentForm({ ad:"",soyad:"",sinif:"",veli_ad:"",veli_soyad:"",veli_telefon:"",aldigi_egitim:"",kur:"",yapilmasi_gereken_odeme:0,ogretmene_yapilacak_odeme:0,ogretmen_id:"" }); fetchStudents(); fetchTeachers(); fetchDashboard(); setTeacherStudents({}); toast({ title:"Başarılı", description:"Öğrenci eklendi" }); } catch { toast({ title:"Hata", description:"Hata oluştu", variant:"destructive" }); } setLoadingAction(false); };
-  const createCourse = async (e) => { e.preventDefault(); setLoadingAction(true); try { await axios.post(`${API}/courses`, courseForm); setCourseForm({ ad:"",fiyat:0,sure:0 }); fetchCourses(); fetchDashboard(); toast({ title:"Başarılı", description:"Kurs eklendi" }); } catch { toast({ title:"Hata", description:"Hata oluştu", variant:"destructive" }); } setLoadingAction(false); };
-  const createPayment = async (e) => { e.preventDefault(); setLoadingAction(true); try { await axios.post(`${API}/payments`, paymentForm); setPaymentForm({ tip:"ogrenci",kisi_id:"",miktar:0,aciklama:"" }); fetchPayments(); fetchTeachers(); fetchStudents(); fetchDashboard(); toast({ title:"Başarılı", description:"Ödeme kaydedildi" }); } catch { toast({ title:"Hata", description:"Hata oluştu", variant:"destructive" }); } setLoadingAction(false); };
-  const deleteTeacher = async (id) => { try { await axios.delete(`${API}/teachers/${id}`); fetchTeachers(); fetchDashboard(); setTeacherStudents(p => { const n={...p}; delete n[id]; return n; }); toast({ title:"Başarılı", description:"Silindi" }); } catch { toast({ title:"Hata", variant:"destructive" }); } };
-  const deleteStudent = async (id) => { try { await axios.delete(`${API}/students/${id}`); fetchStudents(); fetchTeachers(); fetchDashboard(); setTeacherStudents({}); toast({ title:"Başarılı", description:"Silindi" }); } catch { toast({ title:"Hata", variant:"destructive" }); } };
-  const deleteCourse = async (id) => { try { await axios.delete(`${API}/courses/${id}`); fetchCourses(); fetchDashboard(); toast({ title:"Başarılı", description:"Silindi" }); } catch { toast({ title:"Hata", variant:"destructive" }); } };
-
-  const exportToExcel = async () => {
-    setLoadingAction(true);
-    try {
-      const r = await axios.get(`${API}/export`); const d = r.data;
-      const wb = XLSX.utils.book_new();
-      if (d.ogretmenler?.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(d.ogretmenler), "Öğretmenler");
-      if (d.ogrenciler?.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(d.ogrenciler), "Öğrenciler");
-      if (d.kurslar?.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(d.kurslar), "Kurslar");
-      if (d.odemeler?.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(d.odemeler), "Ödemeler");
-      const buf = XLSX.write(wb, { bookType:'xlsx', type:'array' });
-      saveAs(new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `OBA_${new Date().toISOString().slice(0,10)}.xlsx`);
-      toast({ title:"Başarılı", description:"Excel indirildi" });
-    } catch { toast({ title:"Hata", description:"Export hatası", variant:"destructive" }); }
-    setLoadingAction(false);
-  };
-
-  const pieData = dashboardStats ? [
-    { name:'Öğrenci Alacakları', value:dashboardStats.toplam_ogrenci_alacak, color:'#059669' },
-    { name:'Öğretmen Borçları', value:dashboardStats.toplam_ogretmen_borc, color:'#dc2626' }
-  ] : [];
-
-  const tabClass = "inline-flex items-center justify-center whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-red-500 data-[state=active]:text-white data-[state=active]:shadow-sm";
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto p-4">
-        {/* Header */}
-        <div className="bg-white rounded-3xl shadow-sm p-6 mb-6 border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="w-14 h-14 bg-gradient-to-br from-orange-400 to-red-500 rounded-2xl flex items-center justify-center">
-                <BookOpen className="h-7 w-7 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Okuma Becerileri Akademisi</h1>
-                <p className="text-gray-500 text-sm">Eğitim Yönetim Sistemi</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="text-right hidden sm:block">
-                <div className="text-sm font-medium text-gray-900">{user.ad} {user.soyad}</div>
-                <div className="text-xs text-gray-500">{roleLabel(user.role)}</div>
-              </div>
-              <Button onClick={exportToExcel} disabled={loadingAction} className="bg-green-600 hover:bg-green-700 text-white"><Download className="h-4 w-4 mr-2" />Excel</Button>
-              <Button variant="outline" size="sm" onClick={logout} className="flex items-center gap-2"><LogOut className="h-4 w-4" />Çıkış</Button>
-            </div>
-          </div>
-        </div>
-
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="inline-flex h-12 items-center justify-center rounded-2xl bg-white p-1 shadow-sm border border-gray-200 flex-wrap gap-1 mb-6">
-            <TabsTrigger value="dashboard" className={tabClass}><BarChart3 className="h-4 w-4 mr-2" />Dashboard</TabsTrigger>
-            <TabsTrigger value="teachers" className={tabClass}><UserCheck className="h-4 w-4 mr-2" />Öğretmenler</TabsTrigger>
-            <TabsTrigger value="students" className={tabClass}><Users className="h-4 w-4 mr-2" />Öğrenciler</TabsTrigger>
-            <TabsTrigger value="courses" className={tabClass}><BookOpen className="h-4 w-4 mr-2" />Kurslar</TabsTrigger>
-            {user.role !== "coordinator" && <TabsTrigger value="payments" className={tabClass}><CreditCard className="h-4 w-4 mr-2" />Muhasebe</TabsTrigger>}
-            {user.role === "admin" && <TabsTrigger value="users" className={tabClass}><Shield className="h-4 w-4 mr-2" />Kullanıcılar</TabsTrigger>}
-            <TabsTrigger value="gelisim" className={tabClass}><Trophy className="h-4 w-4 mr-2" />Gelişim</TabsTrigger>
-            <TabsTrigger value="giris-analizi" className={tabClass}><Stethoscope className="h-4 w-4 mr-2" />Giriş Analizi</TabsTrigger>
-          </TabsList>
-
-          {/* Dashboard */}
-          <TabsContent value="dashboard">
-            {dashboardStats && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-blue-100 cursor-pointer" onClick={() => setActiveTab("teachers")}>
-                    <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-blue-600">Öğretmen</p><p className="text-3xl font-bold text-blue-900">{dashboardStats.toplam_ogretmen}</p></div><div className="w-12 h-12 bg-blue-500 rounded-2xl flex items-center justify-center"><UserCheck className="h-6 w-6 text-white" /></div></div></CardContent>
-                  </Card>
-                  <Card className="border-0 shadow-sm bg-gradient-to-br from-green-50 to-green-100 cursor-pointer" onClick={() => setActiveTab("students")}>
-                    <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-green-600">Öğrenci</p><p className="text-3xl font-bold text-green-900">{dashboardStats.toplam_ogrenci}</p></div><div className="w-12 h-12 bg-green-500 rounded-2xl flex items-center justify-center"><Users className="h-6 w-6 text-white" /></div></div></CardContent>
-                  </Card>
-                  <Card className="border-0 shadow-sm bg-gradient-to-br from-orange-50 to-orange-100 cursor-pointer" onClick={() => setActiveTab("courses")}>
-                    <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-orange-600">Kurs</p><p className="text-3xl font-bold text-orange-900">{dashboardStats.toplam_kurs}</p></div><div className="w-12 h-12 bg-orange-500 rounded-2xl flex items-center justify-center"><BookOpen className="h-6 w-6 text-white" /></div></div></CardContent>
-                  </Card>
-                  <Card className="border-0 shadow-sm bg-gradient-to-br from-purple-50 to-purple-100 cursor-pointer" onClick={() => setActiveTab("payments")}>
-                    <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-purple-600">Bu Ay</p><p className="text-xl font-bold text-purple-900">{formatCurrency(dashboardStats.bu_ay_odenen_toplam)}</p></div><div className="w-12 h-12 bg-purple-500 rounded-2xl flex items-center justify-center"><Calendar className="h-6 w-6 text-white" /></div></div></CardContent>
-                  </Card>
-                </div>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <Card className="border-0 shadow-sm">
-                    <CardHeader><CardTitle>Finansal Durum</CardTitle></CardHeader>
-                    <CardContent><div className="h-64"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value">{pieData.map((e,i) => <Cell key={i} fill={e.color} />)}</Pie><Tooltip formatter={v => formatCurrency(v)} /></PieChart></ResponsiveContainer></div></CardContent>
-                  </Card>
-                  <Card className="border-0 shadow-sm">
-                    <CardHeader><CardTitle>Aylık İstatistikler</CardTitle></CardHeader>
-                    <CardContent><div className="h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={monthlyStats}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="ay" /><YAxis /><Tooltip /><Bar dataKey="yeni_ogrenciler" fill="#3b82f6" /><Bar dataKey="gelir" fill="#f97316" /></BarChart></ResponsiveContainer></div></CardContent>
-                  </Card>
-                </div>
-              </div>
-            )}
-          </TabsContent>
-
-          {/* Teachers */}
-          <TabsContent value="teachers">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="lg:col-span-1 border-0 shadow-sm">
-                <CardHeader><CardTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />Yeni Öğretmen</CardTitle></CardHeader>
-                <CardContent>
-                  <form onSubmit={createTeacher} className="space-y-4">
-                    <div><Label>Ad</Label><Input value={teacherForm.ad} onChange={e => setTeacherForm({...teacherForm, ad:e.target.value})} required /></div>
-                    <div><Label>Soyad</Label><Input value={teacherForm.soyad} onChange={e => setTeacherForm({...teacherForm, soyad:e.target.value})} required /></div>
-                    <div><Label>Branş</Label><Input value={teacherForm.brans} onChange={e => setTeacherForm({...teacherForm, brans:e.target.value})} required /></div>
-                    <div><Label>Telefon</Label><Input value={teacherForm.telefon} onChange={e => setTeacherForm({...teacherForm, telefon:e.target.value})} required /></div>
-                    <div><Label>Seviye</Label>
-                      <Select value={teacherForm.seviye} onValueChange={v => setTeacherForm({...teacherForm, seviye:v})}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent><SelectItem value="yeni">Yeni</SelectItem><SelectItem value="uzman">Uzman</SelectItem></SelectContent>
-                      </Select>
-                    </div>
-                    <div><Label>Ödeme (₺)</Label><Input type="number" step="0.01" value={teacherForm.yapilmasi_gereken_odeme} onChange={e => setTeacherForm({...teacherForm, yapilmasi_gereken_odeme:parseFloat(e.target.value)||0})} /></div>
-                    <Button type="submit" disabled={loadingAction} className="w-full">Ekle</Button>
-                  </form>
-                </CardContent>
-              </Card>
-              <Card className="lg:col-span-2 border-0 shadow-sm">
-                <CardHeader><CardTitle>Öğretmenler</CardTitle></CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {teachers.map(t => (
-                      <div key={t.id} className="border border-gray-100 rounded-2xl overflow-hidden">
-                        <div className="p-4 cursor-pointer hover:bg-gray-50 flex items-center justify-between" onClick={() => toggleTeacherExpansion(t.id)}>
-                          <div className="flex items-center gap-4">
-                            {expandedTeachers.has(t.id) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                            <div><div className="font-medium">{t.ad} {t.soyad}</div><div className="text-sm text-gray-500">{t.brans} • {t.seviye}</div></div>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <div className="text-center"><div className="text-sm font-medium">{t.ogrenci_sayisi}</div><div className="text-xs text-gray-500">Öğrenci</div></div>
-                            <div className="flex gap-2">
-                              {user.role !== "coordinator" && <Button variant="outline" size="sm" className="text-green-600 border-green-300 hover:bg-green-50" onClick={e => { e.stopPropagation(); setTahsilatDialog({tip:'ogretmen', kisi:t, miktar:0, aciklama:''}); }}><CreditCard className="h-4 w-4" /></Button>}
-                              <Button variant="outline" size="sm" onClick={e => { e.stopPropagation(); setEditingItem({type:'teacher',data:t}); setEditDialogOpen(true); }}><Edit2 className="h-4 w-4" /></Button>
-                              <Button variant="destructive" size="sm" onClick={e => { e.stopPropagation(); deleteTeacher(t.id); }}><Trash2 className="h-4 w-4" /></Button>
-                            </div>
-                          </div>
-                        </div>
-                        {expandedTeachers.has(t.id) && (() => {
-                          const ogretmenOdemeleri = payments.filter(p => p.tip === 'ogretmen' && p.kisi_id === t.id);
-                          const toplamOdenen = ogretmenOdemeleri.reduce((sum, p) => sum + (p.miktar || 0), 0);
-                          const kalanAlacak = Math.max(0, (t.yapilmasi_gereken_odeme || 0) - toplamOdenen);
-                          return (
-                          <div className="border-t border-gray-100 bg-gray-50 p-4 space-y-4">
-                            {/* Ödeme Özeti - koordinatörden gizle */}
-                            {user.role !== "coordinator" && (
-                            <div className="grid grid-cols-3 gap-3">
-                              <div className="bg-white rounded-xl p-3 border border-gray-200 text-center">
-                                <div className="text-xs text-gray-500 mb-1">Yapılacak Ödeme</div>
-                                <div className="font-bold text-orange-600">₺{(t.yapilmasi_gereken_odeme || 0).toLocaleString('tr-TR')}</div>
-                              </div>
-                              <div className="bg-white rounded-xl p-3 border border-gray-200 text-center">
-                                <div className="text-xs text-gray-500 mb-1">Toplam Ödenen</div>
-                                <div className="font-bold text-green-600">₺{toplamOdenen.toLocaleString('tr-TR')}</div>
-                              </div>
-                              <div className="bg-white rounded-xl p-3 border border-gray-200 text-center">
-                                <div className="text-xs text-gray-500 mb-1">Kalan Alacak</div>
-                                <div className={`font-bold ${kalanAlacak > 0 ? 'text-red-600' : 'text-green-600'}`}>₺{kalanAlacak.toLocaleString('tr-TR')}</div>
-                              </div>
-                            </div>
-                            )}
-                            {/* Ödeme Geçmişi */}
-                            {ogretmenOdemeleri.length > 0 && (
-                              <div>
-                                <div className="text-xs font-semibold text-gray-500 mb-2">📤 Ödeme Geçmişi</div>
-                                {ogretmenOdemeleri.slice(0,5).map(p => (
-                                  <div key={p.id} className="flex justify-between items-center bg-white p-2 rounded-lg border border-gray-100 mb-1 text-sm">
-                                    <span className="text-gray-500">{formatDate(p.tarih)}</span>
-                                    <span className="text-gray-700">{p.aciklama || '—'}</span>
-                                    <span className="font-semibold text-green-600">₺{(p.miktar||0).toLocaleString('tr-TR')}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            {/* Öğrenci Listesi */}
-                            {teacherStudents[t.id] && teacherStudents[t.id].length > 0 && (
-                              <div>
-                                <div className="text-xs font-semibold text-gray-500 mb-2">👨‍🎓 Öğrenciler</div>
-                                {teacherStudents[t.id].map(s => (
-                                  <div key={s.id} className="bg-white p-2 rounded-lg border border-gray-100 mb-1 flex justify-between text-sm">
-                                    <span className="font-medium">{s.ad} {s.soyad}</span>
-                                    <span className="text-gray-500">Kur: {s.kur} • {s.sinif}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                          );
-                        })()}
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* Students */}
-          <TabsContent value="students">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="lg:col-span-1 border-0 shadow-sm">
-                <CardHeader><CardTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />Yeni Öğrenci</CardTitle></CardHeader>
-                <CardContent>
-                  <form onSubmit={createStudent} className="space-y-4">
-                    <div><Label>Ad</Label><Input value={studentForm.ad} onChange={e => setStudentForm({...studentForm, ad:e.target.value})} required /></div>
-                    <div><Label>Soyad</Label><Input value={studentForm.soyad} onChange={e => setStudentForm({...studentForm, soyad:e.target.value})} required /></div>
-                    <div><Label>Sınıf</Label>
-                      <Select value={studentForm.sinif} onValueChange={v => setStudentForm({...studentForm, sinif:v})}>
-                        <SelectTrigger><SelectValue placeholder="Seçin" /></SelectTrigger>
-                        <SelectContent>{availableClasses.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </div>
-                    <div><Label>Veli Adı</Label><Input value={studentForm.veli_ad} onChange={e => setStudentForm({...studentForm, veli_ad:e.target.value})} required /></div>
-                    <div><Label>Veli Soyadı</Label><Input value={studentForm.veli_soyad} onChange={e => setStudentForm({...studentForm, veli_soyad:e.target.value})} required /></div>
-                    <div><Label>Veli Telefon</Label><Input value={studentForm.veli_telefon} onChange={e => setStudentForm({...studentForm, veli_telefon:e.target.value})} required /></div>
-                    <div><Label>Eğitim</Label>
-                      <Select value={studentForm.aldigi_egitim} onValueChange={v => setStudentForm({...studentForm, aldigi_egitim:v})}>
-                        <SelectTrigger><SelectValue placeholder="Seçin" /></SelectTrigger>
-                        <SelectContent>{availableCourses.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </div>
-                    <div><Label>Kur</Label><Input value={studentForm.kur} onChange={e => setStudentForm({...studentForm, kur:e.target.value})} required /></div>
-                    <div><Label>Ödeme (₺)</Label><Input type="number" step="0.01" value={studentForm.yapilmasi_gereken_odeme} onChange={e => setStudentForm({...studentForm, yapilmasi_gereken_odeme:parseFloat(e.target.value)||0})} /></div>
-                    <div><Label>Öğretmen Payı (₺)</Label><Input type="number" step="0.01" value={studentForm.ogretmene_yapilacak_odeme} onChange={e => setStudentForm({...studentForm, ogretmene_yapilacak_odeme:parseFloat(e.target.value)||0})} /></div>
-                    <div><Label>Öğretmen</Label>
-                      <Select value={studentForm.ogretmen_id} onValueChange={v => setStudentForm({...studentForm, ogretmen_id:v})}>
-                        <SelectTrigger><SelectValue placeholder="Seçin" /></SelectTrigger>
-                        <SelectContent>{teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.ad} {t.soyad}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </div>
-                    <Button type="submit" disabled={loadingAction} className="w-full">Ekle</Button>
-                  </form>
-                </CardContent>
-              </Card>
-              <Card className="lg:col-span-2 border-0 shadow-sm">
-                <CardHeader><CardTitle>Öğrenciler</CardTitle></CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader><TableRow><TableHead>Ad Soyad</TableHead><TableHead>Sınıf</TableHead>{user.role !== "coordinator" && <TableHead>Veli</TableHead>}<TableHead>Öğretmen</TableHead>{user.role !== "coordinator" && <TableHead>Borç</TableHead>}<TableHead>İşlem</TableHead></TableRow></TableHeader>
-                    <TableBody>
-                      {students.map(s => {
-                        const t = teachers.find(t => t.id === s.ogretmen_id);
-                        return (
-                          <TableRow key={s.id}>
-                            <TableCell className="font-medium">{s.ad} {s.soyad}</TableCell>
-                            <TableCell>{s.sinif}</TableCell>
-                            {user.role !== "coordinator" && <TableCell>{s.veli_ad} {s.veli_soyad}</TableCell>}
-                            <TableCell>{t ? `${t.ad} ${t.soyad}` : '-'}</TableCell>
-                            {user.role !== "coordinator" && <TableCell className="text-green-600 font-semibold">{formatCurrency(Math.max(0, s.yapilmasi_gereken_odeme - s.yapilan_odeme))}</TableCell>}
-                            <TableCell><div className="flex gap-2">{user.role !== "coordinator" && <Button variant="outline" size="sm" className="text-green-600 border-green-300 hover:bg-green-50" onClick={() => setTahsilatDialog({tip:'ogrenci', kisi:s, miktar:0, aciklama:''})}><CreditCard className="h-4 w-4" /></Button>}<Button variant="outline" size="sm" onClick={() => { setEditingItem({type:'student',data:s}); setEditDialogOpen(true); }}><Edit2 className="h-4 w-4" /></Button><Button variant="destructive" size="sm" onClick={() => deleteStudent(s.id)}><Trash2 className="h-4 w-4" /></Button></div></TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* Courses */}
-          <TabsContent value="courses">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="lg:col-span-1 border-0 shadow-sm">
-                <CardHeader><CardTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />Yeni Kurs</CardTitle></CardHeader>
-                <CardContent>
-                  <form onSubmit={createCourse} className="space-y-4">
-                    <div><Label>Kurs Adı</Label><Input value={courseForm.ad} onChange={e => setCourseForm({...courseForm, ad:e.target.value})} required /></div>
-                    <div><Label>Fiyat (₺)</Label><Input type="number" step="0.01" value={courseForm.fiyat} onChange={e => setCourseForm({...courseForm, fiyat:parseFloat(e.target.value)||0})} required /></div>
-                    <div><Label>Süre (Saat)</Label><Input type="number" value={courseForm.sure} onChange={e => setCourseForm({...courseForm, sure:parseInt(e.target.value)||0})} required /></div>
-                    <Button type="submit" disabled={loadingAction} className="w-full">Ekle</Button>
-                  </form>
-                </CardContent>
-              </Card>
-              <Card className="lg:col-span-2 border-0 shadow-sm">
-                <CardHeader><CardTitle>Kurslar</CardTitle></CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader><TableRow><TableHead>Kurs Adı</TableHead><TableHead>Fiyat</TableHead><TableHead>Süre</TableHead><TableHead>İşlem</TableHead></TableRow></TableHeader>
-                    <TableBody>
-                      {courses.map(c => (
-                        <TableRow key={c.id}>
-                          <TableCell className="font-medium">{c.ad}</TableCell>
-                          <TableCell>{formatCurrency(c.fiyat)}</TableCell>
-                          <TableCell>{c.sure} saat</TableCell>
-                          <TableCell><div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => { setEditingItem({type:'course',data:c}); setEditDialogOpen(true); }}><Edit2 className="h-4 w-4" /></Button><Button variant="destructive" size="sm" onClick={() => deleteCourse(c.id)}><Trash2 className="h-4 w-4" /></Button></div></TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* Payments */}
-          <TabsContent value="payments">
-            {/* Özet Kartları */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <Card className="border-0 shadow-sm bg-gradient-to-br from-green-50 to-emerald-100">
-                <CardContent className="p-5 text-center">
-                  <div className="text-sm text-green-700 font-medium mb-2">📥 Öğrenci Ödemeleri</div>
-                  <div className="text-xs text-gray-500 mb-1">Alınması Gereken</div>
-                  <div className="text-2xl font-bold text-green-800">{formatCurrency(students.reduce((s, st) => s + (st.yapilmasi_gereken_odeme || 0), 0))}</div>
-                  <div className="border-t border-green-200 my-2"></div>
-                  <div className="text-xs text-gray-500 mb-1">Alınan (Tahsil Edilen)</div>
-                  <div className="text-2xl font-bold text-green-600">{formatCurrency(payments.filter(p => p.tip === 'ogrenci').reduce((s, p) => s + (p.miktar || 0), 0))}</div>
-                  <div className="text-xs text-green-600 mt-1">{payments.filter(p => p.tip === 'ogrenci').length} tahsilat</div>
-                </CardContent>
-              </Card>
-              <Card className="border-0 shadow-sm bg-gradient-to-br from-red-50 to-orange-100">
-                <CardContent className="p-5 text-center">
-                  <div className="text-sm text-red-700 font-medium mb-2">📤 Öğretmen Ücretleri</div>
-                  <div className="text-xs text-gray-500 mb-1">Ödenecek</div>
-                  <div className="text-2xl font-bold text-red-800">{formatCurrency(teachers.reduce((s, t) => s + (t.yapilmasi_gereken_odeme || 0), 0))}</div>
-                  <div className="border-t border-red-200 my-2"></div>
-                  <div className="text-xs text-gray-500 mb-1">Ödenen</div>
-                  <div className="text-2xl font-bold text-red-600">{formatCurrency(payments.filter(p => p.tip === 'ogretmen').reduce((s, p) => s + (p.miktar || 0), 0))}</div>
-                  <div className="text-xs text-red-600 mt-1">{payments.filter(p => p.tip === 'ogretmen').length} ödeme</div>
-                </CardContent>
-              </Card>
-              <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-indigo-100">
-                <CardContent className="p-5 text-center">
-                  <div className="text-sm text-blue-700 font-medium mb-2">🏦 Kasa Bakiyesi</div>
-                  <div className="text-xs text-gray-500 mb-1">Alınan − Ödenen</div>
-                  <div className={`text-3xl font-bold ${(payments.filter(p => p.tip === 'ogrenci').reduce((s, p) => s + (p.miktar || 0), 0) - payments.filter(p => p.tip === 'ogretmen').reduce((s, p) => s + (p.miktar || 0), 0)) >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
-                    {formatCurrency(payments.filter(p => p.tip === 'ogrenci').reduce((s, p) => s + (p.miktar || 0), 0) - payments.filter(p => p.tip === 'ogretmen').reduce((s, p) => s + (p.miktar || 0), 0))}
-                  </div>
-                  <div className="border-t border-blue-200 my-2"></div>
-                  <div className="text-xs text-gray-500">Kasada kalan para</div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* İki Sütunlu Tablo */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* SOL: Alacaklar (Öğrenci Tahsilatları) */}
-              <Card className="border-0 shadow-sm border-t-4" style={{borderTopColor: '#27ae60'}}>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center justify-between">
-                    <span className="text-green-700">📥 Alacaklar (Öğrenci Ödemeleri)</span>
-                    <button onClick={() => setPaymentForm({...paymentForm, _alacakFormAcik: !paymentForm._alacakFormAcik})}
-                      className="text-xs px-3 py-1 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 border border-green-200">
-                      {paymentForm._alacakFormAcik ? '✕ Kapat' : '+ Tahsilat Ekle'}
-                    </button>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {/* Tahsilat Ekleme Formu */}
-                  {paymentForm._alacakFormAcik && (
-                    <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4 space-y-3">
-                      <div className="text-sm font-semibold text-green-800">Öğrenci Tahsilatı Kaydet</div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <Label className="text-xs">Öğrenci</Label>
-                          <Select value={paymentForm.kisi_id} onValueChange={v => setPaymentForm({...paymentForm, kisi_id:v, tip:'ogrenci'})}>
-                            <SelectTrigger className="h-9"><SelectValue placeholder="Seçin" /></SelectTrigger>
-                            <SelectContent position="popper">{students.map(s => <SelectItem key={s.id} value={s.id}>{s.ad} {s.soyad}</SelectItem>)}</SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label className="text-xs">Miktar (₺)</Label>
-                          <Input type="number" step="0.01" className="h-9" value={paymentForm.miktar} onChange={e => setPaymentForm({...paymentForm, miktar:parseFloat(e.target.value)||0})} />
-                        </div>
-                      </div>
-                      <div>
-                        <Label className="text-xs">Açıklama</Label>
-                        <Input className="h-9" value={paymentForm.aciklama} onChange={e => setPaymentForm({...paymentForm, aciklama:e.target.value})} placeholder="Ör: Mart ayı ödemesi" />
-                      </div>
-                      <Button size="sm" className="w-full bg-green-600 hover:bg-green-700 text-white" disabled={!paymentForm.kisi_id || !paymentForm.miktar}
-                        onClick={async () => {
-                          try {
-                            await axios.post(`${API}/payments`, {tip:'ogrenci', kisi_id:paymentForm.kisi_id, miktar:paymentForm.miktar, aciklama:paymentForm.aciklama});
-                            setPaymentForm({tip:'ogrenci',kisi_id:'',miktar:0,aciklama:'',_alacakFormAcik:false,_odemeFormAcik:false});
-                            fetchPayments(); fetchStudents(); fetchDashboard();
-                            toast({title:"✅ Tahsilat kaydedildi"});
-                          } catch(e) { toast({title:"Hata", variant:"destructive"}); }
-                        }}>
-                        💰 Tahsilatı Kaydet
-                      </Button>
-                    </div>
-                  )}
-                  <div className="max-h-96 overflow-y-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-xs">Tarih</TableHead>
-                          <TableHead className="text-xs">Öğrenci</TableHead>
-                          <TableHead className="text-xs text-right">Miktar</TableHead>
-                          <TableHead className="text-xs">Açıklama</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {payments.filter(p => p.tip === 'ogrenci').length === 0 && (
-                          <TableRow><TableCell colSpan={4} className="text-center text-gray-400 py-8">Henüz alacak kaydı yok</TableCell></TableRow>
-                        )}
-                        {payments.filter(p => p.tip === 'ogrenci').map(p => {
-                          const person = students.find(s => s.id === p.kisi_id);
-                          return (
-                            <TableRow key={p.id}>
-                              <TableCell className="text-xs text-gray-500">{formatDate(p.tarih)}</TableCell>
-                              <TableCell className="text-sm font-medium">{person ? `${person.ad} ${person.soyad}` : '-'}</TableCell>
-                              <TableCell className="text-sm font-bold text-green-600 text-right">{formatCurrency(p.miktar)}</TableCell>
-                              <TableCell className="text-xs text-gray-500">{p.aciklama || '-'}</TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                  <div className="border-t-2 border-green-200 mt-3 pt-3 flex justify-between items-center">
-                    <span className="text-sm font-semibold text-green-700">Toplam Alacak:</span>
-                    <span className="text-lg font-bold text-green-700">{formatCurrency(payments.filter(p => p.tip === 'ogrenci').reduce((s, p) => s + (p.miktar || 0), 0))}</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* SAĞ: Ödenecekler (Öğretmen Ödemeleri) */}
-              <Card className="border-0 shadow-sm border-t-4" style={{borderTopColor: '#e74c3c'}}>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center justify-between">
-                    <span className="text-red-700">📤 Ödemeler (Öğretmen Ücretleri)</span>
-                    <button onClick={() => setPaymentForm({...paymentForm, _odemeFormAcik: !paymentForm._odemeFormAcik})}
-                      className="text-xs px-3 py-1 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 border border-red-200">
-                      {paymentForm._odemeFormAcik ? '✕ Kapat' : '+ Ödeme Ekle'}
-                    </button>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {/* Ödeme Ekleme Formu */}
-                  {paymentForm._odemeFormAcik && (
-                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4 space-y-3">
-                      <div className="text-sm font-semibold text-red-800">Öğretmen Ödemesi Kaydet</div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <Label className="text-xs">Öğretmen</Label>
-                          <Select value={paymentForm.kisi_id} onValueChange={v => setPaymentForm({...paymentForm, kisi_id:v, tip:'ogretmen'})}>
-                            <SelectTrigger className="h-9"><SelectValue placeholder="Seçin" /></SelectTrigger>
-                            <SelectContent position="popper">{teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.ad} {t.soyad}</SelectItem>)}</SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label className="text-xs">Miktar (₺)</Label>
-                          <Input type="number" step="0.01" className="h-9" value={paymentForm.miktar} onChange={e => setPaymentForm({...paymentForm, miktar:parseFloat(e.target.value)||0})} />
-                        </div>
-                      </div>
-                      <div>
-                        <Label className="text-xs">Açıklama</Label>
-                        <Input className="h-9" value={paymentForm.aciklama} onChange={e => setPaymentForm({...paymentForm, aciklama:e.target.value})} placeholder="Ör: Mart ayı öğretmen ücreti" />
-                      </div>
-                      <Button size="sm" className="w-full bg-red-600 hover:bg-red-700 text-white" disabled={!paymentForm.kisi_id || !paymentForm.miktar}
-                        onClick={async () => {
-                          try {
-                            await axios.post(`${API}/payments`, {tip:'ogretmen', kisi_id:paymentForm.kisi_id, miktar:paymentForm.miktar, aciklama:paymentForm.aciklama});
-                            setPaymentForm({tip:'ogrenci',kisi_id:'',miktar:0,aciklama:'',_alacakFormAcik:false,_odemeFormAcik:false});
-                            fetchPayments(); fetchTeachers(); fetchDashboard();
-                            toast({title:"✅ Ödeme kaydedildi"});
-                          } catch(e) { toast({title:"Hata", variant:"destructive"}); }
-                        }}>
-                        💳 Ödemeyi Kaydet
-                      </Button>
-                    </div>
-                  )}
-                  <div className="max-h-96 overflow-y-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-xs">Tarih</TableHead>
-                          <TableHead className="text-xs">Öğretmen</TableHead>
-                          <TableHead className="text-xs text-right">Miktar</TableHead>
-                          <TableHead className="text-xs">Açıklama</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {payments.filter(p => p.tip === 'ogretmen').length === 0 && (
-                          <TableRow><TableCell colSpan={4} className="text-center text-gray-400 py-8">Henüz ödeme kaydı yok</TableCell></TableRow>
-                        )}
-                        {payments.filter(p => p.tip === 'ogretmen').map(p => {
-                          const person = teachers.find(t => t.id === p.kisi_id);
-                          return (
-                            <TableRow key={p.id}>
-                              <TableCell className="text-xs text-gray-500">{formatDate(p.tarih)}</TableCell>
-                              <TableCell className="text-sm font-medium">{person ? `${person.ad} ${person.soyad}` : '-'}</TableCell>
-                              <TableCell className="text-sm font-bold text-red-600 text-right">{formatCurrency(p.miktar)}</TableCell>
-                              <TableCell className="text-xs text-gray-500">{p.aciklama || '-'}</TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                  <div className="border-t-2 border-red-200 mt-3 pt-3 flex justify-between items-center">
-                    <span className="text-sm font-semibold text-red-700">Toplam Ödenen:</span>
-                    <span className="text-lg font-bold text-red-700">{formatCurrency(payments.filter(p => p.tip === 'ogretmen').reduce((s, p) => s + (p.miktar || 0), 0))}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Aylık Özet Tablosu */}
-            <Card className="border-0 shadow-sm mt-6">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">📅 Aylık Özet</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-gray-50">
-                      <TableHead className="font-semibold">Ay</TableHead>
-                      <TableHead className="font-semibold text-right text-green-700">Alacak</TableHead>
-                      <TableHead className="font-semibold text-right text-red-700">Ödenen</TableHead>
-                      <TableHead className="font-semibold text-right text-blue-700">Net</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(() => {
-                      const aylar = {};
-                      const ayAd = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
-                      payments.forEach(p => {
-                        const d = new Date(p.tarih);
-                        const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-                        if (!aylar[key]) aylar[key] = { alacak: 0, odenecek: 0, yil: d.getFullYear(), ay: d.getMonth() };
-                        if (p.tip === 'ogrenci') aylar[key].alacak += (p.miktar || 0);
-                        else aylar[key].odenecek += (p.miktar || 0);
-                      });
-                      const sorted = Object.entries(aylar).sort((a, b) => b[0].localeCompare(a[0]));
-                      if (sorted.length === 0) return <TableRow><TableCell colSpan={4} className="text-center text-gray-400 py-6">Henüz kayıt yok</TableCell></TableRow>;
-                      return sorted.map(([key, v]) => (
-                        <TableRow key={key}>
-                          <TableCell className="font-medium">{ayAd[v.ay]} {v.yil}</TableCell>
-                          <TableCell className="text-right font-semibold text-green-600">{formatCurrency(v.alacak)}</TableCell>
-                          <TableCell className="text-right font-semibold text-red-600">{formatCurrency(v.odenecek)}</TableCell>
-                          <TableCell className={`text-right font-bold ${(v.alacak - v.odenecek) >= 0 ? 'text-blue-600' : 'text-red-600'}`}>{formatCurrency(v.alacak - v.odenecek)}</TableCell>
-                        </TableRow>
-                      ));
-                    })()}
-                  </TableBody>
-                  <tfoot>
-                    <tr className="border-t-2 border-gray-300 bg-gray-50">
-                      <td className="p-3 font-bold text-gray-800">GENEL TOPLAM</td>
-                      <td className="p-3 text-right font-bold text-green-700">{formatCurrency(payments.filter(p => p.tip === 'ogrenci').reduce((s, p) => s + (p.miktar || 0), 0))}</td>
-                      <td className="p-3 text-right font-bold text-red-700">{formatCurrency(payments.filter(p => p.tip === 'ogretmen').reduce((s, p) => s + (p.miktar || 0), 0))}</td>
-                      <td className={`p-3 text-right font-bold ${(payments.filter(p => p.tip === 'ogrenci').reduce((s, p) => s + (p.miktar || 0), 0) - payments.filter(p => p.tip === 'ogretmen').reduce((s, p) => s + (p.miktar || 0), 0)) >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
-                        {formatCurrency(payments.filter(p => p.tip === 'ogrenci').reduce((s, p) => s + (p.miktar || 0), 0) - payments.filter(p => p.tip === 'ogretmen').reduce((s, p) => s + (p.miktar || 0), 0))}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Users - admin only */}
-          {user.role === "admin" && (
-            <TabsContent value="users">
-              <UserManagement teachers={teachers} />
-            </TabsContent>
-          )}
-          {/* Giris Analizi */}
-          <TabsContent value="giris-analizi">
-            <GirisAnaliziModul user={user} students={students} teachers={teachers} />
-          </TabsContent>
-
-          {/* Gelisim Alani */}
-          <TabsContent value="gelisim">
-            <GelisimAlani user={user} />
-          </TabsContent>
-
-        </Tabs>
-
-        {/* Edit Dialog */}
-        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>{editingItem?.type === 'teacher' ? 'Öğretmen Düzenle' : editingItem?.type === 'student' ? 'Öğrenci Düzenle' : 'Kurs Düzenle'}</DialogTitle>
-              <DialogDescription>Bilgileri güncelleyin</DialogDescription>
-            </DialogHeader>
-            {editingItem && <SimpleEditForm item={editingItem} teachers={teachers} courses={availableCourses} classes={availableClasses} onSave={handleEdit} onCancel={() => setEditDialogOpen(false)} />}
-          </DialogContent>
-        </Dialog>
-
-        {/* Tahsilat / Ödeme Dialog */}
-        <Dialog open={!!tahsilatDialog} onOpenChange={() => setTahsilatDialog(null)}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                {tahsilatDialog?.tip === 'ogrenci' ? '💰 Öğrenci Tahsilatı' : '💳 Öğretmen Ödemesi'}
-              </DialogTitle>
-              <DialogDescription>
-                {tahsilatDialog?.kisi ? `${tahsilatDialog.kisi.ad} ${tahsilatDialog.kisi.soyad}` : ''}
-                {tahsilatDialog?.tip === 'ogrenci' && tahsilatDialog?.kisi?.yapilmasi_gereken_odeme > 0 && (
-                  <span className="block mt-1">
-                    Toplam borç: <strong>{formatCurrency(tahsilatDialog.kisi.yapilmasi_gereken_odeme)}</strong> — 
-                    Ödenen: <strong>{formatCurrency(tahsilatDialog.kisi.yapilan_odeme || 0)}</strong> — 
-                    Kalan: <strong className="text-red-600">{formatCurrency(Math.max(0, tahsilatDialog.kisi.yapilmasi_gereken_odeme - (tahsilatDialog.kisi.yapilan_odeme || 0)))}</strong>
-                  </span>
-                )}
-                {tahsilatDialog?.tip === 'ogretmen' && (
-                  <span className="block mt-1">
-                    Toplam alacak: <strong>{formatCurrency(tahsilatDialog.kisi?.yapilmasi_gereken_odeme || 0)}</strong>
-                  </span>
-                )}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 pt-2">
-              <div>
-                <Label>Miktar (₺)</Label>
-                <Input type="number" step="0.01" autoFocus
-                  value={tahsilatDialog?.miktar || ''}
-                  onChange={e => setTahsilatDialog({...tahsilatDialog, miktar: parseFloat(e.target.value) || 0})}
-                  placeholder="Ör: 500"
-                  className="text-lg font-bold text-center mt-1" />
-              </div>
-              <div>
-                <Label>Açıklama</Label>
-                <Input
-                  value={tahsilatDialog?.aciklama || ''}
-                  onChange={e => setTahsilatDialog({...tahsilatDialog, aciklama: e.target.value})}
-                  placeholder={tahsilatDialog?.tip === 'ogrenci' ? 'Ör: Mart ayı taksiti' : 'Ör: Mart ayı öğretmen ücreti'}
-                  className="mt-1" />
-              </div>
-              <div className="flex gap-3">
-                <Button className={`flex-1 text-white font-bold ${tahsilatDialog?.tip === 'ogrenci' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
-                  disabled={!tahsilatDialog?.miktar}
-                  onClick={async () => {
-                    try {
-                      await axios.post(`${API}/payments`, {
-                        tip: tahsilatDialog.tip,
-                        kisi_id: tahsilatDialog.kisi.id,
-                        miktar: tahsilatDialog.miktar,
-                        aciklama: tahsilatDialog.aciklama || (tahsilatDialog.tip === 'ogrenci' ? `Tahsilat — ${tahsilatDialog.kisi.ad} ${tahsilatDialog.kisi.soyad}` : `Ödeme — ${tahsilatDialog.kisi.ad} ${tahsilatDialog.kisi.soyad}`),
-                      });
-                      setTahsilatDialog(null);
-                      fetchPayments(); fetchStudents(); fetchTeachers(); fetchDashboard();
-                      toast({ title: tahsilatDialog.tip === 'ogrenci' ? '✅ Tahsilat kaydedildi' : '✅ Ödeme kaydedildi' });
-                    } catch(e) {
-                      toast({ title: 'Hata', description: 'Kayıt oluşturulamadı', variant: 'destructive' });
-                    }
-                  }}>
-                  {tahsilatDialog?.tip === 'ogrenci' ? '💰 Tahsilatı Kaydet' : '💳 Ödemeyi Kaydet'}
-                </Button>
-                <Button variant="outline" className="flex-1" onClick={() => setTahsilatDialog(null)}>İptal</Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
-      <Toaster />
-    </div>
-  );
-}
-
-
-
-// ── DASHBOARD: ONAY BEKLEYENLERKarti ──
-function BekleyenlerKarti({ bekleyenler, onRefresh, onTabChange }) {
-  const { toast } = useToast();
-
-  const adminKararMetin = async (id, onay, direkt = false) => {
-    try {
-      await axios.post(`${API}/diagnostic/texts/${id}/admin-karar`, { onay, direkt });
-      toast({ title: direkt ? "✅ Direkt havuza alındı" : onay ? "🗳️ Oylama başlatıldı" : "❌ Reddedildi" });
-      onRefresh();
-    } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
-  };
-
-  const adminKararGelisim = async (id, onay, direkt = false) => {
-    try {
-      await axios.post(`${API}/gelisim/icerik/${id}/admin-karar`, { onay, direkt });
-      toast({ title: direkt ? "✅ Direkt yayına alındı" : onay ? "🗳️ Oylama başlatıldı" : "❌ Reddedildi" });
-      onRefresh();
-    } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
-  };
-
-  const turLabel = { hikaye: "Hikaye", bilgilendirici: "Bilgilendirici", siir: "Şiir", hizmetici: "Hizmetiçi", film: "Film", kitap: "Kitap" };
-
-  const satir = (item, tip) => {
-    const isMetin = tip === "metin";
-    const isBekleyen = (isMetin ? item.durum : item.durum) === "beklemede";
-    return (
-      <div key={item.id} className={`flex items-center justify-between p-3 rounded-xl border ${isBekleyen ? 'border-yellow-200 bg-yellow-50' : 'border-blue-100 bg-blue-50'}`}>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${isBekleyen ? 'bg-yellow-200 text-yellow-800' : 'bg-blue-200 text-blue-800'}`}>
-              {isMetin ? "📄 Metin" : "📚 Gelişim"}
-            </span>
-            <span className={`text-xs px-2 py-0.5 rounded-full ${isBekleyen ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'}`}>
-              {isBekleyen ? "⏳ Onay Bekliyor" : "🗳️ Oylamada"}
-            </span>
-          </div>
-          <div className="font-semibold text-sm text-gray-800 mt-1 truncate">{item.baslik}</div>
-          <div className="text-xs text-gray-500">
-            {item.ekleyen_ad} •{" "}
-            {isMetin ? `${item.sinif_seviyesi}. Sınıf • ${turLabel[item.tur] || item.tur}` : turLabel[item.tur] || item.tur}
-            {" • "}{new Date(item.olusturma_tarihi).toLocaleDateString("tr-TR")}
-          </div>
-        </div>
-        {isBekleyen && (
-          <div className="flex gap-1 ml-3 shrink-0">
-            <button onClick={() => isMetin ? adminKararMetin(item.id, true, true) : adminKararGelisim(item.id, true, true)}
-              className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-medium transition-colors">
-              ✅ Direkt
-            </button>
-            <button onClick={() => isMetin ? adminKararMetin(item.id, true, false) : adminKararGelisim(item.id, true, false)}
-              className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors">
-              🗳️ Oylama
-            </button>
-            <button onClick={() => isMetin ? adminKararMetin(item.id, false) : adminKararGelisim(item.id, false)}
-              className="px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-medium transition-colors">
-              ❌
-            </button>
-          </div>
-        )}
-        {!isBekleyen && (
-          <div className="ml-3 text-xs text-blue-600 font-medium shrink-0">
-            {Object.keys(item.oylar || {}).length} oy
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const tumListe = [
-    ...bekleyenler.metin_bekleyen.map(i => ({ ...i, _tip: "metin" })),
-    ...bekleyenler.gelisim_bekleyen.map(i => ({ ...i, _tip: "gelisim" })),
-    ...bekleyenler.metin_oylama.map(i => ({ ...i, _tip: "metin" })),
-    ...bekleyenler.gelisim_oylama.map(i => ({ ...i, _tip: "gelisim" })),
-  ];
-
-  return (
-    <Card className="border-2 border-orange-200 shadow-sm">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-red-500 rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold text-sm">{bekleyenler.toplam}</span>
-            </div>
-            <div>
-              <div className="text-base font-bold">Onay Bekleyenler</div>
-              <div className="text-xs text-gray-500 font-normal">
-                {bekleyenler.metin_bekleyen.length + bekleyenler.gelisim_bekleyen.length} karar bekliyor •{" "}
-                {bekleyenler.metin_oylama.length + bekleyenler.gelisim_oylama.length} oylamada
-              </div>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={() => onTabChange("giris-analizi")}
-              className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-              📄 Metinler
-            </button>
-            <button onClick={() => onTabChange("gelisim")}
-              className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-              📚 Gelişim
-            </button>
-          </div>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2 max-h-80 overflow-y-auto">
-        {tumListe.length === 0 && <p className="text-gray-400 text-sm text-center py-4">Bekleyen içerik yok</p>}
-        {tumListe.map(item => satir(item, item._tip))}
-      </CardContent>
-    </Card>
-  );
-}
-
-
-// ── Sadece havuzdaki metinleri listele (analiz için) ──
-function MetinSecimListesi({ onMetinSec }) {
-  const [metinler, setMetinler] = useState([]);
-  const [yukleniyor, setYukleniyor] = useState(true);
-  const turLabel = { hikaye: "Hikaye", bilgilendirici: "Bilgilendirici", siir: "Şiir" };
-
-  useEffect(() => {
-    axios.get(`${API}/diagnostic/texts`)
-      .then(r => setMetinler(r.data.filter(m => m.durum === "havuzda")))
-      .catch(() => {})
-      .finally(() => setYukleniyor(false));
-  }, []);
-
-  if (yukleniyor) return <div className="text-center py-8 text-gray-400">Yükleniyor...</div>;
-  if (metinler.length === 0) return (
-    <div className="text-center py-8 text-gray-400">
-      <p>Henüz onaylı metin yok.</p>
-      <p className="text-sm mt-1">Metinler sekmesinden metin ekleyip onaylayın.</p>
-    </div>
-  );
-
-  return (
-    <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
-      {metinler.map(m => (
-        <div key={m.id} onClick={() => onMetinSec(m)}
-          className="border border-gray-200 rounded-xl p-4 cursor-pointer hover:border-orange-400 hover:bg-orange-50 transition-all">
-          <div className="font-semibold text-gray-800">{m.baslik}</div>
-          <div className="text-xs text-gray-500 mt-1">{m.sinif_seviyesi}. Sınıf • {turLabel[m.tur] || m.tur} • {m.kelime_sayisi} kelime</div>
-          <p className="text-sm text-gray-600 mt-2 line-clamp-2">{m.icerik}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ── NORM TABLOSU YÖNETİMİ (Admin) ──
-function NormTablosu({ onClose }) {
-  const { toast } = useToast();
-  const [normlar, setNormlar] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  const siniflar = ["1","2","3","4","5","6","7","8"];
-
-  useEffect(() => {
-    axios.get(`${API}/diagnostic/normlar`).then(r => {
-      setNormlar(r.data);
-      setLoading(false);
-    });
-  }, []);
-
-  const kaydet = async () => {
-    try {
-      await axios.put(`${API}/diagnostic/normlar`, { normlar });
-      toast({ title: "Norm tablosu güncellendi" });
-      onClose();
-    } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
-  };
-
-  if (loading || !normlar) return <div className="p-8 text-center text-gray-500">Yükleniyor...</div>;
-
-  return (
-    <div className="space-y-4">
-      <p className="text-sm text-gray-600">Her sınıf için okuma hızı sınır değerlerini kelime/dakika cinsinden girin.</p>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm border-collapse">
-          <thead>
-            <tr className="bg-gray-100">
-              <th className="p-3 text-left font-semibold border border-gray-200">Sınıf</th>
-              <th className="p-3 text-center font-semibold border border-gray-200 text-red-600">Düşük (≤)</th>
-              <th className="p-3 text-center font-semibold border border-gray-200 text-yellow-600">Orta (≤)</th>
-              <th className="p-3 text-center font-semibold border border-gray-200 text-blue-600">Yeterli (≤)</th>
-              <th className="p-3 text-center font-semibold border border-gray-200 text-green-600">İleri (&gt;)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {siniflar.map(s => {
-              const n = normlar[s] || { dusuk: 0, orta: 0, yeterli: 0 };
-              return (
-                <tr key={s} className="hover:bg-gray-50">
-                  <td className="p-3 border border-gray-200 font-medium">{s}. Sınıf</td>
-                  {["dusuk","orta","yeterli"].map(alan => (
-                    <td key={alan} className="p-2 border border-gray-200">
-                      <input type="number" value={n[alan] || ""} min={0} max={500}
-                        onChange={e => setNormlar({...normlar, [s]: {...n, [alan]: parseInt(e.target.value)||0}})}
-                        className="w-full text-center border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-orange-500" />
-                    </td>
-                  ))}
-                  <td className="p-3 border border-gray-200 text-center text-green-600 font-medium">{(n.yeterli||0)+1}+</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      <div className="flex gap-3 pt-2">
-        <Button onClick={kaydet} className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white">Kaydet</Button>
-        <Button variant="outline" onClick={onClose} className="flex-1">İptal</Button>
-      </div>
-    </div>
-  );
-}
-
-// ── METİN YÖNETİMİ (Moderasyon Akışlı) ──
-function MetinYonetimi({ onMetinSec, secimModu = false, user }) {
-  const { toast } = useToast();
-  const [metinler, setMetinler] = useState([]);
-  const [formAcik, setFormAcik] = useState(false);
-  const [form, setForm] = useState({ baslik: "", icerik: "", kelime_sayisi: 0, sinif_seviyesi: "4", tur: "hikaye" });
-  const [redDialog, setRedDialog] = useState(null);
-  const [redSebep, setRedSebep] = useState("");
-  const [puanAyarlari, setPuanAyarlari] = useState({ metin_ekleme: 5, oylama_katilim: 2, metin_havuza_girme: 10 });
-  const [puanDuzenle, setPuanDuzenle] = useState(false);
-
-  const fetchMetinler = async () => {
-    try { const r = await axios.get(`${API}/diagnostic/texts`); setMetinler(r.data); } catch(e) {}
-  };
-
-  const fetchPuanAyarlari = async () => {
-    try { const r = await axios.get(`${API}/ayarlar/puanlar`); setPuanAyarlari(r.data); } catch(e) {}
-  };
-
-  useEffect(() => { fetchMetinler(); fetchPuanAyarlari(); }, []);
-
-  const kelimeSay = (t) => t.trim().split(/\s+/).filter(Boolean).length;
-
-  const kaydet = async (e) => {
-    e.preventDefault();
-    try {
-      await axios.post(`${API}/diagnostic/texts`, { ...form, kelime_sayisi: kelimeSay(form.icerik) });
-      setForm({ baslik: "", icerik: "", kelime_sayisi: 0, sinif_seviyesi: "4", tur: "hikaye" });
-      setFormAcik(false); fetchMetinler();
-      const rol = user?.role;
-      toast({ title: "Metin eklendi (+5 puan)", description: rol === "admin" ? "Oylama başlatıldı" : "Yönetici onayına gönderildi" });
-    } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
-  };
-
-  const sil = async (id) => {
-    try { await axios.delete(`${API}/diagnostic/texts/${id}`); fetchMetinler(); toast({ title: "Silindi" }); }
-    catch(e) { toast({ title: "Hata", variant: "destructive" }); }
-  };
-
-  const adminKarar = async (metinId, onay, direkt = false) => {
-    try {
-      await axios.post(`${API}/diagnostic/texts/${metinId}/admin-karar`, { onay, direkt });
-      fetchMetinler();
-      toast({ title: direkt ? "✅ Direkt havuza alındı" : onay ? "🗳️ Oylama başlatıldı" : "❌ Reddedildi" });
-    } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
-  };
-
-  const oyVer = async (metinId, onay, sebep = "") => {
-    if (!onay && !sebep) { setRedDialog(metinId); return; }
-    try {
-      const r = await axios.post(`${API}/diagnostic/texts/oy`, { metin_id: metinId, onay, sebep });
-      fetchMetinler(); setRedDialog(null); setRedSebep("");
-      toast({ title: onay ? "✅ Onaylandı (+2 puan)" : "❌ Reddedildi", description: `Onay oranı: %${r.data.onay_orani}` });
-    } catch(e) { console.error('Session error:', e.response?.data); toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
-  };
-
-  const turLabel = { hikaye: "Hikaye", bilgilendirici: "Bilgilendirici", siir: "Şiir" };
-  const durumBadge = (d) => ({
-    beklemede: <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded-full">⏳ Onay Bekliyor</span>,
-    oylama: <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">🗳️ Oylamada</span>,
-    havuzda: <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">✅ Havuzda</span>,
-    reddedildi: <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">❌ Reddedildi</span>,
-  }[d] || null);
-
-  const oyKullandi = (m) => m.oylar && m.oylar[user?.id];
-  const onayOrani = (m) => {
-    const oylar = m.oylar || {};
-    const t = Object.keys(oylar).length;
-    if (!t) return null;
-    return Math.round(Object.values(oylar).filter(o => o.onay).length / t * 100);
-  };
-
-  // Seçim modunda sadece havuzdakileri göster
-  const gorunurMetinler = secimModu ? metinler.filter(m => m.durum === "havuzda") : metinler;
-  const bekleyenler = metinler.filter(m => m.durum === "beklemede");
-  const oylamadakiler = metinler.filter(m => m.durum === "oylama");
-
-  return (
-    <div className="space-y-4">
-      {/* Üst bar */}
-      <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-gray-800">{secimModu ? "Analiz Metinleri" : "Analiz Metinleri"}</h3>
-        <Button onClick={() => setFormAcik(!formAcik)} className="bg-gradient-to-r from-orange-500 to-red-500 text-white" size="sm">
-          <Plus className="h-4 w-4 mr-1"/>{formAcik ? "İptal" : "Metin Ekle (+5 puan)"}
-        </Button>
-      </div>
-
-      {/* Metin Ekleme Formu */}
-      {formAcik && (
-        <Card className="border-2 border-orange-200">
-          <CardContent className="p-5">
-            <form onSubmit={kaydet} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div><Label>Başlık</Label><Input value={form.baslik} onChange={e => setForm({...form, baslik: e.target.value})} required /></div>
-                <div><Label>Sınıf Seviyesi</Label>
-                  <Select value={form.sinif_seviyesi} onValueChange={v => setForm({...form, sinif_seviyesi: v})}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{["1","2","3","4","5","6","7","8"].map(s => <SelectItem key={s} value={s}>{s}. Sınıf</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div><Label>Tür</Label>
-                <Select value={form.tur} onValueChange={v => setForm({...form, tur: v})}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="hikaye">Hikaye</SelectItem>
-                    <SelectItem value="bilgilendirici">Bilgilendirici</SelectItem>
-                    <SelectItem value="siir">Şiir</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Metin İçeriği</Label>
-                <textarea value={form.icerik} onChange={e => setForm({...form, icerik: e.target.value})} required rows={8}
-                  className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-y font-serif leading-relaxed" />
-                <p className="text-xs text-gray-500 mt-1">Kelime sayısı: {kelimeSay(form.icerik)}</p>
-              </div>
-              <div className="flex gap-3">
-                <Button type="submit" className="flex-1">Kaydet</Button>
-                <Button type="button" variant="outline" onClick={() => setFormAcik(false)} className="flex-1">İptal</Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Admin: Onay Bekleyenler */}
-      {(user?.role === "admin" || user?.role === "coordinator") && bekleyenler.length > 0 && (
-        <div>
-          <h4 className="text-sm font-semibold text-yellow-700 mb-2">⏳ Onay Bekleyenler ({bekleyenler.length})</h4>
-          {bekleyenler.map(m => (
-            <div key={m.id} className="border-2 border-yellow-200 rounded-xl p-4 mb-2 bg-yellow-50">
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="font-semibold">{m.baslik}</div>
-                  <div className="text-xs text-gray-500">{m.sinif_seviyesi}. Sınıf • {turLabel[m.tur]} • {m.kelime_sayisi} kelime • Ekleyen: {m.ekleyen_ad}</div>
-                  <p className="text-sm text-gray-600 mt-1 line-clamp-2">{m.icerik}</p>
-                </div>
-              </div>
-              <div className="flex gap-2 mt-3 flex-wrap">
-                <Button size="sm" onClick={() => adminKarar(m.id, true, false)} className="bg-blue-600 hover:bg-blue-700 text-white">🗳️ Oylama Başlat</Button>
-                <Button size="sm" onClick={() => adminKarar(m.id, true, true)} className="bg-green-600 hover:bg-green-700 text-white">✅ Direkt Havuza Al</Button>
-                <Button size="sm" variant="destructive" onClick={() => adminKarar(m.id, false)}>❌ Reddet</Button>
-                <Button size="sm" variant="destructive" onClick={() => sil(m.id)}><Trash2 className="h-4 w-4"/></Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Oylamadakiler */}
-      {oylamadakiler.length > 0 && (user?.role === "admin" || user?.role === "teacher") && (
-        <div>
-          <h4 className="text-sm font-semibold text-blue-700 mb-2">🗳️ Oylamada ({oylamadakiler.length})</h4>
-          {oylamadakiler.map(m => {
-            const kullandi = oyKullandi(m);
-            const oran = onayOrani(m);
-            const oyCount = Object.keys(m.oylar || {}).length;
-            return (
-              <div key={m.id} className="border-2 border-blue-200 rounded-xl p-4 mb-2">
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <div className="font-semibold">{m.baslik}</div>
-                    <div className="text-xs text-gray-500">{m.sinif_seviyesi}. Sınıf • {turLabel[m.tur]} • {m.kelime_sayisi} kelime • Ekleyen: {m.ekleyen_ad}</div>
-                  </div>
-                  {oran !== null && <div className="text-right"><div className="text-lg font-bold text-blue-600">%{oran}</div><div className="text-xs text-gray-400">{oyCount} oy</div></div>}
-                </div>
-                {oran !== null && (
-                  <div className="mb-3">
-                    <div className="w-full bg-gray-200 rounded-full h-1.5">
-                      <div className={`h-1.5 rounded-full ${oran >= 60 ? 'bg-green-500' : 'bg-orange-500'}`} style={{width:`${oran}%`}}></div>
-                    </div>
-                    <p className="text-xs text-gray-400 mt-1">%60 onay gerekli</p>
-                  </div>
-                )}
-                <p className="text-sm text-gray-600 mb-3 line-clamp-2">{m.icerik}</p>
-                {kullandi ? (
-                  <div className="text-sm bg-gray-50 p-2 rounded-lg text-gray-500">
-                    ✓ Oyunuzu kullandınız: <strong>{kullandi.onay ? "Onay" : "Red"}</strong>
-                    {!kullandi.onay && kullandi.sebep && <span> — {kullandi.sebep}</span>}
-                  </div>
-                ) : (
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={() => oyVer(m.id, true)} className="bg-green-600 hover:bg-green-700 text-white">✅ Onayla (+2 puan)</Button>
-                    <Button size="sm" variant="destructive" onClick={() => { setRedDialog(m.id); }}>❌ Reddet</Button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Havuzdaki / Seçilebilir Metinler */}
-      <div className="space-y-2 max-h-80 overflow-y-auto">
-        <h4 className="text-sm font-semibold text-green-700 mb-2">✅ Havuzdaki Metinler ({metinler.filter(m => m.durum === "havuzda").length})</h4>
-        {metinler.filter(m => m.durum === "havuzda").length === 0 && <p className="text-gray-400 text-sm text-center py-6">Henüz havuzda metin yok. Metin ekleyip onaylayın.</p>}
-        {metinler.filter(m => m.durum === "havuzda").map(m => (
-          <div key={m.id}
-            onClick={() => secimModu && m.durum === "havuzda" && onMetinSec && onMetinSec(m)}
-            className={`border rounded-xl p-4 transition-all
-              ${secimModu && m.durum === "havuzda" ? 'cursor-pointer hover:border-orange-400 hover:bg-orange-50' : ''}
-              ${m.durum === "havuzda" ? 'border-green-200' : 'border-gray-200'}`}>
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-semibold">{m.baslik}</span>
-                  {durumBadge(m.durum)}
-                </div>
-                <div className="text-xs text-gray-500 mt-1">{m.sinif_seviyesi}. Sınıf • {turLabel[m.tur]} • {m.kelime_sayisi} kelime</div>
-                <p className="text-sm text-gray-600 mt-1 line-clamp-2">{m.icerik}</p>
-              </div>
-              {(user?.role === "admin" || user?.role === "coordinator") && (
-                <Button variant="destructive" size="sm" className="ml-2" onClick={(e) => { e.stopPropagation(); sil(m.id); }}><Trash2 className="h-4 w-4"/></Button>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Puan Rehberi */}
-      <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-sm">
-          <div className="flex items-center justify-between mb-2">
-            <div className="font-semibold text-orange-800">🎯 Metin Katkı Puanları</div>
-            {(user?.role === "admin" || user?.role === "coordinator") && (
-              <button onClick={() => setPuanDuzenle(!puanDuzenle)}
-                className="text-xs px-2 py-1 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 border border-orange-300">
-                {puanDuzenle ? '✕ Kapat' : '⚙️ Düzenle'}
-              </button>
-            )}
-          </div>
-          {!puanDuzenle ? (
-            <div className="space-y-1 text-orange-700">
-              <div className="flex justify-between"><span>📝 Metin ekle</span><span className="font-bold">+{puanAyarlari.metin_ekleme} puan</span></div>
-              <div className="flex justify-between"><span>🗳️ Oylama katıl</span><span className="font-bold">+{puanAyarlari.oylama_katilim} puan</span></div>
-              <div className="flex justify-between"><span>🌟 Metin havuza girince</span><span className="font-bold">+{puanAyarlari.metin_havuza_girme} puan</span></div>
-            </div>
-          ) : (
-            <div className="space-y-3 mt-2">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-orange-700">📝 Metin ekle</span>
-                <input type="number" min="0" value={puanAyarlari.metin_ekleme}
-                  onChange={e => setPuanAyarlari({...puanAyarlari, metin_ekleme: parseInt(e.target.value) || 0})}
-                  className="w-20 border border-orange-300 rounded-lg p-1 text-center text-sm font-bold focus:outline-none focus:ring-2 focus:ring-orange-400" />
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-orange-700">🗳️ Oylama katıl</span>
-                <input type="number" min="0" value={puanAyarlari.oylama_katilim}
-                  onChange={e => setPuanAyarlari({...puanAyarlari, oylama_katilim: parseInt(e.target.value) || 0})}
-                  className="w-20 border border-orange-300 rounded-lg p-1 text-center text-sm font-bold focus:outline-none focus:ring-2 focus:ring-orange-400" />
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-orange-700">🌟 Metin havuza girince</span>
-                <input type="number" min="0" value={puanAyarlari.metin_havuza_girme}
-                  onChange={e => setPuanAyarlari({...puanAyarlari, metin_havuza_girme: parseInt(e.target.value) || 0})}
-                  className="w-20 border border-orange-300 rounded-lg p-1 text-center text-sm font-bold focus:outline-none focus:ring-2 focus:ring-orange-400" />
-              </div>
-              <Button size="sm" className="w-full bg-orange-600 hover:bg-orange-700 text-white mt-2"
-                onClick={async () => {
-                  try {
-                    await axios.put(`${API}/ayarlar/puanlar`, puanAyarlari);
-                    toast({ title: "✅ Puan ayarları güncellendi" });
-                    setPuanDuzenle(false);
-                  } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
-                }}>
-                💾 Kaydet
-              </Button>
-            </div>
-          )}
-        </div>
-
-      {/* Red Sebebi Dialog */}
-      <Dialog open={!!redDialog} onOpenChange={() => { setRedDialog(null); setRedSebep(""); }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>❌ Reddetme Sebebi</DialogTitle>
-            <DialogDescription>Bu metni neden reddediyorsunuz?</DialogDescription>
-          </DialogHeader>
-          <textarea value={redSebep} onChange={e => setRedSebep(e.target.value)} rows={4}
-            placeholder="Lütfen sebebinizi açıklayın..."
-            className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none" />
-          <div className="flex gap-2">
-            <Button variant="destructive" className="flex-1" disabled={!redSebep.trim()} onClick={() => oyVer(redDialog, false, redSebep)}>Reddet</Button>
-            <Button variant="outline" className="flex-1" onClick={() => { setRedDialog(null); setRedSebep(""); }}>İptal</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
-// ── CANLI ANALİZ EKRANI ──
-// user.role === "student" → tam ekran metin (salt okunur)
-// user.role === "teacher"/"admin" → üstte rapor formu, altta metin + kontroller
-function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
-  const [sure, setSure] = useState(0);
-  const [calisıyor, setCalisıyor] = useState(false);
-  const [hatalar, setHatalar] = useState([]);
-  const [gozlemNotu, setGozlemNotu] = useState("");
-  const intervalRef = useRef(null);
-
-  // Rapor form state (öğretmen için)
-  const [anlama, setAnlama] = useState({
-    cumle_anlama:"orta", bilinmeyen_sozcuk:"orta", baglac_zamir:"orta",
-    ana_fikir:"orta", yardimci_fikir:"orta", konu:"orta", baslik_onerme:"orta",
-    neden_sonuc:"orta", cikarim:"orta", ipuclari:"orta", yorumlama:"orta",
-    gorus_bildirme:"orta", yazar_amaci:"orta", alternatif_fikir:"orta", guncelle_hayat:"orta",
-    bilgi:"iyi", kavrama:"iyi", uygulama:"iyi", analiz:"iyi", sentez:"iyi", degerlendirme:"iyi",
-    genel_yuzde: 0,
-  });
-  const [prozodik, setProzodik] = useState({ noktalama:3, vurgu:3, tonlama:3, akicilik:3, anlamli_gruplama:3 });
-  const [ogretmenNotu, setOgretmenNotu] = useState("");
-  const [kurKarari, setKurKarari] = useState("");
-  const [raporAdim, setRaporAdim] = useState(0); // 0=analiz, 1=anlama, 2=prozodik, 3=kur+bitir
-
-  useEffect(() => () => clearInterval(intervalRef.current), []);
-
-  const toggleSayac = () => {
-    if (calisıyor) { clearInterval(intervalRef.current); setCalisıyor(false); }
-    else { intervalRef.current = setInterval(() => setSure(s => s + 1), 1000); setCalisıyor(true); }
-  };
-
-  const hataEkle = (tip) => setHatalar(h => [...h, { tip, kelime: "" }]);
-  const hataGeriAl = (tip) => setHatalar(h => { const idx = [...h].map(x=>x.tip).lastIndexOf(tip); return idx>=0 ? [...h.slice(0,idx), ...h.slice(idx+1)] : h; });
-  const hataSay = (tip) => hatalar.filter(h => h.tip === tip).length;
-
-  const formatSure = (s) => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
-  const prozodikToplam = Object.values(prozodik).reduce((a,b) => a+b, 0);
-
-  const isOgretmen = user?.role === "admin" || user?.role === "coordinator" || user?.role === "teacher";
-
-  const tamamla = () => {
-    if (sure === 0) return;
-    clearInterval(intervalRef.current);
-    setCalisıyor(false);
-    onTamamla({ sure_saniye: sure, hatalar, gozlem_notu: gozlemNotu, anlama, prozodik, ogretmen_notu: ogretmenNotu, ogretmen_kur: kurKarari });
-  };
-
-  const hataRenk = { atlama:"bg-red-100 text-red-700 border-red-200", yanlis_okuma:"bg-orange-100 text-orange-700 border-orange-200", takilma:"bg-yellow-100 text-yellow-700 border-yellow-200", tekrar:"bg-purple-100 text-purple-700 border-purple-200" };
-  const hataTipler = [
-    { tip:"atlama", etiket:"Atlama" },
-    { tip:"yanlis_okuma", etiket:"Yanlış Okuma" },
-    { tip:"takilma", etiket:"Takılma" },
-    { tip:"tekrar", etiket:"Tekrar" },
-  ];
-
-  const SeviyeSecici = ({ alan, etiket, state, setState }) => {
-    const sevRenk = { zayif:"border-red-300 bg-red-50 text-red-700", orta:"border-yellow-300 bg-yellow-50 text-yellow-700", iyi:"border-green-300 bg-green-50 text-green-700" };
-    return (
-      <div className="flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0">
-        <span className="text-xs text-gray-700 flex-1">{etiket}</span>
-        <div className="flex gap-1">
-          {["zayif","orta","iyi"].map(s => (
-            <button key={s} onClick={() => setState({...state, [alan]: s})}
-              className={`px-2 py-0.5 rounded text-xs border transition-all ${state[alan]===s ? sevRenk[s] : 'border-gray-200 text-gray-400 hover:bg-gray-50'}`}>
-              {s==="zayif"?"Zayıf":s==="orta"?"Orta":"İyi"}
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  // ── ÖĞRENCİ: Tam ekran metin ──
-  if (!isOgretmen) {
-    return (
-      <div className="fixed inset-0 bg-amber-50 z-50 overflow-auto">
-        <div className="max-w-3xl mx-auto p-8">
-          <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-800">{metin.baslik}</h2>
-            <p className="text-sm text-gray-500">{metin.sinif_seviyesi}. Sınıf • {metin.kelime_sayisi} kelime</p>
-          </div>
-          <div className="bg-white rounded-2xl shadow-sm p-8 font-serif text-lg leading-loose text-gray-800 whitespace-pre-wrap">
-            {metin.icerik}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── ÖĞRETMEN/ADMİN: Bölünmüş ekran ──
-  return (
-    <div className="fixed inset-0 bg-gray-100 z-50 flex flex-col overflow-hidden">
-      {/* Üst bar */}
-      <div className="bg-white border-b px-4 py-2 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-4">
-          <span className="font-semibold text-gray-800">{ogrenci.ad} {ogrenci.soyad}</span>
-          <span className="text-sm text-gray-500">{metin.baslik} • {metin.kelime_sayisi} kelime</span>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="text-3xl font-mono font-bold text-gray-800 tabular-nums">{formatSure(sure)}</div>
-          <button onClick={toggleSayac}
-            className={`px-4 py-2 rounded-xl text-white font-medium transition-all ${calisıyor ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}>
-            {calisıyor ? "⏸ Durdur" : "▶ Başlat"}
-          </button>
-        </div>
-      </div>
-
-      {/* Ana içerik: sol metin, sağ panel */}
-      <div className="flex flex-1 overflow-hidden">
-
-        {/* Sol: Metin */}
-        <div className="flex-1 overflow-y-auto bg-amber-50 p-6">
-          <h3 className="text-xl font-bold text-gray-800 mb-4 text-center">{metin.baslik}</h3>
-          <div className="font-serif text-base leading-loose text-gray-800 whitespace-pre-wrap max-w-xl mx-auto">
-            {metin.icerik}
-          </div>
-        </div>
-
-        {/* Sağ panel: sekmeli form */}
-        <div className="w-96 bg-white border-l overflow-y-auto flex flex-col">
-          {/* Adım sekmeleri */}
-          <div className="flex border-b shrink-0">
-            {["Hata Takibi","Anlama","Prozodik","Kur & Bitir"].map((label, i) => (
-              <button key={i} onClick={() => setRaporAdim(i)}
-                className={`flex-1 py-2 text-xs font-medium transition-all ${raporAdim===i ? 'border-b-2 border-orange-500 text-orange-600' : 'text-gray-400 hover:text-gray-600'}`}>
-                {label}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-4">
-
-            {/* Adım 0: Hata Takibi */}
-            {raporAdim === 0 && (
-              <div className="space-y-3">
-                {hataTipler.map(({tip, etiket}) => (
-                  <div key={tip} className={`flex items-center justify-between p-3 rounded-xl border ${hataRenk[tip]}`}>
-                    <span className="font-medium text-sm">{etiket}</span>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => hataGeriAl(tip)} className="w-7 h-7 rounded-lg bg-white/60 font-bold text-sm hover:bg-white">−</button>
-                      <span className="w-8 text-center font-bold text-lg tabular-nums">{hataSay(tip)}</span>
-                      <button onClick={() => hataEkle(tip)} className="w-7 h-7 rounded-lg bg-white/60 font-bold text-sm hover:bg-white">+</button>
-                    </div>
-                  </div>
-                ))}
-                <div>
-                  <label className="text-xs font-medium text-gray-600">Gözlem Notu</label>
-                  <textarea value={gozlemNotu} onChange={e => setGozlemNotu(e.target.value)} rows={3}
-                    className="w-full mt-1 border border-gray-200 rounded-xl p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-400" />
-                </div>
-              </div>
-            )}
-
-            {/* Adım 1: Anlama */}
-            {raporAdim === 1 && (
-              <div className="space-y-3">
-                {[
-                  ["4.1 Sözcük Düzeyi", [["cumle_anlama","Cümle anlamı"],["bilinmeyen_sozcuk","Bilinmeyen sözcük"],["baglac_zamir","Bağlaç/zamir"]]],
-                  ["4.2 Ana Yapı", [["ana_fikir","Ana fikir"],["yardimci_fikir","Yardımcı fikir"],["konu","Konu"],["baslik_onerme","Başlık önerme"]]],
-                  ["4.3 Derin Anlama", [["neden_sonuc","Neden-sonuç"],["cikarim","Çıkarım"],["ipuclari","İpuçları"],["yorumlama","Yorumlama"]]],
-                  ["4.4 Eleştirel", [["gorus_bildirme","Görüş bildirme"],["yazar_amaci","Yazar amacı"],["alternatif_fikir","Alternatif fikir"],["guncelle_hayat","Günlük hayat"]]],
-                  ["4.5 Soru Performansı", [["bilgi","Bilgi"],["kavrama","Kavrama"],["uygulama","Uygulama"],["analiz","Analiz"],["sentez","Sentez"],["degerlendirme","Değerlendirme"]]],
-                ].map(([baslik, alanlar]) => (
-                  <div key={baslik}>
-                    <div className="text-xs font-semibold text-gray-500 bg-gray-50 px-2 py-1 rounded mb-1">{baslik}</div>
-                    {alanlar.map(([alan, etiket]) => (
-                      <SeviyeSecici key={alan} alan={alan} etiket={etiket} state={anlama} setState={setAnlama} />
-                    ))}
-                  </div>
-                ))}
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
-                  <label className="text-xs font-medium text-blue-700">Genel Anlama % (0 = otomatik)</label>
-                  <input type="number" min="0" max="100" value={anlama.genel_yuzde}
-                    onChange={e => setAnlama({...anlama, genel_yuzde: parseInt(e.target.value)||0})}
-                    className="w-full mt-1 border border-blue-200 rounded-lg p-2 text-center text-lg font-bold focus:outline-none" />
-                </div>
-              </div>
-            )}
-
-            {/* Adım 2: Prozodik */}
-            {raporAdim === 2 && (
-              <div className="space-y-3">
-                {[
-                  ["noktalama","Noktalama/Duraklama",["Uymuyor","Kısmen","Çoğunlukla","Tam/bilinçli"]],
-                  ["vurgu","Vurgu",["Tek düze","Yer yer","Anlama uygun","Etkili/bilinçli"]],
-                  ["tonlama","Tonlama",["Monoton","Sınırlı","Metne uygun","Doğal/etkileyici"]],
-                  ["akicilik","Akıcılık",["Sık duraklama","Kısmi akış","Genel akıcı","Kesintisiz"]],
-                  ["anlamli_gruplama","Anlamlı Gruplama",["Sözcük sözcük","Kısmen","Çoğunlukla","Tam/tutarlı"]],
-                ].map(([alan, etiket, aciklamalar]) => (
-                  <div key={alan} className="border border-gray-100 rounded-xl p-3">
-                    <div className="text-xs font-semibold text-gray-700 mb-2">{etiket}</div>
-                    <div className="grid grid-cols-4 gap-1">
-                      {[1,2,3,4].map(p => (
-                        <button key={p} onClick={() => setProzodik({...prozodik, [alan]: p})}
-                          className={`p-1.5 rounded-lg text-xs border text-center transition-all ${prozodik[alan]===p ? 'border-orange-400 bg-orange-50 text-orange-700 font-bold' : 'border-gray-200 text-gray-400 hover:bg-gray-50'}`}>
-                          <div className="font-bold">{p}</div>
-                          <div className="text-[10px] leading-tight">{aciklamalar[p-1]}</div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-                <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-center">
-                  <div className="text-sm text-orange-700 font-medium">Toplam: <span className="text-2xl font-bold">{prozodikToplam}</span>/20</div>
-                </div>
-              </div>
-            )}
-
-            {/* Adım 3: Kur & Bitir */}
-            {raporAdim === 3 && (
-              <div className="space-y-4">
-                <div>
-                  <label className="text-xs font-medium text-gray-600">Öğretmen Notu</label>
-                  <textarea value={ogretmenNotu} onChange={e => setOgretmenNotu(e.target.value)} rows={4}
-                    placeholder="Genel değerlendirme ve öneriler..."
-                    className="w-full mt-1 border border-gray-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-400" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-600">Kur Kararı</label>
-                  <div className="grid grid-cols-3 gap-2 mt-2">
-                    {["Kur 1","Kur 2","Kur 3"].map(k => (
-                      <button key={k} onClick={() => setKurKarari(k)}
-                        className={`py-3 rounded-xl border-2 font-bold text-sm transition-all ${kurKarari===k ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-500 hover:border-orange-300'}`}>
-                        {k}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="text-xs text-gray-500 bg-gray-50 rounded-xl p-3 space-y-1">
-                  <div>⏱ Süre: <strong>{formatSure(sure)}</strong></div>
-                  <div>❌ Toplam hata: <strong>{hatalar.length}</strong></div>
-                  <div>📊 Prozodik: <strong>{prozodikToplam}/20</strong></div>
-                </div>
-                <button onClick={tamamla} disabled={sure===0 || !kurKarari}
-                  className="w-full py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-all">
-                  {sure===0 ? "Önce süre sayacını başlatın" : !kurKarari ? "Kur kararı seçin" : "✅ Analizi Tamamla ve Raporu Oluştur"}
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Alt navigasyon */}
-          <div className="flex border-t p-3 gap-2 shrink-0">
-            <button onClick={() => setRaporAdim(a => Math.max(0, a-1))} disabled={raporAdim===0}
-              className="flex-1 py-2 text-sm border border-gray-200 rounded-xl disabled:opacity-30 hover:bg-gray-50">← Geri</button>
-            <button onClick={() => setRaporAdim(a => Math.min(3, a+1))} disabled={raporAdim===3}
-              className="flex-1 py-2 text-sm bg-orange-500 text-white rounded-xl disabled:opacity-30 hover:bg-orange-600">İleri →</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── ANALİZ SONUÇ EKRANI ──
-function AnalizSonucEkrani({ sonuc, ogrenci, onKaydet, onYeniAnaliz }) {
-  const [ogretmenKur, setOgretmenKur] = useState(sonuc.sistem_kur || sonuc.atanan_kur || "Kur 1");
-
-  const hizRenk = { dusuk: "text-red-600", orta: "text-yellow-600", yeterli: "text-blue-600", ileri: "text-green-600" };
-  const hizLabel = { dusuk: "Düşük", orta: "Orta", yeterli: "Yeterli", ileri: "İleri" };
-
-  const formatSure = (s) => `${Math.floor(s/60)}:${Math.round(s%60).toString().padStart(2,'0')}`;
-
-  return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900">Analiz Sonucu</h2>
-        <p className="text-gray-500">{ogrenci.ad} {ogrenci.soyad}</p>
-      </div>
-
-      {/* Temel İstatistikler */}
-      <div className="grid grid-cols-3 gap-4">
-        <Card className="border-0 shadow-sm text-center">
-          <CardContent className="p-5">
-            <div className="text-3xl font-bold text-blue-600">{sonuc.wpm}</div>
-            <div className="text-xs text-gray-500 mt-1">kelime/dakika</div>
-            <div className={`text-sm font-medium mt-1 ${hizRenk[sonuc.hiz_deger]}`}>{hizLabel[sonuc.hiz_deger]}</div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm text-center">
-          <CardContent className="p-5">
-            <div className="text-3xl font-bold text-green-600">%{sonuc.dogruluk_yuzde}</div>
-            <div className="text-xs text-gray-500 mt-1">doğruluk oranı</div>
-            <div className="text-sm font-medium mt-1 text-gray-600">{sonuc.hata_sayilari ? Object.values(sonuc.hata_sayilari).reduce((a,b)=>a+b,0) : 0} hata</div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm text-center">
-          <CardContent className="p-5">
-            <div className="text-3xl font-bold text-orange-600">{formatSure(sonuc.sure_saniye)}</div>
-            <div className="text-xs text-gray-500 mt-1">okuma süresi</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Hata Dağılımı */}
-      {sonuc.hata_sayilari && (
-        <Card className="border-0 shadow-sm">
-          <CardHeader><CardTitle className="text-base">Hata Dağılımı</CardTitle></CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-3">
-              {[["atlama","Atlama","red"],["yanlis_okuma","Yanlış Okuma","orange"],["takilma","Takılma","yellow"],["tekrar","Tekrar","purple"]].map(([key,label,color]) => (
-                <div key={key} className={`flex items-center justify-between p-3 bg-${color}-50 rounded-xl border border-${color}-200`}>
-                  <span className="text-sm font-medium">{label}</span>
-                  <span className={`text-lg font-bold text-${color}-600`}>{sonuc.hata_sayilari[key] || 0}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Kur Kararı */}
-      <Card className="border-2 border-orange-200 shadow-sm">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <div className="text-sm text-gray-500">Sistem Önerisi</div>
-              <div className="text-2xl font-bold text-orange-600">{sonuc.sistem_kur}</div>
-            </div>
-            <div className="text-4xl">🎯</div>
-          </div>
-          <div>
-            <Label>Öğretmen Kararı</Label>
-            <Select value={ogretmenKur} onValueChange={setOgretmenKur}>
-              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Kur 1">Kur 1</SelectItem>
-                <SelectItem value="Kur 2">Kur 2</SelectItem>
-                <SelectItem value="Kur 3">Kur 3</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <Button onClick={() => onKaydet(ogretmenKur)}
-            className="w-full mt-4 bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold py-3">
-            ✅ Onayla ve Kaydet
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-
-// ── RAPOR FORMU (AI Destekli, Ölçüt Eklenebilir, Yorum Düzenlenebilir) ──
-// ══════════════════════════════════════════════
-// RaporFormu — AI Destekli, Ölçüt Eklenebilir, Yorum Düzenlenebilir
-// Bu fonksiyonu App.js'deki eski RaporFormu ile değiştirin
-// ══════════════════════════════════════════════
-
-function RaporFormu({ oturum, sonuc, ogrenci, metin, onRaporTamamla }) {
-  const { toast } = useToast();
-
-  const seviyeler = ["zayif", "orta", "iyi"];
-  const seviyeLabel = { zayif: "Zayıf", orta: "Orta", iyi: "İyi" };
-  const seviyeRenk = {
-    zayif: "border-red-300 bg-red-50 text-red-700",
-    orta:  "border-yellow-300 bg-yellow-50 text-yellow-700",
-    iyi:   "border-green-300 bg-green-50 text-green-700",
-  };
-
-  // ── State ──
-  const [anlama, setAnlama] = useState({
-    cumle_anlama: "orta", bilinmeyen_sozcuk: "orta", baglac_zamir: "orta",
-    ana_fikir: "orta", yardimci_fikir: "orta", konu: "orta", baslik_onerme: "orta",
-    neden_sonuc: "orta", cikarim: "orta", ipuclari: "orta", yorumlama: "orta",
-    gorus_bildirme: "orta", yazar_amaci: "orta", alternatif_fikir: "orta", guncelle_hayat: "orta",
-    bilgi: "iyi", kavrama: "iyi", uygulama: "iyi", analiz: "iyi", sentez: "iyi", degerlendirme: "iyi",
-    genel_yuzde: 0,
-  });
-  const [prozodik, setProzodik] = useState({ noktalama: 3, vurgu: 3, tonlama: 3, akicilik: 3, anlamli_gruplama: 3 });
-  const [ogretmenNotu, setOgretmenNotu] = useState("");
-
-  // ★ Ek ölçütler (el ile eklenen)
-  const [ekAnlamaOlcutleri, setEkAnlamaOlcutleri] = useState([]); // [{id, etiket, kategori, value}]
-  const [ekProzodikOlcutleri, setEkProzodikOlcutleri] = useState([]); // [{id, etiket, aciklamalar, puan}]
-  const [yeniAnlamaAdi, setYeniAnlamaAdi] = useState("");
-  const [yeniAnlamaKat, setYeniAnlamaKat] = useState("sozcuk");
-  const [yeniProzodikAdi, setYeniProzodikAdi] = useState("");
-  const [anlamaEkleAcik, setAnlamaEkleAcik] = useState(false);
-  const [prozodikEkleAcik, setProzodikEkleAcik] = useState(false);
-
-  // ★ AI yorumları (her bölüm için)
-  const [aiYorumlar, setAiYorumlar] = useState({
-    hiz: "",
-    dogruluk: "",
-    anlama: "",
-    prozodik: "",
-    sonuc: "",
-    oneriler: "",
-  });
-  const [aiYukleniyor, setAiYukleniyor] = useState(false);
-  const [aiOlusturuldu, setAiOlusturuldu] = useState(false);
-
-  const prozodikToplam = Object.values(prozodik).reduce((a, b) => a + b, 0)
-    + ekProzodikOlcutleri.reduce((a, b) => a + (b.puan || 0), 0);
-
-  const anlamaKategoriler = {
-    sozcuk: "4.1 Sözcük Düzeyinde Anlama",
-    ana_yapi: "4.2 Metnin Ana Yapısını Anlama",
-    derin: "4.3 Metinler Arasılık ve Derin Anlama",
-    elestirel: "4.4 Eleştirel ve Yaratıcı Okuma",
-    soru: "4.5 Soru Performans Analizi",
-  };
-
-  // ── Anlama seviye seçici ──
-  const SeviyeSecici = ({ alan, etiket, isEk, ekId }) => (
-    <div className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-      <span className="text-sm text-gray-700 flex-1">{etiket}</span>
-      <div className="flex gap-1 items-center">
-        {seviyeler.map(s => (
-          <button key={s} onClick={() => {
-            if (isEk) {
-              setEkAnlamaOlcutleri(prev => prev.map(o => o.id === ekId ? {...o, value: s} : o));
-            } else {
-              setAnlama({ ...anlama, [alan]: s });
-            }
-          }}
-            className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all ${
-              (isEk ? ekAnlamaOlcutleri.find(o=>o.id===ekId)?.value : anlama[alan]) === s
-                ? seviyeRenk[s]
-                : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
-            }`}>
-            {seviyeLabel[s]}
-          </button>
-        ))}
-        {isEk && (
-          <button onClick={() => setEkAnlamaOlcutleri(prev => prev.filter(o => o.id !== ekId))}
-            className="ml-2 text-red-400 hover:text-red-600 text-xs">✕</button>
-        )}
-      </div>
-    </div>
-  );
-
-  // ── Prozodik satır ──
-  const ProzodikSatir = ({ alan, etiket, aciklama1, aciklama2, aciklama3, aciklama4, isEk, ekId }) => (
-    <div className="py-3 border-b border-gray-100 last:border-0">
-      <div className="flex items-center justify-between">
-        <div className="font-medium text-sm text-gray-800 mb-2">{etiket}</div>
-        {isEk && (
-          <button onClick={() => setEkProzodikOlcutleri(prev => prev.filter(o => o.id !== ekId))}
-            className="text-red-400 hover:text-red-600 text-xs mb-2">✕ Kaldır</button>
-        )}
-      </div>
-      <div className="grid grid-cols-4 gap-1">
-        {[1,2,3,4].map(p => (
-          <button key={p} onClick={() => {
-            if (isEk) {
-              setEkProzodikOlcutleri(prev => prev.map(o => o.id === ekId ? {...o, puan: p} : o));
-            } else {
-              setProzodik({ ...prozodik, [alan]: p });
-            }
-          }}
-            className={`p-2 rounded-lg text-xs border text-center transition-all leading-tight ${
-              (isEk ? ekProzodikOlcutleri.find(o=>o.id===ekId)?.puan : prozodik[alan]) === p
-                ? 'border-orange-400 bg-orange-50 text-orange-700 font-medium'
-                : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
-            }`}>
-            <div className="font-bold text-sm mb-1">{p} puan</div>
-            <div>{[aciklama1, aciklama2, aciklama3, aciklama4][p-1]}</div>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-
-  // ── Ölçüt ekleme ──
-  const anlamaOlcutEkle = () => {
-    if (!yeniAnlamaAdi.trim()) return;
-    const id = `ek_${Date.now()}`;
-    setEkAnlamaOlcutleri(prev => [...prev, { id, etiket: yeniAnlamaAdi.trim(), kategori: yeniAnlamaKat, value: "orta" }]);
-    setYeniAnlamaAdi("");
-    setAnlamaEkleAcik(false);
-  };
-
-  const prozodikOlcutEkle = () => {
-    if (!yeniProzodikAdi.trim()) return;
-    const id = `ekp_${Date.now()}`;
-    setEkProzodikOlcutleri(prev => [...prev, {
-      id, etiket: yeniProzodikAdi.trim(),
-      aciklamalar: ["Yetersiz", "Kısmen yeterli", "Yeterli", "Çok iyi"],
-      puan: 3,
-    }]);
-    setYeniProzodikAdi("");
-    setProzodikEkleAcik(false);
-  };
-
-  // ══════════════════════════════════════════
-  // ★★★ AI YORUM OLUŞTURMA ★★★
-  // ══════════════════════════════════════════
-  const aiYorumlariOlustur = async () => {
-    setAiYukleniyor(true);
-    try {
-      const hizSev = { dusuk: "düşük", orta: "orta", yeterli: "yeterli", ileri: "ileri" }[sonuc?.hiz_deger] || "orta";
-      const prozSev = prozodikToplam >= 18 ? "çok iyi" : prozodikToplam >= 14 ? "iyi" : prozodikToplam >= 10 ? "orta" : "geliştirilmeli";
-      const anlamaSev = (anlama.genel_yuzde || hesaplaAnlamaYuzde()) >= 85 ? "iyi" : (anlama.genel_yuzde || hesaplaAnlamaYuzde()) >= 70 ? "orta" : "zayıf";
-
-      const ekAnlamaStr = ekAnlamaOlcutleri.length > 0
-        ? `\nEk ölçütler: ${ekAnlamaOlcutleri.map(o => `${o.etiket}: ${seviyeLabel[o.value]}`).join(", ")}`
-        : "";
-
-      const ekProzodikStr = ekProzodikOlcutleri.length > 0
-        ? `\nEk prozodik ölçütler: ${ekProzodikOlcutleri.map(o => `${o.etiket}: ${o.puan}/4`).join(", ")}`
-        : "";
-
-      const prompt = `Sen bir okuma becerileri uzmanısın. Aşağıdaki verilere göre her bölüm için profesyonel değerlendirme metni yaz. Türkçe yaz, akademik ama anlaşılır bir dil kullan.
-
-ÖĞRENCİ: ${ogrenci?.ad || ""} ${ogrenci?.soyad || ""}, Sınıf: ${ogrenci?.sinif || ""}
-METİN: ${metin?.baslik || ""} (${metin?.kelime_sayisi || 0} kelime, Tür: ${metin?.tur || ""})
-
-VERİLER:
-- Okuma Hızı: ${sonuc?.wpm || 0} kelime/dk (${hizSev} düzey)
-- Doğruluk: %${sonuc?.dogruluk_yuzde || 0}
-- Hata dağılımı: Atlama: ${sonuc?.hata_sayilari?.atlama || 0}, Yanlış okuma: ${sonuc?.hata_sayilari?.yanlis_okuma || 0}, Takılma: ${sonuc?.hata_sayilari?.takilma || 0}, Tekrar: ${sonuc?.hata_sayilari?.tekrar || 0}
-- Anlama yüzdesi: %${anlama.genel_yuzde || hesaplaAnlamaYuzde()} (${anlamaSev})
-- Anlama detay: Cümle anlama: ${seviyeLabel[anlama.cumle_anlama]}, Bilinmeyen sözcük: ${seviyeLabel[anlama.bilinmeyen_sozcuk]}, Bağlaç/zamir: ${seviyeLabel[anlama.baglac_zamir]}, Ana fikir: ${seviyeLabel[anlama.ana_fikir]}, Yardımcı fikir: ${seviyeLabel[anlama.yardimci_fikir]}, Konu: ${seviyeLabel[anlama.konu]}, Başlık önerme: ${seviyeLabel[anlama.baslik_onerme]}, Neden-sonuç: ${seviyeLabel[anlama.neden_sonuc]}, Çıkarım: ${seviyeLabel[anlama.cikarim]}, İpuçları: ${seviyeLabel[anlama.ipuclari]}, Yorumlama: ${seviyeLabel[anlama.yorumlama]}, Görüş bildirme: ${seviyeLabel[anlama.gorus_bildirme]}, Yazar amacı: ${seviyeLabel[anlama.yazar_amaci]}, Alternatif fikir: ${seviyeLabel[anlama.alternatif_fikir]}, Günlük hayat: ${seviyeLabel[anlama.guncelle_hayat]}${ekAnlamaStr}
-- Prozodik toplam: ${prozodikToplam}/20 (${prozSev}), Noktalama: ${prozodik.noktalama}/4, Vurgu: ${prozodik.vurgu}/4, Tonlama: ${prozodik.tonlama}/4, Akıcılık: ${prozodik.akicilik}/4, Anlamlı gruplama: ${prozodik.anlamli_gruplama}/4${ekProzodikStr}
-- Önerilen kur: ${sonuc?.atanan_kur || sonuc?.sistem_kur || ""}
-
-JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
-{
-  "hiz": "Okuma hızı değerlendirmesi (2-3 cümle)",
-  "dogruluk": "Doğru okuma oranı ve hata analizi değerlendirmesi (3-4 cümle)",
-  "anlama": "Okuduğunu anlama becerileri genel değerlendirmesi (4-5 cümle, alt boyutlara değin)",
-  "prozodik": "Prozodik okuma değerlendirmesi (2-3 cümle)",
-  "sonuc": "Sonuç ve genel yorum (4-5 cümle, tüm boyutları birlikte değerlendir)",
-  "oneriler": "Eğitsel ve ev temelli gelişim önerileri (6-8 cümle, okul ve ev için ayrı öneriler)"
-}`;
-
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          messages: [{ role: "user", content: prompt }],
-        }),
-      });
-
-      const data = await response.json();
-      const text = data.content?.map(c => c.text || "").join("") || "";
-      const cleaned = text.replace(/```json|```/g, "").trim();
-      const parsed = JSON.parse(cleaned);
-
-      setAiYorumlar(parsed);
-      setAiOlusturuldu(true);
-      toast({ title: "✅ AI yorumları oluşturuldu!", description: "İnceleyip düzenleyebilirsiniz." });
-    } catch (err) {
-      console.error("AI yorum hatası:", err);
-      toast({ title: "AI Hatası", description: "Yorumlar oluşturulamadı. Lütfen tekrar deneyin.", variant: "destructive" });
-    } finally {
-      setAiYukleniyor(false);
+@api_router.post("/auth/change-password")
+async def change_password(data: ChangePassword, current_user=Depends(get_current_user)):
+    if not verify_password(data.old_password, current_user.get("password_hash", "")):
+        raise HTTPException(status_code=400, detail="Mevcut şifre hatalı")
+    
+    new_hash = hash_password(data.new_password)
+    await db.users.update_one(
+        {"id": current_user["id"]},
+        {"$set": {"password_hash": new_hash}}
+    )
+    return {"message": "Şifre başarıyla güncellendi"}
+
+# Admin: kullanıcı oluşturma (sadece admin)
+@api_router.post("/auth/users", response_model=UserResponse)
+async def create_user(
+    user_data: UserCreate,
+    current_user=Depends(require_role(UserRole.ADMIN))
+):
+    # Email kontrolü
+    existing = await db.users.find_one({"email": user_data.email.lower().strip()})
+    if existing:
+        raise HTTPException(status_code=400, detail="Bu e-posta zaten kayıtlı")
+    
+    user_doc = {
+        "id": str(uuid.uuid4()),
+        "ad": user_data.ad,
+        "soyad": user_data.soyad,
+        "email": user_data.email.lower().strip(),
+        "telefon": user_data.telefon.strip() if user_data.telefon else None,
+        "password_hash": hash_password(user_data.password),
+        "role": user_data.role.value,
+        "linked_id": user_data.linked_id,
+        "olusturma_tarihi": datetime.now(timezone.utc).isoformat()
     }
-  };
+    await db.users.insert_one(user_doc)
+    
+    return UserResponse(
+        id=user_doc["id"],
+        ad=user_doc["ad"],
+        soyad=user_doc["soyad"],
+        email=user_doc["email"],
+        role=user_doc["role"],
+        linked_id=user_doc.get("linked_id"),
+        olusturma_tarihi=datetime.now(timezone.utc)
+    )
 
-  // ── Anlama yüzdesi hesapla ──
-  const hesaplaAnlamaYuzde = () => {
-    const alanlar = [
-      anlama.cumle_anlama, anlama.bilinmeyen_sozcuk, anlama.baglac_zamir,
-      anlama.ana_fikir, anlama.yardimci_fikir, anlama.konu, anlama.baslik_onerme,
-      anlama.neden_sonuc, anlama.cikarim, anlama.ipuclari, anlama.yorumlama,
-      anlama.gorus_bildirme, anlama.yazar_amaci, anlama.alternatif_fikir, anlama.guncelle_hayat,
-      anlama.bilgi, anlama.kavrama, anlama.uygulama, anlama.analiz, anlama.sentez, anlama.degerlendirme,
-      ...ekAnlamaOlcutleri.map(o => o.value),
-    ];
-    const puanMap = { zayif: 0, orta: 1, iyi: 2 };
-    const toplam = alanlar.reduce((s, a) => s + (puanMap[a] || 1), 0);
-    return Math.round(toplam / (alanlar.length * 2) * 100);
-  };
+@api_router.get("/auth/users", response_model=List[UserResponse])
+async def list_users(current_user=Depends(require_role(UserRole.ADMIN))):
+    users = await db.users.find().to_list(length=None)
+    result = []
+    for u in users:
+        result.append(UserResponse(
+            id=u["id"],
+            ad=u["ad"],
+            soyad=u["soyad"],
+            email=u["email"],
+            role=u["role"],
+            telefon=u.get("telefon"),
+            linked_id=u.get("linked_id"),
+            olusturma_tarihi=datetime.fromisoformat(u["olusturma_tarihi"]) if isinstance(u.get("olusturma_tarihi"), str) else datetime.now(timezone.utc),
+            puan=u.get("puan", 0)
+        ))
+    return result
 
-  // ── Düzenlenebilir yorum bileşeni ──
-  const YorumAlani = ({ baslik, alan, placeholder }) => (
-    <div className="mb-4">
-      <label className="text-sm font-semibold text-gray-700 mb-1 block">{baslik}</label>
-      <textarea
-        value={aiYorumlar[alan]}
-        onChange={e => setAiYorumlar({ ...aiYorumlar, [alan]: e.target.value })}
-        rows={4}
-        placeholder={placeholder || "AI ile oluşturun veya el ile yazın..."}
-        className="w-full border border-gray-300 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none leading-relaxed"
-      />
-    </div>
-  );
+@api_router.delete("/auth/users/{user_id}")
+async def delete_user(user_id: str, current_user=Depends(require_role(UserRole.ADMIN))):
+    if user_id == current_user["id"]:
+        raise HTTPException(status_code=400, detail="Kendi hesabınızı silemezsiniz")
+    result = await db.users.delete_one({"id": user_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı")
+    return {"message": "Kullanıcı silindi"}
 
-  // ── Kaydet ──
-  const kaydet = async () => {
-    try {
-      // Ek ölçütleri anlama objesine ekle
-      const anlamaFull = { ...anlama };
-      ekAnlamaOlcutleri.forEach(o => { anlamaFull[o.id] = o.value; });
+# ─────────────────────────────────────────────
+# STARTUP: Admin kullanıcı oluştur
+# ─────────────────────────────────────────────
 
-      // Ek prozodik ölçütleri prozodik objesine ekle
-      const prozodikFull = { ...prozodik };
-      ekProzodikOlcutleri.forEach(o => { prozodikFull[o.id] = o.puan; });
+@app.on_event("startup")
+async def create_default_admin():
+    """
+    .env dosyasındaki bilgilerle varsayılan admin oluşturur.
+    Admin zaten varsa tekrar oluşturmaz.
+    """
+    admin_email = os.environ.get('ADMIN_EMAIL', 'admin@oba.com')
+    admin_password = os.environ.get('ADMIN_PASSWORD', 'Admin123!')
+    admin_ad = os.environ.get('ADMIN_AD', 'Sistem')
+    admin_soyad = os.environ.get('ADMIN_SOYAD', 'Yöneticisi')
 
-      // AI yorumlarını öğretmen notuna birleştir
-      let tamNot = "";
-      if (aiOlusturuldu || Object.values(aiYorumlar).some(v => v)) {
-        const bolumler = [
-          { baslik: "OKUMA HIZI DEĞERLENDİRMESİ", icerik: aiYorumlar.hiz },
-          { baslik: "DOĞRU OKUMA ORANI DEĞERLENDİRMESİ", icerik: aiYorumlar.dogruluk },
-          { baslik: "OKUDUĞUNU ANLAMA DEĞERLENDİRMESİ", icerik: aiYorumlar.anlama },
-          { baslik: "PROZODİK OKUMA DEĞERLENDİRMESİ", icerik: aiYorumlar.prozodik },
-          { baslik: "SONUÇ VE GENEL YORUM", icerik: aiYorumlar.sonuc },
-          { baslik: "EĞİTSEL VE EV TEMELLİ GELİŞİM ÖNERİLERİ", icerik: aiYorumlar.oneriler },
-        ];
-        tamNot = bolumler.filter(b => b.icerik).map(b => `${b.baslik}:\n${b.icerik}`).join("\n\n");
-        if (ogretmenNotu) tamNot += `\n\nÖĞRETMEN EK NOTU:\n${ogretmenNotu}`;
-      } else {
-        tamNot = ogretmenNotu;
-      }
+    existing = await db.users.find_one({"email": admin_email})
+    if not existing:
+        admin_doc = {
+            "id": str(uuid.uuid4()),
+            "ad": admin_ad,
+            "soyad": admin_soyad,
+            "email": admin_email,
+            "password_hash": hash_password(admin_password),
+            "role": UserRole.ADMIN.value,
+            "linked_id": None,
+            "olusturma_tarihi": datetime.now(timezone.utc).isoformat()
+        }
+        await db.users.insert_one(admin_doc)
+        logging.info(f"✅ Varsayılan admin oluşturuldu: {admin_email}")
+    else:
+        logging.info(f"ℹ️ Admin zaten mevcut: {admin_email}")
 
-      // Ek ölçüt bilgilerini de nota ekle
-      if (ekAnlamaOlcutleri.length > 0) {
-        tamNot += `\n\nEK ANLAMA ÖLÇÜTLERİ: ${ekAnlamaOlcutleri.map(o => `${o.etiket}: ${seviyeLabel[o.value]}`).join(", ")}`;
-      }
-      if (ekProzodikOlcutleri.length > 0) {
-        tamNot += `\nEK PROZODİK ÖLÇÜTLER: ${ekProzodikOlcutleri.map(o => `${o.etiket}: ${o.puan}/4`).join(", ")}`;
-      }
+# ─────────────────────────────────────────────
+# MEVCUT MODELLER (değişmeden korunuyor)
+# ─────────────────────────────────────────────
 
-      const r = await axios.post(`${API}/diagnostic/rapor`, {
-        oturum_id: oturum.id,
-        anlama: anlamaFull,
-        prozodik: prozodikFull,
-        ogretmen_notu: tamNot,
-      });
+class Teacher(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    ad: str
+    soyad: str
+    brans: str
+    telefon: str
+    seviye: TeacherLevel
+    ogrenci_sayisi: int = 0
+    atanan_ogrenciler: List[str] = []
+    yapilmasi_gereken_odeme: float = 0.0
+    yapilan_odeme: float = 0.0
+    olusturma_tarihi: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-      // AI yorumlarını rapor verisine ekle (DOCX oluşturucu için)
-      const raporData = { ...r.data, ai_yorumlar: aiYorumlar, ek_anlama: ekAnlamaOlcutleri, ek_prozodik: ekProzodikOlcutleri };
+    @property
+    def tam_ad(self):
+        return f"{self.ad} {self.soyad}"
 
-      toast({ title: "✅ Rapor oluşturuldu!" });
-      onRaporTamamla(raporData);
-    } catch(e) {
-      toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" });
+    @property
+    def borc(self):
+        has_students = self.ogrenci_sayisi > 0 or len(self.atanan_ogrenciler) > 0
+        if not has_students:
+            return 0.0
+        return max(0, self.yapilmasi_gereken_odeme - self.yapilan_odeme)
+
+class TeacherCreate(BaseModel):
+    ad: str
+    soyad: str
+    brans: str
+    telefon: str
+    seviye: TeacherLevel
+    yapilmasi_gereken_odeme: float = 0.0
+
+class TeacherUpdate(BaseModel):
+    ad: Optional[str] = None
+    soyad: Optional[str] = None
+    brans: Optional[str] = None
+    telefon: Optional[str] = None
+    seviye: Optional[TeacherLevel] = None
+    yapilmasi_gereken_odeme: Optional[float] = None
+    yapilan_odeme: Optional[float] = None
+
+class Student(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    ad: str
+    soyad: str
+    sinif: str
+    veli_ad: str
+    veli_soyad: str
+    veli_telefon: str
+    aldigi_egitim: str
+    kur: str
+    yapilmasi_gereken_odeme: float = 0.0
+    yapilan_odeme: float = 0.0
+    ogretmene_yapilacak_odeme: float = 0.0
+    ogretmen_id: Optional[str] = None
+    olusturma_tarihi: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class StudentCreate(BaseModel):
+    ad: str
+    soyad: str
+    sinif: str
+    veli_ad: str
+    veli_soyad: str
+    veli_telefon: str
+    aldigi_egitim: str
+    kur: str
+    yapilmasi_gereken_odeme: float = 0.0
+    ogretmene_yapilacak_odeme: float = 0.0
+    ogretmen_id: Optional[str] = None
+
+class StudentUpdate(BaseModel):
+    ad: Optional[str] = None
+    soyad: Optional[str] = None
+    sinif: Optional[str] = None
+    veli_ad: Optional[str] = None
+    veli_soyad: Optional[str] = None
+    veli_telefon: Optional[str] = None
+    aldigi_egitim: Optional[str] = None
+    kur: Optional[str] = None
+    yapilmasi_gereken_odeme: Optional[float] = None
+    yapilan_odeme: Optional[float] = None
+    ogretmene_yapilacak_odeme: Optional[float] = None
+    ogretmen_id: Optional[str] = None
+
+class Course(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    ad: str
+    fiyat: float
+    sure: int
+    olusturma_tarihi: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    ogrenci_sayisi: int = 0
+
+class CourseCreate(BaseModel):
+    ad: str
+    fiyat: float
+    sure: int
+
+class CourseUpdate(BaseModel):
+    ad: Optional[str] = None
+    fiyat: Optional[float] = None
+    sure: Optional[int] = None
+
+class Payment(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    tip: str
+    kisi_id: str
+    miktar: float
+    aciklama: Optional[str] = None
+    tarih: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class PaymentCreate(BaseModel):
+    tip: str
+    kisi_id: str
+    miktar: float
+    aciklama: Optional[str] = None
+
+class DashboardStats(BaseModel):
+    toplam_ogretmen: int
+    toplam_ogrenci: int
+    toplam_kurs: int
+    toplam_ogrenci_alacak: float
+    toplam_ogretmen_borc: float
+    bu_ay_odenen_toplam: float
+
+class WeeklyStats(BaseModel):
+    hafta: str
+    yeni_ogrenciler: int
+    odemeler: float
+    gelir: float
+
+class MonthlyStats(BaseModel):
+    ay: str
+    yeni_ogrenciler: int
+    odemeler: float
+    gelir: float
+    toplam_borc: float
+
+class ExportData(BaseModel):
+    ogretmenler: List[dict]
+    ogrenciler: List[dict]
+    kurslar: List[dict]
+    odemeler: List[dict]
+
+# ─────────────────────────────────────────────
+# MEVCUT ROUTE'LAR (değişmeden korunuyor)
+# ─────────────────────────────────────────────
+
+@api_router.get("/dashboard", response_model=DashboardStats)
+async def get_dashboard_stats():
+    teacher_count = await db.teachers.count_documents({})
+    student_count = await db.students.count_documents({})
+    course_count = await db.courses.count_documents({})
+    teachers = await db.teachers.find().to_list(length=None)
+    students = await db.students.find().to_list(length=None)
+    total_student_receivable = sum(max(0, s.get('yapilmasi_gereken_odeme', 0) - s.get('yapilan_odeme', 0)) for s in students)
+    total_teacher_debt = 0
+    for t in teachers:
+        has_students = t.get('ogrenci_sayisi', 0) > 0 or len(t.get('atanan_ogrenciler', [])) > 0
+        if has_students:
+            total_teacher_debt += max(0, t.get('yapilmasi_gereken_odeme', 0) - t.get('yapilan_odeme', 0))
+    current_month_start = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    monthly_payments = await db.payments.find({"tarih": {"$gte": current_month_start.isoformat()}}).to_list(length=None)
+    monthly_total = sum(p.get('miktar', 0) for p in monthly_payments)
+    return DashboardStats(
+        toplam_ogretmen=teacher_count,
+        toplam_ogrenci=student_count,
+        toplam_kurs=course_count,
+        toplam_ogrenci_alacak=total_student_receivable,
+        toplam_ogretmen_borc=total_teacher_debt,
+        bu_ay_odenen_toplam=monthly_total
+    )
+
+
+@api_router.get("/dashboard/bekleyenler")
+async def get_bekleyenler(current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+    # Analiz metinleri - beklemede olanlar
+    metin_bekleyen = await db.analiz_metinler.find({"durum": "beklemede"}).sort("olusturma_tarihi", -1).to_list(length=None)
+    metin_oylama = await db.analiz_metinler.find({"durum": "oylama"}).sort("olusturma_tarihi", -1).to_list(length=None)
+    # Gelişim araçları - beklemede olanlar
+    gelisim_bekleyen = await db.gelisim_icerik.find({"durum": "beklemede"}).sort("olusturma_tarihi", -1).to_list(length=None)
+    gelisim_oylama = await db.gelisim_icerik.find({"durum": "oylama"}).sort("olusturma_tarihi", -1).to_list(length=None)
+
+    for lst in [metin_bekleyen, metin_oylama, gelisim_bekleyen, gelisim_oylama]:
+        for item in lst:
+            item.pop("_id", None)
+            item.pop("icerik", None)  # İçerik metnini kırp, sadece meta
+
+    return {
+        "metin_bekleyen": metin_bekleyen,
+        "metin_oylama": metin_oylama,
+        "gelisim_bekleyen": gelisim_bekleyen,
+        "gelisim_oylama": gelisim_oylama,
+        "toplam": len(metin_bekleyen) + len(metin_oylama) + len(gelisim_bekleyen) + len(gelisim_oylama)
     }
-  };
 
-  return (
-    <div className="space-y-6 max-w-3xl mx-auto">
-      <div className="text-center">
-        <h2 className="text-2xl font-bold">Rapor Doldur</h2>
-        <p className="text-gray-500">{ogrenci.ad} {ogrenci.soyad} — {ogrenci.sinif}</p>
-      </div>
+@api_router.get("/stats/weekly", response_model=List[WeeklyStats])
+async def get_weekly_stats():
+    from datetime import timedelta
+    stats = []
+    now = datetime.now(timezone.utc)
+    for i in range(12):
+        week_start = now - timedelta(weeks=i+1)
+        week_end = now - timedelta(weeks=i)
+        students_this_week = await db.students.find({"olusturma_tarihi": {"$gte": week_start.isoformat(), "$lt": week_end.isoformat()}}).to_list(length=None)
+        payments_this_week = await db.payments.find({"tarih": {"$gte": week_start.isoformat(), "$lt": week_end.isoformat()}}).to_list(length=None)
+        stats.append(WeeklyStats(
+            hafta=f"{week_start.strftime('%d/%m')} - {week_end.strftime('%d/%m')}",
+            yeni_ogrenciler=len(students_this_week),
+            odemeler=sum(p.get('miktar', 0) for p in payments_this_week),
+            gelir=sum(s.get('yapilmasi_gereken_odeme', 0) for s in students_this_week)
+        ))
+    return list(reversed(stats))
 
-      {/* Özet bilgiler */}
-      <div className="grid grid-cols-3 gap-3">
-        <Card className="border-0 shadow-sm text-center"><CardContent className="p-4">
-          <div className="text-2xl font-bold text-blue-600">{sonuc.wpm}</div>
-          <div className="text-xs text-gray-500">kelime/dk</div>
-        </CardContent></Card>
-        <Card className="border-0 shadow-sm text-center"><CardContent className="p-4">
-          <div className="text-2xl font-bold text-green-600">%{sonuc.dogruluk_yuzde}</div>
-          <div className="text-xs text-gray-500">doğruluk</div>
-        </CardContent></Card>
-        <Card className="border-0 shadow-sm text-center"><CardContent className="p-4">
-          <div className="text-2xl font-bold text-orange-600">{sonuc.atanan_kur || sonuc.sistem_kur}</div>
-          <div className="text-xs text-gray-500">atanan kur</div>
-        </CardContent></Card>
-      </div>
+@api_router.get("/stats/monthly", response_model=List[MonthlyStats])
+async def get_monthly_stats():
+    from datetime import timedelta
+    stats = []
+    now = datetime.now(timezone.utc)
+    for i in range(6):
+        if i == 0:
+            month_end = now
+        else:
+            month_end = now.replace(day=1) - timedelta(days=1)
+            for j in range(i-1):
+                month_end = month_end.replace(day=1) - timedelta(days=1)
+                month_end = month_end.replace(day=28)
+        month_start = month_end.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        students_this_month = await db.students.find({"olusturma_tarihi": {"$gte": month_start.isoformat(), "$lt": month_end.isoformat()}}).to_list(length=None)
+        payments_this_month = await db.payments.find({"tarih": {"$gte": month_start.isoformat(), "$lt": month_end.isoformat()}}).to_list(length=None)
+        students_total = await db.students.find({"olusturma_tarihi": {"$lt": month_end.isoformat()}}).to_list(length=None)
+        stats.append(MonthlyStats(
+            ay=month_start.strftime('%B %Y'),
+            yeni_ogrenciler=len(students_this_month),
+            odemeler=sum(p.get('miktar', 0) for p in payments_this_month),
+            gelir=sum(s.get('yapilmasi_gereken_odeme', 0) for s in students_this_month),
+            toplam_borc=sum(max(0, s.get('yapilmasi_gereken_odeme', 0) - s.get('yapilan_odeme', 0)) for s in students_total)
+        ))
+    return list(reversed(stats))
 
-      {/* ══ 4. Okuduğunu Anlama ══ */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-base flex items-center justify-between">
-            <span>4. Okuduğunu Anlama Becerileri</span>
-            <button onClick={() => setAnlamaEkleAcik(!anlamaEkleAcik)}
-              className="text-xs px-3 py-1 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all border border-blue-200">
-              + Ölçüt Ekle
-            </button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Ölçüt ekleme formu */}
-          {anlamaEkleAcik && (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
-              <div className="text-sm font-semibold text-blue-700">Yeni Anlama Ölçütü Ekle</div>
-              <input value={yeniAnlamaAdi} onChange={e => setYeniAnlamaAdi(e.target.value)}
-                placeholder="Ölçüt adı (ör: Metafor anlama)"
-                className="w-full border border-blue-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
-              <select value={yeniAnlamaKat} onChange={e => setYeniAnlamaKat(e.target.value)}
-                className="w-full border border-blue-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-                {Object.entries(anlamaKategoriler).map(([k, v]) => (
-                  <option key={k} value={k}>{v}</option>
-                ))}
-              </select>
-              <div className="flex gap-2">
-                <button onClick={anlamaOlcutEkle}
-                  className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">Ekle</button>
-                <button onClick={() => setAnlamaEkleAcik(false)}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300">İptal</button>
-              </div>
-            </div>
-          )}
+@api_router.post("/teachers", response_model=Teacher)
+async def create_teacher(teacher_data: TeacherCreate):
+    teacher = Teacher(**teacher_data.dict())
+    await db.teachers.insert_one(prepare_for_mongo(teacher.dict()))
+    return teacher
 
-          {/* 4.1 Sözcük */}
-          <div>
-            <h4 className="text-sm font-semibold text-gray-600 mb-2 bg-gray-50 p-2 rounded-lg">4.1 Sözcük Düzeyinde Anlama</h4>
-            <SeviyeSecici alan="cumle_anlama" etiket="Cümle anlamını kavrama" />
-            <SeviyeSecici alan="bilinmeyen_sozcuk" etiket="Bilinmeyen sözcük tahmini" />
-            <SeviyeSecici alan="baglac_zamir" etiket="Bağlaç ve zamirleri anlama" />
-            {ekAnlamaOlcutleri.filter(o => o.kategori === "sozcuk").map(o => (
-              <SeviyeSecici key={o.id} isEk ekId={o.id} etiket={o.etiket} />
-            ))}
-          </div>
+@api_router.get("/teachers", response_model=List[Teacher])
+async def get_teachers():
+    teachers = await db.teachers.find().to_list(length=None)
+    result = []
+    for teacher in teachers:
+        real_count = await db.students.count_documents({"ogretmen_id": teacher['id']})
+        teacher['ogrenci_sayisi'] = real_count
+        if teacher.get('ogrenci_sayisi', 0) != real_count:
+            await db.teachers.update_one({"id": teacher['id']}, {"$set": {"ogrenci_sayisi": real_count}})
+        result.append(Teacher(**parse_from_mongo(teacher)))
+    return result
 
-          {/* 4.2 Ana yapı */}
-          <div>
-            <h4 className="text-sm font-semibold text-gray-600 mb-2 bg-gray-50 p-2 rounded-lg">4.2 Metnin Ana Yapısını Anlama</h4>
-            <SeviyeSecici alan="ana_fikir" etiket="Ana fikir belirleme" />
-            <SeviyeSecici alan="yardimci_fikir" etiket="Yardımcı fikirleri ifade etme" />
-            <SeviyeSecici alan="konu" etiket="Metnin konusunu ifade etme" />
-            <SeviyeSecici alan="baslik_onerme" etiket="Başlık önerme" />
-            {ekAnlamaOlcutleri.filter(o => o.kategori === "ana_yapi").map(o => (
-              <SeviyeSecici key={o.id} isEk ekId={o.id} etiket={o.etiket} />
-            ))}
-          </div>
+@api_router.get("/teachers/{teacher_id}", response_model=Teacher)
+async def get_teacher(teacher_id: str):
+    teacher = await db.teachers.find_one({"id": teacher_id})
+    if not teacher:
+        raise HTTPException(status_code=404, detail="Öğretmen bulunamadı")
+    return Teacher(**parse_from_mongo(teacher))
 
-          {/* 4.3 Derin anlama */}
-          <div>
-            <h4 className="text-sm font-semibold text-gray-600 mb-2 bg-gray-50 p-2 rounded-lg">4.3 Metinler Arasılık ve Derin Anlama</h4>
-            <SeviyeSecici alan="neden_sonuc" etiket="Neden-sonuç ilişkisini belirleme" />
-            <SeviyeSecici alan="cikarim" etiket="Çıkarım yapma" />
-            <SeviyeSecici alan="ipuclari" etiket="Metindeki ipuçlarını kullanma" />
-            <SeviyeSecici alan="yorumlama" etiket="Yorumlama" />
-            {ekAnlamaOlcutleri.filter(o => o.kategori === "derin").map(o => (
-              <SeviyeSecici key={o.id} isEk ekId={o.id} etiket={o.etiket} />
-            ))}
-          </div>
+@api_router.get("/teachers/{teacher_id}/students", response_model=List[Student])
+async def get_teacher_students(teacher_id: str):
+    teacher = await db.teachers.find_one({"id": teacher_id})
+    if not teacher:
+        raise HTTPException(status_code=404, detail="Öğretmen bulunamadı")
+    students = await db.students.find({"ogretmen_id": teacher_id}).to_list(length=None)
+    return [Student(**parse_from_mongo(s)) for s in students]
 
-          {/* 4.4 Eleştirel */}
-          <div>
-            <h4 className="text-sm font-semibold text-gray-600 mb-2 bg-gray-50 p-2 rounded-lg">4.4 Eleştirel ve Yaratıcı Okuma</h4>
-            <SeviyeSecici alan="gorus_bildirme" etiket="Metne yönelik görüş bildirme" />
-            <SeviyeSecici alan="yazar_amaci" etiket="Yazarın amacını sezme" />
-            <SeviyeSecici alan="alternatif_fikir" etiket="Alternatif son / fikir üretme" />
-            <SeviyeSecici alan="guncelle_hayat" etiket="Metni günlük hayatla ilişkilendirme" />
-            {ekAnlamaOlcutleri.filter(o => o.kategori === "elestirel").map(o => (
-              <SeviyeSecici key={o.id} isEk ekId={o.id} etiket={o.etiket} />
-            ))}
-          </div>
+@api_router.put("/teachers/{teacher_id}", response_model=Teacher)
+async def update_teacher(teacher_id: str, teacher_update: TeacherUpdate):
+    update_data = teacher_update.dict(exclude_unset=True)
+    if not update_data:
+        raise HTTPException(status_code=400, detail="Güncellenecek veri bulunamadı")
+    result = await db.teachers.update_one({"id": teacher_id}, {"$set": update_data})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Öğretmen bulunamadı")
+    teacher = await db.teachers.find_one({"id": teacher_id})
+    return Teacher(**parse_from_mongo(teacher))
 
-          {/* 4.5 Soru performans */}
-          <div>
-            <h4 className="text-sm font-semibold text-gray-600 mb-2 bg-gray-50 p-2 rounded-lg">4.5 Soru Performans Analizi</h4>
-            <SeviyeSecici alan="bilgi" etiket="Bilgi" />
-            <SeviyeSecici alan="kavrama" etiket="Kavrama" />
-            <SeviyeSecici alan="uygulama" etiket="Uygulama" />
-            <SeviyeSecici alan="analiz" etiket="Analiz" />
-            <SeviyeSecici alan="sentez" etiket="Sentez" />
-            <SeviyeSecici alan="degerlendirme" etiket="Değerlendirme" />
-            {ekAnlamaOlcutleri.filter(o => o.kategori === "soru").map(o => (
-              <SeviyeSecici key={o.id} isEk ekId={o.id} etiket={o.etiket} />
-            ))}
-          </div>
+@api_router.delete("/teachers/{teacher_id}")
+async def delete_teacher(teacher_id: str):
+    result = await db.teachers.delete_one({"id": teacher_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Öğretmen bulunamadı")
+    return {"message": "Öğretmen başarıyla silindi"}
 
-          {/* Anlama yüzdesi */}
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-            <Label>Genel Anlama Yüzdesi (%)</Label>
-            <div className="flex items-center gap-3 mt-2">
-              <input type="number" min="0" max="100" value={anlama.genel_yuzde}
-                onChange={e => setAnlama({...anlama, genel_yuzde: parseInt(e.target.value)||0})}
-                className="w-24 border border-blue-300 rounded-lg p-2 text-center text-lg font-bold focus:outline-none focus:ring-2 focus:ring-blue-400" />
-              <span className="text-sm text-gray-500">0 bırakırsanız otomatik hesaplanır: %{hesaplaAnlamaYuzde()}</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+@api_router.post("/students", response_model=Student)
+async def create_student(student_data: StudentCreate):
+    student = Student(**student_data.dict())
+    await db.students.insert_one(prepare_for_mongo(student.dict()))
+    if student.ogretmen_id:
+        teacher = await db.teachers.find_one({"id": student.ogretmen_id})
+        if teacher:
+            await db.teachers.update_one(
+                {"id": student.ogretmen_id},
+                {"$inc": {"ogrenci_sayisi": 1, "yapilmasi_gereken_odeme": student.ogretmene_yapilacak_odeme},
+                 "$addToSet": {"atanan_ogrenciler": student.id}}
+            )
+    # ★ Otomatik muhasebe kaydı: öğrenci alacak kaydı
+    if student.yapilmasi_gereken_odeme and student.yapilmasi_gereken_odeme > 0:
+        alacak_kaydi = {
+            "id": str(uuid.uuid4()),
+            "tip": "ogrenci",
+            "kisi_id": student.id,
+            "miktar": student.yapilmasi_gereken_odeme,
+            "aciklama": f"Kayıt ücreti — {student.ad} {student.soyad}",
+            "tarih": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.payments.insert_one(alacak_kaydi)
+    # ★ Otomatik muhasebe kaydı: öğretmene yapılacak ödeme
+    if student.ogretmen_id and student.ogretmene_yapilacak_odeme and student.ogretmene_yapilacak_odeme > 0:
+        ogretmen_kaydi = {
+            "id": str(uuid.uuid4()),
+            "tip": "ogretmen",
+            "kisi_id": student.ogretmen_id,
+            "miktar": student.ogretmene_yapilacak_odeme,
+            "aciklama": f"Öğretmen ücreti — {student.ad} {student.soyad}",
+            "tarih": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.payments.insert_one(ogretmen_kaydi)
+    return student
 
-      {/* ══ 5. Prozodik Okuma ══ */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-base flex items-center justify-between">
-            <span>5. Prozodik Okuma Ölçeği</span>
-            <div className="flex items-center gap-3">
-              <span className="text-lg font-bold text-orange-600">Toplam: {prozodikToplam}/{20 + ekProzodikOlcutleri.length * 4}</span>
-              <button onClick={() => setProzodikEkleAcik(!prozodikEkleAcik)}
-                className="text-xs px-3 py-1 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 transition-all border border-orange-200">
-                + Ölçüt Ekle
-              </button>
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {/* Prozodik ölçüt ekleme */}
-          {prozodikEkleAcik && (
-            <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 space-y-3 mb-4">
-              <div className="text-sm font-semibold text-orange-700">Yeni Prozodik Ölçüt Ekle</div>
-              <input value={yeniProzodikAdi} onChange={e => setYeniProzodikAdi(e.target.value)}
-                placeholder="Ölçüt adı (ör: Diyalog ifadesi)"
-                className="w-full border border-orange-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
-              <div className="flex gap-2">
-                <button onClick={prozodikOlcutEkle}
-                  className="px-4 py-2 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-700">Ekle</button>
-                <button onClick={() => setProzodikEkleAcik(false)}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300">İptal</button>
-              </div>
-            </div>
-          )}
+@api_router.get("/students", response_model=List[Student])
+async def get_students():
+    students = await db.students.find().to_list(length=None)
+    return [Student(**parse_from_mongo(s)) for s in students]
 
-          <ProzodikSatir alan="noktalama" etiket="Noktalama ve Duraklama"
-            aciklama1="Uymuyor" aciklama2="Kısmen uyuyor" aciklama3="Çoğunlukla" aciklama4="Tam ve bilinçli" />
-          <ProzodikSatir alan="vurgu" etiket="Vurgu"
-            aciklama1="Tek düze" aciklama2="Yer yer vurgu" aciklama3="Anlama uygun" aciklama4="Etkili ve bilinçli" />
-          <ProzodikSatir alan="tonlama" etiket="Tonlama"
-            aciklama1="Monoton" aciklama2="Sınırlı" aciklama3="Metne uygun" aciklama4="Doğal ve etkileyici" />
-          <ProzodikSatir alan="akicilik" etiket="Akıcılık"
-            aciklama1="Sık duraklama" aciklama2="Kısmi akış" aciklama3="Genel olarak akıcı" aciklama4="Kesintisiz akıcı" />
-          <ProzodikSatir alan="anlamli_gruplama" etiket="Anlamlı Gruplama"
-            aciklama1="Sözcük sözcük" aciklama2="Kısmen gruplama" aciklama3="Çoğunlukla doğru" aciklama4="Tam ve tutarlı" />
+@api_router.get("/students/{student_id}", response_model=Student)
+async def get_student(student_id: str):
+    student = await db.students.find_one({"id": student_id})
+    if not student:
+        raise HTTPException(status_code=404, detail="Öğrenci bulunamadı")
+    return Student(**parse_from_mongo(student))
 
-          {/* Ek prozodik ölçütler */}
-          {ekProzodikOlcutleri.map(o => (
-            <ProzodikSatir key={o.id} isEk ekId={o.id} etiket={o.etiket}
-              aciklama1={o.aciklamalar[0]} aciklama2={o.aciklamalar[1]}
-              aciklama3={o.aciklamalar[2]} aciklama4={o.aciklamalar[3]} />
-          ))}
-        </CardContent>
-      </Card>
+@api_router.put("/students/{student_id}", response_model=Student)
+async def update_student(student_id: str, student_update: StudentUpdate):
+    update_data = student_update.dict(exclude_unset=True)
+    if not update_data:
+        raise HTTPException(status_code=400, detail="Güncellenecek veri bulunamadı")
+    old_student = await db.students.find_one({"id": student_id})
+    if not old_student:
+        raise HTTPException(status_code=404, detail="Öğrenci bulunamadı")
+    old_teacher_id = old_student.get('ogretmen_id')
+    new_teacher_id = update_data.get('ogretmen_id')
+    old_payment = old_student.get('ogretmene_yapilacak_odeme', 0)
+    new_payment = update_data.get('ogretmene_yapilacak_odeme', old_payment)
+    await db.students.update_one({"id": student_id}, {"$set": update_data})
+    if old_teacher_id != new_teacher_id:
+        if old_teacher_id:
+            await db.teachers.update_one({"id": old_teacher_id}, {"$inc": {"ogrenci_sayisi": -1, "yapilmasi_gereken_odeme": -old_payment}, "$pull": {"atanan_ogrenciler": student_id}})
+        if new_teacher_id:
+            await db.teachers.update_one({"id": new_teacher_id}, {"$inc": {"ogrenci_sayisi": 1, "yapilmasi_gereken_odeme": new_payment}, "$addToSet": {"atanan_ogrenciler": student_id}})
+    elif old_teacher_id and old_payment != new_payment:
+        await db.teachers.update_one({"id": old_teacher_id}, {"$inc": {"yapilmasi_gereken_odeme": new_payment - old_payment}})
+    student = await db.students.find_one({"id": student_id})
+    return Student(**parse_from_mongo(student))
 
-      {/* ══ 6. AI Yorumları ══ */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-base flex items-center justify-between">
-            <span>6. Değerlendirme Yorumları</span>
-            <button onClick={aiYorumlariOlustur} disabled={aiYukleniyor}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                aiYukleniyor
-                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:from-purple-600 hover:to-blue-600 shadow-md'
-              }`}>
-              {aiYukleniyor ? (
-                <span className="flex items-center gap-2">
-                  <span className="animate-spin">⏳</span> AI Oluşturuyor...
-                </span>
-              ) : aiOlusturuldu ? "🔄 Yeniden Oluştur" : "🤖 AI ile Oluştur"}
-            </button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-1">
-          {!aiOlusturuldu && !Object.values(aiYorumlar).some(v => v) && (
-            <div className="text-center py-8 text-gray-400">
-              <div className="text-4xl mb-3">🤖</div>
-              <p className="text-sm">Önce yukarıdaki ölçütleri doldurun, sonra<br/><strong>"AI ile Oluştur"</strong> butonuna tıklayın</p>
-              <p className="text-xs mt-2 text-gray-400">AI, sayısal verilere göre her bölüm için profesyonel yorum yazacak.</p>
-              <p className="text-xs text-gray-400">Oluşturulan yorumları istediğiniz gibi düzenleyebilirsiniz.</p>
-            </div>
-          )}
-          {(aiOlusturuldu || Object.values(aiYorumlar).some(v => v)) && (
-            <>
-              <YorumAlani baslik="📊 Okuma Hızı Değerlendirmesi" alan="hiz" placeholder="Okuma hızına ilişkin değerlendirme..." />
-              <YorumAlani baslik="✅ Doğru Okuma Oranı Değerlendirmesi" alan="dogruluk" placeholder="Doğruluk ve hata analizi..." />
-              <YorumAlani baslik="📖 Okuduğunu Anlama Değerlendirmesi" alan="anlama" placeholder="Anlama becerileri değerlendirmesi..." />
-              <YorumAlani baslik="🎵 Prozodik Okuma Değerlendirmesi" alan="prozodik" placeholder="Prozodik okuma değerlendirmesi..." />
-              <YorumAlani baslik="📝 Sonuç ve Genel Yorum" alan="sonuc" placeholder="Genel sonuç ve yorum..." />
-              <YorumAlani baslik="🎯 Eğitsel ve Ev Temelli Gelişim Önerileri" alan="oneriler" placeholder="Gelişim önerileri..." />
-            </>
-          )}
-        </CardContent>
-      </Card>
+@api_router.delete("/students/{student_id}")
+async def delete_student(student_id: str):
+    student = await db.students.find_one({"id": student_id})
+    if not student:
+        raise HTTPException(status_code=404, detail="Öğrenci bulunamadı")
+    if student.get('ogretmen_id'):
+        teacher = await db.teachers.find_one({"id": student['ogretmen_id']})
+        if teacher:
+            await db.teachers.update_one(
+                {"id": student['ogretmen_id']},
+                {"$inc": {"ogrenci_sayisi": -1, "yapilmasi_gereken_odeme": -student.get('ogretmene_yapilacak_odeme', 0)},
+                 "$pull": {"atanan_ogrenciler": student_id}}
+            )
+    await db.students.delete_one({"id": student_id})
+    return {"message": "Öğrenci başarıyla silindi"}
 
-      {/* ══ 7. Öğretmen Ek Notu ══ */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader><CardTitle className="text-base">7. Öğretmen Ek Notu</CardTitle></CardHeader>
-        <CardContent>
-          <textarea value={ogretmenNotu} onChange={e => setOgretmenNotu(e.target.value)} rows={4}
-            placeholder="Öğrenciye ilişkin ek değerlendirme ve notlarınızı yazın..."
-            className="w-full border border-gray-300 rounded-xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none leading-relaxed" />
-        </CardContent>
-      </Card>
+@api_router.post("/courses", response_model=Course)
+async def create_course(course_data: CourseCreate):
+    course = Course(**course_data.dict())
+    await db.courses.insert_one(prepare_for_mongo(course.dict()))
+    return course
 
-      <Button onClick={kaydet} className="w-full py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold text-lg">
-        📄 Raporu Oluştur
-      </Button>
-    </div>
-  );
+@api_router.get("/courses", response_model=List[Course])
+async def get_courses():
+    courses = await db.courses.find().to_list(length=None)
+    return [Course(**parse_from_mongo(c)) for c in courses]
+
+@api_router.get("/courses/{course_id}", response_model=Course)
+async def get_course(course_id: str):
+    course = await db.courses.find_one({"id": course_id})
+    if not course:
+        raise HTTPException(status_code=404, detail="Kurs bulunamadı")
+    return Course(**parse_from_mongo(course))
+
+@api_router.put("/courses/{course_id}", response_model=Course)
+async def update_course(course_id: str, course_update: CourseUpdate):
+    update_data = course_update.dict(exclude_unset=True)
+    if not update_data:
+        raise HTTPException(status_code=400, detail="Güncellenecek veri bulunamadı")
+    result = await db.courses.update_one({"id": course_id}, {"$set": update_data})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Kurs bulunamadı")
+    course = await db.courses.find_one({"id": course_id})
+    return Course(**parse_from_mongo(course))
+
+@api_router.delete("/courses/{course_id}")
+async def delete_course(course_id: str):
+    result = await db.courses.delete_one({"id": course_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Kurs bulunamadı")
+    return {"message": "Kurs başarıyla silindi"}
+
+@api_router.post("/payments", response_model=Payment)
+async def create_payment(payment_data: PaymentCreate):
+    payment = Payment(**payment_data.dict())
+    await db.payments.insert_one(prepare_for_mongo(payment.dict()))
+    if payment.tip == "ogrenci":
+        await db.students.update_one({"id": payment.kisi_id}, {"$inc": {"yapilan_odeme": payment.miktar}})
+    elif payment.tip == "ogretmen":
+        await db.teachers.update_one({"id": payment.kisi_id}, {"$inc": {"yapilan_odeme": payment.miktar}})
+    return payment
+
+@api_router.get("/payments", response_model=List[Payment])
+async def get_payments():
+    payments = await db.payments.find().sort("tarih", -1).to_list(length=None)
+    return [Payment(**parse_from_mongo(p)) for p in payments]
+
+@api_router.delete("/payments/{payment_id}")
+async def delete_payment(payment_id: str):
+    payment = await db.payments.find_one({"id": payment_id})
+    if not payment:
+        raise HTTPException(status_code=404, detail="Ödeme bulunamadı")
+    if payment['tip'] == "ogrenci":
+        await db.students.update_one({"id": payment['kisi_id']}, {"$inc": {"yapilan_odeme": -payment['miktar']}})
+    elif payment['tip'] == "ogretmen":
+        await db.teachers.update_one({"id": payment['kisi_id']}, {"$inc": {"yapilan_odeme": -payment['miktar']}})
+    await db.payments.delete_one({"id": payment_id})
+    return {"message": "Ödeme başarıyla silindi"}
+
+@api_router.get("/export", response_model=ExportData)
+async def get_export_data():
+    teachers = await db.teachers.find().to_list(length=None)
+    teacher_export = [{"Ad": t.get('ad',''), "Soyad": t.get('soyad',''), "Branş": t.get('brans',''), "Telefon": t.get('telefon',''), "Seviye": t.get('seviye',''), "Öğrenci Sayısı": t.get('ogrenci_sayisi',0), "Yapılması Gereken Ödeme": t.get('yapilmasi_gereken_odeme',0), "Yapılan Ödeme": t.get('yapilan_odeme',0), "Borç": max(0, t.get('yapilmasi_gereken_odeme',0) - t.get('yapilan_odeme',0)) if (t.get('ogrenci_sayisi',0) > 0 or len(t.get('atanan_ogrenciler',[])) > 0) else 0} for t in teachers]
+    students = await db.students.find().to_list(length=None)
+    student_export = []
+    for s in students:
+        teacher = await db.teachers.find_one({"id": s.get('ogretmen_id')}) if s.get('ogretmen_id') else None
+        student_export.append({"Ad": s.get('ad',''), "Soyad": s.get('soyad',''), "Sınıf": s.get('sinif',''), "Veli Adı": s.get('veli_ad',''), "Veli Soyadı": s.get('veli_soyad',''), "Veli Telefon": s.get('veli_telefon',''), "Aldığı Eğitim": s.get('aldigi_egitim',''), "Kur": s.get('kur',''), "Yapılması Gereken Ödeme": s.get('yapilmasi_gereken_odeme',0), "Yapılan Ödeme": s.get('yapilan_odeme',0), "Öğretmene Yapılacak Ödeme": s.get('ogretmene_yapilacak_odeme',0), "Öğretmen": f"{teacher.get('ad','')} {teacher.get('soyad','')}" if teacher else 'Atanmamış', "Alacak": max(0, s.get('yapilmasi_gereken_odeme',0) - s.get('yapilan_odeme',0))})
+    courses = await db.courses.find().to_list(length=None)
+    course_export = [{"Kurs Adı": c.get('ad',''), "Fiyat": c.get('fiyat',0), "Süre (Saat)": c.get('sure',0), "Öğrenci Sayısı": c.get('ogrenci_sayisi',0)} for c in courses]
+    payments = await db.payments.find().sort("tarih", -1).to_list(length=None)
+    payment_export = []
+    for p in payments:
+        if p.get('tip') == 'ogrenci':
+            person = await db.students.find_one({"id": p.get('kisi_id')})
+        else:
+            person = await db.teachers.find_one({"id": p.get('kisi_id')})
+        payment_export.append({"Tarih": p.get('tarih',''), "Tip": 'Öğrenci' if p.get('tip') == 'ogrenci' else 'Öğretmen', "Kişi": f"{person.get('ad','')} {person.get('soyad','')}" if person else 'Bilinmiyor', "Miktar": p.get('miktar',0), "Açıklama": p.get('aciklama','')})
+    return ExportData(ogretmenler=teacher_export, ogrenciler=student_export, kurslar=course_export, odemeler=payment_export)
+
+@api_router.post("/backup/google-drive")
+async def backup_to_google_drive(backup_data: dict):
+    return {"success": True, "message": "Data queued for Google Drive backup", "backup_id": str(uuid.uuid4())}
+
+
+# ─────────────────────────────────────────────
+# GİRİŞ ANALİZİ (FAZ 1A)
+# ─────────────────────────────────────────────
+
+# Varsayılan norm tablosu (admin değiştirebilir)
+VARSAYILAN_NORMLAR = {
+    "1": {"dusuk": 25, "orta": 40, "yeterli": 60},
+    "2": {"dusuk": 55, "orta": 75, "yeterli": 95},
+    "3": {"dusuk": 65, "orta": 90, "yeterli": 115},
+    "4": {"dusuk": 80, "orta": 110, "yeterli": 140},
+    "5": {"dusuk": 90, "orta": 120, "yeterli": 150},
+    "6": {"dusuk": 100, "orta": 135, "yeterli": 170},
+    "7": {"dusuk": 110, "orta": 150, "yeterli": 185},
+    "8": {"dusuk": 120, "orta": 160, "yeterli": 200},
 }
 
-// ── RAPOR GÖRÜNTÜLE ──
-function RaporGoruntule({ rapor, ogrenci, onGeri }) {
-  const hizLabel = { dusuk: "Düşük", orta: "Orta", yeterli: "Yeterli", ileri: "İleri" };
-  const seviyeRenk = { zayif: "text-red-600", orta: "text-yellow-600", iyi: "text-green-600" };
-  const seviyeLabel = { zayif: "Zayıf", orta: "Orta", iyi: "İyi" };
-  const prozodikSeviye = (t) => t >= 18 ? "Çok İyi" : t >= 14 ? "İyi" : t >= 10 ? "Orta" : "Geliştirilmeli";
-  const formatTarih = (t) => new Date(t).toLocaleDateString("tr-TR");
-  const formatSure = (s) => `${Math.floor(s/60)}:${Math.round(s%60).toString().padStart(2,'0')}`;
+async def get_norm_tablosu():
+    doc = await db.sistem_ayarlari.find_one({"tip": "okuma_hizi_normlari"})
+    if doc:
+        return doc.get("normlar", VARSAYILAN_NORMLAR)
+    return VARSAYILAN_NORMLAR
 
-  const AnlamaTablosu = ({ baslik, satirlar }) => (
-    <div className="mb-4">
-      <div className="bg-gray-100 px-3 py-2 rounded-t-lg font-semibold text-sm text-gray-700">{baslik}</div>
-      <table className="w-full border border-gray-200 rounded-b-lg overflow-hidden text-sm">
-        <thead><tr className="bg-gray-50">
-          <th className="text-left p-2 border-b border-gray-200 font-medium">Ölçüt</th>
-          <th className="p-2 border-b border-gray-200 w-20 text-center font-medium">Zayıf</th>
-          <th className="p-2 border-b border-gray-200 w-20 text-center font-medium">Orta</th>
-          <th className="p-2 border-b border-gray-200 w-20 text-center font-medium">İyi</th>
-        </tr></thead>
-        <tbody>
-          {satirlar.map(([etiket, alan]) => {
-            const deger = rapor.anlama?.[alan] || "orta";
-            return (
-              <tr key={alan} className="border-b border-gray-100 last:border-0">
-                <td className="p-2 text-gray-700">{etiket}</td>
-                {["zayif","orta","iyi"].map(s => (
-                  <td key={s} className="p-2 text-center text-orange-500 font-bold">{deger === s ? "+" : ""}</td>
-                ))}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
+async def hiz_degerlendirme(sinif: str, wpm: float) -> str:
+    normlar = await get_norm_tablosu()
+    sinif_no = sinif.replace("-", "").replace(".", "").strip()[:1]
+    n = normlar.get(sinif_no, normlar.get("4", VARSAYILAN_NORMLAR["4"]))
+    if wpm <= n["dusuk"]:
+        return "dusuk"
+    elif wpm <= n["orta"]:
+        return "orta"
+    elif wpm <= n["yeterli"]:
+        return "yeterli"
+    else:
+        return "ileri"
 
-  return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <div className="flex items-center gap-3">
-        <Button variant="outline" size="sm" onClick={onGeri}>← Geri</Button>
-        <h2 className="text-xl font-bold">Okuma Becerileri Ölçüm Raporu</h2>
-      </div>
+async def kur_onerisi_hesapla(wpm: float, dogruluk: float, sinif: str) -> str:
+    hiz = await hiz_degerlendirme(sinif, wpm)
+    if dogruluk >= 97 and hiz in ("yeterli", "ileri"):
+        return "Kur 3"
+    elif dogruluk >= 93 and hiz in ("orta", "yeterli", "ileri"):
+        return "Kur 2"
+    else:
+        return "Kur 1"
 
-      {/* 1. Öğrenci Bilgileri */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader><CardTitle className="text-base bg-gray-800 text-white p-3 rounded-lg -m-1">1. ÖĞRENCİ BİLGİLERİ</CardTitle></CardHeader>
-        <CardContent className="p-0">
-          <table className="w-full text-sm">
-            <tbody>
-              <tr className="border-b"><td className="p-3 font-semibold w-48 bg-gray-50">Adı Soyadı:</td><td className="p-3">{rapor.ogrenci_ad}</td></tr>
-              <tr className="border-b"><td className="p-3 font-semibold bg-gray-50">Sınıfı:</td><td className="p-3">{rapor.ogrenci_sinif}</td></tr>
-              <tr className="border-b"><td className="p-3 font-semibold bg-gray-50">Değerlendirme Tarihi:</td><td className="p-3">{formatTarih(rapor.olusturma_tarihi)}</td></tr>
-              <tr><td className="p-3 font-semibold bg-gray-50">Değerlendirmeyi Yapan:</td><td className="p-3">{rapor.ogretmen_ad}</td></tr>
-            </tbody>
-          </table>
-        </CardContent>
-      </Card>
+# ── Norm Tablosu Yönetimi ──
+class NormGuncelle(BaseModel):
+    normlar: dict  # {"1": {"dusuk": 25, "orta": 40, "yeterli": 60}, ...}
 
-      {/* 2. Metin */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader><CardTitle className="text-base bg-gray-800 text-white p-3 rounded-lg -m-1">2. METİN</CardTitle></CardHeader>
-        <CardContent className="p-0">
-          <table className="w-full text-sm">
-            <tbody>
-              <tr className="border-b"><td className="p-3 font-semibold w-48 bg-gray-50">Metnin Adı:</td><td className="p-3 uppercase">{rapor.metin_adi}</td></tr>
-              <tr className="border-b"><td className="p-3 font-semibold bg-gray-50">Metnin Türü:</td><td className="p-3 uppercase">{rapor.metin_turu}</td></tr>
-              <tr className="border-b"><td className="p-3 font-semibold bg-gray-50">Toplam Kelime Sayısı:</td><td className="p-3">{rapor.kelime_sayisi}</td></tr>
-              <tr className="border-b"><td className="p-3 font-semibold bg-gray-50">Doğru Okunan Kelime:</td><td className="p-3">{Math.round(rapor.kelime_sayisi * rapor.dogruluk_yuzde / 100)}</td></tr>
-              <tr className="border-b"><td className="p-3 font-semibold bg-gray-50">Yanlış Okunan Kelime:</td><td className="p-3">{rapor.kelime_sayisi - Math.round(rapor.kelime_sayisi * rapor.dogruluk_yuzde / 100)}</td></tr>
-              <tr><td className="p-3 font-semibold bg-gray-50">Tamamlama Süresi:</td><td className="p-3">{formatSure(rapor.sure_saniye)} ({rapor.sure_saniye} sn)</td></tr>
-            </tbody>
-          </table>
-        </CardContent>
-      </Card>
+@api_router.get("/diagnostic/normlar")
+async def get_normlar(current_user=Depends(get_current_user)):
+    return await get_norm_tablosu()
 
-      {/* 3. Okuma Hızı */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader><CardTitle className="text-base bg-gray-800 text-white p-3 rounded-lg -m-1">3. OKUMA HIZI</CardTitle></CardHeader>
-        <CardContent className="pt-4">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="text-4xl font-bold text-blue-600">{rapor.wpm}</div>
-            <div>
-              <div className="text-sm text-gray-500">kelime/dakika</div>
-              <div className={`font-semibold ${rapor.hiz_deger === "ileri" ? "text-green-600" : rapor.hiz_deger === "yeterli" ? "text-blue-600" : rapor.hiz_deger === "orta" ? "text-yellow-600" : "text-red-600"}`}>
-                {hizLabel[rapor.hiz_deger]} Düzey
-              </div>
-            </div>
-          </div>
-          <p className="text-sm text-gray-700 leading-relaxed bg-blue-50 p-3 rounded-xl">
-            Öğrencinin okuma hızı dakikada <strong>{rapor.wpm} kelime</strong>dir. Bu okuma hızı, öğrencinin bulunduğu sınıf düzeyi normlarına göre <strong>{hizLabel[rapor.hiz_deger]?.toLowerCase()} düzeydedir</strong>.
-          </p>
-        </CardContent>
-      </Card>
+@api_router.put("/diagnostic/normlar")
+async def update_normlar(data: NormGuncelle, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+    await db.sistem_ayarlari.update_one(
+        {"tip": "okuma_hizi_normlari"},
+        {"$set": {"tip": "okuma_hizi_normlari", "normlar": data.normlar}},
+        upsert=True
+    )
+    return {"message": "Norm tablosu güncellendi", "normlar": data.normlar}
 
-      {/* 4. Okuduğunu Anlama */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-base bg-gray-800 text-white p-3 rounded-lg -m-1">
-            4. OKUDUĞUNU ANLAMA BECERİLERİ — %{rapor.anlama_yuzde}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-4 space-y-4">
-          <AnlamaTablosu baslik="4.1 Sözcük Düzeyinde Anlama" satirlar={[
-            ["Cümle anlamını kavrama","cumle_anlama"],
-            ["Bilinmeyen sözcük tahmini","bilinmeyen_sozcuk"],
-            ["Bağlaç ve zamirleri anlama","baglac_zamir"],
-          ]} />
-          <AnlamaTablosu baslik="4.2 Metnin Ana Yapısını Anlama" satirlar={[
-            ["Ana fikir belirleme","ana_fikir"],
-            ["Yardımcı fikirleri ifade etme","yardimci_fikir"],
-            ["Metnin konusunu ifade etme","konu"],
-            ["Başlık önerme","baslik_onerme"],
-          ]} />
-          <AnlamaTablosu baslik="4.3 Metinler Arasılık ve Derin Anlama" satirlar={[
-            ["Neden-sonuç ilişkisini belirleme","neden_sonuc"],
-            ["Çıkarım yapma","cikarim"],
-            ["Metindeki ipuçlarını kullanma","ipuclari"],
-            ["Yorumlama","yorumlama"],
-          ]} />
-          <AnlamaTablosu baslik="4.4 Eleştirel ve Yaratıcı Okuma" satirlar={[
-            ["Metne yönelik görüş bildirme","gorus_bildirme"],
-            ["Yazarın amacını sezme","yazar_amaci"],
-            ["Alternatif son / fikir üretme","alternatif_fikir"],
-            ["Metni günlük hayatla ilişkilendirme","guncelle_hayat"],
-          ]} />
-          <AnlamaTablosu baslik="4.5 Soru Performans Analizi" satirlar={[
-            ["Bilgi","bilgi"],["Kavrama","kavrama"],["Uygulama","uygulama"],
-            ["Analiz","analiz"],["Sentez","sentez"],["Değerlendirme","degerlendirme"],
-          ]} />
-        </CardContent>
-      </Card>
-
-      {/* 5. Prozodik Okuma */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader><CardTitle className="text-base bg-gray-800 text-white p-3 rounded-lg -m-1">5. PROZODİK OKUMA ÖLÇEĞİ</CardTitle></CardHeader>
-        <CardContent className="pt-4">
-          <table className="w-full text-sm border border-gray-200 rounded-xl overflow-hidden mb-4">
-            <thead><tr className="bg-gray-100">
-              <th className="text-left p-3 font-semibold">Ölçüt</th>
-              <th className="text-center p-3 font-semibold w-24">1 puan</th>
-              <th className="text-center p-3 font-semibold w-24">2 puan</th>
-              <th className="text-center p-3 font-semibold w-24">3 puan</th>
-              <th className="text-center p-3 font-semibold w-24">4 puan</th>
-              <th className="text-center p-3 font-semibold w-24">Puan</th>
-            </tr></thead>
-            <tbody>
-              {[
-                ["Noktalama ve Duraklama","noktalama",["Uymuyor","Kısmen","Çoğunlukla","Tam ve bilinçli"]],
-                ["Vurgu","vurgu",["Tek düze","Yer yer","Anlama uygun","Etkili ve bilinçli"]],
-                ["Tonlama","tonlama",["Monoton","Sınırlı","Metne uygun","Doğal ve etkileyici"]],
-                ["Akıcılık","akicilik",["Sık duraklama","Kısmi akış","Genel akıcı","Kesintisiz"]],
-                ["Anlamlı Gruplama","anlamli_gruplama",["Sözcük sözcük","Kısmen","Çoğunlukla","Tam ve tutarlı"]],
-              ].map(([etiket, alan, aciklamalar]) => (
-                <tr key={alan} className="border-t border-gray-100">
-                  <td className="p-3 font-medium">{etiket}</td>
-                  {aciklamalar.map((a, i) => (
-                    <td key={i} className={`p-2 text-center text-xs ${rapor.prozodik?.[alan] === i+1 ? 'bg-orange-100 font-bold text-orange-700' : 'text-gray-500'}`}>{a}</td>
-                  ))}
-                  <td className="p-3 text-center font-bold text-orange-600">{rapor.prozodik?.[alan]}</td>
-                </tr>
-              ))}
-              <tr className="bg-gray-50 border-t-2 border-gray-300">
-                <td colSpan="5" className="p-3 font-bold text-right">Toplam</td>
-                <td className="p-3 text-center font-bold text-xl text-orange-600">{rapor.prozodik_toplam}</td>
-              </tr>
-            </tbody>
-          </table>
-          <div className="bg-orange-50 p-3 rounded-xl text-sm text-gray-700">
-            Prozodik okuma performansı: <strong>{prozodikSeviye(rapor.prozodik_toplam)}</strong> (Toplam {rapor.prozodik_toplam}/20)
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* 6. Sonuç */}
-      {rapor.ogretmen_notu && (
-        <Card className="border-0 shadow-sm">
-          <CardHeader><CardTitle className="text-base bg-gray-800 text-white p-3 rounded-lg -m-1">6. SONUÇ VE GENEL YORUM</CardTitle></CardHeader>
-          <CardContent className="pt-4">
-            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{rapor.ogretmen_notu}</p>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="flex gap-3 pb-8">
-        <Button onClick={() => window.print()} variant="outline" className="flex-1">🖨️ Yazdır / PDF</Button>
-        <Button onClick={onGeri} variant="outline" className="flex-1">← Geri</Button>
-      </div>
-    </div>
-  );
+# ── Puan Ayarları ──
+VARSAYILAN_PUANLAR = {
+    "metin_ekleme": 5,
+    "oylama_katilim": 2,
+    "metin_havuza_girme": 10,
+    "icerik_ekleme": 5,
+    "icerik_oylama": 2,
 }
 
+async def get_puan_ayarlari():
+    doc = await db.sistem_ayarlari.find_one({"tip": "puan_ayarlari"})
+    if doc:
+        return doc.get("puanlar", VARSAYILAN_PUANLAR)
+    return VARSAYILAN_PUANLAR
 
-// ── ANA GİRİŞ ANALİZİ MODÜLÜ ──
-function GirisAnaliziModul({ user, students, teachers }) {
-  const { toast } = useToast();
-  const [adim, setAdim] = useState("liste"); // liste, metin-sec, canli, sonuc, rapor-form, rapor-goruntule
-  const [seciliOgrenci, setSeciliOgrenci] = useState(null);
-  const [seciliMetin, setSeciliMetin] = useState(null);
-  const [aktifOturumId, setAktifOturumId] = useState(null);
-  const [sonuc, setSonuc] = useState(null);
-  const [gecmisOturumlar, setGecmisOturumlar] = useState([]);
-  const [aktifRapor, setAktifRapor] = useState(null);
-  const [aktifOturum, setAktifOturum] = useState(null);
-  const [normDialogAcik, setNormDialogAcik] = useState(false);
-  const [metinDialogAcik, setMetinDialogAcik] = useState(false);
+@api_router.get("/ayarlar/puanlar")
+async def get_puanlar(current_user=Depends(get_current_user)):
+    return await get_puan_ayarlari()
 
-  const fetchGecmis = useCallback(async () => {
-    try { const r = await axios.get(`${API}/diagnostic/sessions`); setGecmisOturumlar(r.data); } catch(e) {}
-  }, []);
+@api_router.put("/ayarlar/puanlar")
+async def update_puanlar(data: dict = Body(...), current_user=Depends(require_role(UserRole.ADMIN))):
+    await db.sistem_ayarlari.update_one(
+        {"tip": "puan_ayarlari"},
+        {"$set": {"tip": "puan_ayarlari", "puanlar": data}},
+        upsert=True
+    )
+    return {"message": "Puan ayarları güncellendi", "puanlar": data}
 
-  useEffect(() => { fetchGecmis(); }, [fetchGecmis]);
 
-  const analiziBaslat = async () => {
-    if (!seciliOgrenci || !seciliMetin) { toast({ title: "Öğrenci ve metin seçin", variant: "destructive" }); return; }
-    if (!seciliOgrenci?.id) { toast({ title: "Geçersiz öğrenci", description: "Lütfen listeden tekrar seçin", variant: "destructive" }); return; }
-    if (!seciliMetin?.id) { toast({ title: "Geçersiz metin", description: "Lütfen metni tekrar seçin", variant: "destructive" }); return; }
-    try {
-      const payload = { ogrenci_id: seciliOgrenci.id, metin_id: seciliMetin.id };
-      console.log("Session başlatılıyor:", payload);
-      const r = await axios.post(`${API}/diagnostic/sessions`, payload);
-      console.log("Session response:", r.data);
-      if (!r.data?.id) throw new Error('Oturum ID alınamadı');
-      setAktifOturumId(r.data.id);
-      setAdim("canli");
-    } catch(e) { console.error('Session error:', e.response?.data); toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
-  };
+# ─────────────────────────────────────────────
+# ★ EKSİK MODELLER VE ENDPOINT'LER (EKLENDİ)
+# ─────────────────────────────────────────────
 
-  const analiziTamamla = async (veri) => {
-    // veri: { sure_saniye, hatalar, gozlem_notu, anlama, prozodik, ogretmen_notu, ogretmen_kur }
-    try {
-      const r = await axios.post(`${API}/diagnostic/sessions/${aktifOturumId}/complete`, {
-        sure_saniye: veri.sure_saniye,
-        hatalar: veri.hatalar,
-        gozlem_notu: veri.gozlem_notu,
-        ogretmen_kur: veri.ogretmen_kur,
-      });
-      setSonuc({ ...r.data, atanan_kur: veri.ogretmen_kur });
-      fetchGecmis();
-      if (veri.anlama && veri.prozodik) {
-        try {
-          const rRapor = await axios.post(`${API}/diagnostic/rapor`, {
-            oturum_id: aktifOturumId,
-            anlama: veri.anlama,
-            prozodik: veri.prozodik,
-            ogretmen_notu: veri.ogretmen_notu || "",
-          });
-          setAktifRapor(rRapor.data);
-          setAdim("rapor-goruntule");
-        } catch(e2) { setAdim("sonuc"); }
-      } else { setAdim("sonuc"); }
-    } catch(e) {
-      toast({ title: "Hata", description: e.response?.data?.detail || "Analiz tamamlanamadı", variant: "destructive" });
+# Metin oluşturma modeli — frontend MetinYonetimi bileşeni kullanıyor
+class MetinCreate(BaseModel):
+    baslik: str
+    icerik: str
+    kelime_sayisi: int = 0
+    sinif_seviyesi: str = "4"
+    tur: str = "hikaye"  # hikaye, bilgilendirici, siir
+
+# Metin oylama modeli — metin_oy_ver endpoint'i kullanıyor (NameError düzeltmesi)
+class MetinOyCreate(BaseModel):
+    metin_id: str
+    onay: bool
+    sebep: str = ""
+
+
+# ★ Metin ekleme endpoint'i (frontend: axios.post(`${API}/diagnostic/texts`, ...))
+@api_router.post("/diagnostic/texts")
+async def create_metin(data: MetinCreate, current_user=Depends(get_current_user)):
+    role = current_user.get("role", "")
+    if role not in ["admin", "coordinator", "teacher"]:
+        raise HTTPException(status_code=403, detail="Yetkisiz")
+
+    # Kelime sayısı otomatik hesapla (0 geldiyse)
+    kelime_sayisi = data.kelime_sayisi
+    if kelime_sayisi == 0 and data.icerik:
+        kelime_sayisi = len(data.icerik.strip().split())
+
+    # Admin/Koordinatör eklerse direkt oylama, öğretmen eklerse beklemede
+    durum = "oylama" if role in ["admin", "coordinator"] else "beklemede"
+
+    metin_doc = {
+        "id": str(uuid.uuid4()),
+        "baslik": data.baslik,
+        "icerik": data.icerik,
+        "kelime_sayisi": kelime_sayisi,
+        "sinif_seviyesi": data.sinif_seviyesi,
+        "tur": data.tur,
+        "durum": durum,
+        "ekleyen_id": current_user["id"],
+        "ekleyen_ad": f"{current_user.get('ad', '')} {current_user.get('soyad', '')}",
+        "oylar": {},
+        "olusturma_tarihi": datetime.now(timezone.utc).isoformat(),
+        "yayin_tarihi": None,
     }
-  };
+    await db.analiz_metinler.insert_one(metin_doc)
 
-  const kurOnayla = async (ogretmenKur) => {
-    try {
-      const r = await axios.post(`${API}/diagnostic/sessions/${aktifOturumId}/complete`, {
-        ...sonuc, ogretmen_kur: ogretmenKur
-      });
-      toast({ title: "✅ Analiz kaydedildi!", description: `${seciliOgrenci.ad} → ${ogretmenKur} — Raporu doldurun` });
-      fetchGecmis();
-      setAktifOturum({ id: aktifOturumId, ...r.data, ogretmen_kur: ogretmenKur });
-      setSonuc({ ...r.data, atanan_kur: ogretmenKur });
-      setAdim("rapor-form");
-    } catch(e) {
-      // Güncelleme hatası olsa bile rapor formuna geç
-      setAktifOturum({ id: aktifOturumId });
-      setAdim("rapor-form");
+    # Ekleyene puan ver (dinamik)
+    puanlar = await get_puan_ayarlari()
+    await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": puanlar.get("metin_ekleme", 5)}})
+
+    metin_doc.pop("_id", None)
+    return metin_doc
+
+
+# ★ Metin listeleme endpoint'i (frontend: axios.get(`${API}/diagnostic/texts`))
+@api_router.get("/diagnostic/texts")
+async def get_metinler(current_user=Depends(get_current_user)):
+    role = current_user.get("role", "")
+    user_id = current_user.get("id", "")
+
+    items = await db.analiz_metinler.find().sort("olusturma_tarihi", -1).to_list(length=None)
+    result = []
+    for item in items:
+        item.pop("_id", None)
+        durum = item.get("durum", "")
+
+        # Admin her şeyi görür
+        if role == "admin":
+            result.append(item)
+        # Öğretmen: kendi eklediği + oylama bekleyenler + havuzdakiler
+        elif role == "teacher":
+            if item.get("ekleyen_id") == user_id:
+                result.append(item)
+            elif durum in ("oylama", "havuzda"):
+                result.append(item)
+        # Öğrenci/diğer: sadece havuzdakiler
+        else:
+            if durum == "havuzda":
+                result.append(item)
+
+    return result
+
+
+# ─────────────────────────────────────────────
+# MEVCUT GİRİŞ ANALİZİ ROUTE'LARI
+# ─────────────────────────────────────────────
+
+@api_router.post("/diagnostic/texts/{metin_id}/admin-karar")
+async def metin_admin_karar(metin_id: str, karar: dict, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+    # karar: {"onay": True/False, "direkt": True/False}
+    # direkt=True → oylama atla, direkt havuza al
+    onay = karar.get("onay", False)
+    direkt = karar.get("direkt", False)
+    if not onay:
+        yeni_durum = "reddedildi"
+    elif direkt:
+        yeni_durum = "havuzda"
+        # Ekleyene bonus puan (havuza direkt girince - dinamik)
+        puanlar = await get_puan_ayarlari()
+        metin = await db.analiz_metinler.find_one({"id": metin_id})
+        if metin and metin.get("ekleyen_id"):
+            await db.users.update_one({"id": metin["ekleyen_id"]}, {"$inc": {"puan": puanlar.get("metin_havuza_girme", 10)}})
+    else:
+        yeni_durum = "oylama"
+    await db.analiz_metinler.update_one(
+        {"id": metin_id},
+        {"$set": {"durum": yeni_durum, **({"yayin_tarihi": datetime.utcnow().isoformat()} if yeni_durum == "havuzda" else {})}}
+    )
+    return {"durum": yeni_durum}
+
+@api_router.post("/diagnostic/texts/oy")
+async def metin_oy_ver(oy: MetinOyCreate, current_user=Depends(get_current_user)):
+    role = current_user.get("role", "")
+    if role not in ["admin", "coordinator", "teacher"]:
+        raise HTTPException(status_code=403, detail="Sadece öğretmenler oy verebilir")
+    if not oy.onay and not oy.sebep:
+        raise HTTPException(status_code=400, detail="Red için sebep belirtmelisiniz")
+    metin = await db.analiz_metinler.find_one({"id": oy.metin_id})
+    if not metin:
+        raise HTTPException(status_code=404, detail="Metin bulunamadı")
+    if metin.get("durum") != "oylama":
+        raise HTTPException(status_code=400, detail="Bu metin oylamada değil")
+    user_id = current_user["id"]
+    oylar = metin.get("oylar", {})
+    if user_id in oylar:
+        raise HTTPException(status_code=400, detail="Zaten oy kullandınız")
+    oylar[user_id] = {"onay": oy.onay, "sebep": oy.sebep}
+    await db.analiz_metinler.update_one({"id": oy.metin_id}, {"$set": {"oylar": oylar}})
+    # Oy veren öğretmene puan (dinamik)
+    puanlar = await get_puan_ayarlari()
+    await db.users.update_one({"id": user_id}, {"$inc": {"puan": puanlar.get("oylama_katilim", 2)}})
+    # %60 kontrolü
+    ogretmenler = await db.users.find({"role": {"$in": ["teacher", "coordinator", "admin"]}}).to_list(length=None)
+    toplam = len(ogretmenler)
+    onay_sayisi = sum(1 for v in oylar.values() if v.get("onay"))
+    oy_sayisi = len(oylar)
+    yeni_durum = metin.get("durum")
+    if toplam > 0:
+        onay_orani = onay_sayisi / toplam
+        if onay_orani >= 0.6:
+            yeni_durum = "havuzda"
+            await db.analiz_metinler.update_one(
+                {"id": oy.metin_id},
+                {"$set": {"durum": "havuzda", "yayin_tarihi": datetime.utcnow().isoformat()}}
+            )
+            # Metni ekleyene bonus puan (havuza girince - dinamik)
+            ekleyen_id = metin.get("ekleyen_id")
+            if ekleyen_id:
+                await db.users.update_one({"id": ekleyen_id}, {"$inc": {"puan": puanlar.get("metin_havuza_girme", 10)}})
+        elif oy_sayisi == toplam and onay_orani < 0.6:
+            yeni_durum = "reddedildi"
+            await db.analiz_metinler.update_one({"id": oy.metin_id}, {"$set": {"durum": "reddedildi"}})
+    return {
+        "mesaj": f"Oyunuz kaydedildi (+{puanlar.get('oylama_katilim', 2)} puan)",
+        "durum": yeni_durum,
+        "onay_orani": round(onay_sayisi / max(toplam, 1) * 100),
+        "oy_sayisi": oy_sayisi,
+        "toplam": toplam
     }
-  };
 
-  const hizLabel = { dusuk: "Düşük", orta: "Orta", yeterli: "Yeterli", ileri: "İleri" };
-  const hizRenk = { dusuk: "bg-red-100 text-red-700", orta: "bg-yellow-100 text-yellow-700", yeterli: "bg-blue-100 text-blue-700", ileri: "bg-green-100 text-green-700" };
+@api_router.delete("/diagnostic/texts/{metin_id}")
+async def delete_metin(metin_id: str, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+    await db.analiz_metinler.delete_one({"id": metin_id})
+    return {"message": "Silindi"}
 
-  // ── CANLI ANALİZ ──
-  if (adim === "canli") {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => { setAdim("liste"); setAktifOturumId(null); }}>← Geri</Button>
-          <h2 className="text-xl font-bold">Canlı Analiz</h2>
-        </div>
-        <CanlıAnalizEkrani ogrenci={seciliOgrenci} metin={seciliMetin} oturumId={aktifOturumId} onTamamla={analiziTamamla} user={user} />
-      </div>
-    );
-  }
+# ── Analiz Oturumları ──
+class HataKaydi(BaseModel):
+    tip: str  # atlama, yanlis_okuma, takilma, tekrar
+    kelime: str = ""
 
-  // ── RAPOR FORMU ──
-  if (adim === "rapor-form") {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => { setAdim("liste"); setSonuc(null); setSeciliOgrenci(null); setSeciliMetin(null); setAktifOturumId(null); }}>← Listeye Dön</Button>
-          <span className="text-sm text-gray-500">Raporu doldurup kaydedin veya atlayın</span>
-        </div>
-        <RaporFormu
-          oturum={aktifOturum || { id: aktifOturumId }}
-          sonuc={sonuc || {}}
-          ogrenci={seciliOgrenci || {}}
-          metin={seciliMetin || {}}
-          onRaporTamamla={(r) => { setAktifRapor(r); setAdim("rapor-goruntule"); }}
-        />
-      </div>
-    );
-  }
+class AnalizOturumBaslat(BaseModel):
+    ogrenci_id: str
+    metin_id: str
 
-  // ── RAPOR GÖRÜNTÜLE ──
-  if (adim === "rapor-goruntule" && aktifRapor) {
-    return (
-      <RaporGoruntule
-        rapor={aktifRapor}
-        ogrenci={seciliOgrenci || {}}
-        onGeri={() => { setAdim("liste"); setAktifRapor(null); setSonuc(null); setSeciliOgrenci(null); setSeciliMetin(null); setAktifOturumId(null); }}
-      />
-    );
-  }
+class AnalizTamamla(BaseModel):
+    sure_saniye: float
+    hatalar: List[HataKaydi]
+    gozlem_notu: str = ""
+    ogretmen_kur: str = ""
 
-  // ── SONUÇ ──
-  if (adim === "sonuc" && sonuc) {
-    return (
-      <div className="space-y-4">
-        <AnalizSonucEkrani sonuc={sonuc} ogrenci={seciliOgrenci} onKaydet={kurOnayla}
-          onYeniAnaliz={() => { setAdim("liste"); setSonuc(null); }} />
-      </div>
-    );
-  }
+class DiagnosticOturum(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    ogrenci_id: str
+    metin_id: str
+    ogretmen_id: str
+    durum: str = "devam"
+    sure_saniye: float = 0
+    hatalar: List[dict] = []
+    gozlem_notu: str = ""
+    wpm: float = 0
+    dogruluk_yuzde: float = 0
+    hiz_deger: str = ""
+    sistem_kur: str = ""
+    ogretmen_kur: str = ""
+    olusturma_tarihi: datetime = Field(default_factory=datetime.utcnow)
+    tamamlama_tarihi: Optional[datetime] = None
 
-  // ── ANA LİSTE ──
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold">Giriş Analizi</h2>
-        <div className="flex gap-2">
-          {(user.role === "admin" || user.role === "coordinator") && (
-            <Button variant="outline" size="sm" onClick={() => setNormDialogAcik(true)}>
-              ⚙️ Norm Tablosu
-            </Button>
-          )}
-          <Button variant="outline" size="sm" onClick={() => setMetinDialogAcik(true)}>
-            📄 Metinler
-          </Button>
-        </div>
-      </div>
+@api_router.post("/diagnostic/sessions")
+async def baslat_oturum(data: AnalizOturumBaslat, current_user=Depends(get_current_user)):
+    if current_user.get("role") not in ["admin", "coordinator", "teacher"]:
+        raise HTTPException(status_code=403, detail="Yetkisiz")
+    # Metni bul (id veya _id ile)
+    metin = await db.analiz_metinler.find_one({"id": data.metin_id})
+    if not metin:
+        raise HTTPException(status_code=404, detail=f"Metin bulunamadı: {data.metin_id}")
+    # Öğrenciyi kontrol et
+    ogrenci = await db.students.find_one({"id": data.ogrenci_id})
+    if not ogrenci:
+        raise HTTPException(status_code=404, detail=f"Öğrenci bulunamadı: {data.ogrenci_id}")
+    oturum = DiagnosticOturum(
+        ogrenci_id=data.ogrenci_id,
+        metin_id=data.metin_id,
+        ogretmen_id=current_user["id"]
+    )
+    d = oturum.dict()
+    d["olusturma_tarihi"] = d["olusturma_tarihi"].isoformat()
+    d["tamamlama_tarihi"] = None
+    await db.diagnostic_oturumlar.insert_one(d)
+    d.pop("_id", None)
+    return d
 
-      {/* Yeni Analiz Başlat */}
-      <Card className="border-2 border-orange-200 shadow-sm">
-        <CardHeader><CardTitle className="text-base flex items-center gap-2">🎯 Yeni Analiz Başlat</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label>Öğrenci Seç</Label>
-              <Select value={seciliOgrenci?.id || ""} onValueChange={v => setSeciliOgrenci(students.find(s => s.id === v))}>
-                <SelectTrigger><SelectValue placeholder="Öğrenci seçin..." /></SelectTrigger>
-                <SelectContent position="popper" sideOffset={4} className="max-h-60 overflow-y-auto z-50">
-                  {(students || []).map(s => <SelectItem key={s.id} value={s.id}>{s.ad} {s.soyad} — {s.sinif}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Analiz Metni Seç</Label>
-              <button onClick={() => setMetinDialogAcik(true)}
-                className="w-full border border-gray-300 rounded-lg p-2 text-left text-sm hover:border-orange-400 transition-colors">
-                {seciliMetin ? <span className="font-medium">{seciliMetin.baslik} <span className="text-gray-400 font-normal">({seciliMetin.kelime_sayisi} kelime)</span></span> : <span className="text-gray-400">Metin seçmek için tıklayın...</span>}
-              </button>
-            </div>
-          </div>
-          <Button onClick={analiziBaslat} disabled={!seciliOgrenci || !seciliMetin}
-            className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 font-bold">
-            ▶ Analizi Başlat
-          </Button>
-        </CardContent>
-      </Card>
+@api_router.get("/diagnostic/sessions")
+async def get_oturumlar(current_user=Depends(get_current_user)):
+    q = {}
+    if current_user.get("role") == "teacher":
+        q["ogretmen_id"] = current_user["id"]
+    items = await db.diagnostic_oturumlar.find(q).sort("olusturma_tarihi", -1).to_list(length=None)
+    for i in items: i.pop("_id", None)
+    return items
 
-      {/* Geçmiş Analizler */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader><CardTitle className="text-base">Geçmiş Analizler</CardTitle></CardHeader>
-        <CardContent>
-          {gecmisOturumlar.length === 0 && <p className="text-gray-500 text-sm text-center py-8">Henüz analiz yapılmadı</p>}
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Öğrenci</TableHead>
-                <TableHead>Tarih</TableHead>
-                <TableHead>WPM</TableHead>
-                <TableHead>Doğruluk</TableHead>
-                <TableHead>Hız</TableHead>
-                <TableHead>Atanan Kur</TableHead>
-                <TableHead>Rapor</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {gecmisOturumlar.filter(o => o.durum === "tamamlandi").map(o => {
-                const ogr = students.find(s => s.id === o.ogrenci_id);
-                return (
-                  <TableRow key={o.id}>
-                    <TableCell className="font-medium">{ogr ? `${ogr.ad} ${ogr.soyad}` : "-"}</TableCell>
-                    <TableCell className="text-sm text-gray-500">{new Date(o.olusturma_tarihi).toLocaleDateString("tr-TR")}</TableCell>
-                    <TableCell className="font-bold text-blue-600">{o.wpm}</TableCell>
-                    <TableCell>%{o.dogruluk_yuzde}</TableCell>
-                    <TableCell><span className={`px-2 py-1 rounded-full text-xs font-medium ${hizRenk[o.hiz_deger] || "bg-gray-100 text-gray-600"}`}>{hizLabel[o.hiz_deger] || "-"}</span></TableCell>
-                    <TableCell className="font-semibold text-orange-600">{o.ogretmen_kur || "-"}</TableCell>
-                    <TableCell>
-                      <Button size="sm" variant="outline" onClick={async () => {
-                        try { const r = await axios.get(`${API}/diagnostic/rapor/ogrenci/${o.ogrenci_id}`);
-                          const ogrRapor = r.data.find(rp => rp.oturum_id === o.id);
-                          if (ogrRapor) { setAktifRapor(ogrRapor); setSeciliOgrenci(students.find(s => s.id === o.ogrenci_id) || {}); setAdim("rapor-goruntule"); }
-                          else { toast({ title: "Bu analiz için rapor bulunamadı" }); }
-                        } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
-                      }}>📄 Rapor</Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+@api_router.get("/diagnostic/sessions/student/{ogrenci_id}")
+async def get_ogrenci_oturumlari(ogrenci_id: str, current_user=Depends(get_current_user)):
+    items = await db.diagnostic_oturumlar.find({"ogrenci_id": ogrenci_id}).sort("olusturma_tarihi", -1).to_list(length=None)
+    for i in items: i.pop("_id", None)
+    return items
 
-      {/* Norm Tablosu Dialog */}
-      <Dialog open={normDialogAcik} onOpenChange={setNormDialogAcik}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>⚙️ Okuma Hızı Norm Tablosu</DialogTitle>
-            <DialogDescription>Sınıf bazlı okuma hızı sınır değerlerini düzenleyin (kelime/dakika)</DialogDescription>
-          </DialogHeader>
-          <NormTablosu onClose={() => setNormDialogAcik(false)} />
-        </DialogContent>
-      </Dialog>
+@api_router.post("/diagnostic/sessions/{oturum_id}/complete")
+async def tamamla_oturum(oturum_id: str, data: AnalizTamamla, current_user=Depends(get_current_user)):
+    oturum = await db.diagnostic_oturumlar.find_one({"id": oturum_id})
+    if not oturum:
+        raise HTTPException(status_code=404, detail="Oturum bulunamadı")
 
-      {/* Metin Seçim Dialog */}
-      <Dialog open={metinDialogAcik} onOpenChange={setMetinDialogAcik}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>📄 Analiz Metinleri</DialogTitle>
-            <DialogDescription>{seciliMetin ? "Farklı bir metin seçin veya yeni metin ekleyin" : "Analiz için metin seçin"}</DialogDescription>
-          </DialogHeader>
-          <MetinYonetimi secimModu={true} user={user} onMetinSec={m => { setSeciliMetin(m); setMetinDialogAcik(false); }} />
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
+    metin = await db.analiz_metinler.find_one({"id": oturum["metin_id"]})
+    kelime_sayisi = metin.get("kelime_sayisi", 100) if metin else 100
+    sinif_seviyesi = metin.get("sinif_seviyesi", "4") if metin else "4"
 
+    # Hesaplamalar
+    sure_dakika = data.sure_saniye / 60 if data.sure_saniye > 0 else 1
+    wpm = round(kelime_sayisi / sure_dakika, 1)
 
-function GelisimAlani({ user }) {
-  const { toast } = useToast();
-  const [icerikler, setIcerikler] = useState([]);
-  const [tamamlananlar, setTamamlananlar] = useState([]);
-  const [puanTablosu, setPuanTablosu] = useState([]);
-  const [aktifIcerik, setAktifIcerik] = useState(null);
-  const [gorunum, setGorunum] = useState("liste"); // liste, test, sonuc, icerikEkle
-  const [testCevaplari, setTestCevaplari] = useState([]);
-  const [sonuc, setSonuc] = useState(null);
-  const [redSebep, setRedSebep] = useState("");
-  const [redDialogIcerik, setRedDialogIcerik] = useState(null);
-  const [adminForm, setAdminForm] = useState({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [], makale_link: "", makale_dosya_turu: "link" });
-  const [yeniSoru, setYeniSoru] = useState({ soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0 });
+    toplam_hata = len(data.hatalar)
+    dogruluk = round(max(0, (kelime_sayisi - toplam_hata) / kelime_sayisi * 100), 1)
 
-  const fetchAll = useCallback(async () => {
-    try { const r = await axios.get(`${API}/gelisim/icerik`); setIcerikler(r.data); } catch(e) {}
-    try { const r = await axios.get(`${API}/gelisim/tamamlama/${user.id}`); setTamamlananlar(r.data); } catch(e) {}
-    try { const r = await axios.get(`${API}/gelisim/puan-tablosu`); setPuanTablosu(r.data); } catch(e) {}
-  }, [user.id]);
+    hiz_deger = await hiz_degerlendirme(sinif_seviyesi, wpm)
+    sistem_kur = await kur_onerisi_hesapla(wpm, dogruluk, sinif_seviyesi)
+    atanan_kur = data.ogretmen_kur if data.ogretmen_kur else sistem_kur
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+    # Hata dağılımı
+    hata_sayilari = {"atlama": 0, "yanlis_okuma": 0, "takilma": 0, "tekrar": 0}
+    for h in data.hatalar:
+        tip = h.tip if hasattr(h, "tip") else h.get("tip", "")
+        if tip in hata_sayilari:
+            hata_sayilari[tip] += 1
 
-  const turIcon = (tur) => ({ hizmetici: <GraduationCap className="h-5 w-5"/>, film: <Film className="h-5 w-5"/>, kitap: <BookMarked className="h-5 w-5"/>, makale: <FileText className="h-5 w-5"/> }[tur] || <BookOpen className="h-5 w-5"/>);
-  const turLabel = (tur) => ({ hizmetici: "Hizmetiçi Eğitim", film: "Film", kitap: "Kitap", makale: "Makale" }[tur] || tur);
-  const turColor = (tur) => ({ hizmetici: "bg-blue-100 text-blue-600", film: "bg-purple-100 text-purple-600", kitap: "bg-green-100 text-green-600", makale: "bg-orange-100 text-orange-600" }[tur] || "bg-gray-100 text-gray-600");
-  const durumBadge = (d) => ({
-    beklemede: <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full font-medium">⏳ Yönetici Onayı Bekliyor</span>,
-    oylama: <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">🗳️ Öğretmen Oylamasında</span>,
-    yayinda: <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium">✅ Yayında</span>,
-    reddedildi: <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full font-medium">❌ Reddedildi</span>,
-  }[d] || null);
-
-  const isTamamlandi = (id) => tamamlananlar.some(t => t.icerik_id === id);
-  const getPuan = (id) => { const t = tamamlananlar.find(t => t.icerik_id === id); return t ? t.kazanilan_puan : null; };
-  const oyKullandi = (icerik) => icerik.oylar && icerik.oylar[user.id];
-  const onayOrani = (icerik) => {
-    const oylar = icerik.oylar || {};
-    const toplam = Object.keys(oylar).length;
-    if (toplam === 0) return null;
-    const onay = Object.values(oylar).filter(o => o.onay).length;
-    return Math.round(onay / toplam * 100);
-  };
-
-  const adminKarar = async (icerikId, onay, direkt = false) => {
-    try {
-      await axios.post(`${API}/gelisim/icerik/${icerikId}/admin-karar`, { onay, direkt });
-      toast({ title: direkt ? "✅ Direkt yayına alındı" : onay ? "🗳️ Oylama başlatıldı" : "❌ İçerik reddedildi" });
-      fetchAll();
-    } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
-  };
-
-  const oyVer = async (onay, sebep = "", icerikObj = null) => {
-    const hedef = icerikObj || aktifIcerik || redDialogIcerik;
-    if (!onay && !sebep) { setRedDialogIcerik(hedef); return; }
-    try {
-      const r = await axios.post(`${API}/gelisim/oy`, { icerik_id: hedef.id, onay, sebep });
-      toast({ title: onay ? `✅ Onaylandı (+2 puan)` : "❌ Reddedildi", description: `Onay oranı: %${r.data.onay_orani}` });
-      setRedDialogIcerik(null); setRedSebep(""); fetchAll();
-    } catch(e) { console.error('Session error:', e.response?.data); toast({ title: "Hata", description: e.response?.data?.detail || "Hata", variant: "destructive" }); }
-  };
-
-  const handleTamamla = async (testYapildi) => {
-    try {
-      const data = { icerik_id: aktifIcerik.id, kullanici_id: user.id };
-      if (testYapildi) data.test_cevaplari = testCevaplari;
-      const r = await axios.post(`${API}/gelisim/tamamla`, data);
-      setSonuc(r.data); setGorunum("sonuc"); fetchAll();
-      toast({ title: `+${r.data.puan} puan kazandınız!` });
-    } catch(e) { console.error('Session error:', e.response?.data); toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
-  };
-
-  const soruEkle = () => {
-    if (!yeniSoru.soru || yeniSoru.secenekler.some(s => !s)) {
-      toast({ title: "Uyarı", description: "Soru ve tüm seçenekler dolu olmalı", variant: "destructive" }); return;
+    now = datetime.utcnow().isoformat()
+    guncelle = {
+        "durum": "tamamlandi",
+        "sure_saniye": data.sure_saniye,
+        "hatalar": [h.dict() if hasattr(h, "dict") else h for h in data.hatalar],
+        "gozlem_notu": data.gozlem_notu,
+        "wpm": wpm,
+        "dogruluk_yuzde": dogruluk,
+        "hiz_deger": hiz_deger,
+        "sistem_kur": sistem_kur,
+        "ogretmen_kur": atanan_kur,
+        "tamamlama_tarihi": now
     }
-    setAdminForm({ ...adminForm, sorular: [...adminForm.sorular, { ...yeniSoru, id: Date.now().toString() }] });
-    setYeniSoru({ soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0 });
-  };
+    await db.diagnostic_oturumlar.update_one({"id": oturum_id}, {"$set": guncelle})
 
-  const icerikKaydet = async (e) => {
-    e.preventDefault();
-    try {
-      await axios.post(`${API}/gelisim/icerik`, adminForm);
-      setAdminForm({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [], makale_link: "", makale_dosya_turu: "link" });
-      setGorunum("liste"); fetchAll();
-      toast({ title: (user.role === "admin" || user.role === "coordinator") ? "İçerik oylama aşamasına alındı" : "İçerik yönetici onayına gönderildi" });
-    } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
-  };
+    # Öğrencinin kurunu güncelle
+    await db.students.update_one({"id": oturum["ogrenci_id"]}, {"$set": {"kur": atanan_kur}})
 
-  // ── TEST GÖRÜNÜMÜ ──
-  if (gorunum === "test" && aktifIcerik) {
-    return (
-      <div className="max-w-2xl mx-auto space-y-6">
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => { setGorunum("liste"); setTestCevaplari([]); }}>← Geri</Button>
-          <h2 className="text-xl font-bold">{aktifIcerik.baslik} — Test</h2>
-        </div>
-        {aktifIcerik.sorular.map((soru, i) => (
-          <Card key={i} className="border-0 shadow-sm">
-            <CardContent className="p-6">
-              <p className="font-medium mb-4">{i + 1}. {soru.soru}</p>
-              <div className="space-y-2">
-                {soru.secenekler.map((s, j) => (
-                  <button key={j} onClick={() => { const c=[...testCevaplari]; c[i]=j; setTestCevaplari(c); }}
-                    className={`w-full text-left p-3 rounded-xl border-2 transition-all ${testCevaplari[i]===j ? 'border-orange-500 bg-orange-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                    <span className="font-medium mr-2">{['A','B','C','D'][j]})</span>{s}
-                  </button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-        <Button onClick={() => handleTamamla(true)}
-          disabled={testCevaplari.filter(c => c !== undefined).length < aktifIcerik.sorular.length}
-          className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-3">
-          Testi Tamamla ({testCevaplari.filter(c=>c!==undefined).length} / {aktifIcerik.sorular.length} cevaplandı)
-        </Button>
-      </div>
-    );
-  }
-
-  // ── SONUÇ GÖRÜNÜMÜ ──
-  if (gorunum === "sonuc" && sonuc) {
-    return (
-      <div className="max-w-md mx-auto text-center space-y-6 py-12">
-        <div className="w-24 h-24 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto">
-          <Trophy className="h-12 w-12 text-white" />
-        </div>
-        <div>
-          <h2 className="text-4xl font-bold text-gray-900">+{sonuc.puan} Puan!</h2>
-          {sonuc.test_yapildi
-            ? <p className="text-gray-600 mt-2 text-lg">{sonuc.dogru} / {sonuc.toplam} doğru cevap</p>
-            : <p className="text-gray-500 mt-2">Test çözülmeden tamamlandı</p>}
-        </div>
-        <Button onClick={() => { setGorunum("liste"); setSonuc(null); setAktifIcerik(null); }}
-          className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-8">
-          Listeye Dön
-        </Button>
-      </div>
-    );
-  }
-
-  // ── İÇERİK EKLEME GÖRÜNÜMÜ ──
-  if (gorunum === "icerikEkle") {
-    return (
-      <div className="max-w-2xl mx-auto">
-        <div className="flex items-center gap-3 mb-6">
-          <Button variant="outline" size="sm" onClick={() => setGorunum("liste")}>← Geri</Button>
-          <h2 className="text-xl font-bold">Yeni İçerik Ekle</h2>
-        </div>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-6">
-            <form onSubmit={icerikKaydet} className="space-y-5">
-              <div><Label>Başlık *</Label><Input value={adminForm.baslik} onChange={e => setAdminForm({...adminForm, baslik: e.target.value})} required /></div>
-              <div className="grid grid-cols-2 gap-4">
-                <div><Label>Tür</Label>
-                  <Select value={adminForm.tur} onValueChange={v => setAdminForm({...adminForm, tur: v})}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent position="popper" sideOffset={4} className="z-[200]">
-                      <SelectItem value="hizmetici">🎓 Hizmetiçi Eğitim</SelectItem>
-                      <SelectItem value="film">🎬 Film</SelectItem>
-                      <SelectItem value="kitap">📚 Kitap</SelectItem>
-                      <SelectItem value="makale">📄 Makale</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div><Label>Hedef Kitle</Label>
-                  <Select value={adminForm.hedef_kitle} onValueChange={v => setAdminForm({...adminForm, hedef_kitle: v})}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent position="popper" sideOffset={4} className="z-[200]">
-                      <SelectItem value="hepsi">👥 Herkes</SelectItem>
-                      <SelectItem value="ogretmen">👩‍🏫 Öğretmenler</SelectItem>
-                      <SelectItem value="ogrenci">🎓 Öğrenciler</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div><Label>Açıklama</Label><Input value={adminForm.aciklama} onChange={e => setAdminForm({...adminForm, aciklama: e.target.value})} placeholder="Kısa açıklama..." /></div>
-
-              {/* Makale alanları */}
-              {adminForm.tur === "makale" && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl space-y-3">
-                  <div className="font-semibold text-sm text-blue-800">📎 Makale Kaynağı</div>
-                  <div><Label>Dosya Türü</Label>
-                    <Select value={adminForm.makale_dosya_turu || "link"} onValueChange={v => setAdminForm({...adminForm, makale_dosya_turu: v})}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent position="popper" sideOffset={4} className="z-[200]">
-                        <SelectItem value="link">🔗 Web Linki</SelectItem>
-                        <SelectItem value="pdf">📕 PDF</SelectItem>
-                        <SelectItem value="word">📘 Word</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>{(adminForm.makale_dosya_turu || "link") === "link" ? "URL" : "Paylaşım Linki (Drive/Dropbox)"}</Label>
-                    <Input value={adminForm.makale_link || ""} onChange={e => setAdminForm({...adminForm, makale_link: e.target.value})} placeholder="https://..." />
-                    {(adminForm.makale_dosya_turu || "link") !== "link" && <p className="text-xs text-gray-500 mt-1">Dosyayı Google Drive'a yükleyip "Herkesle paylaş" linkini yapıştırın.</p>}
-                  </div>
-                </div>
-              )}
-
-              {/* Soru Ekleme */}
-              <div className="border-2 border-dashed border-gray-200 rounded-xl p-4 space-y-4">
-                <h4 className="font-semibold text-gray-700">Test Soruları ({adminForm.sorular.length} soru eklendi)</h4>
-                {adminForm.sorular.map((s, i) => (
-                  <div key={i} className="bg-green-50 p-3 rounded-lg text-sm flex items-start justify-between">
-                    <span><strong>{i+1}.</strong> {s.soru}</span>
-                    <button type="button" onClick={() => setAdminForm({...adminForm, sorular: adminForm.sorular.filter((_,idx)=>idx!==i)})}
-                      className="text-red-500 ml-2 text-xs">✕</button>
-                  </div>
-                ))}
-                <div className="space-y-3 border-t pt-4">
-                  <Input placeholder="Soru metni" value={yeniSoru.soru} onChange={e => setYeniSoru({...yeniSoru, soru: e.target.value})} />
-                  {yeniSoru.secenekler.map((s, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <span className="text-sm font-bold w-5">{['A','B','C','D'][i]}</span>
-                      <Input placeholder={`${['A','B','C','D'][i]} seçeneği`} value={s} onChange={e => { const sec=[...yeniSoru.secenekler]; sec[i]=e.target.value; setYeniSoru({...yeniSoru, secenekler:sec}); }} />
-                      <input type="radio" name="dogru" checked={yeniSoru.dogru_cevap===i} onChange={() => setYeniSoru({...yeniSoru, dogru_cevap:i})} className="w-4 h-4 accent-orange-500" title="Doğru cevap" />
-                    </div>
-                  ))}
-                  <p className="text-xs text-gray-500">● Doğru cevabı radyo butonuyla işaretleyin</p>
-                  <Button type="button" variant="outline" size="sm" onClick={soruEkle} className="w-full">+ Soru Ekle</Button>
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <Button type="submit" className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white">
-                  {(user.role === "admin" || user.role === "coordinator") ? "Oylama Başlat" : "Yöneticiye Gönder"}
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setGorunum("liste")} className="flex-1">İptal</Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // ── ANA LİSTE GÖRÜNÜMÜ ──
-  const bekleyenler = icerikler.filter(i => i.durum === "beklemede");
-  const oylamadakiler = icerikler.filter(i => i.durum === "oylama");
-  const yayindakiler = icerikler.filter(i => i.durum === "yayinda");
-  const reddedilenler = icerikler.filter(i => i.durum === "reddedildi");
-
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          {/* Başlık */}
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold">Gelişim Alanı</h2>
-            {(user.role === "admin" || user.role === "teacher") && (
-              <Button onClick={() => setGorunum("icerikEkle")} className="bg-gradient-to-r from-orange-500 to-red-500 text-white">
-                <Plus className="h-4 w-4 mr-2"/>İçerik Ekle
-              </Button>
-            )}
-          </div>
-
-          {/* Yönetici onayı bekleyenler */}
-          {(user.role === "admin" || user.role === "coordinator") && bekleyenler.length > 0 && (
-            <div>
-              <h3 className="font-semibold text-yellow-700 mb-3">⏳ Onay Bekleyenler ({bekleyenler.length})</h3>
-              <div className="space-y-3">
-                {bekleyenler.map(icerik => (
-                  <Card key={icerik.id} className="border-2 border-yellow-200 shadow-sm">
-                    <CardContent className="p-5">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${turColor(icerik.tur)}`}>{turIcon(icerik.tur)}</div>
-                          <div>
-                            <div className="font-semibold">{icerik.baslik}</div>
-                            <div className="text-xs text-gray-500">{turLabel(icerik.tur)} • Ekleyen: {icerik.ekleyen_ad} • {icerik.sorular?.length || 0} soru</div>
-                          </div>
-                        </div>
-                      </div>
-                      {icerik.aciklama && <p className="text-sm text-gray-600 mb-3">{icerik.aciklama}</p>}
-                      <div className="flex gap-2 flex-wrap">
-                        <Button size="sm" onClick={() => adminKarar(icerik.id, true, false)} className="bg-blue-600 hover:bg-blue-700 text-white">🗳️ Oylama Başlat</Button>
-                        <Button size="sm" onClick={() => adminKarar(icerik.id, true, true)} className="bg-green-600 hover:bg-green-700 text-white">✅ Direkt Yayına Al</Button>
-                        <Button size="sm" variant="destructive" onClick={() => adminKarar(icerik.id, false)}>❌ Reddet</Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Oylama bekleyenler */}
-          {oylamadakiler.length > 0 && (user.role === "admin" || user.role === "teacher") && (
-            <div>
-              <h3 className="font-semibold text-blue-700 mb-3">🗳️ Oylaması Bekleyenler ({oylamadakiler.length})</h3>
-              <div className="space-y-3">
-                {oylamadakiler.map(icerik => {
-                  const kullandi = oyKullandi(icerik);
-                  const oran = onayOrani(icerik);
-                  const oyCount = Object.keys(icerik.oylar || {}).length;
-                  return (
-                    <Card key={icerik.id} className="border-2 border-blue-200 shadow-sm">
-                      <CardContent className="p-5">
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${turColor(icerik.tur)}`}>{turIcon(icerik.tur)}</div>
-                            <div>
-                              <div className="font-semibold">{icerik.baslik}</div>
-                              <div className="text-xs text-gray-500">{turLabel(icerik.tur)} • Ekleyen: {icerik.ekleyen_ad}</div>
-                            </div>
-                          </div>
-                          {oran !== null && (
-                            <div className="text-right">
-                              <div className="text-lg font-bold text-blue-600">%{oran}</div>
-                              <div className="text-xs text-gray-500">{oyCount} oy</div>
-                            </div>
-                          )}
-                        </div>
-                        {icerik.aciklama && <p className="text-sm text-gray-600 mb-3">{icerik.aciklama}</p>}
-
-                        {/* Oy bar */}
-                        {oran !== null && (
-                          <div className="mb-3">
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div className={`h-2 rounded-full transition-all ${oran >= 60 ? 'bg-green-500' : 'bg-orange-500'}`} style={{width:`${oran}%`}}></div>
-                            </div>
-                            <p className="text-xs text-gray-500 mt-1">%60 onay gerekli • Şu an %{oran}</p>
-                          </div>
-                        )}
-
-                        {kullandi ? (
-                          <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
-                            ✓ Oyunuzu kullandınız: <strong>{kullandi.onay ? "Onay ✅" : "Red ❌"}</strong>
-                            {!kullandi.onay && kullandi.sebep && <span className="text-gray-600"> — {kullandi.sebep}</span>}
-                          </div>
-                        ) : (
-                          <div className="flex gap-2">
-                            <Button size="sm" onClick={() => oyVer(true, "", icerik)} className="bg-green-600 hover:bg-green-700 text-white flex-1">✅ Onayla (+2 puan)</Button>
-                            <Button size="sm" variant="destructive" className="flex-1" onClick={() => { setRedDialogIcerik(icerik); }}>❌ Reddet</Button>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Yayındaki içerikler */}
-          {yayindakiler.length > 0 && (
-            <div>
-              <h3 className="font-semibold text-green-700 mb-3">✅ Yayındaki İçerikler ({yayindakiler.length})</h3>
-              <div className="space-y-3">
-                {yayindakiler.map(icerik => {
-                  const tamamlandi = isTamamlandi(icerik.id);
-                  const puan = getPuan(icerik.id);
-                  return (
-                    <Card key={icerik.id} className={`border-0 shadow-sm ${tamamlandi ? 'opacity-75' : ''}`}>
-                      <CardContent className="p-5">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${turColor(icerik.tur)}`}>{turIcon(icerik.tur)}</div>
-                            <div>
-                              <div className="font-semibold">{icerik.baslik}</div>
-                              <div className="text-xs text-gray-500">{turLabel(icerik.tur)} • {icerik.sorular?.length || 0} soru</div>
-                              {icerik.aciklama && <div className="text-sm text-gray-600 mt-1">{icerik.aciklama}</div>}
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-end gap-2">
-                            {tamamlandi && <span className="flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium"><CheckCircle className="h-4 w-4"/>+{puan} puan</span>}
-                            {(user.role === "admin" || user.role === "coordinator") && <Button variant="destructive" size="sm" onClick={async () => { try { await axios.delete(`${API}/gelisim/icerik/${icerik.id}`); fetchAll(); toast({title:"Silindi"}); } catch(e){} }}><Trash2 className="h-4 w-4"/></Button>}
-                          </div>
-                        </div>
-                        {!tamamlandi && (
-                          <div className="flex gap-2 mt-4">
-                            {icerik.sorular?.length > 0 && (
-                              <Button size="sm" onClick={() => { setAktifIcerik(icerik); setGorunum("test"); setTestCevaplari([]); }}
-                                className="bg-gradient-to-r from-orange-500 to-red-500 text-white">
-                                📝 Testi Çöz (+10 puan)
-                              </Button>
-                            )}
-                            <Button size="sm" variant="outline" onClick={() => { setAktifIcerik(icerik); handleTamamla(false); }}>
-                              ✓ Tamamlandı (+1 puan)
-                            </Button>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {icerikler.length === 0 && (
-            <div className="text-center py-16 text-gray-500">
-              <Trophy className="h-16 w-16 mx-auto mb-4 text-gray-300"/>
-              <p className="text-lg">Henüz içerik yok</p>
-              <p className="text-sm">İlk içeriği eklemek için yukarıdaki butona tıklayın</p>
-            </div>
-          )}
-        </div>
-
-        {/* Puan Tablosu */}
-        <div className="space-y-4">
-          <Card className="border-0 shadow-sm">
-            <CardHeader><CardTitle className="flex items-center gap-2"><Trophy className="h-5 w-5 text-yellow-500"/>Puan Tablosu</CardTitle></CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {puanTablosu.slice(0, 10).map((u, i) => (
-                  <div key={i} className={`flex items-center justify-between p-3 rounded-xl ${u.ad === user.ad && u.soyad === user.soyad ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50'}`}>
-                    <div className="flex items-center gap-2">
-                      <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold ${i===0?'bg-yellow-400 text-white':i===1?'bg-gray-300 text-gray-700':i===2?'bg-orange-300 text-white':'bg-gray-100 text-gray-600'}`}>{i+1}</span>
-                      <div>
-                        <div className="text-sm font-medium">{u.ad} {u.soyad}</div>
-                        <div className="text-xs text-gray-400">{roleLabel(u.role)}</div>
-                      </div>
-                    </div>
-                    <span className="font-bold text-orange-600">{u.puan} puan</span>
-                  </div>
-                ))}
-                {puanTablosu.length === 0 && <p className="text-sm text-gray-400 text-center py-4">Henüz puan yok</p>}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Puan Rehberi */}
-          <Card className="border-0 shadow-sm bg-gradient-to-br from-orange-50 to-yellow-50">
-            <CardContent className="p-5">
-              <h4 className="font-semibold text-gray-800 mb-3">🎯 Puan Rehberi</h4>
-              <div className="space-y-2 text-sm text-gray-600">
-                <div className="flex justify-between"><span>✅ İçerik tamamla</span><span className="font-bold text-orange-600">+1</span></div>
-                <div className="flex justify-between"><span>📝 Test çöz (tam puan)</span><span className="font-bold text-orange-600">+10</span></div>
-                <div className="flex justify-between"><span>🗳️ Oylama katıl</span><span className="font-bold text-orange-600">+2</span></div>
-                <div className="flex justify-between"><span>🌟 İçeriğin yayına girdi</span><span className="font-bold text-orange-600">+5</span></div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Red Sebebi Dialog */}
-      <Dialog open={!!redDialogIcerik} onOpenChange={() => { setRedDialogIcerik(null); setRedSebep(""); }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>❌ Reddetme Sebebi</DialogTitle>
-            <DialogDescription>{redDialogIcerik?.baslik} içeriğini neden reddediyorsunuz?</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <textarea value={redSebep} onChange={e => setRedSebep(e.target.value)}
-              placeholder="Lütfen reddetme sebebinizi açıklayın..." rows={4}
-              className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none" />
-            <div className="flex gap-2">
-              <Button variant="destructive" className="flex-1" disabled={!redSebep.trim()} onClick={() => oyVer(false, redSebep)}>Reddet</Button>
-              <Button variant="outline" className="flex-1" onClick={() => { setRedDialogIcerik(null); setRedSebep(""); }}>İptal</Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
+    return {
+        "wpm": wpm,
+        "dogruluk_yuzde": dogruluk,
+        "hiz_deger": hiz_deger,
+        "sistem_kur": sistem_kur,
+        "atanan_kur": atanan_kur,
+        "hata_sayilari": hata_sayilari,
+        "sure_saniye": data.sure_saniye
+    }
 
 
-export default function App() {
-  return <AppContent />;
-}
+
+# ── Rapor Sistemi ──
+class AnlamaVeri(BaseModel):
+    # 4.1 Sözcük düzeyinde
+    cumle_anlama: str = "orta"          # zayif / orta / iyi
+    bilinmeyen_sozcuk: str = "orta"
+    baglac_zamir: str = "orta"
+    # 4.2 Ana yapı
+    ana_fikir: str = "orta"
+    yardimci_fikir: str = "orta"
+    konu: str = "orta"
+    baslik_onerme: str = "orta"
+    # 4.3 Derin anlama
+    neden_sonuc: str = "orta"
+    cikarim: str = "orta"
+    ipuclari: str = "orta"
+    yorumlama: str = "orta"
+    # 4.4 Eleştirel
+    gorus_bildirme: str = "orta"
+    yazar_amaci: str = "orta"
+    alternatif_fikir: str = "orta"
+    guncelle_hayat: str = "orta"
+    # 4.5 Soru performansı
+    bilgi: str = "iyi"
+    kavrama: str = "iyi"
+    uygulama: str = "iyi"
+    analiz: str = "iyi"
+    sentez: str = "iyi"
+    degerlendirme: str = "iyi"
+    genel_yuzde: int = 0
+
+class ProzodikVeri(BaseModel):
+    noktalama: int = 3    # 1-4 puan
+    vurgu: int = 3
+    tonlama: int = 3
+    akicilik: int = 3
+    anlamli_gruplama: int = 3
+
+class RaporOlusturCreate(BaseModel):
+    oturum_id: str
+    anlama: AnlamaVeri
+    prozodik: ProzodikVeri
+    ogretmen_notu: str = ""
+
+def anlama_yuzde(anlama: AnlamaVeri) -> int:
+    alanlar = [
+        anlama.cumle_anlama, anlama.bilinmeyen_sozcuk, anlama.baglac_zamir,
+        anlama.ana_fikir, anlama.yardimci_fikir, anlama.konu, anlama.baslik_onerme,
+        anlama.neden_sonuc, anlama.cikarim, anlama.ipuclari, anlama.yorumlama,
+        anlama.gorus_bildirme, anlama.yazar_amaci, anlama.alternatif_fikir, anlama.guncelle_hayat,
+        anlama.bilgi, anlama.kavrama, anlama.uygulama, anlama.analiz, anlama.sentez, anlama.degerlendirme
+    ]
+    puan_map = {"zayif": 0, "orta": 1, "iyi": 2}
+    toplam = sum(puan_map.get(a, 1) for a in alanlar)
+    return round(toplam / (len(alanlar) * 2) * 100)
+
+def hiz_metni(hiz_deger: str) -> str:
+    return {"dusuk": "düşük", "orta": "orta", "yeterli": "yeterli", "ileri": "ileri"}.get(hiz_deger, "orta")
+
+def prozodik_seviye(toplam: int) -> str:
+    if toplam >= 18: return "çok iyi"
+    elif toplam >= 14: return "iyi"
+    elif toplam >= 10: return "orta"
+    else: return "geliştirilmeli"
+
+def anlama_seviye(pct: int) -> str:
+    if pct >= 85: return "iyi"
+    elif pct >= 70: return "orta"
+    else: return "zayıf"
+
+@api_router.post("/diagnostic/rapor")
+async def olustur_rapor(data: RaporOlusturCreate, current_user=Depends(get_current_user)):
+    oturum = await db.diagnostic_oturumlar.find_one({"id": data.oturum_id})
+    if not oturum:
+        raise HTTPException(status_code=404, detail="Oturum bulunamadı")
+
+    metin = await db.analiz_metinler.find_one({"id": oturum.get("metin_id")})
+    ogrenci = await db.students.find_one({"id": oturum.get("ogrenci_id")})
+    ogretmen = await db.users.find_one({"id": oturum.get("ogretmen_id")})
+
+    prozodik_toplam = data.prozodik.noktalama + data.prozodik.vurgu + data.prozodik.tonlama + data.prozodik.akicilik + data.prozodik.anlamli_gruplama
+    anlama_pct = data.anlama.genel_yuzde if data.anlama.genel_yuzde > 0 else anlama_yuzde(data.anlama)
+
+    rapor_data = {
+        "id": str(uuid.uuid4()),
+        "oturum_id": data.oturum_id,
+        "ogrenci_id": oturum.get("ogrenci_id"),
+        "ogretmen_id": oturum.get("ogretmen_id"),
+        "ogrenci_ad": f"{ogrenci.get('ad','')} {ogrenci.get('soyad','')}" if ogrenci else "",
+        "ogrenci_sinif": ogrenci.get("sinif", "") if ogrenci else "",
+        "ogretmen_ad": f"{ogretmen.get('ad','')} {ogretmen.get('soyad','')}" if ogretmen else "",
+        "metin_adi": metin.get("baslik", "") if metin else "",
+        "metin_turu": metin.get("tur", "") if metin else "",
+        "kelime_sayisi": metin.get("kelime_sayisi", 0) if metin else 0,
+        "sure_saniye": oturum.get("sure_saniye", 0),
+        "wpm": oturum.get("wpm", 0),
+        "dogruluk_yuzde": oturum.get("dogruluk_yuzde", 0),
+        "hiz_deger": oturum.get("hiz_deger", ""),
+        "atanan_kur": oturum.get("ogretmen_kur", ""),
+        "hata_sayilari": oturum.get("hatalar", []),
+        "anlama": data.anlama.dict(),
+        "anlama_yuzde": anlama_pct,
+        "prozodik": data.prozodik.dict(),
+        "prozodik_toplam": prozodik_toplam,
+        "ogretmen_notu": data.ogretmen_notu,
+        "olusturma_tarihi": datetime.utcnow().isoformat(),
+    }
+    await db.diagnostic_raporlar.insert_one(rapor_data)
+    rapor_data.pop("_id", None)
+    return rapor_data
+
+@api_router.get("/diagnostic/rapor/ogrenci/{ogrenci_id}")
+async def get_ogrenci_raporlari(ogrenci_id: str, current_user=Depends(get_current_user)):
+    items = await db.diagnostic_raporlar.find({"ogrenci_id": ogrenci_id}).sort("olusturma_tarihi", -1).to_list(length=None)
+    for i in items: i.pop("_id", None)
+    return items
+
+@api_router.get("/diagnostic/rapor/{rapor_id}")
+async def get_rapor(rapor_id: str, current_user=Depends(get_current_user)):
+    rapor = await db.diagnostic_raporlar.find_one({"id": rapor_id})
+    if not rapor:
+        raise HTTPException(status_code=404, detail="Rapor bulunamadı")
+    rapor.pop("_id", None)
+    return rapor
+
+# ── PDF Rapor Üretimi ──
+@api_router.get("/diagnostic/rapor/{rapor_id}/pdf")
+async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
+    rapor = await db.diagnostic_raporlar.find_one({"id": rapor_id})
+    if not rapor:
+        raise HTTPException(status_code=404, detail="Rapor bulunamadı")
+    rapor.pop("_id", None)
+
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm, mm
+    from reportlab.platypus import SimpleDocTemplate, Paragraph as RLParagraph, Spacer, Table as RLTable, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    import io
+
+    buffer = io.BytesIO()
+    doc_pdf = SimpleDocTemplate(buffer, pagesize=A4, topMargin=1.5*cm, bottomMargin=1.5*cm, leftMargin=2*cm, rightMargin=2*cm)
+
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(name='TitleOBA', fontSize=18, leading=22, alignment=TA_CENTER, spaceAfter=6, textColor=colors.HexColor('#1F4E79'), fontName='Helvetica-Bold'))
+    styles.add(ParagraphStyle(name='SubtitleOBA', fontSize=10, leading=14, alignment=TA_CENTER, spaceAfter=20, textColor=colors.HexColor('#666666')))
+    styles.add(ParagraphStyle(name='SectionHead', fontSize=13, leading=16, spaceBefore=16, spaceAfter=8, textColor=colors.HexColor('#1F4E79'), fontName='Helvetica-Bold'))
+    styles.add(ParagraphStyle(name='BodyOBA', fontSize=10, leading=14, spaceAfter=6))
+    styles.add(ParagraphStyle(name='SmallOBA', fontSize=9, leading=12, textColor=colors.HexColor('#555555')))
+
+    elements = []
+
+    # Başlık
+    elements.append(RLParagraph("Okuma Becerileri Akademisi", styles['TitleOBA']))
+    elements.append(RLParagraph("Giris Analizi Raporu", styles['SubtitleOBA']))
+
+    # Öğrenci Bilgileri
+    elements.append(RLParagraph("1. Ogrenci Bilgileri", styles['SectionHead']))
+    info_data = [
+        ["Ogrenci:", rapor.get("ogrenci_ad", "-"), "Sinif:", rapor.get("ogrenci_sinif", "-")],
+        ["Egitimci:", rapor.get("ogretmen_ad", "-"), "Tarih:", rapor.get("olusturma_tarihi", "")[:10]],
+        ["Metin:", rapor.get("metin_adi", "-"), "Tur:", rapor.get("metin_turu", "-")],
+    ]
+    t = RLTable(info_data, colWidths=[2.5*cm, 5.5*cm, 2.5*cm, 5.5*cm])
+    t.setStyle(TableStyle([
+        ('FONTSIZE', (0,0), (-1,-1), 9),
+        ('FONTNAME', (0,0), (0,-1), 'Helvetica-Bold'),
+        ('FONTNAME', (2,0), (2,-1), 'Helvetica-Bold'),
+        ('TEXTCOLOR', (0,0), (0,-1), colors.HexColor('#1F4E79')),
+        ('TEXTCOLOR', (2,0), (2,-1), colors.HexColor('#1F4E79')),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+    ]))
+    elements.append(t)
+    elements.append(Spacer(1, 8))
+
+    # Okuma Hızı
+    elements.append(RLParagraph("2. Okuma Hizi", styles['SectionHead']))
+    sure_dk = rapor.get("sure_saniye", 0) // 60
+    sure_sn = rapor.get("sure_saniye", 0) % 60
+    hiz_label = {"dusuk": "Dusuk", "orta": "Orta", "yeterli": "Yeterli", "ileri": "Ileri"}.get(rapor.get("hiz_deger", ""), "?")
+    speed_data = [
+        ["Kelime Sayisi", "Sure", "Kelime/Dakika", "Seviye"],
+        [str(rapor.get("kelime_sayisi", 0)), f"{sure_dk}dk {sure_sn}sn", str(round(rapor.get("wpm", 0))), hiz_label],
+    ]
+    t2 = RLTable(speed_data, colWidths=[4*cm, 4*cm, 4*cm, 4*cm])
+    t2.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1F4E79')),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,-1), 9),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CCCCCC')),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+    ]))
+    elements.append(t2)
+    elements.append(Spacer(1, 8))
+
+    # Doğru Okuma
+    elements.append(RLParagraph("3. Dogru Okuma Orani", styles['SectionHead']))
+    elements.append(RLParagraph(f"Dogruluk: %{round(rapor.get('dogruluk_yuzde', 0))}", styles['BodyOBA']))
+    hatalar = rapor.get("hata_sayilari", [])
+    if hatalar:
+        hata_labels = {"atlama": "Atlama", "yanlis": "Yanlis Okuma", "takilma": "Takilma", "tekrar": "Tekrar"}
+        hata_rows = [["Hata Turu", "Sayi"]]
+        for h in hatalar:
+            hata_rows.append([hata_labels.get(h.get("tur", ""), h.get("tur", "")), str(h.get("sayi", 0))])
+        t3 = RLTable(hata_rows, colWidths=[8*cm, 4*cm])
+        t3.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#E8F0FE')),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,-1), 9),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CCCCCC')),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+            ('TOPPADDING', (0,0), (-1,-1), 4),
+        ]))
+        elements.append(t3)
+    elements.append(Spacer(1, 8))
+
+    # Anlama
+    elements.append(RLParagraph("4. Okudugunu Anlama", styles['SectionHead']))
+    anlama_pct = rapor.get("anlama_yuzde", 0)
+    elements.append(RLParagraph(f"Genel anlama: %{anlama_pct} ({anlama_seviye(anlama_pct)})", styles['BodyOBA']))
+    elements.append(Spacer(1, 8))
+
+    # Prozodik
+    elements.append(RLParagraph("5. Prozodik Okuma", styles['SectionHead']))
+    proz = rapor.get("prozodik", {})
+    proz_toplam = rapor.get("prozodik_toplam", 0)
+    proz_labels = {"noktalama": "Noktalama", "vurgu": "Vurgu", "tonlama": "Tonlama", "akicilik": "Akicilik", "anlamli_gruplama": "Anlamli Gruplama"}
+    proz_rows = [["Olcut", "Puan (1-4)"]]
+    for k, label in proz_labels.items():
+        proz_rows.append([label, str(proz.get(k, 0))])
+    proz_rows.append(["TOPLAM", f"{proz_toplam}/20 ({prozodik_seviye(proz_toplam)})"])
+    t4 = RLTable(proz_rows, colWidths=[8*cm, 4*cm])
+    t4.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1F4E79')),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor('#E8F0FE')),
+        ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,-1), 9),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CCCCCC')),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+    ]))
+    elements.append(t4)
+    elements.append(Spacer(1, 8))
+
+    # Kur
+    elements.append(RLParagraph("6. Atanan Kur", styles['SectionHead']))
+    elements.append(RLParagraph(f"Atanan Kur: {rapor.get('atanan_kur', '-')}", styles['BodyOBA']))
+    elements.append(Spacer(1, 8))
+
+    # Öğretmen Notu
+    if rapor.get("ogretmen_notu"):
+        elements.append(RLParagraph("7. Ogretmen Notu ve Oneriler", styles['SectionHead']))
+        for line in rapor.get("ogretmen_notu", "").split("\n"):
+            if line.strip():
+                elements.append(RLParagraph(line.strip(), styles['BodyOBA']))
+    
+    # AI Yorumları
+    ai = rapor.get("ai_yorumlar", {})
+    if ai:
+        elements.append(Spacer(1, 8))
+        elements.append(RLParagraph("8. Detayli Degerlendirme", styles['SectionHead']))
+        ai_labels = {"hiz": "Okuma Hizi", "dogruluk": "Dogru Okuma", "anlama": "Anlama", "prozodik": "Prozodik Okuma", "sonuc": "Sonuc", "oneriler": "Oneriler"}
+        for key, label in ai_labels.items():
+            if ai.get(key):
+                elements.append(RLParagraph(f"<b>{label}:</b> {ai[key]}", styles['BodyOBA']))
+
+    # Alt bilgi
+    elements.append(Spacer(1, 20))
+    elements.append(RLParagraph("Bu rapor Okuma Becerileri Akademisi sistemi tarafindan olusturulmustur.", styles['SmallOBA']))
+
+    doc_pdf.build(elements)
+    buffer.seek(0)
+
+    from fastapi.responses import StreamingResponse
+    ogrenci_ad = rapor.get("ogrenci_ad", "ogrenci").replace(" ", "_")
+    tarih = rapor.get("olusturma_tarihi", "")[:10]
+    filename = f"Rapor_{ogrenci_ad}_{tarih}.pdf"
+
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
+# ── Migration / Debug Endpoint ──
+@api_router.post("/admin/fix-ids")
+async def fix_missing_ids(current_user=Depends(require_role(UserRole.ADMIN))):
+    """Eksik id alanlarını düzelt"""
+    fixed = 0
+    # analiz_metinler
+    async for doc in db.analiz_metinler.find({"id": {"$exists": False}}):
+        new_id = str(uuid.uuid4())
+        await db.analiz_metinler.update_one({"_id": doc["_id"]}, {"$set": {"id": new_id}})
+        fixed += 1
+    # analiz_metinler - durum alanı yoksa ekle
+    await db.analiz_metinler.update_many({"durum": {"$exists": False}}, {"$set": {"durum": "havuzda"}})
+    # diagnostic_oturumlar
+    async for doc in db.diagnostic_oturumlar.find({"id": {"$exists": False}}):
+        await db.diagnostic_oturumlar.update_one({"_id": doc["_id"]}, {"$set": {"id": str(uuid.uuid4())}})
+    return {"fixed": fixed, "message": "ID düzeltme tamamlandı"}
+
+@api_router.get("/admin/debug-metinler")
+async def debug_metinler(current_user=Depends(require_role(UserRole.ADMIN))):
+    """Tüm metinleri ham haliyle göster"""
+    items = await db.analiz_metinler.find().to_list(length=None)
+    result = []
+    for item in items:
+        item.pop("_id", None)
+        result.append({"id": item.get("id","EKSİK"), "baslik": item.get("baslik","?"), "durum": item.get("durum","?")})
+    return result
+
+@api_router.get("/admin/debug-ogrenciler")
+async def debug_ogrenciler(current_user=Depends(require_role(UserRole.ADMIN))):
+    items = await db.students.find().to_list(length=None)
+    result = []
+    for item in items:
+        item.pop("_id", None)
+        result.append({"id": item.get("id","EKSİK"), "ad": item.get("ad","?"), "soyad": item.get("soyad","?")})
+    return result
+
+# ─────────────────────────────────────────────
+# GELİŞİM ALANI - Tam İş Akışı
+# ─────────────────────────────────────────────
+
+class SoruModel(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    soru: str
+    secenekler: List[str]
+    dogru_cevap: int
+
+class IcerikCreate(BaseModel):
+    baslik: str
+    tur: str  # hizmetici, film, kitap, makale
+    aciklama: str = ""
+    hedef_kitle: str  # ogretmen, ogrenci, hepsi
+    sorular: List[SoruModel] = []
+    # Makale alanları
+    makale_link: Optional[str] = None
+    makale_dosya_turu: Optional[str] = None  # pdf, word, link
+
+class IcerikModel(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    baslik: str
+    tur: str
+    aciklama: str = ""
+    hedef_kitle: str
+    sorular: List[SoruModel] = []
+    makale_link: Optional[str] = None
+    makale_dosya_turu: Optional[str] = None
+    ekleyen_id: str = ""
+    ekleyen_ad: str = ""
+    durum: str = "beklemede"  # beklemede, oylama, yayinda, reddedildi
+    oylar: dict = Field(default_factory=dict)  # {user_id: {"oy": True/False, "sebep": ""}}
+    olusturma_tarihi: datetime = Field(default_factory=datetime.utcnow)
+    yayin_tarihi: Optional[datetime] = None
+
+class OyCreate(BaseModel):
+    icerik_id: str
+    onay: bool
+    sebep: str = ""  # Red durumunda zorunlu
+
+class TamamlamaCreate(BaseModel):
+    icerik_id: str
+    kullanici_id: str
+    test_cevaplari: Optional[List[int]] = None
+
+class TamamlamaModel(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    kullanici_id: str
+    icerik_id: str
+    test_yapildi: bool = False
+    dogru_sayisi: int = 0
+    toplam_soru: int = 0
+    kazanilan_puan: int = 0
+    tarih: datetime = Field(default_factory=datetime.utcnow)
+
+# İçerik ekleme (admin veya öğretmen)
+@api_router.post("/gelisim/icerik")
+async def create_icerik(icerik: IcerikCreate, current_user=Depends(get_current_user)):
+    role = current_user.get("role", "")
+    if role not in ["admin", "coordinator", "teacher"]:
+        raise HTTPException(status_code=403, detail="Yetkisiz")
+    
+    # Admin/Koordinatör eklerse direkt oylama, öğretmen eklerse beklemede
+    durum = "oylama" if role in ["admin", "coordinator"] else "beklemede"
+    
+    model = IcerikModel(
+        **icerik.dict(),
+        ekleyen_id=current_user["id"],
+        ekleyen_ad=f"{current_user.get('ad','')} {current_user.get('soyad','')}",
+        durum=durum
+    )
+    data = model.dict()
+    data["olusturma_tarihi"] = data["olusturma_tarihi"].isoformat()
+    if data.get("yayin_tarihi"):
+        data["yayin_tarihi"] = data["yayin_tarihi"].isoformat()
+    await db.gelisim_icerik.insert_one(data)
+    return data
+
+# İçerikleri listele
+@api_router.get("/gelisim/icerik")
+async def get_icerik_list(current_user=Depends(get_current_user)):
+    role = current_user.get("role", "")
+    user_id = current_user.get("id", "")
+    
+    items = await db.gelisim_icerik.find().sort("olusturma_tarihi", -1).to_list(length=None)
+    result = []
+    for item in items:
+        item.pop("_id", None)
+        durum = item.get("durum", "")
+        hedef = item.get("hedef_kitle", "hepsi")
+        
+        # Admin her şeyi görür
+        if role == "admin":
+            result.append(item)
+        # Öğretmen: kendi eklediği + oylama bekleyenler + yayındakiler
+        elif role == "teacher":
+            if item.get("ekleyen_id") == user_id:
+                result.append(item)
+            elif durum == "oylama":
+                result.append(item)
+            elif durum == "yayinda" and hedef in ["hepsi", "ogretmen"]:
+                result.append(item)
+        # Öğrenci: sadece yayındakiler
+        elif role == "student":
+            if durum == "yayinda" and hedef in ["hepsi", "ogrenci"]:
+                result.append(item)
+    
+    return result
+
+# Admin onay/red (beklemede → oylama veya reddedildi)
+@api_router.post("/gelisim/icerik/{icerik_id}/admin-karar")
+async def admin_karar(icerik_id: str, karar: dict, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+    # direkt=True → oylama atla, direkt yayına al
+    onay = karar.get("onay", False)
+    direkt = karar.get("direkt", False)
+    if not onay:
+        yeni_durum = "reddedildi"
+    elif direkt:
+        yeni_durum = "yayinda"
+        icerik = await db.gelisim_icerik.find_one({"id": icerik_id})
+        puanlar = await get_puan_ayarlari()
+        if icerik and icerik.get("ekleyen_id"):
+            await db.users.update_one({"id": icerik["ekleyen_id"]}, {"$inc": {"puan": puanlar.get("icerik_ekleme", 5)}})
+    else:
+        yeni_durum = "oylama"
+    await db.gelisim_icerik.update_one(
+        {"id": icerik_id},
+        {"$set": {"durum": yeni_durum, **({"yayin_tarihi": datetime.utcnow().isoformat()} if yeni_durum == "yayinda" else {})}}
+    )
+    return {"durum": yeni_durum}
+
+# Öğretmen oylama
+@api_router.post("/gelisim/oy")
+async def oy_ver(oy: OyCreate, current_user=Depends(get_current_user)):
+    role = current_user.get("role", "")
+    if role not in ["admin", "coordinator", "teacher"]:
+        raise HTTPException(status_code=403, detail="Sadece öğretmenler oy verebilir")
+    
+    if not oy.onay and not oy.sebep:
+        raise HTTPException(status_code=400, detail="Red için sebep belirtmelisiniz")
+    
+    icerik = await db.gelisim_icerik.find_one({"id": oy.icerik_id})
+    if not icerik:
+        raise HTTPException(status_code=404, detail="İçerik bulunamadı")
+    if icerik.get("durum") != "oylama":
+        raise HTTPException(status_code=400, detail="Bu içerik oylamada değil")
+    
+    user_id = current_user["id"]
+    oylar = icerik.get("oylar", {})
+    
+    if user_id in oylar:
+        raise HTTPException(status_code=400, detail="Zaten oy kullandınız")
+    
+    # Oyu kaydet
+    oylar[user_id] = {"onay": oy.onay, "sebep": oy.sebep}
+    await db.gelisim_icerik.update_one({"id": oy.icerik_id}, {"$set": {"oylar": oylar}})
+    
+    # Oy veren öğretmene puan (dinamik)
+    puanlar = await get_puan_ayarlari()
+    await db.users.update_one({"id": user_id}, {"$inc": {"puan": puanlar.get("icerik_oylama", 2)}})
+    
+    # %60 kontrolü
+    ogretmenler = await db.users.find({"role": {"$in": ["teacher", "coordinator", "admin"]}}).to_list(length=None)
+    toplam_ogretmen = len(ogretmenler)
+    onay_sayisi = sum(1 for v in oylar.values() if v.get("onay"))
+    oy_sayisi = len(oylar)
+    
+    yeni_durum = icerik.get("durum")
+    
+    if toplam_ogretmen > 0:
+        onay_orani = onay_sayisi / toplam_ogretmen
+        # Herkes oy kullandı veya onay oranı %60 geçti
+        if onay_orani >= 0.6:
+            yeni_durum = "yayinda"
+            await db.gelisim_icerik.update_one(
+                {"id": oy.icerik_id},
+                {"$set": {"durum": "yayinda", "yayin_tarihi": datetime.utcnow().isoformat()}}
+            )
+            # İçerik ekleyene bonus puan (dinamik)
+            ekleyen_id = icerik.get("ekleyen_id")
+            if ekleyen_id:
+                await db.users.update_one({"id": ekleyen_id}, {"$inc": {"puan": puanlar.get("icerik_ekleme", 5)}})
+        elif oy_sayisi == toplam_ogretmen and onay_orani < 0.6:
+            yeni_durum = "reddedildi"
+            await db.gelisim_icerik.update_one({"id": oy.icerik_id}, {"$set": {"durum": "reddedildi"}})
+    
+    return {
+        "mesaj": "Oyunuz kaydedildi (+2 puan)",
+        "durum": yeni_durum,
+        "onay_orani": round(onay_sayisi / max(toplam_ogretmen, 1) * 100),
+        "oy_sayisi": oy_sayisi,
+        "toplam": toplam_ogretmen
+    }
+
+# Tamamlama
+@api_router.post("/gelisim/tamamla")
+async def tamamla_icerik(data: TamamlamaCreate, current_user=Depends(get_current_user)):
+    existing = await db.gelisim_tamamlama.find_one({"kullanici_id": data.kullanici_id, "icerik_id": data.icerik_id})
+    if existing:
+        raise HTTPException(status_code=400, detail="Bu içerik zaten tamamlandı")
+    
+    icerik = await db.gelisim_icerik.find_one({"id": data.icerik_id})
+    if not icerik:
+        raise HTTPException(status_code=404, detail="İçerik bulunamadı")
+    
+    sorular = icerik.get("sorular", [])
+    toplam = len(sorular)
+    dogru = 0
+    test_yapildi = False
+    puan = 1
+    
+    if data.test_cevaplari and toplam > 0:
+        test_yapildi = True
+        for i, cevap in enumerate(data.test_cevaplari):
+            if i < toplam and cevap == sorular[i].get("dogru_cevap"):
+                dogru += 1
+        puan = max(1, round((dogru / toplam) * 10))
+    
+    tamamlama = TamamlamaModel(
+        kullanici_id=data.kullanici_id,
+        icerik_id=data.icerik_id,
+        test_yapildi=test_yapildi,
+        dogru_sayisi=dogru,
+        toplam_soru=toplam,
+        kazanilan_puan=puan
+    )
+    t_data = tamamlama.dict()
+    t_data["tarih"] = t_data["tarih"].isoformat()
+    await db.gelisim_tamamlama.insert_one(t_data)
+    await db.users.update_one({"id": data.kullanici_id}, {"$inc": {"puan": puan}})
+    
+    return {"puan": puan, "dogru": dogru, "toplam": toplam, "test_yapildi": test_yapildi}
+
+# Kullanıcının tamamlamaları
+@api_router.get("/gelisim/tamamlama/{kullanici_id}")
+async def get_tamamlamalar(kullanici_id: str, current_user=Depends(get_current_user)):
+    items = await db.gelisim_tamamlama.find({"kullanici_id": kullanici_id}).to_list(length=None)
+    for item in items:
+        item.pop("_id", None)
+    return items
+
+# Puan tablosu
+@api_router.get("/gelisim/puan-tablosu")
+async def get_puan_tablosu(current_user=Depends(get_current_user)):
+    users = await db.users.find().to_list(length=None)
+    tablo = []
+    for u in users:
+        tablo.append({
+            "ad": u.get("ad", ""), "soyad": u.get("soyad", ""),
+            "role": u.get("role", ""), "puan": u.get("puan", 0)
+        })
+    tablo.sort(key=lambda x: x["puan"], reverse=True)
+    return tablo
+
+# İçerik sil
+@api_router.delete("/gelisim/icerik/{icerik_id}")
+async def delete_icerik(icerik_id: str, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+    await db.gelisim_icerik.delete_one({"id": icerik_id})
+    return {"message": "Silindi"}
+
+
+# ─────────────────────────────────────────────
+# APP SETUP
+# ─────────────────────────────────────────────
+
+# ★ CORS middleware yukarıda (app oluşturulduktan hemen sonra) eklendi
+# Router'ı burada dahil ediyoruz
+app.include_router(api_router)
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+@app.on_event("shutdown")
+async def shutdown_db_client():
+    client.close()
