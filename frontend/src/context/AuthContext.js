@@ -50,8 +50,8 @@ export function AuthProvider({ children }) {
     verifyToken();
   }, [token]); // ★ DÜZELTİLDİ: dependency eklendi
 
-  const login = async (email, password) => {
-    const response = await axios.post(`${API}/auth/login`, { email, password });
+  const login = async (emailOrPhone, password) => {
+    const response = await axios.post(`${API}/auth/login`, { email_or_phone: emailOrPhone, password });
     const { access_token, user: userData } = response.data;
 
     localStorage.setItem("oba_token", access_token);
