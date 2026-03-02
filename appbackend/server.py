@@ -1361,6 +1361,174 @@ async def get_rapor(rapor_id: str, current_user=Depends(get_current_user)):
     rapor.pop("_id", None)
     return rapor
 
+# ── PDF Rapor Üretimi ──
+@api_router.get("/diagnostic/rapor/{rapor_id}/pdf")
+async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
+    rapor = await db.diagnostic_raporlar.find_one({"id": rapor_id})
+    if not rapor:
+        raise HTTPException(status_code=404, detail="Rapor bulunamadı")
+    rapor.pop("_id", None)
+
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm, mm
+    from reportlab.platypus import SimpleDocTemplate, Paragraph as RLParagraph, Spacer, Table as RLTable, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    import io
+
+    buffer = io.BytesIO()
+    doc_pdf = SimpleDocTemplate(buffer, pagesize=A4, topMargin=1.5*cm, bottomMargin=1.5*cm, leftMargin=2*cm, rightMargin=2*cm)
+
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(name='TitleOBA', fontSize=18, leading=22, alignment=TA_CENTER, spaceAfter=6, textColor=colors.HexColor('#1F4E79'), fontName='Helvetica-Bold'))
+    styles.add(ParagraphStyle(name='SubtitleOBA', fontSize=10, leading=14, alignment=TA_CENTER, spaceAfter=20, textColor=colors.HexColor('#666666')))
+    styles.add(ParagraphStyle(name='SectionHead', fontSize=13, leading=16, spaceBefore=16, spaceAfter=8, textColor=colors.HexColor('#1F4E79'), fontName='Helvetica-Bold'))
+    styles.add(ParagraphStyle(name='BodyOBA', fontSize=10, leading=14, spaceAfter=6))
+    styles.add(ParagraphStyle(name='SmallOBA', fontSize=9, leading=12, textColor=colors.HexColor('#555555')))
+
+    elements = []
+
+    # Başlık
+    elements.append(RLParagraph("Okuma Becerileri Akademisi", styles['TitleOBA']))
+    elements.append(RLParagraph("Giris Analizi Raporu", styles['SubtitleOBA']))
+
+    # Öğrenci Bilgileri
+    elements.append(RLParagraph("1. Ogrenci Bilgileri", styles['SectionHead']))
+    info_data = [
+        ["Ogrenci:", rapor.get("ogrenci_ad", "-"), "Sinif:", rapor.get("ogrenci_sinif", "-")],
+        ["Egitimci:", rapor.get("ogretmen_ad", "-"), "Tarih:", rapor.get("olusturma_tarihi", "")[:10]],
+        ["Metin:", rapor.get("metin_adi", "-"), "Tur:", rapor.get("metin_turu", "-")],
+    ]
+    t = RLTable(info_data, colWidths=[2.5*cm, 5.5*cm, 2.5*cm, 5.5*cm])
+    t.setStyle(TableStyle([
+        ('FONTSIZE', (0,0), (-1,-1), 9),
+        ('FONTNAME', (0,0), (0,-1), 'Helvetica-Bold'),
+        ('FONTNAME', (2,0), (2,-1), 'Helvetica-Bold'),
+        ('TEXTCOLOR', (0,0), (0,-1), colors.HexColor('#1F4E79')),
+        ('TEXTCOLOR', (2,0), (2,-1), colors.HexColor('#1F4E79')),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+    ]))
+    elements.append(t)
+    elements.append(Spacer(1, 8))
+
+    # Okuma Hızı
+    elements.append(RLParagraph("2. Okuma Hizi", styles['SectionHead']))
+    sure_dk = rapor.get("sure_saniye", 0) // 60
+    sure_sn = rapor.get("sure_saniye", 0) % 60
+    hiz_label = {"dusuk": "Dusuk", "orta": "Orta", "yeterli": "Yeterli", "ileri": "Ileri"}.get(rapor.get("hiz_deger", ""), "?")
+    speed_data = [
+        ["Kelime Sayisi", "Sure", "Kelime/Dakika", "Seviye"],
+        [str(rapor.get("kelime_sayisi", 0)), f"{sure_dk}dk {sure_sn}sn", str(round(rapor.get("wpm", 0))), hiz_label],
+    ]
+    t2 = RLTable(speed_data, colWidths=[4*cm, 4*cm, 4*cm, 4*cm])
+    t2.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1F4E79')),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,-1), 9),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CCCCCC')),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+    ]))
+    elements.append(t2)
+    elements.append(Spacer(1, 8))
+
+    # Doğru Okuma
+    elements.append(RLParagraph("3. Dogru Okuma Orani", styles['SectionHead']))
+    elements.append(RLParagraph(f"Dogruluk: %{round(rapor.get('dogruluk_yuzde', 0))}", styles['BodyOBA']))
+    hatalar = rapor.get("hata_sayilari", [])
+    if hatalar:
+        hata_labels = {"atlama": "Atlama", "yanlis": "Yanlis Okuma", "takilma": "Takilma", "tekrar": "Tekrar"}
+        hata_rows = [["Hata Turu", "Sayi"]]
+        for h in hatalar:
+            hata_rows.append([hata_labels.get(h.get("tur", ""), h.get("tur", "")), str(h.get("sayi", 0))])
+        t3 = RLTable(hata_rows, colWidths=[8*cm, 4*cm])
+        t3.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#E8F0FE')),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,-1), 9),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CCCCCC')),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+            ('TOPPADDING', (0,0), (-1,-1), 4),
+        ]))
+        elements.append(t3)
+    elements.append(Spacer(1, 8))
+
+    # Anlama
+    elements.append(RLParagraph("4. Okudugunu Anlama", styles['SectionHead']))
+    anlama_pct = rapor.get("anlama_yuzde", 0)
+    elements.append(RLParagraph(f"Genel anlama: %{anlama_pct} ({anlama_seviye(anlama_pct)})", styles['BodyOBA']))
+    elements.append(Spacer(1, 8))
+
+    # Prozodik
+    elements.append(RLParagraph("5. Prozodik Okuma", styles['SectionHead']))
+    proz = rapor.get("prozodik", {})
+    proz_toplam = rapor.get("prozodik_toplam", 0)
+    proz_labels = {"noktalama": "Noktalama", "vurgu": "Vurgu", "tonlama": "Tonlama", "akicilik": "Akicilik", "anlamli_gruplama": "Anlamli Gruplama"}
+    proz_rows = [["Olcut", "Puan (1-4)"]]
+    for k, label in proz_labels.items():
+        proz_rows.append([label, str(proz.get(k, 0))])
+    proz_rows.append(["TOPLAM", f"{proz_toplam}/20 ({prozodik_seviye(proz_toplam)})"])
+    t4 = RLTable(proz_rows, colWidths=[8*cm, 4*cm])
+    t4.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1F4E79')),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor('#E8F0FE')),
+        ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,-1), 9),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CCCCCC')),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+    ]))
+    elements.append(t4)
+    elements.append(Spacer(1, 8))
+
+    # Kur
+    elements.append(RLParagraph("6. Atanan Kur", styles['SectionHead']))
+    elements.append(RLParagraph(f"Atanan Kur: {rapor.get('atanan_kur', '-')}", styles['BodyOBA']))
+    elements.append(Spacer(1, 8))
+
+    # Öğretmen Notu
+    if rapor.get("ogretmen_notu"):
+        elements.append(RLParagraph("7. Ogretmen Notu ve Oneriler", styles['SectionHead']))
+        for line in rapor.get("ogretmen_notu", "").split("\n"):
+            if line.strip():
+                elements.append(RLParagraph(line.strip(), styles['BodyOBA']))
+    
+    # AI Yorumları
+    ai = rapor.get("ai_yorumlar", {})
+    if ai:
+        elements.append(Spacer(1, 8))
+        elements.append(RLParagraph("8. Detayli Degerlendirme", styles['SectionHead']))
+        ai_labels = {"hiz": "Okuma Hizi", "dogruluk": "Dogru Okuma", "anlama": "Anlama", "prozodik": "Prozodik Okuma", "sonuc": "Sonuc", "oneriler": "Oneriler"}
+        for key, label in ai_labels.items():
+            if ai.get(key):
+                elements.append(RLParagraph(f"<b>{label}:</b> {ai[key]}", styles['BodyOBA']))
+
+    # Alt bilgi
+    elements.append(Spacer(1, 20))
+    elements.append(RLParagraph("Bu rapor Okuma Becerileri Akademisi sistemi tarafindan olusturulmustur.", styles['SmallOBA']))
+
+    doc_pdf.build(elements)
+    buffer.seek(0)
+
+    from fastapi.responses import StreamingResponse
+    ogrenci_ad = rapor.get("ogrenci_ad", "ogrenci").replace(" ", "_")
+    tarih = rapor.get("olusturma_tarihi", "")[:10]
+    filename = f"Rapor_{ogrenci_ad}_{tarih}.pdf"
+
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
 
 # ── Migration / Debug Endpoint ──
 @api_router.post("/admin/fix-ids")
