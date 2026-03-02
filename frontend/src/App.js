@@ -30,7 +30,7 @@ function roleLabel(role) {
 function UserManagement({ teachers }) {
   const { toast } = useToast();
   const [users, setUsers] = useState([]);
-  const [form, setForm] = useState({ ad: "", soyad: "", email: "", password: "", role: "teacher", linked_id: "" });
+  const [form, setForm] = useState({ ad: "", soyad: "", email: "", telefon: "", password: "", role: "teacher", linked_id: "" });
   const [loading, setLoading] = useState(false);
 
   const fetchUsers = useCallback(async () => {
@@ -43,7 +43,7 @@ function UserManagement({ teachers }) {
     e.preventDefault(); setLoading(true);
     try {
       await axios.post(`${API}/auth/users`, form);
-      setForm({ ad: "", soyad: "", email: "", password: "", role: "teacher", linked_id: "" });
+      setForm({ ad: "", soyad: "", email: "", telefon: "", password: "", role: "teacher", linked_id: "" });
       fetchUsers();
       toast({ title: "Başarılı", description: "Kullanıcı oluşturuldu" });
     } catch (error) {
@@ -68,6 +68,7 @@ function UserManagement({ teachers }) {
             <div><Label>Ad</Label><Input value={form.ad} onChange={e => setForm({...form, ad: e.target.value})} required /></div>
             <div><Label>Soyad</Label><Input value={form.soyad} onChange={e => setForm({...form, soyad: e.target.value})} required /></div>
             <div><Label>E-posta</Label><Input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} required /></div>
+            <div><Label>Telefon</Label><Input type="tel" value={form.telefon} onChange={e => setForm({...form, telefon: e.target.value})} placeholder="05xx xxx xx xx" /></div>
             <div><Label>Şifre</Label><Input type="password" value={form.password} onChange={e => setForm({...form, password: e.target.value})} required minLength={6} /></div>
             <div><Label>Rol</Label>
               <Select value={form.role} onValueChange={v => setForm({...form, role: v})}>
@@ -89,12 +90,13 @@ function UserManagement({ teachers }) {
         <CardHeader><CardTitle>Kullanıcılar</CardTitle></CardHeader>
         <CardContent>
           <Table>
-            <TableHeader><TableRow><TableHead>Ad Soyad</TableHead><TableHead>E-posta</TableHead><TableHead>Rol</TableHead><TableHead>İşlem</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Ad Soyad</TableHead><TableHead>E-posta</TableHead><TableHead>Telefon</TableHead><TableHead>Rol</TableHead><TableHead>İşlem</TableHead></TableRow></TableHeader>
             <TableBody>
               {users.map(u => (
                 <TableRow key={u.id}>
                   <TableCell>{u.ad} {u.soyad}</TableCell>
                   <TableCell>{u.email}</TableCell>
+                  <TableCell className="text-gray-500">{u.telefon || '-'}</TableCell>
                   <TableCell><span className={`px-2 py-1 rounded-full text-xs font-medium ${roleBadgeColor[u.role] || 'bg-gray-100'}`}>{roleLabel(u.role)}</span></TableCell>
                   <TableCell><Button variant="destructive" size="sm" onClick={() => deleteUser(u.id)}><Trash2 className="h-4 w-4" /></Button></TableCell>
                 </TableRow>
