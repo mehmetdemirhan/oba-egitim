@@ -51,7 +51,18 @@ export function AuthProvider({ children }) {
   }, [token]); // ★ DÜZELTİLDİ: dependency eklendi
 
   const login = async (emailOrPhone, password) => {
-    const response = await axios.post(`${API}/auth/login`, { email_or_phone: emailOrPhone, password });
+    let response;
+    try {
+      // Yeni backend format (email_or_phone)
+      response = await axios.post(`${API}/auth/login`, { email_or_phone: emailOrPhone, password });
+    } catch (err) {
+      if (err.response?.status === 422) {
+        // Eski backend format (email) — fallback
+        response = await axios.post(`${API}/auth/login`, { email: emailOrPhone, password });
+      } else {
+        throw err;
+      }
+    }
     const { access_token, user: userData } = response.data;
 
     localStorage.setItem("oba_token", access_token);
