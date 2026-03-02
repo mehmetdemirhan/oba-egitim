@@ -23,7 +23,7 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
 function roleLabel(role) {
-  const labels = { admin: "Yönetici", teacher: "Öğretmen", student: "Öğrenci", parent: "Veli" };
+  const labels = { admin: "Yönetici", coordinator: "Koordinatör", teacher: "Öğretmen", student: "Öğrenci", parent: "Veli" };
   return labels[role] || role;
 }
 
@@ -57,7 +57,7 @@ function UserManagement({ teachers }) {
     catch (error) { toast({ title: "Hata", description: error.response?.data?.detail || "Hata oluştu", variant: "destructive" }); }
   };
 
-  const roleBadgeColor = { admin: "bg-red-100 text-red-700", teacher: "bg-blue-100 text-blue-700", student: "bg-green-100 text-green-700", parent: "bg-purple-100 text-purple-700" };
+  const roleBadgeColor = { admin: "bg-red-100 text-red-700", coordinator: "bg-orange-100 text-orange-700", teacher: "bg-blue-100 text-blue-700", student: "bg-green-100 text-green-700", parent: "bg-purple-100 text-purple-700" };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -74,6 +74,7 @@ function UserManagement({ teachers }) {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin">Yönetici</SelectItem>
+                  <SelectItem value="coordinator">Koordinatör</SelectItem>
                   <SelectItem value="teacher">Öğretmen</SelectItem>
                   <SelectItem value="student">Öğrenci</SelectItem>
                   <SelectItem value="parent">Veli</SelectItem>
@@ -179,7 +180,7 @@ function AppContent() {
 
   const fetchAll = useCallback(async () => {
     try { const r = await axios.get(`${API}/dashboard`); setDashboardStats(r.data); } catch(e) {}
-    try { if (user?.role === 'admin') { const r = await axios.get(`${API}/dashboard/bekleyenler`); setBekleyenler(r.data); } } catch(e) { setBekleyenler({ metin_bekleyen:[], metin_oylama:[], gelisim_bekleyen:[], gelisim_oylama:[], toplam:0 }); }
+    try { if ((user?.role === 'admin' || user?.role === 'coordinator')) { const r = await axios.get(`${API}/dashboard/bekleyenler`); setBekleyenler(r.data); } } catch(e) { setBekleyenler({ metin_bekleyen:[], metin_oylama:[], gelisim_bekleyen:[], gelisim_oylama:[], toplam:0 }); }
     try { const r = await axios.get(`${API}/stats/weekly`); setWeeklyStats(r.data); } catch(e) {}
     try { const r = await axios.get(`${API}/stats/monthly`); setMonthlyStats(r.data); } catch(e) {}
     try { const r = await axios.get(`${API}/teachers`); setTeachers(r.data); } catch(e) {}
@@ -293,7 +294,7 @@ function AppContent() {
             <TabsTrigger value="teachers" className={tabClass}><UserCheck className="h-4 w-4 mr-2" />Öğretmenler</TabsTrigger>
             <TabsTrigger value="students" className={tabClass}><Users className="h-4 w-4 mr-2" />Öğrenciler</TabsTrigger>
             <TabsTrigger value="courses" className={tabClass}><BookOpen className="h-4 w-4 mr-2" />Kurslar</TabsTrigger>
-            <TabsTrigger value="payments" className={tabClass}><CreditCard className="h-4 w-4 mr-2" />Muhasebe</TabsTrigger>
+            {user.role !== "coordinator" && <TabsTrigger value="payments" className={tabClass}><CreditCard className="h-4 w-4 mr-2" />Muhasebe</TabsTrigger>}
             {user.role === "admin" && <TabsTrigger value="users" className={tabClass}><Shield className="h-4 w-4 mr-2" />Kullanıcılar</TabsTrigger>}
             <TabsTrigger value="gelisim" className={tabClass}><Trophy className="h-4 w-4 mr-2" />Gelişim</TabsTrigger>
             <TabsTrigger value="giris-analizi" className={tabClass}><Stethoscope className="h-4 w-4 mr-2" />Giriş Analizi</TabsTrigger>
@@ -367,7 +368,7 @@ function AppContent() {
                           <div className="flex items-center gap-4">
                             <div className="text-center"><div className="text-sm font-medium">{t.ogrenci_sayisi}</div><div className="text-xs text-gray-500">Öğrenci</div></div>
                             <div className="flex gap-2">
-                              <Button variant="outline" size="sm" className="text-green-600 border-green-300 hover:bg-green-50" onClick={e => { e.stopPropagation(); setTahsilatDialog({tip:'ogretmen', kisi:t, miktar:0, aciklama:''}); }}><CreditCard className="h-4 w-4" /></Button>
+                              {user.role !== "coordinator" && <Button variant="outline" size="sm" className="text-green-600 border-green-300 hover:bg-green-50" onClick={e => { e.stopPropagation(); setTahsilatDialog({tip:'ogretmen', kisi:t, miktar:0, aciklama:''}); }}><CreditCard className="h-4 w-4" /></Button>}
                               <Button variant="outline" size="sm" onClick={e => { e.stopPropagation(); setEditingItem({type:'teacher',data:t}); setEditDialogOpen(true); }}><Edit2 className="h-4 w-4" /></Button>
                               <Button variant="destructive" size="sm" onClick={e => { e.stopPropagation(); deleteTeacher(t.id); }}><Trash2 className="h-4 w-4" /></Button>
                             </div>
@@ -379,7 +380,8 @@ function AppContent() {
                           const kalanAlacak = Math.max(0, (t.yapilmasi_gereken_odeme || 0) - toplamOdenen);
                           return (
                           <div className="border-t border-gray-100 bg-gray-50 p-4 space-y-4">
-                            {/* Ödeme Özeti */}
+                            {/* Ödeme Özeti - koordinatörden gizle */}
+                            {user.role !== "coordinator" && (
                             <div className="grid grid-cols-3 gap-3">
                               <div className="bg-white rounded-xl p-3 border border-gray-200 text-center">
                                 <div className="text-xs text-gray-500 mb-1">Yapılacak Ödeme</div>
@@ -394,6 +396,7 @@ function AppContent() {
                                 <div className={`font-bold ${kalanAlacak > 0 ? 'text-red-600' : 'text-green-600'}`}>₺{kalanAlacak.toLocaleString('tr-TR')}</div>
                               </div>
                             </div>
+                            )}
                             {/* Ödeme Geçmişi */}
                             {ogretmenOdemeleri.length > 0 && (
                               <div>
@@ -471,7 +474,7 @@ function AppContent() {
                 <CardHeader><CardTitle>Öğrenciler</CardTitle></CardHeader>
                 <CardContent>
                   <Table>
-                    <TableHeader><TableRow><TableHead>Ad Soyad</TableHead><TableHead>Sınıf</TableHead><TableHead>Veli</TableHead><TableHead>Öğretmen</TableHead><TableHead>Borç</TableHead><TableHead>İşlem</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow><TableHead>Ad Soyad</TableHead><TableHead>Sınıf</TableHead>{user.role !== "coordinator" && <TableHead>Veli</TableHead>}<TableHead>Öğretmen</TableHead>{user.role !== "coordinator" && <TableHead>Borç</TableHead>}<TableHead>İşlem</TableHead></TableRow></TableHeader>
                     <TableBody>
                       {students.map(s => {
                         const t = teachers.find(t => t.id === s.ogretmen_id);
@@ -479,10 +482,10 @@ function AppContent() {
                           <TableRow key={s.id}>
                             <TableCell className="font-medium">{s.ad} {s.soyad}</TableCell>
                             <TableCell>{s.sinif}</TableCell>
-                            <TableCell>{s.veli_ad} {s.veli_soyad}</TableCell>
+                            {user.role !== "coordinator" && <TableCell>{s.veli_ad} {s.veli_soyad}</TableCell>}
                             <TableCell>{t ? `${t.ad} ${t.soyad}` : '-'}</TableCell>
-                            <TableCell className="text-green-600 font-semibold">{formatCurrency(Math.max(0, s.yapilmasi_gereken_odeme - s.yapilan_odeme))}</TableCell>
-                            <TableCell><div className="flex gap-2"><Button variant="outline" size="sm" className="text-green-600 border-green-300 hover:bg-green-50" onClick={() => setTahsilatDialog({tip:'ogrenci', kisi:s, miktar:0, aciklama:''})}><CreditCard className="h-4 w-4" /></Button><Button variant="outline" size="sm" onClick={() => { setEditingItem({type:'student',data:s}); setEditDialogOpen(true); }}><Edit2 className="h-4 w-4" /></Button><Button variant="destructive" size="sm" onClick={() => deleteStudent(s.id)}><Trash2 className="h-4 w-4" /></Button></div></TableCell>
+                            {user.role !== "coordinator" && <TableCell className="text-green-600 font-semibold">{formatCurrency(Math.max(0, s.yapilmasi_gereken_odeme - s.yapilan_odeme))}</TableCell>}
+                            <TableCell><div className="flex gap-2">{user.role !== "coordinator" && <Button variant="outline" size="sm" className="text-green-600 border-green-300 hover:bg-green-50" onClick={() => setTahsilatDialog({tip:'ogrenci', kisi:s, miktar:0, aciklama:''})}><CreditCard className="h-4 w-4" /></Button>}<Button variant="outline" size="sm" onClick={() => { setEditingItem({type:'student',data:s}); setEditDialogOpen(true); }}><Edit2 className="h-4 w-4" /></Button><Button variant="destructive" size="sm" onClick={() => deleteStudent(s.id)}><Trash2 className="h-4 w-4" /></Button></div></TableCell>
                           </TableRow>
                         );
                       })}
@@ -1228,7 +1231,7 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user }) {
       )}
 
       {/* Admin: Onay Bekleyenler */}
-      {user?.role === "admin" && bekleyenler.length > 0 && (
+      {(user?.role === "admin" || user?.role === "coordinator") && bekleyenler.length > 0 && (
         <div>
           <h4 className="text-sm font-semibold text-yellow-700 mb-2">⏳ Onay Bekleyenler ({bekleyenler.length})</h4>
           {bekleyenler.map(m => (
@@ -1313,7 +1316,7 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user }) {
                 <div className="text-xs text-gray-500 mt-1">{m.sinif_seviyesi}. Sınıf • {turLabel[m.tur]} • {m.kelime_sayisi} kelime</div>
                 <p className="text-sm text-gray-600 mt-1 line-clamp-2">{m.icerik}</p>
               </div>
-              {user?.role === "admin" && (
+              {(user?.role === "admin" || user?.role === "coordinator") && (
                 <Button variant="destructive" size="sm" className="ml-2" onClick={(e) => { e.stopPropagation(); sil(m.id); }}><Trash2 className="h-4 w-4"/></Button>
               )}
             </div>
@@ -1325,7 +1328,7 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user }) {
       <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-sm">
           <div className="flex items-center justify-between mb-2">
             <div className="font-semibold text-orange-800">🎯 Metin Katkı Puanları</div>
-            {user?.role === "admin" && (
+            {(user?.role === "admin" || user?.role === "coordinator") && (
               <button onClick={() => setPuanDuzenle(!puanDuzenle)}
                 className="text-xs px-2 py-1 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 border border-orange-300">
                 {puanDuzenle ? '✕ Kapat' : '⚙️ Düzenle'}
@@ -1430,7 +1433,7 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
   const formatSure = (s) => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
   const prozodikToplam = Object.values(prozodik).reduce((a,b) => a+b, 0);
 
-  const isOgretmen = user?.role === "admin" || user?.role === "teacher";
+  const isOgretmen = user?.role === "admin" || user?.role === "coordinator" || user?.role === "teacher";
 
   const tamamla = () => {
     if (sure === 0) return;
@@ -2602,7 +2605,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold">Giriş Analizi</h2>
         <div className="flex gap-2">
-          {user.role === "admin" && (
+          {(user.role === "admin" || user.role === "coordinator") && (
             <Button variant="outline" size="sm" onClick={() => setNormDialogAcik(true)}>
               ⚙️ Norm Tablosu
             </Button>
@@ -2798,7 +2801,7 @@ function GelisimAlani({ user }) {
       await axios.post(`${API}/gelisim/icerik`, adminForm);
       setAdminForm({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [], makale_link: "", makale_dosya_turu: "link" });
       setGorunum("liste"); fetchAll();
-      toast({ title: user.role === "admin" ? "İçerik oylama aşamasına alındı" : "İçerik yönetici onayına gönderildi" });
+      toast({ title: (user.role === "admin" || user.role === "coordinator") ? "İçerik oylama aşamasına alındı" : "İçerik yönetici onayına gönderildi" });
     } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
   };
 
@@ -2940,7 +2943,7 @@ function GelisimAlani({ user }) {
 
               <div className="flex gap-3">
                 <Button type="submit" className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white">
-                  {user.role === "admin" ? "Oylama Başlat" : "Yöneticiye Gönder"}
+                  {(user.role === "admin" || user.role === "coordinator") ? "Oylama Başlat" : "Yöneticiye Gönder"}
                 </Button>
                 <Button type="button" variant="outline" onClick={() => setGorunum("liste")} className="flex-1">İptal</Button>
               </div>
@@ -2972,7 +2975,7 @@ function GelisimAlani({ user }) {
           </div>
 
           {/* Yönetici onayı bekleyenler */}
-          {user.role === "admin" && bekleyenler.length > 0 && (
+          {(user.role === "admin" || user.role === "coordinator") && bekleyenler.length > 0 && (
             <div>
               <h3 className="font-semibold text-yellow-700 mb-3">⏳ Onay Bekleyenler ({bekleyenler.length})</h3>
               <div className="space-y-3">
@@ -3081,7 +3084,7 @@ function GelisimAlani({ user }) {
                           </div>
                           <div className="flex flex-col items-end gap-2">
                             {tamamlandi && <span className="flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium"><CheckCircle className="h-4 w-4"/>+{puan} puan</span>}
-                            {user.role === "admin" && <Button variant="destructive" size="sm" onClick={async () => { try { await axios.delete(`${API}/gelisim/icerik/${icerik.id}`); fetchAll(); toast({title:"Silindi"}); } catch(e){} }}><Trash2 className="h-4 w-4"/></Button>}
+                            {(user.role === "admin" || user.role === "coordinator") && <Button variant="destructive" size="sm" onClick={async () => { try { await axios.delete(`${API}/gelisim/icerik/${icerik.id}`); fetchAll(); toast({title:"Silindi"}); } catch(e){} }}><Trash2 className="h-4 w-4"/></Button>}
                           </div>
                         </div>
                         {!tamamlandi && (
