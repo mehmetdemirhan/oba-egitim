@@ -923,9 +923,14 @@ class DiagnosticOturum(BaseModel):
 async def baslat_oturum(data: AnalizOturumBaslat, current_user=Depends(get_current_user)):
     if current_user.get("role") not in ["admin", "teacher"]:
         raise HTTPException(status_code=403, detail="Yetkisiz")
+    # Metni bul (id veya _id ile)
     metin = await db.analiz_metinler.find_one({"id": data.metin_id})
     if not metin:
-        raise HTTPException(status_code=404, detail="Metin bulunamadı")
+        raise HTTPException(status_code=404, detail=f"Metin bulunamadı: {data.metin_id}")
+    # Öğrenciyi kontrol et
+    ogrenci = await db.students.find_one({"id": data.ogrenci_id})
+    if not ogrenci:
+        raise HTTPException(status_code=404, detail=f"Öğrenci bulunamadı: {data.ogrenci_id}")
     oturum = DiagnosticOturum(
         ogrenci_id=data.ogrenci_id,
         metin_id=data.metin_id,
