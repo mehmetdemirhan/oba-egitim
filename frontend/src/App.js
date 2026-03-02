@@ -534,25 +534,35 @@ function AppContent() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <Card className="border-0 shadow-sm bg-gradient-to-br from-green-50 to-emerald-100">
                 <CardContent className="p-5 text-center">
-                  <div className="text-sm text-green-700 font-medium mb-1">📥 Toplam Alacak</div>
-                  <div className="text-3xl font-bold text-green-700">{formatCurrency(payments.filter(p => p.tip === 'ogrenci').reduce((s, p) => s + (p.miktar || 0), 0))}</div>
-                  <div className="text-xs text-green-600 mt-1">{payments.filter(p => p.tip === 'ogrenci').length} kayıt</div>
+                  <div className="text-sm text-green-700 font-medium mb-2">📥 Öğrenci Ödemeleri</div>
+                  <div className="text-xs text-gray-500 mb-1">Alınması Gereken</div>
+                  <div className="text-2xl font-bold text-green-800">{formatCurrency(students.reduce((s, st) => s + (st.yapilmasi_gereken_odeme || 0), 0))}</div>
+                  <div className="border-t border-green-200 my-2"></div>
+                  <div className="text-xs text-gray-500 mb-1">Alınan (Tahsil Edilen)</div>
+                  <div className="text-2xl font-bold text-green-600">{formatCurrency(payments.filter(p => p.tip === 'ogrenci').reduce((s, p) => s + (p.miktar || 0), 0))}</div>
+                  <div className="text-xs text-green-600 mt-1">{payments.filter(p => p.tip === 'ogrenci').length} tahsilat</div>
                 </CardContent>
               </Card>
               <Card className="border-0 shadow-sm bg-gradient-to-br from-red-50 to-orange-100">
                 <CardContent className="p-5 text-center">
-                  <div className="text-sm text-red-700 font-medium mb-1">📤 Toplam Ödenen</div>
-                  <div className="text-3xl font-bold text-red-700">{formatCurrency(payments.filter(p => p.tip === 'ogretmen').reduce((s, p) => s + (p.miktar || 0), 0))}</div>
-                  <div className="text-xs text-red-600 mt-1">{payments.filter(p => p.tip === 'ogretmen').length} kayıt</div>
+                  <div className="text-sm text-red-700 font-medium mb-2">📤 Öğretmen Ücretleri</div>
+                  <div className="text-xs text-gray-500 mb-1">Ödenecek</div>
+                  <div className="text-2xl font-bold text-red-800">{formatCurrency(teachers.reduce((s, t) => s + (t.yapilmasi_gereken_odeme || 0), 0))}</div>
+                  <div className="border-t border-red-200 my-2"></div>
+                  <div className="text-xs text-gray-500 mb-1">Ödenen</div>
+                  <div className="text-2xl font-bold text-red-600">{formatCurrency(payments.filter(p => p.tip === 'ogretmen').reduce((s, p) => s + (p.miktar || 0), 0))}</div>
+                  <div className="text-xs text-red-600 mt-1">{payments.filter(p => p.tip === 'ogretmen').length} ödeme</div>
                 </CardContent>
               </Card>
               <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-indigo-100">
                 <CardContent className="p-5 text-center">
-                  <div className="text-sm text-blue-700 font-medium mb-1">💰 Net Bakiye</div>
+                  <div className="text-sm text-blue-700 font-medium mb-2">🏦 Kasa Bakiyesi</div>
+                  <div className="text-xs text-gray-500 mb-1">Alınan − Ödenen</div>
                   <div className={`text-3xl font-bold ${(payments.filter(p => p.tip === 'ogrenci').reduce((s, p) => s + (p.miktar || 0), 0) - payments.filter(p => p.tip === 'ogretmen').reduce((s, p) => s + (p.miktar || 0), 0)) >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
                     {formatCurrency(payments.filter(p => p.tip === 'ogrenci').reduce((s, p) => s + (p.miktar || 0), 0) - payments.filter(p => p.tip === 'ogretmen').reduce((s, p) => s + (p.miktar || 0), 0))}
                   </div>
-                  <div className="text-xs text-blue-600 mt-1">Alacak − Ödenen</div>
+                  <div className="border-t border-blue-200 my-2"></div>
+                  <div className="text-xs text-gray-500">Kasada kalan para</div>
                 </CardContent>
               </Card>
             </div>
