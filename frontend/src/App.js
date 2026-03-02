@@ -1109,12 +1109,18 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user }) {
   const [form, setForm] = useState({ baslik: "", icerik: "", kelime_sayisi: 0, sinif_seviyesi: "4", tur: "hikaye" });
   const [redDialog, setRedDialog] = useState(null);
   const [redSebep, setRedSebep] = useState("");
+  const [puanAyarlari, setPuanAyarlari] = useState({ metin_ekleme: 5, oylama_katilim: 2, metin_havuza_girme: 10 });
+  const [puanDuzenle, setPuanDuzenle] = useState(false);
 
   const fetchMetinler = async () => {
     try { const r = await axios.get(`${API}/diagnostic/texts`); setMetinler(r.data); } catch(e) {}
   };
 
-  useEffect(() => { fetchMetinler(); }, []);
+  const fetchPuanAyarlari = async () => {
+    try { const r = await axios.get(`${API}/ayarlar/puanlar`); setPuanAyarlari(r.data); } catch(e) {}
+  };
+
+  useEffect(() => { fetchMetinler(); fetchPuanAyarlari(); }, []);
 
   const kelimeSay = (t) => t.trim().split(/\s+/).filter(Boolean).length;
 
@@ -1317,12 +1323,53 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user }) {
 
       {/* Puan Rehberi */}
       <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-sm">
-          <div className="font-semibold text-orange-800 mb-2">🎯 Metin Katkı Puanları</div>
-          <div className="space-y-1 text-orange-700">
-            <div className="flex justify-between"><span>📝 Metin ekle</span><span className="font-bold">+5 puan</span></div>
-            <div className="flex justify-between"><span>🗳️ Oylama katıl</span><span className="font-bold">+2 puan</span></div>
-            <div className="flex justify-between"><span>🌟 Metin havuza girince</span><span className="font-bold">+10 puan</span></div>
+          <div className="flex items-center justify-between mb-2">
+            <div className="font-semibold text-orange-800">🎯 Metin Katkı Puanları</div>
+            {user?.role === "admin" && (
+              <button onClick={() => setPuanDuzenle(!puanDuzenle)}
+                className="text-xs px-2 py-1 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 border border-orange-300">
+                {puanDuzenle ? '✕ Kapat' : '⚙️ Düzenle'}
+              </button>
+            )}
           </div>
+          {!puanDuzenle ? (
+            <div className="space-y-1 text-orange-700">
+              <div className="flex justify-between"><span>📝 Metin ekle</span><span className="font-bold">+{puanAyarlari.metin_ekleme} puan</span></div>
+              <div className="flex justify-between"><span>🗳️ Oylama katıl</span><span className="font-bold">+{puanAyarlari.oylama_katilim} puan</span></div>
+              <div className="flex justify-between"><span>🌟 Metin havuza girince</span><span className="font-bold">+{puanAyarlari.metin_havuza_girme} puan</span></div>
+            </div>
+          ) : (
+            <div className="space-y-3 mt-2">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-orange-700">📝 Metin ekle</span>
+                <input type="number" min="0" value={puanAyarlari.metin_ekleme}
+                  onChange={e => setPuanAyarlari({...puanAyarlari, metin_ekleme: parseInt(e.target.value) || 0})}
+                  className="w-20 border border-orange-300 rounded-lg p-1 text-center text-sm font-bold focus:outline-none focus:ring-2 focus:ring-orange-400" />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-orange-700">🗳️ Oylama katıl</span>
+                <input type="number" min="0" value={puanAyarlari.oylama_katilim}
+                  onChange={e => setPuanAyarlari({...puanAyarlari, oylama_katilim: parseInt(e.target.value) || 0})}
+                  className="w-20 border border-orange-300 rounded-lg p-1 text-center text-sm font-bold focus:outline-none focus:ring-2 focus:ring-orange-400" />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-orange-700">🌟 Metin havuza girince</span>
+                <input type="number" min="0" value={puanAyarlari.metin_havuza_girme}
+                  onChange={e => setPuanAyarlari({...puanAyarlari, metin_havuza_girme: parseInt(e.target.value) || 0})}
+                  className="w-20 border border-orange-300 rounded-lg p-1 text-center text-sm font-bold focus:outline-none focus:ring-2 focus:ring-orange-400" />
+              </div>
+              <Button size="sm" className="w-full bg-orange-600 hover:bg-orange-700 text-white mt-2"
+                onClick={async () => {
+                  try {
+                    await axios.put(`${API}/ayarlar/puanlar`, puanAyarlari);
+                    toast({ title: "✅ Puan ayarları güncellendi" });
+                    setPuanDuzenle(false);
+                  } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
+                }}>
+                💾 Kaydet
+              </Button>
+            </div>
+          )}
         </div>
 
       {/* Red Sebebi Dialog */}
