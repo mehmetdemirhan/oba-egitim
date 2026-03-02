@@ -359,7 +359,7 @@ async def create_default_admin():
     .env dosyasındaki bilgilerle varsayılan admin oluşturur.
     Admin zaten varsa tekrar oluşturmaz.
     """
-    admin_email = os.environ.get('ADMIN_EMAIL', 'admin@oba.com')
+    admin_email = os.environ.get('ADMIN_EMAIL', 'hilmiaygun@gmail.com')
     admin_password = os.environ.get('ADMIN_PASSWORD', 'Admin123!')
     admin_ad = os.environ.get('ADMIN_AD', 'Sistem')
     admin_soyad = os.environ.get('ADMIN_SOYAD', 'Yöneticisi')
