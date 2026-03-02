@@ -649,6 +649,28 @@ async def create_student(student_data: StudentCreate):
                 {"$inc": {"ogrenci_sayisi": 1, "yapilmasi_gereken_odeme": student.ogretmene_yapilacak_odeme},
                  "$addToSet": {"atanan_ogrenciler": student.id}}
             )
+    # ★ Otomatik muhasebe kaydı: öğrenci alacak kaydı
+    if student.yapilmasi_gereken_odeme and student.yapilmasi_gereken_odeme > 0:
+        alacak_kaydi = {
+            "id": str(uuid.uuid4()),
+            "tip": "ogrenci",
+            "kisi_id": student.id,
+            "miktar": student.yapilmasi_gereken_odeme,
+            "aciklama": f"Kayıt ücreti — {student.ad} {student.soyad}",
+            "tarih": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.payments.insert_one(alacak_kaydi)
+    # ★ Otomatik muhasebe kaydı: öğretmene yapılacak ödeme
+    if student.ogretmen_id and student.ogretmene_yapilacak_odeme and student.ogretmene_yapilacak_odeme > 0:
+        ogretmen_kaydi = {
+            "id": str(uuid.uuid4()),
+            "tip": "ogretmen",
+            "kisi_id": student.ogretmen_id,
+            "miktar": student.ogretmene_yapilacak_odeme,
+            "aciklama": f"Öğretmen ücreti — {student.ad} {student.soyad}",
+            "tarih": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.payments.insert_one(ogretmen_kaydi)
     return student
 
 @api_router.get("/students", response_model=List[Student])
