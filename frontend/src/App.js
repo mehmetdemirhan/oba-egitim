@@ -643,6 +643,58 @@ function AppContent() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Aylık Özet Tablosu */}
+            <Card className="border-0 shadow-sm mt-6">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">📅 Aylık Özet</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50">
+                      <TableHead className="font-semibold">Ay</TableHead>
+                      <TableHead className="font-semibold text-right text-green-700">Alacak</TableHead>
+                      <TableHead className="font-semibold text-right text-red-700">Ödenecek</TableHead>
+                      <TableHead className="font-semibold text-right text-blue-700">Net</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(() => {
+                      const aylar = {};
+                      const ayAd = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
+                      payments.forEach(p => {
+                        const d = new Date(p.tarih);
+                        const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+                        if (!aylar[key]) aylar[key] = { alacak: 0, odenecek: 0, yil: d.getFullYear(), ay: d.getMonth() };
+                        if (p.tip === 'ogrenci') aylar[key].alacak += (p.miktar || 0);
+                        else aylar[key].odenecek += (p.miktar || 0);
+                      });
+                      const sorted = Object.entries(aylar).sort((a, b) => b[0].localeCompare(a[0]));
+                      if (sorted.length === 0) return <TableRow><TableCell colSpan={4} className="text-center text-gray-400 py-6">Henüz kayıt yok</TableCell></TableRow>;
+                      return sorted.map(([key, v]) => (
+                        <TableRow key={key}>
+                          <TableCell className="font-medium">{ayAd[v.ay]} {v.yil}</TableCell>
+                          <TableCell className="text-right font-semibold text-green-600">{formatCurrency(v.alacak)}</TableCell>
+                          <TableCell className="text-right font-semibold text-red-600">{formatCurrency(v.odenecek)}</TableCell>
+                          <TableCell className={`text-right font-bold ${(v.alacak - v.odenecek) >= 0 ? 'text-blue-600' : 'text-red-600'}`}>{formatCurrency(v.alacak - v.odenecek)}</TableCell>
+                        </TableRow>
+                      ));
+                    })()}
+                  </TableBody>
+                  <tfoot>
+                    <tr className="border-t-2 border-gray-300 bg-gray-50">
+                      <td className="p-3 font-bold text-gray-800">GENEL TOPLAM</td>
+                      <td className="p-3 text-right font-bold text-green-700">{formatCurrency(payments.filter(p => p.tip === 'ogrenci').reduce((s, p) => s + (p.miktar || 0), 0))}</td>
+                      <td className="p-3 text-right font-bold text-red-700">{formatCurrency(payments.filter(p => p.tip === 'ogretmen').reduce((s, p) => s + (p.miktar || 0), 0))}</td>
+                      <td className={`p-3 text-right font-bold ${(payments.filter(p => p.tip === 'ogrenci').reduce((s, p) => s + (p.miktar || 0), 0) - payments.filter(p => p.tip === 'ogretmen').reduce((s, p) => s + (p.miktar || 0), 0)) >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
+                        {formatCurrency(payments.filter(p => p.tip === 'ogrenci').reduce((s, p) => s + (p.miktar || 0), 0) - payments.filter(p => p.tip === 'ogretmen').reduce((s, p) => s + (p.miktar || 0), 0))}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </Table>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Users - admin only */}
