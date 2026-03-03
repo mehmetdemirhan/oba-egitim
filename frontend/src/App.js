@@ -623,12 +623,20 @@ function AppContent() {
                                             <p className="text-xs text-gray-500 font-medium">Bir egzersiz seçin:</p>
                                             <div className="grid grid-cols-2 gap-2">
                                               {[
-                                                {id:'goz-takip', icon:'👁️', ad:'Göz Takip Egzersizi', aciklama:'Hareket eden topu takip edin'},
-                                                {id:'goz-sekiz', icon:'♾️', ad:'Sonsuzluk (∞) Egzersizi', aciklama:'Göz sonsuzluk şeklinde hareket eder'},
+                                                {id:'goz-takip', icon:'👁️', ad:'Göz Takip', aciklama:'Hareket eden topu takip edin'},
+                                                {id:'goz-sekiz', icon:'♾️', ad:'Sonsuzluk (∞)', aciklama:'Sonsuzluk şeklinde göz hareketi'},
                                                 {id:'goz-zigzag', icon:'⚡', ad:'Zigzag Okuma', aciklama:'Satır takip hızını artırır'},
                                                 {id:'goz-genisletme', icon:'🔭', ad:'Görüş Alanı Genişletme', aciklama:'Çevresel görüşü genişletin'},
-                                                {id:'hizli-kelime', icon:'📖', ad:'Hızlı Kelime Okuma (RSVP)', aciklama:'Kelimeler tek tek hızla gösterilir'},
+                                                {id:'hizli-kelime', icon:'📖', ad:'Hızlı Kelime (RSVP)', aciklama:'Kelimeler tek tek gösterilir'},
                                                 {id:'odaklanma', icon:'🎯', ad:'Odaklanma Noktası', aciklama:'Merkeze odaklan, çevreyi oku'},
+                                                {id:'periferik', icon:'👀', ad:'Periferik Görüş', aciklama:'Çevresel görüş egzersizi'},
+                                                {id:'schulte', icon:'🔢', ad:'Schulte Tablosu', aciklama:'Sayıları sırayla bul'},
+                                                {id:'goz-yoga', icon:'🧘', ad:'Göz Yoga', aciklama:'Uzak-yakın odaklanma'},
+                                                {id:'renk-eslestirme', icon:'🎨', ad:'Şekil/Renk Eşleştirme', aciklama:'Hızlı eşleştirme'},
+                                                {id:'kelime-avcisi', icon:'🔍', ad:'Kelime Avcısı', aciklama:'Metinde hedef kelime bul'},
+                                                {id:'ters-kelime', icon:'🔄', ad:'Ters Kelime Okuma', aciklama:'Beyin jimnastiği'},
+                                                {id:'eksik-harf', icon:'✏️', ad:'Eksik Harf Tamamlama', aciklama:'Eksik harfleri tamamla'},
+                                                {id:'karisik-cumle', icon:'🧩', ad:'Karışık Cümle Düzenleme', aciklama:'Cümleyi doğru sırala'},
                                               ].map(eg => (
                                                 <div key={eg.id} className={`p-2 rounded-lg border cursor-pointer transition-all ${yeniIcerikForm._egzersizId === eg.id ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/50'}`}
                                                   onClick={() => setYeniIcerikForm({...yeniIcerikForm, _egzersizId: eg.id, baslik: eg.ad, url: `egzersiz://${eg.id}`, ozet: eg.aciklama})}>
@@ -2855,7 +2863,7 @@ function EgzersizlerModul() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {egzersizler.map(eg => (
-              <div key={eg.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onClick={() => baslat(eg.id)}>
+              <div key={eg.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onClick={() => setAktifEgzersiz(eg.id)}>
                 <div className={`bg-gradient-to-r ${eg.renk} p-6 text-center`}>
                   <span className="text-5xl">{eg.icon}</span>
                 </div>
@@ -2865,15 +2873,6 @@ function EgzersizlerModul() {
                 </div>
               </div>
             ))}
-          </div>
-          <div className="mt-6 p-4 bg-gray-50 rounded-xl">
-            <h3 className="font-semibold text-sm mb-3">⚙️ Egzersiz Ayarları</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div><label className="text-xs text-gray-500">Hız</label><input type="range" min="0.5" max="5" step="0.5" value={egzersizAyar.hiz} onChange={e => setEgzersizAyar({...egzersizAyar, hiz: parseFloat(e.target.value)})} className="w-full" /><span className="text-xs">{egzersizAyar.hiz}x</span></div>
-              <div><label className="text-xs text-gray-500">Top Boyutu</label><input type="range" min="20" max="80" step="5" value={egzersizAyar.boyut} onChange={e => setEgzersizAyar({...egzersizAyar, boyut: parseInt(e.target.value)})} className="w-full" /><span className="text-xs">{egzersizAyar.boyut}px</span></div>
-              <div><label className="text-xs text-gray-500">Süre (sn)</label><input type="range" min="10" max="120" step="10" value={egzersizAyar.sure} onChange={e => setEgzersizAyar({...egzersizAyar, sure: parseInt(e.target.value)})} className="w-full" /><span className="text-xs">{egzersizAyar.sure}sn</span></div>
-              <div><label className="text-xs text-gray-500">Kelime Hızı</label><input type="range" min="100" max="800" step="50" value={egzersizAyar.kelimeHiz} onChange={e => setEgzersizAyar({...egzersizAyar, kelimeHiz: parseInt(e.target.value)})} className="w-full" /><span className="text-xs">{egzersizAyar.kelimeHiz} k/dk</span></div>
-            </div>
           </div>
         </div>
       ) : (
@@ -2907,6 +2906,21 @@ function EgzersizlerModul() {
             {aktifEgzersiz === 'goz-genisletme' && 'Kırmızı noktaya odaklanın, çevredeki harfleri okumaya çalışın.'}
             {aktifEgzersiz === 'hizli-kelime' && 'Kelimelere odaklanın. Geri dönüp okumayın, sadece ileriye bakın.'}
             {aktifEgzersiz === 'odaklanma' && 'Kırmızı noktaya odaklanın, çevredeki rakam/harfleri okumaya çalışın.'}
+          </div>
+          <div className="mt-4 p-4 bg-white rounded-xl border border-gray-200">
+            <h4 className="text-sm font-semibold mb-3">⚙️ Ayarlar</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {aktifEgzersiz !== 'hizli-kelime' && (
+                <div><label className="text-xs text-gray-500 block mb-1">Hız</label><input type="range" min="0.5" max="5" step="0.5" value={egzersizAyar.hiz} onChange={e => setEgzersizAyar({...egzersizAyar, hiz: parseFloat(e.target.value)})} className="w-full" /><span className="text-xs font-medium">{egzersizAyar.hiz}x</span></div>
+              )}
+              {['goz-takip','goz-sekiz','goz-zigzag'].includes(aktifEgzersiz) && (
+                <div><label className="text-xs text-gray-500 block mb-1">Top Boyutu</label><input type="range" min="20" max="80" step="5" value={egzersizAyar.boyut} onChange={e => setEgzersizAyar({...egzersizAyar, boyut: parseInt(e.target.value)})} className="w-full" /><span className="text-xs font-medium">{egzersizAyar.boyut}px</span></div>
+              )}
+              <div><label className="text-xs text-gray-500 block mb-1">Süre (saniye)</label><input type="range" min="10" max="120" step="10" value={egzersizAyar.sure} onChange={e => setEgzersizAyar({...egzersizAyar, sure: parseInt(e.target.value)})} className="w-full" /><span className="text-xs font-medium">{egzersizAyar.sure}sn</span></div>
+              {aktifEgzersiz === 'hizli-kelime' && (
+                <div><label className="text-xs text-gray-500 block mb-1">Kelime Hızı</label><input type="range" min="100" max="800" step="50" value={egzersizAyar.kelimeHiz} onChange={e => setEgzersizAyar({...egzersizAyar, kelimeHiz: parseInt(e.target.value)})} className="w-full" /><span className="text-xs font-medium">{egzersizAyar.kelimeHiz} k/dk</span></div>
+              )}
+            </div>
           </div>
         </div>
       )}
