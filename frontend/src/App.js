@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./components/ui/dialog";
 import { Badge } from "./components/ui/badge";
-import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText } from "lucide-react";
+import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye } from "lucide-react";
 import { useToast } from "./hooks/use-toast";
 import { Toaster } from "./components/ui/toaster";
 import { ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Tooltip, XAxis, YAxis, CartesianGrid, AreaChart, Area } from 'recharts';
@@ -320,6 +320,7 @@ function AppContent() {
             {user.role !== "coordinator" && <TabsTrigger value="payments" className={tabClass}><CreditCard className="h-4 w-4 mr-2" />Muhasebe</TabsTrigger>}
             {user.role === "admin" && <TabsTrigger value="users" className={tabClass}><Shield className="h-4 w-4 mr-2" />Kullanıcılar</TabsTrigger>}
             <TabsTrigger value="gelisim" className={tabClass}><Trophy className="h-4 w-4 mr-2" />Gelişim</TabsTrigger>
+            <TabsTrigger value="egzersizler" className={tabClass}><Eye className="h-4 w-4 mr-2" />Egzersizler</TabsTrigger>
             <TabsTrigger value="giris-analizi" className={tabClass}><Stethoscope className="h-4 w-4 mr-2" />Giriş Analizi</TabsTrigger>
           </TabsList>
 
@@ -611,9 +612,9 @@ function AppContent() {
                                     {yeniIcerikForm?._acik && yeniIcerikForm?.ders_id === ders.id && (
                                       <div className="bg-white p-3 rounded-lg border border-green-200 space-y-2">
                                         <div className="flex gap-2">
-                                          {['video','pdf','docx'].map(t => (
+                                          {['video','pdf','docx','embed','egzersiz'].map(t => (
                                             <button key={t} className={`px-3 py-1 rounded-full text-xs font-medium border ${yeniIcerikForm.tur === t ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300'}`} onClick={() => setYeniIcerikForm({...yeniIcerikForm, tur: t})}>
-                                              {t === 'video' ? '🎬 Video' : t === 'pdf' ? '📄 PDF' : '📝 Doküman'}
+                                              {t === 'video' ? '🎬 Video' : t === 'pdf' ? '📄 PDF' : t === 'docx' ? '📝 Doküman' : t === 'embed' ? '🌐 Web Embed' : '🎯 Egzersiz'}
                                             </button>
                                           ))}
                                         </div>
@@ -635,23 +636,51 @@ function AppContent() {
                                       </div>
                                     )}
                                     {(ders.icerikler || []).length === 0 && !yeniIcerikForm?._acik && <p className="text-xs text-gray-400 italic">Henüz içerik eklenmemiş</p>}
-                                    {(ders.icerikler || []).map(ic => (
-                                      <div key={ic.id} className="bg-white p-2 rounded-lg border border-gray-100 flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                          <span className="text-lg">{ic.tur === 'video' ? '🎬' : ic.tur === 'pdf' ? '📄' : '📝'}</span>
-                                          <div>
-                                            <div className="text-sm font-medium">{ic.baslik}</div>
-                                            {ic.ozet && <div className="text-xs text-gray-500">{ic.ozet.slice(0,60)}{ic.ozet.length > 60 ? '...' : ''}</div>}
-                                            {ic.url && <a href={ic.url} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline">🔗 Bağlantı</a>}
+                                    {(ders.icerikler || []).map(ic => {
+                                      const isYoutube = ic.url && (ic.url.includes('youtube.com') || ic.url.includes('youtu.be'));
+                                      const ytId = isYoutube ? (ic.url.match(/(?:v=|youtu\.be\/)([\w-]+)/)?.[1] || '') : '';
+                                      const isEmbed = ic.tur === 'embed' || ic.tur === 'egzersiz';
+                                      const isPdf = ic.url && ic.url.endsWith('.pdf');
+                                      const showEmbed = ic._embed || false;
+                                      return (
+                                      <div key={ic.id} className="bg-white rounded-lg border border-gray-100 overflow-hidden">
+                                        <div className="flex items-center justify-between p-2">
+                                          <div className="flex items-center gap-2 flex-1">
+                                            <span className="text-lg">{ic.tur === 'video' ? '🎬' : ic.tur === 'pdf' ? '📄' : ic.tur === 'embed' || ic.tur === 'egzersiz' ? '🎯' : '📝'}</span>
+                                            <div className="flex-1">
+                                              <div className="text-sm font-medium">{ic.baslik}</div>
+                                              {ic.ozet && <div className="text-xs text-gray-500">{ic.ozet.slice(0,80)}{ic.ozet.length > 80 ? '...' : ''}</div>}
+                                            </div>
+                                          </div>
+                                          <div className="flex items-center gap-1">
+                                            {ic.url && (isYoutube || isEmbed || isPdf) && (
+                                              <Button variant="outline" size="sm" className="h-7 text-xs text-blue-600 border-blue-300" onClick={() => {
+                                                const updated = (kursDersleri[c.id] || []).map(d => d.id === ders.id ? {...d, icerikler: d.icerikler.map(i => i.id === ic.id ? {...i, _embed: !i._embed} : i)} : d);
+                                                setKursDersleri(prev => ({...prev, [c.id]: updated}));
+                                              }}>{showEmbed ? '▲ Kapat' : '▶ Aç'}</Button>
+                                            )}
+                                            {ic.url && !isYoutube && !isEmbed && !isPdf && <a href={ic.url} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline mr-2">🔗 Aç</a>}
+                                            <Button variant="outline" size="sm" className="h-7 w-7 p-0 text-red-500" onClick={async () => {
+                                              await axios.delete(`${API}/dersler/${ders.id}/icerik/${ic.id}`);
+                                              fetchKursDersleri(c.id);
+                                              toast({title: "İçerik silindi"});
+                                            }}><Trash2 className="h-3 w-3" /></Button>
                                           </div>
                                         </div>
-                                        <Button variant="outline" size="sm" className="h-7 w-7 p-0 text-red-500" onClick={async () => {
-                                          await axios.delete(`${API}/dersler/${ders.id}/icerik/${ic.id}`);
-                                          fetchKursDersleri(c.id);
-                                          toast({title: "İçerik silindi"});
-                                        }}><Trash2 className="h-3 w-3" /></Button>
+                                        {showEmbed && ic.url && (
+                                          <div className="border-t border-gray-100 p-2 bg-gray-50">
+                                            {isYoutube && ytId ? (
+                                              <div className="relative w-full" style={{paddingBottom:'56.25%'}}><iframe src={`https://www.youtube.com/embed/${ytId}`} className="absolute inset-0 w-full h-full rounded-lg" allowFullScreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" /></div>
+                                            ) : isPdf ? (
+                                              <iframe src={ic.url} className="w-full rounded-lg border" style={{height:'500px'}} />
+                                            ) : (
+                                              <iframe src={ic.url} className="w-full rounded-lg border" style={{height:'500px'}} sandbox="allow-scripts allow-same-origin allow-popups" />
+                                            )}
+                                          </div>
+                                        )}
                                       </div>
-                                    ))}
+                                      );
+                                    })}
                                   </div>
                                 )}
                               </div>
@@ -929,6 +958,12 @@ function AppContent() {
               <UserManagement teachers={teachers} />
             </TabsContent>
           )}
+
+          {/* Egzersizler */}
+          <TabsContent value="egzersizler">
+            <EgzersizlerModul />
+          </TabsContent>
+
           {/* Giris Analizi */}
           <TabsContent value="giris-analizi">
             <GirisAnaliziModul user={user} students={students} teachers={teachers} />
@@ -2608,6 +2643,243 @@ function RaporGoruntule({ rapor, ogrenci, onGeri }) {
 
 
 // ── ANA GİRİŞ ANALİZİ MODÜLÜ ──
+// ═══════════════════════════════════════════════════════════════
+// EGZERSİZLER MODÜLÜ — Göz Egzersizleri & Okuma Egzersizleri
+// ═══════════════════════════════════════════════════════════════
+function EgzersizlerModul() {
+  const [aktifEgzersiz, setAktifEgzersiz] = useState(null);
+  const [egzersizAyar, setEgzersizAyar] = useState({ hiz: 2, boyut: 40, sure: 30, kelimeHiz: 300 });
+  const canvasRef = React.useRef(null);
+  const animRef = React.useRef(null);
+  const [calisiyorMu, setCalisiyorMu] = useState(false);
+  const [kalanSure, setKalanSure] = useState(0);
+  const [wpmKelimeler, setWpmKelimeler] = useState([]);
+  const [wpmIndex, setWpmIndex] = useState(0);
+
+  const egzersizler = [
+    { id: 'goz-takip', baslik: 'Göz Takip Egzersizi', icon: '👁️', aciklama: 'Hareket eden topu gözlerinizle takip edin. Göz kaslarını güçlendirir.', renk: 'from-blue-500 to-cyan-500' },
+    { id: 'goz-sekiz', baslik: 'Sonsuzluk (∞) Egzersizi', icon: '♾️', aciklama: 'Göz sonsuzluk şeklinde hareket eder. Odaklanma ve koordinasyonu geliştirir.', renk: 'from-purple-500 to-pink-500' },
+    { id: 'goz-zigzag', baslik: 'Zigzag Okuma', icon: '⚡', aciklama: 'Göz zigzag şeklinde hareket eder. Satır takip hızını artırır.', renk: 'from-orange-500 to-red-500' },
+    { id: 'goz-genisletme', baslik: 'Görüş Alanı Genişletme', icon: '🔭', aciklama: 'Merkeze odaklanırken çevresel görüşü genişletin.', renk: 'from-green-500 to-emerald-500' },
+    { id: 'hizli-kelime', baslik: 'Hızlı Kelime Okuma (RSVP)', icon: '📖', aciklama: 'Kelimeler tek tek hızla gösterilir. Okuma hızını artırır.', renk: 'from-indigo-500 to-blue-500' },
+    { id: 'odaklanma', baslik: 'Odaklanma Noktası', icon: '🎯', aciklama: 'Merkez noktaya odaklanın, çevredeki harfleri okumaya çalışın.', renk: 'from-teal-500 to-cyan-500' },
+  ];
+
+  const durdur = () => {
+    setCalisiyorMu(false);
+    if (animRef.current) { cancelAnimationFrame(animRef.current); animRef.current = null; }
+  };
+
+  const baslat = (id) => {
+    setAktifEgzersiz(id);
+    setCalisiyorMu(true);
+    setKalanSure(egzersizAyar.sure);
+  };
+
+  // Geri sayım
+  React.useEffect(() => {
+    if (!calisiyorMu || kalanSure <= 0) { if (kalanSure <= 0 && calisiyorMu) durdur(); return; }
+    const t = setTimeout(() => setKalanSure(k => k - 1), 1000);
+    return () => clearTimeout(t);
+  }, [calisiyorMu, kalanSure]);
+
+  // Canvas animasyonları
+  React.useEffect(() => {
+    if (!calisiyorMu || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width = canvas.offsetWidth;
+    const H = canvas.height = canvas.offsetHeight;
+    let t = 0;
+    const speed = egzersizAyar.hiz;
+    const sz = egzersizAyar.boyut;
+
+    const draw = () => {
+      ctx.clearRect(0, 0, W, H);
+      t += 0.02 * speed;
+      let x, y;
+
+      if (aktifEgzersiz === 'goz-takip') {
+        // Düz yatay hareket
+        x = W/2 + Math.cos(t) * (W/2 - sz);
+        y = H/2 + Math.sin(t * 0.7) * (H/3);
+        ctx.beginPath(); ctx.arc(x, y, sz/2, 0, Math.PI*2);
+        const grad = ctx.createRadialGradient(x, y, 0, x, y, sz/2);
+        grad.addColorStop(0, '#60a5fa'); grad.addColorStop(1, '#2563eb');
+        ctx.fillStyle = grad; ctx.fill();
+        ctx.strokeStyle = '#1d4ed8'; ctx.lineWidth = 2; ctx.stroke();
+        // Göz parıltısı
+        ctx.beginPath(); ctx.arc(x - sz/6, y - sz/6, sz/8, 0, Math.PI*2);
+        ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fill();
+      }
+      else if (aktifEgzersiz === 'goz-sekiz') {
+        // Sonsuzluk şekli (lemniscate)
+        const scale = Math.min(W, H) * 0.35;
+        x = W/2 + scale * Math.cos(t) / (1 + Math.sin(t)*Math.sin(t));
+        y = H/2 + scale * Math.sin(t) * Math.cos(t) / (1 + Math.sin(t)*Math.sin(t));
+        // İz çiz
+        ctx.beginPath(); ctx.strokeStyle = 'rgba(168,85,247,0.15)'; ctx.lineWidth = 3;
+        for (let i = 0; i < Math.PI * 2; i += 0.05) {
+          const ix = W/2 + scale * Math.cos(i) / (1 + Math.sin(i)*Math.sin(i));
+          const iy = H/2 + scale * Math.sin(i) * Math.cos(i) / (1 + Math.sin(i)*Math.sin(i));
+          i === 0 ? ctx.moveTo(ix, iy) : ctx.lineTo(ix, iy);
+        }
+        ctx.stroke();
+        ctx.beginPath(); ctx.arc(x, y, sz/2, 0, Math.PI*2);
+        const grad = ctx.createRadialGradient(x, y, 0, x, y, sz/2);
+        grad.addColorStop(0, '#c084fc'); grad.addColorStop(1, '#9333ea');
+        ctx.fillStyle = grad; ctx.fill();
+      }
+      else if (aktifEgzersiz === 'goz-zigzag') {
+        const rows = 5;
+        const progress = (t % (rows * Math.PI)) / (rows * Math.PI);
+        const row = Math.floor(progress * rows);
+        const rowProgress = (progress * rows) % 1;
+        x = row % 2 === 0 ? rowProgress * W : (1 - rowProgress) * W;
+        y = (row + 0.5) / rows * H;
+        // Zigzag izi
+        ctx.beginPath(); ctx.strokeStyle = 'rgba(249,115,22,0.15)'; ctx.lineWidth = 2;
+        for (let r = 0; r < rows; r++) {
+          const lx = r % 2 === 0 ? 20 : W - 20;
+          const rx = r % 2 === 0 ? W - 20 : 20;
+          const ry = (r + 0.5) / rows * H;
+          ctx.moveTo(lx, ry); ctx.lineTo(rx, ry);
+          if (r < rows - 1) { const ny = (r + 1.5) / rows * H; ctx.lineTo(rx, ny); }
+        }
+        ctx.stroke();
+        ctx.beginPath(); ctx.arc(x, y, sz/2, 0, Math.PI*2);
+        ctx.fillStyle = '#f97316'; ctx.fill();
+      }
+      else if (aktifEgzersiz === 'goz-genisletme') {
+        // Merkez nokta + genişleyen çember
+        ctx.beginPath(); ctx.arc(W/2, H/2, 8, 0, Math.PI*2);
+        ctx.fillStyle = '#ef4444'; ctx.fill();
+        const radius = 30 + Math.abs(Math.sin(t * 0.5)) * (Math.min(W, H)/2 - 50);
+        ctx.beginPath(); ctx.arc(W/2, H/2, radius, 0, Math.PI*2);
+        ctx.strokeStyle = `rgba(16,185,129,${0.8 - radius / (Math.min(W,H)/2) * 0.6})`; ctx.lineWidth = 3; ctx.stroke();
+        // Çevresel harfler
+        const harfler = 'ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZ';
+        const harfSayi = 12;
+        ctx.font = '18px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        for (let i = 0; i < harfSayi; i++) {
+          const angle = (i / harfSayi) * Math.PI * 2 + t * 0.3;
+          const hx = W/2 + Math.cos(angle) * radius;
+          const hy = H/2 + Math.sin(angle) * radius;
+          ctx.fillStyle = `rgba(16,185,129,${0.9 - radius / (Math.min(W,H)/2) * 0.5})`;
+          ctx.fillText(harfler[Math.floor(Math.random() * harfler.length)], hx, hy);
+        }
+        ctx.font = '12px sans-serif'; ctx.fillStyle = '#666';
+        ctx.fillText('Kırmızı noktaya odaklanın', W/2, H - 20);
+      }
+      else if (aktifEgzersiz === 'odaklanma') {
+        ctx.beginPath(); ctx.arc(W/2, H/2, 10, 0, Math.PI*2);
+        ctx.fillStyle = '#ef4444'; ctx.fill();
+        // İç içe halkalar
+        for (let r = 1; r <= 4; r++) {
+          ctx.beginPath(); ctx.arc(W/2, H/2, r * 50, 0, Math.PI*2);
+          ctx.strokeStyle = `rgba(99,102,241,${0.3 - r * 0.05})`; ctx.lineWidth = 1; ctx.stroke();
+        }
+        // Rastgele harfler
+        const harfler2 = 'ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZ0123456789';
+        ctx.font = '16px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        const harfFrame = Math.floor(t * 2);
+        for (let i = 0; i < 8; i++) {
+          const angle = (i / 8) * Math.PI * 2;
+          const dist = 80 + Math.sin(t + i) * 30;
+          const hx = W/2 + Math.cos(angle) * dist;
+          const hy = H/2 + Math.sin(angle) * dist;
+          ctx.fillStyle = '#4f46e5';
+          ctx.fillText(harfler2[(harfFrame + i * 3) % harfler2.length], hx, hy);
+        }
+      }
+
+      animRef.current = requestAnimationFrame(draw);
+    };
+    draw();
+    return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
+  }, [calisiyorMu, aktifEgzersiz, egzersizAyar]);
+
+  // RSVP kelime gösterici
+  React.useEffect(() => {
+    if (!calisiyorMu || aktifEgzersiz !== 'hizli-kelime') return;
+    const ornek = "Bir varmış bir yokmuş evvel zaman içinde kalbur saman içinde uzak diyarların birinde yaşlı bir bilge yaşarmış Bu bilge her gün sabahın erken saatlerinde kalkıp ormana yürüyüşe çıkarmış Ormanın derinliklerinde akan bir dere varmış Derenin kenarında oturup düşünür kuşların şarkılarını dinlermiş Bir gün küçük bir çocuk bilgenin yanına gelmiş ve sormuş Bilge dede mutluluğun sırrı nedir Bilge gülümsemiş ve demiş ki Mutluluk aradığın yerde değil olduğun yerdedir".split(' ');
+    setWpmKelimeler(ornek);
+    setWpmIndex(0);
+    const ms = 60000 / egzersizAyar.kelimeHiz;
+    const interval = setInterval(() => {
+      setWpmIndex(prev => { if (prev >= ornek.length - 1) return 0; return prev + 1; });
+    }, ms);
+    return () => clearInterval(interval);
+  }, [calisiyorMu, aktifEgzersiz, egzersizAyar.kelimeHiz]);
+
+  return (
+    <div>
+      {!aktifEgzersiz ? (
+        <div>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold flex items-center gap-2"><Eye className="h-6 w-6" /> Egzersiz Merkezi</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {egzersizler.map(eg => (
+              <div key={eg.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onClick={() => baslat(eg.id)}>
+                <div className={`bg-gradient-to-r ${eg.renk} p-6 text-center`}>
+                  <span className="text-5xl">{eg.icon}</span>
+                </div>
+                <div className="p-4">
+                  <h3 className="font-bold text-sm mb-1">{eg.baslik}</h3>
+                  <p className="text-xs text-gray-500">{eg.aciklama}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-6 p-4 bg-gray-50 rounded-xl">
+            <h3 className="font-semibold text-sm mb-3">⚙️ Egzersiz Ayarları</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div><label className="text-xs text-gray-500">Hız</label><input type="range" min="0.5" max="5" step="0.5" value={egzersizAyar.hiz} onChange={e => setEgzersizAyar({...egzersizAyar, hiz: parseFloat(e.target.value)})} className="w-full" /><span className="text-xs">{egzersizAyar.hiz}x</span></div>
+              <div><label className="text-xs text-gray-500">Top Boyutu</label><input type="range" min="20" max="80" step="5" value={egzersizAyar.boyut} onChange={e => setEgzersizAyar({...egzersizAyar, boyut: parseInt(e.target.value)})} className="w-full" /><span className="text-xs">{egzersizAyar.boyut}px</span></div>
+              <div><label className="text-xs text-gray-500">Süre (sn)</label><input type="range" min="10" max="120" step="10" value={egzersizAyar.sure} onChange={e => setEgzersizAyar({...egzersizAyar, sure: parseInt(e.target.value)})} className="w-full" /><span className="text-xs">{egzersizAyar.sure}sn</span></div>
+              <div><label className="text-xs text-gray-500">Kelime Hızı</label><input type="range" min="100" max="800" step="50" value={egzersizAyar.kelimeHiz} onChange={e => setEgzersizAyar({...egzersizAyar, kelimeHiz: parseInt(e.target.value)})} className="w-full" /><span className="text-xs">{egzersizAyar.kelimeHiz} k/dk</span></div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <Button variant="outline" onClick={() => { durdur(); setAktifEgzersiz(null); }}>← Geri</Button>
+            <h2 className="font-bold">{egzersizler.find(e => e.id === aktifEgzersiz)?.baslik}</h2>
+            <div className="flex items-center gap-3">
+              <span className={`text-lg font-bold ${kalanSure <= 5 ? 'text-red-500' : 'text-gray-700'}`}>{kalanSure}s</span>
+              <Button size="sm" className={calisiyorMu ? 'bg-red-500' : 'bg-green-500'} onClick={() => calisiyorMu ? durdur() : baslat(aktifEgzersiz)}>
+                {calisiyorMu ? '⏸ Durdur' : '▶ Başlat'}
+              </Button>
+            </div>
+          </div>
+          {aktifEgzersiz === 'hizli-kelime' ? (
+            <div className="bg-gray-900 rounded-2xl flex items-center justify-center" style={{height:'400px'}}>
+              <div className="text-center">
+                <div className="text-5xl font-bold text-white mb-4">{wpmKelimeler[wpmIndex] || ''}</div>
+                <div className="text-gray-500 text-sm">{egzersizAyar.kelimeHiz} kelime/dakika • Kelime {wpmIndex + 1}/{wpmKelimeler.length}</div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-gray-50 rounded-2xl border border-gray-200 overflow-hidden" style={{height:'400px'}}>
+              <canvas ref={canvasRef} className="w-full h-full" />
+            </div>
+          )}
+          <div className="mt-3 text-center text-sm text-gray-500">
+            {aktifEgzersiz === 'goz-takip' && 'Mavi topu gözlerinizle takip edin. Başınızı hareket ettirmeyin.'}
+            {aktifEgzersiz === 'goz-sekiz' && 'Mor topu sonsuzluk (∞) şeklinde takip edin.'}
+            {aktifEgzersiz === 'goz-zigzag' && 'Turuncu topu zigzag çizerek takip edin. Satır okuma hızınızı artırır.'}
+            {aktifEgzersiz === 'goz-genisletme' && 'Kırmızı noktaya odaklanın, çevredeki harfleri okumaya çalışın.'}
+            {aktifEgzersiz === 'hizli-kelime' && 'Kelimelere odaklanın. Geri dönüp okumayın, sadece ileriye bakın.'}
+            {aktifEgzersiz === 'odaklanma' && 'Kırmızı noktaya odaklanın, çevredeki rakam/harfleri okumaya çalışın.'}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function GirisAnaliziModul({ user, students, teachers }) {
   const { toast } = useToast();
   const [adim, setAdim] = useState("liste"); // liste, metin-sec, canli, sonuc, rapor-form, rapor-goruntule
