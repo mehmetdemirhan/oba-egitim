@@ -320,7 +320,6 @@ function AppContent() {
             {user.role !== "coordinator" && <TabsTrigger value="payments" className={tabClass}><CreditCard className="h-4 w-4 mr-2" />Muhasebe</TabsTrigger>}
             {user.role === "admin" && <TabsTrigger value="users" className={tabClass}><Shield className="h-4 w-4 mr-2" />Kullanıcılar</TabsTrigger>}
             <TabsTrigger value="gelisim" className={tabClass}><Trophy className="h-4 w-4 mr-2" />Gelişim</TabsTrigger>
-            <TabsTrigger value="egzersizler" className={tabClass}><Eye className="h-4 w-4 mr-2" />Egzersizler</TabsTrigger>
             <TabsTrigger value="giris-analizi" className={tabClass}><Stethoscope className="h-4 w-4 mr-2" />Giriş Analizi</TabsTrigger>
           </TabsList>
 
@@ -1000,11 +999,6 @@ function AppContent() {
               <UserManagement teachers={teachers} />
             </TabsContent>
           )}
-
-          {/* Egzersizler */}
-          <TabsContent value="egzersizler">
-            <EgzersizlerModul />
-          </TabsContent>
 
           {/* Giris Analizi */}
           <TabsContent value="giris-analizi">
@@ -2688,7 +2682,7 @@ function RaporGoruntule({ rapor, ogrenci, onGeri }) {
 // ═══════════════════════════════════════════════════════════════
 // EGZERSİZLER MODÜLÜ — Göz Egzersizleri & Okuma Egzersizleri
 // ═══════════════════════════════════════════════════════════════
-function EgzersizlerModul() {
+function EgzersizlerModul({ user, egzersizPuanlari = {}, onTamamla }) {
   const [aktifEgzersiz, setAktifEgzersiz] = useState(null);
   const [egzersizAyar, setEgzersizAyar] = useState({ hiz: 2, boyut: 40, sure: 30, kelimeHiz: 300 });
   const canvasRef = React.useRef(null);
@@ -2720,7 +2714,7 @@ function EgzersizlerModul() {
 
   // Geri sayım
   React.useEffect(() => {
-    if (!calisiyorMu || kalanSure <= 0) { if (kalanSure <= 0 && calisiyorMu) durdur(); return; }
+    if (!calisiyorMu || kalanSure <= 0) { if (kalanSure <= 0 && calisiyorMu) { durdur(); if (onTamamla && aktifEgzersiz) onTamamla(aktifEgzersiz); } return; }
     const t = setTimeout(() => setKalanSure(k => k - 1), 1000);
     return () => clearTimeout(t);
   }, [calisiyorMu, kalanSure]);
@@ -2870,6 +2864,7 @@ function EgzersizlerModul() {
                 <div className="p-4">
                   <h3 className="font-bold text-sm mb-1">{eg.baslik}</h3>
                   <p className="text-xs text-gray-500">{eg.aciklama}</p>
+                  {egzersizPuanlari[eg.id] > 0 && <span className="inline-block mt-2 text-xs font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded-full">🏆 +{egzersizPuanlari[eg.id]} puan</span>}
                 </div>
               </div>
             ))}
@@ -3186,18 +3181,21 @@ function GelisimAlani({ user }) {
   const [tamamlananlar, setTamamlananlar] = useState([]);
   const [puanTablosu, setPuanTablosu] = useState([]);
   const [aktifIcerik, setAktifIcerik] = useState(null);
-  const [gorunum, setGorunum] = useState("liste"); // liste, test, sonuc, icerikEkle
+  const [gorunum, setGorunum] = useState("liste");
   const [testCevaplari, setTestCevaplari] = useState([]);
   const [sonuc, setSonuc] = useState(null);
   const [redSebep, setRedSebep] = useState("");
   const [redDialogIcerik, setRedDialogIcerik] = useState(null);
   const [adminForm, setAdminForm] = useState({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [], makale_link: "", makale_dosya_turu: "link" });
   const [yeniSoru, setYeniSoru] = useState({ soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0 });
+  const [gelisimSekme, setGelisimSekme] = useState("icerikler");
+  const [egzersizPuanlari, setEgzersizPuanlari] = useState({});
 
   const fetchAll = useCallback(async () => {
     try { const r = await axios.get(`${API}/gelisim/icerik`); setIcerikler(r.data); } catch(e) {}
     try { const r = await axios.get(`${API}/gelisim/tamamlama/${user.id}`); setTamamlananlar(r.data); } catch(e) {}
     try { const r = await axios.get(`${API}/gelisim/puan-tablosu`); setPuanTablosu(r.data); } catch(e) {}
+    try { const r = await axios.get(`${API}/egzersiz/puanlar`); setEgzersizPuanlari(r.data); } catch(e) {}
   }, [user.id]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
@@ -3426,6 +3424,62 @@ function GelisimAlani({ user }) {
 
   return (
     <div className="space-y-6">
+      {/* Alt sekme: İçerikler / Egzersizler */}
+      <div className="flex gap-2 mb-2">
+        <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'icerikler' ? 'bg-orange-500 text-white shadow' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`} onClick={() => setGelisimSekme('icerikler')}>📚 İçerikler</button>
+        <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'egzersizler' ? 'bg-blue-500 text-white shadow' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`} onClick={() => setGelisimSekme('egzersizler')}>👁️ Egzersizler</button>
+        {user.role === 'admin' && (
+          <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'puan-ayar' ? 'bg-purple-500 text-white shadow' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`} onClick={() => setGelisimSekme('puan-ayar')}>⚙️ Egzersiz Puanları</button>
+        )}
+      </div>
+
+      {gelisimSekme === 'egzersizler' && (
+        <EgzersizlerModul user={user} egzersizPuanlari={egzersizPuanlari} onTamamla={async (egzersizId) => {
+          try {
+            const r = await axios.post(`${API}/egzersiz/tamamla`, { kullanici_id: user.id, egzersiz_id: egzersizId });
+            toast({ title: `🎉 +${r.data.kazanilan_puan} puan kazandınız!` });
+            fetchAll();
+          } catch(e) {
+            if (e.response?.status === 409) toast({ title: "Bu egzersizi bugün zaten yaptınız" });
+            else toast({ title: "Hata", variant: "destructive" });
+          }
+        }} />
+      )}
+
+      {gelisimSekme === 'puan-ayar' && user.role === 'admin' && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h3 className="font-bold mb-4">⚙️ Egzersiz Puan Ayarları</h3>
+          <p className="text-sm text-gray-500 mb-4">Her egzersiz tamamlandığında öğrencinin kazanacağı puanı belirleyin.</p>
+          <div className="space-y-3">
+            {[
+              {id:'goz-takip', ad:'👁️ Göz Takip'},
+              {id:'goz-sekiz', ad:'♾️ Sonsuzluk (∞)'},
+              {id:'goz-zigzag', ad:'⚡ Zigzag Okuma'},
+              {id:'goz-genisletme', ad:'🔭 Görüş Alanı Genişletme'},
+              {id:'hizli-kelime', ad:'📖 Hızlı Kelime Okuma'},
+              {id:'odaklanma', ad:'🎯 Odaklanma Noktası'},
+            ].map(eg => (
+              <div key={eg.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <span className="text-sm font-medium">{eg.ad}</span>
+                <div className="flex items-center gap-2">
+                  <input type="number" min="0" max="100" className="w-20 border rounded-lg px-2 py-1 text-sm text-center"
+                    value={egzersizPuanlari[eg.id] ?? 10}
+                    onChange={e => setEgzersizPuanlari(prev => ({...prev, [eg.id]: parseInt(e.target.value) || 0}))} />
+                  <span className="text-xs text-gray-500">puan</span>
+                </div>
+              </div>
+            ))}
+            <Button className="bg-purple-600 text-white mt-3" onClick={async () => {
+              try {
+                await axios.post(`${API}/egzersiz/puan-ayarla`, { puanlar: egzersizPuanlari });
+                toast({ title: "Puanlar kaydedildi" });
+              } catch { toast({ title: "Hata", variant: "destructive" }); }
+            }}>💾 Kaydet</Button>
+          </div>
+        </div>
+      )}
+
+      {gelisimSekme === 'icerikler' && (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           {/* Başlık */}
@@ -3618,6 +3672,7 @@ function GelisimAlani({ user }) {
           </Card>
         </div>
       </div>
+      )} {/* /gelisimSekme === icerikler */}
 
       {/* Red Sebebi Dialog */}
       <Dialog open={!!redDialogIcerik} onOpenChange={() => { setRedDialogIcerik(null); setRedSebep(""); }}>
