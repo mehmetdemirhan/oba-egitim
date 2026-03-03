@@ -182,11 +182,6 @@ function AppContent() {
   const [kursDersleri, setKursDersleri] = useState({});
   const [yeniDersForm, setYeniDersForm] = useState(null);
   const [yeniIcerikForm, setYeniIcerikForm] = useState(null);
-  const [kursDersleri, setKursDersleri] = useState({});
-  const [expandedKurs, setExpandedKurs] = useState(null);
-  const [dersForm, setDersForm] = useState({ baslik: "", ozet: "" });
-  const [icerikForm, setIcerikForm] = useState({ tur: "video", baslik: "", url: "", ozet: "" });
-  const [icerikEkleDers, setIcerikEkleDers] = useState(null);
 
   const availableCourses = ["Okuma Becerileri Temel", "Okuma Becerileri İleri", "Hızlı Okuma", "Anlama Becerileri", "Yazım Kuralları", "Dikkat Geliştirme", "Kelime Dağarcığı", "Metin Analizi"];
   const availableClasses = ["1","2","3","4","5","6","7","8","9"];
@@ -267,39 +262,6 @@ function AppContent() {
   };
 
   // ── Ders Yönetimi ──
-  const fetchDersler = async (kursId) => {
-    try {
-      const r = await axios.get(`${API}/courses/${kursId}/dersler`);
-      setKursDersleri(prev => ({ ...prev, [kursId]: r.data }));
-    } catch { console.error("Ders yükleme hatası"); }
-  };
-  const createDers = async (kursId) => {
-    if (!dersForm.baslik.trim()) return;
-    try {
-      const mevcut = kursDersleri[kursId] || [];
-      await axios.post(`${API}/courses/${kursId}/dersler`, { ...dersForm, kurs_id: kursId, sira: mevcut.length + 1 });
-      setDersForm({ baslik: "", ozet: "" });
-      fetchDersler(kursId);
-      toast({ title: "Ders eklendi" });
-    } catch { toast({ title: "Hata", variant: "destructive" }); }
-  };
-  const deleteDers = async (dersId, kursId) => {
-    try { await axios.delete(`${API}/dersler/${dersId}`); fetchDersler(kursId); toast({ title: "Ders silindi" }); } catch { toast({ title: "Hata", variant: "destructive" }); }
-  };
-  const addIcerik = async (dersId, kursId) => {
-    if (!icerikForm.baslik.trim()) return;
-    try {
-      await axios.post(`${API}/dersler/${dersId}/icerik`, icerikForm);
-      setIcerikForm({ tur: "video", baslik: "", url: "", ozet: "" });
-      setIcerikEkleDers(null);
-      fetchDersler(kursId);
-      toast({ title: "İçerik eklendi" });
-    } catch { toast({ title: "Hata", variant: "destructive" }); }
-  };
-  const deleteIcerik = async (dersId, icerikId, kursId) => {
-    try { await axios.delete(`${API}/dersler/${dersId}/icerik/${icerikId}`); fetchDersler(kursId); } catch { toast({ title: "Hata", variant: "destructive" }); }
-  };
-
   const exportToExcel = async () => {
     setLoadingAction(true);
     try {
