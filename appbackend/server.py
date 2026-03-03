@@ -404,6 +404,7 @@ class Teacher(BaseModel):
     atanan_ogrenciler: List[str] = []
     yapilmasi_gereken_odeme: float = 0.0
     yapilan_odeme: float = 0.0
+    arsivli: bool = False
     olusturma_tarihi: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     @property
@@ -433,6 +434,7 @@ class TeacherUpdate(BaseModel):
     seviye: Optional[TeacherLevel] = None
     yapilmasi_gereken_odeme: Optional[float] = None
     yapilan_odeme: Optional[float] = None
+    arsivli: Optional[bool] = None
 
 class Student(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -448,6 +450,7 @@ class Student(BaseModel):
     yapilan_odeme: float = 0.0
     ogretmene_yapilacak_odeme: float = 0.0
     ogretmen_id: Optional[str] = None
+    arsivli: bool = False
     olusturma_tarihi: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class StudentCreate(BaseModel):
@@ -476,6 +479,7 @@ class StudentUpdate(BaseModel):
     yapilan_odeme: Optional[float] = None
     ogretmene_yapilacak_odeme: Optional[float] = None
     ogretmen_id: Optional[str] = None
+    arsivli: Optional[bool] = None
 
 class Course(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -484,6 +488,7 @@ class Course(BaseModel):
     sure: int
     olusturma_tarihi: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     ogrenci_sayisi: int = 0
+    arsivli: bool = False
 
 class CourseCreate(BaseModel):
     ad: str
@@ -494,6 +499,41 @@ class CourseUpdate(BaseModel):
     ad: Optional[str] = None
     fiyat: Optional[float] = None
     sure: Optional[int] = None
+    arsivli: Optional[bool] = None
+
+# ── Ders ve İçerik Modelleri ──
+class DersIcerik(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    tur: str  # video, pdf, docx
+    baslik: str
+    url: str = ""
+    ozet: str = ""
+
+class Ders(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    kurs_id: str
+    baslik: str
+    sira: int = 0
+    ozet: str = ""
+    icerikler: List[DersIcerik] = []
+    olusturma_tarihi: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class DersCreate(BaseModel):
+    kurs_id: str
+    baslik: str
+    sira: int = 0
+    ozet: str = ""
+
+class DersUpdate(BaseModel):
+    baslik: Optional[str] = None
+    sira: Optional[int] = None
+    ozet: Optional[str] = None
+
+class DersIcerikCreate(BaseModel):
+    tur: str
+    baslik: str
+    url: str = ""
+    ozet: str = ""
 
 class Payment(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -805,6 +845,61 @@ async def delete_course(course_id: str):
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Kurs bulunamadı")
     return {"message": "Kurs başarıyla silindi"}
+
+# ── Ders Endpoints ──
+@api_router.get("/courses/{kurs_id}/dersler")
+async def get_dersler(kurs_id: str):
+    dersler = await db.dersler.find({"kurs_id": kurs_id}).sort("sira", 1).to_list(length=None)
+    for d in dersler:
+        d.pop("_id", None)
+    return dersler
+
+@api_router.post("/courses/{kurs_id}/dersler")
+async def create_ders(kurs_id: str, data: DersCreate, current_user=Depends(get_current_user)):
+    ders_doc = {
+        "id": str(uuid.uuid4()),
+        "kurs_id": kurs_id,
+        "baslik": data.baslik,
+        "sira": data.sira,
+        "ozet": data.ozet,
+        "icerikler": [],
+        "olusturma_tarihi": datetime.utcnow().isoformat(),
+    }
+    await db.dersler.insert_one(ders_doc)
+    ders_doc.pop("_id", None)
+    return ders_doc
+
+@api_router.put("/dersler/{ders_id}")
+async def update_ders(ders_id: str, data: DersUpdate, current_user=Depends(get_current_user)):
+    update = data.dict(exclude_unset=True)
+    if update:
+        await db.dersler.update_one({"id": ders_id}, {"$set": update})
+    ders = await db.dersler.find_one({"id": ders_id})
+    if ders:
+        ders.pop("_id", None)
+    return ders
+
+@api_router.delete("/dersler/{ders_id}")
+async def delete_ders(ders_id: str, current_user=Depends(get_current_user)):
+    await db.dersler.delete_one({"id": ders_id})
+    return {"message": "Ders silindi"}
+
+@api_router.post("/dersler/{ders_id}/icerik")
+async def add_ders_icerik(ders_id: str, data: DersIcerikCreate, current_user=Depends(get_current_user)):
+    icerik = {
+        "id": str(uuid.uuid4()),
+        "tur": data.tur,
+        "baslik": data.baslik,
+        "url": data.url,
+        "ozet": data.ozet,
+    }
+    await db.dersler.update_one({"id": ders_id}, {"$push": {"icerikler": icerik}})
+    return icerik
+
+@api_router.delete("/dersler/{ders_id}/icerik/{icerik_id}")
+async def delete_ders_icerik(ders_id: str, icerik_id: str, current_user=Depends(get_current_user)):
+    await db.dersler.update_one({"id": ders_id}, {"$pull": {"icerikler": {"id": icerik_id}}})
+    return {"message": "İçerik silindi"}
 
 @api_router.post("/payments", response_model=Payment)
 async def create_payment(payment_data: PaymentCreate):
