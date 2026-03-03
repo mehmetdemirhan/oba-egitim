@@ -519,7 +519,6 @@ class Ders(BaseModel):
     olusturma_tarihi: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class DersCreate(BaseModel):
-    kurs_id: str
     baslik: str
     sira: int = 0
     ozet: str = ""
