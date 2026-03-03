@@ -176,9 +176,20 @@ function AppContent() {
   const [tahsilatDialog, setTahsilatDialog] = useState(null); // {tip: 'ogrenci'|'ogretmen', kisi: {id,ad,soyad}, miktar: 0, aciklama: ''}
   const [editingItem, setEditingItem] = useState(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [showArchived, setShowArchived] = useState({ teachers: false, students: false, courses: false });
+  const [expandedCourse, setExpandedCourse] = useState(null);
+  const [expandedDers, setExpandedDers] = useState(null);
+  const [kursDersleri, setKursDersleri] = useState({});
+  const [yeniDersForm, setYeniDersForm] = useState(null);
+  const [yeniIcerikForm, setYeniIcerikForm] = useState(null);
+  const [kursDersleri, setKursDersleri] = useState({});
+  const [expandedKurs, setExpandedKurs] = useState(null);
+  const [dersForm, setDersForm] = useState({ baslik: "", ozet: "" });
+  const [icerikForm, setIcerikForm] = useState({ tur: "video", baslik: "", url: "", ozet: "" });
+  const [icerikEkleDers, setIcerikEkleDers] = useState(null);
 
   const availableCourses = ["Okuma Becerileri Temel", "Okuma Becerileri İleri", "Hızlı Okuma", "Anlama Becerileri", "Yazım Kuralları", "Dikkat Geliştirme", "Kelime Dağarcığı", "Metin Analizi"];
-  const availableClasses = ["1-A","1-B","1-C","2-A","2-B","2-C","3-A","3-B","3-C","4-A","4-B","4-C","5-A","5-B","5-C","6-A","6-B","6-C","7-A","7-B","7-C","8-A","8-B","8-C"];
+  const availableClasses = ["1","2","3","4","5","6","7","8","9"];
 
   const fetchAll = useCallback(async () => {
     try { const r = await axios.get(`${API}/dashboard`); setDashboardStats(r.data); } catch(e) {}
@@ -211,6 +222,7 @@ function AppContent() {
   const fetchTeachers = async () => { try { const r = await axios.get(`${API}/teachers`); setTeachers(r.data); } catch(e) {} };
   const fetchStudents = async () => { try { const r = await axios.get(`${API}/students`); setStudents(r.data); } catch(e) {} };
   const fetchCourses = async () => { try { const r = await axios.get(`${API}/courses`); setCourses(r.data); } catch(e) {} };
+  const fetchKursDersleri = async (kursId) => { try { const r = await axios.get(`${API}/courses/${kursId}/dersler`); setKursDersleri(prev => ({...prev, [kursId]: r.data})); } catch(e) {} };
   const fetchPayments = async () => { try { const r = await axios.get(`${API}/payments`); setPayments(r.data); } catch(e) {} };
   const fetchDashboard = async () => { try { const r = await axios.get(`${API}/dashboard`); setDashboardStats(r.data); } catch(e) {} };
   const fetchTeacherStudents = async (id) => { try { const r = await axios.get(`${API}/teachers/${id}/students`); setTeacherStudents(p => ({...p, [id]: r.data})); } catch(e) {} };
@@ -222,6 +234,7 @@ function AppContent() {
   };
 
   const formatCurrency = (v) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(v);
+  const toggleCourseExpand = (id) => { if (expandedCourse === id) { setExpandedCourse(null); } else { setExpandedCourse(id); if (!kursDersleri[id]) fetchKursDersleri(id); } };
   const formatDate = (d) => new Date(d).toLocaleDateString('tr-TR');
 
   const handleEdit = async (updatedData) => {
@@ -240,6 +253,52 @@ function AppContent() {
   const deleteTeacher = async (id) => { try { await axios.delete(`${API}/teachers/${id}`); fetchTeachers(); fetchDashboard(); setTeacherStudents(p => { const n={...p}; delete n[id]; return n; }); toast({ title:"Başarılı", description:"Silindi" }); } catch { toast({ title:"Hata", variant:"destructive" }); } };
   const deleteStudent = async (id) => { try { await axios.delete(`${API}/students/${id}`); fetchStudents(); fetchTeachers(); fetchDashboard(); setTeacherStudents({}); toast({ title:"Başarılı", description:"Silindi" }); } catch { toast({ title:"Hata", variant:"destructive" }); } };
   const deleteCourse = async (id) => { try { await axios.delete(`${API}/courses/${id}`); fetchCourses(); fetchDashboard(); toast({ title:"Başarılı", description:"Silindi" }); } catch { toast({ title:"Hata", variant:"destructive" }); } };
+
+  // ── Arşivleme ──
+  const toggleArsiv = async (type, id, current) => {
+    try {
+      const endpoint = type === 'teacher' ? 'teachers' : type === 'student' ? 'students' : 'courses';
+      await axios.put(`${API}/${endpoint}/${id}`, { arsivli: !current });
+      if (type === 'teacher') fetchTeachers();
+      else if (type === 'student') { fetchStudents(); fetchTeachers(); }
+      else fetchCourses();
+      toast({ title: current ? "Arşivden çıkarıldı" : "Arşivlendi" });
+    } catch { toast({ title: "Hata", variant: "destructive" }); }
+  };
+
+  // ── Ders Yönetimi ──
+  const fetchDersler = async (kursId) => {
+    try {
+      const r = await axios.get(`${API}/courses/${kursId}/dersler`);
+      setKursDersleri(prev => ({ ...prev, [kursId]: r.data }));
+    } catch { console.error("Ders yükleme hatası"); }
+  };
+  const createDers = async (kursId) => {
+    if (!dersForm.baslik.trim()) return;
+    try {
+      const mevcut = kursDersleri[kursId] || [];
+      await axios.post(`${API}/courses/${kursId}/dersler`, { ...dersForm, kurs_id: kursId, sira: mevcut.length + 1 });
+      setDersForm({ baslik: "", ozet: "" });
+      fetchDersler(kursId);
+      toast({ title: "Ders eklendi" });
+    } catch { toast({ title: "Hata", variant: "destructive" }); }
+  };
+  const deleteDers = async (dersId, kursId) => {
+    try { await axios.delete(`${API}/dersler/${dersId}`); fetchDersler(kursId); toast({ title: "Ders silindi" }); } catch { toast({ title: "Hata", variant: "destructive" }); }
+  };
+  const addIcerik = async (dersId, kursId) => {
+    if (!icerikForm.baslik.trim()) return;
+    try {
+      await axios.post(`${API}/dersler/${dersId}/icerik`, icerikForm);
+      setIcerikForm({ tur: "video", baslik: "", url: "", ozet: "" });
+      setIcerikEkleDers(null);
+      fetchDersler(kursId);
+      toast({ title: "İçerik eklendi" });
+    } catch { toast({ title: "Hata", variant: "destructive" }); }
+  };
+  const deleteIcerik = async (dersId, icerikId, kursId) => {
+    try { await axios.delete(`${API}/dersler/${dersId}/icerik/${icerikId}`); fetchDersler(kursId); } catch { toast({ title: "Hata", variant: "destructive" }); }
+  };
 
   const exportToExcel = async () => {
     setLoadingAction(true);
@@ -357,11 +416,11 @@ function AppContent() {
                 </CardContent>
               </Card>
               <Card className="lg:col-span-2 border-0 shadow-sm">
-                <CardHeader><CardTitle>Öğretmenler</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="flex items-center justify-between">Öğretmenler <label className="flex items-center gap-2 text-sm font-normal cursor-pointer"><input type="checkbox" checked={showArchived.teachers} onChange={e => setShowArchived(p => ({...p, teachers: e.target.checked}))} className="rounded" /> Arşivi göster</label></CardTitle></CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {teachers.map(t => (
-                      <div key={t.id} className="border border-gray-100 rounded-2xl overflow-hidden">
+                    {teachers.filter(t => showArchived.teachers || !t.arsivli).map(t => (
+                      <div key={t.id} className={`border border-gray-100 rounded-2xl overflow-hidden ${t.arsivli ? 'opacity-50 bg-gray-50' : ''}`}>
                         <div className="p-4 cursor-pointer hover:bg-gray-50 flex items-center justify-between" onClick={() => toggleTeacherExpansion(t.id)}>
                           <div className="flex items-center gap-4">
                             {expandedTeachers.has(t.id) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -372,6 +431,7 @@ function AppContent() {
                             <div className="flex gap-2">
                               {user.role !== "coordinator" && <Button variant="outline" size="sm" className="text-green-600 border-green-300 hover:bg-green-50" onClick={e => { e.stopPropagation(); setTahsilatDialog({tip:'ogretmen', kisi:t, miktar:0, aciklama:''}); }}><CreditCard className="h-4 w-4" /></Button>}
                               <Button variant="outline" size="sm" onClick={e => { e.stopPropagation(); setEditingItem({type:'teacher',data:t}); setEditDialogOpen(true); }}><Edit2 className="h-4 w-4" /></Button>
+                              <Button variant="outline" size="sm" className={t.arsivli ? "text-green-600 border-green-300" : "text-yellow-600 border-yellow-300"} onClick={e => { e.stopPropagation(); toggleArsiv('teacher', t.id, t.arsivli); }} title={t.arsivli ? "Arşivden Çıkar" : "Arşivle"}>{t.arsivli ? "📂" : "📦"}</Button>
                               <Button variant="destructive" size="sm" onClick={e => { e.stopPropagation(); deleteTeacher(t.id); }}><Trash2 className="h-4 w-4" /></Button>
                             </div>
                           </div>
@@ -473,21 +533,21 @@ function AppContent() {
                 </CardContent>
               </Card>
               <Card className="lg:col-span-2 border-0 shadow-sm">
-                <CardHeader><CardTitle>Öğrenciler</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="flex items-center justify-between">Öğrenciler <label className="flex items-center gap-2 text-sm font-normal cursor-pointer"><input type="checkbox" checked={showArchived.students} onChange={e => setShowArchived(p => ({...p, students: e.target.checked}))} className="rounded" /> Arşivi göster</label></CardTitle></CardHeader>
                 <CardContent>
                   <Table>
                     <TableHeader><TableRow><TableHead>Ad Soyad</TableHead><TableHead>Sınıf</TableHead>{user.role !== "coordinator" && <TableHead>Veli</TableHead>}<TableHead>Öğretmen</TableHead>{user.role !== "coordinator" && <TableHead>Borç</TableHead>}<TableHead>İşlem</TableHead></TableRow></TableHeader>
                     <TableBody>
-                      {students.map(s => {
+                      {students.filter(s => showArchived.students || !s.arsivli).map(s => {
                         const t = teachers.find(t => t.id === s.ogretmen_id);
                         return (
-                          <TableRow key={s.id}>
+                          <TableRow key={s.id} className={s.arsivli ? 'opacity-50 bg-gray-50' : ''}>
                             <TableCell className="font-medium">{s.ad} {s.soyad}</TableCell>
                             <TableCell>{s.sinif}</TableCell>
                             {user.role !== "coordinator" && <TableCell>{s.veli_ad} {s.veli_soyad}</TableCell>}
                             <TableCell>{t ? `${t.ad} ${t.soyad}` : '-'}</TableCell>
                             {user.role !== "coordinator" && <TableCell className="text-green-600 font-semibold">{formatCurrency(Math.max(0, s.yapilmasi_gereken_odeme - s.yapilan_odeme))}</TableCell>}
-                            <TableCell><div className="flex gap-2">{user.role !== "coordinator" && <Button variant="outline" size="sm" className="text-green-600 border-green-300 hover:bg-green-50" onClick={() => setTahsilatDialog({tip:'ogrenci', kisi:s, miktar:0, aciklama:''})}><CreditCard className="h-4 w-4" /></Button>}<Button variant="outline" size="sm" onClick={() => { setEditingItem({type:'student',data:s}); setEditDialogOpen(true); }}><Edit2 className="h-4 w-4" /></Button><Button variant="destructive" size="sm" onClick={() => deleteStudent(s.id)}><Trash2 className="h-4 w-4" /></Button></div></TableCell>
+                            <TableCell><div className="flex gap-2">{user.role !== "coordinator" && <Button variant="outline" size="sm" className="text-green-600 border-green-300 hover:bg-green-50" onClick={() => setTahsilatDialog({tip:'ogrenci', kisi:s, miktar:0, aciklama:''})}><CreditCard className="h-4 w-4" /></Button>}<Button variant="outline" size="sm" onClick={() => { setEditingItem({type:'student',data:s}); setEditDialogOpen(true); }}><Edit2 className="h-4 w-4" /></Button><Button variant="outline" size="sm" className={s.arsivli ? "text-green-600 border-green-300" : "text-yellow-600 border-yellow-300"} onClick={() => toggleArsiv('student', s.id, s.arsivli)} title={s.arsivli ? "Arşivden Çıkar" : "Arşivle"}>{s.arsivli ? "📂" : "📦"}</Button><Button variant="destructive" size="sm" onClick={() => deleteStudent(s.id)}><Trash2 className="h-4 w-4" /></Button></div></TableCell>
                           </TableRow>
                         );
                       })}
@@ -513,21 +573,132 @@ function AppContent() {
                 </CardContent>
               </Card>
               <Card className="lg:col-span-2 border-0 shadow-sm">
-                <CardHeader><CardTitle>Kurslar</CardTitle></CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader><TableRow><TableHead>Kurs Adı</TableHead><TableHead>Fiyat</TableHead><TableHead>Süre</TableHead><TableHead>İşlem</TableHead></TableRow></TableHeader>
-                    <TableBody>
-                      {courses.map(c => (
-                        <TableRow key={c.id}>
-                          <TableCell className="font-medium">{c.ad}</TableCell>
-                          <TableCell>{formatCurrency(c.fiyat)}</TableCell>
-                          <TableCell>{c.sure} saat</TableCell>
-                          <TableCell><div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => { setEditingItem({type:'course',data:c}); setEditDialogOpen(true); }}><Edit2 className="h-4 w-4" /></Button><Button variant="destructive" size="sm" onClick={() => deleteCourse(c.id)}><Trash2 className="h-4 w-4" /></Button></div></TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                <CardHeader><CardTitle className="flex items-center justify-between">Kurslar <label className="flex items-center gap-2 text-sm font-normal cursor-pointer"><input type="checkbox" checked={showArchived.courses} onChange={e => setShowArchived(p => ({...p, courses: e.target.checked}))} className="rounded" /> Arşivi göster</label></CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  {courses.filter(c => showArchived.courses || !c.arsivli).map(c => {
+                    const isExpanded = expandedCourse === c.id;
+                    return (
+                      <div key={c.id} className={`border border-gray-200 rounded-xl overflow-hidden ${c.arsivli ? 'opacity-50 bg-gray-50' : ''}`}>
+                        <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50" onClick={() => toggleCourseExpand(c.id)}>
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg">{isExpanded ? '▼' : '▶'}</span>
+                            <div>
+                              <div className="font-semibold">{c.ad}</div>
+                              <div className="text-sm text-gray-500">{formatCurrency(c.fiyat)} • {c.sure} saat • {(kursDersleri[c.id] || []).length} ders</div>
+                            </div>
+                          </div>
+                          <div className="flex gap-2" onClick={e => e.stopPropagation()}>
+                            <Button variant="outline" size="sm" onClick={() => { setEditingItem({type:'course',data:c}); setEditDialogOpen(true); }}><Edit2 className="h-4 w-4" /></Button>
+                            <Button variant="outline" size="sm" className={c.arsivli ? "text-green-600 border-green-300" : "text-yellow-600 border-yellow-300"} onClick={() => toggleArsiv('course', c.id, c.arsivli)} title={c.arsivli ? "Arşivden Çıkar" : "Arşivle"}>{c.arsivli ? "📂" : "📦"}</Button>
+                            <Button variant="destructive" size="sm" onClick={() => deleteCourse(c.id)}><Trash2 className="h-4 w-4" /></Button>
+                          </div>
+                        </div>
+                        {isExpanded && (
+                          <div className="border-t border-gray-100 bg-gray-50 p-4 space-y-4">
+                            <div className="flex items-center justify-between">
+                              <h4 className="font-semibold text-sm">📚 Dersler</h4>
+                              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setYeniDersForm({kurs_id: c.id, baslik: '', ozet: '', _acik: true})}>+ Ders Ekle</Button>
+                            </div>
+                            {yeniDersForm?._acik && yeniDersForm?.kurs_id === c.id && (
+                              <div className="bg-white p-3 rounded-lg border border-blue-200 space-y-2">
+                                <Input placeholder="Ders başlığı" value={yeniDersForm.baslik} onChange={e => setYeniDersForm({...yeniDersForm, baslik: e.target.value})} />
+                                <textarea className="w-full border rounded-lg p-2 text-sm" rows={2} placeholder="Ders özeti..." value={yeniDersForm.ozet} onChange={e => setYeniDersForm({...yeniDersForm, ozet: e.target.value})} />
+                                <div className="flex gap-2">
+                                  <Button size="sm" className="bg-blue-600 text-white" onClick={async () => {
+                                    if (!yeniDersForm.baslik) return;
+                                    try {
+                                      const sira = (kursDersleri[c.id] || []).length + 1;
+                                      await axios.post(`${API}/courses/${c.id}/dersler`, { baslik: yeniDersForm.baslik, ozet: yeniDersForm.ozet, sira });
+                                      setYeniDersForm(null);
+                                      fetchKursDersleri(c.id);
+                                      toast({title: "Ders eklendi"});
+                                    } catch { toast({title:"Hata", variant:"destructive"}); }
+                                  }}>Kaydet</Button>
+                                  <Button size="sm" variant="outline" onClick={() => setYeniDersForm(null)}>İptal</Button>
+                                </div>
+                              </div>
+                            )}
+                            {(kursDersleri[c.id] || []).length === 0 && <p className="text-sm text-gray-400 italic">Henüz ders eklenmemiş</p>}
+                            {(kursDersleri[c.id] || []).map((ders, di) => (
+                              <div key={ders.id} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                                <div className="flex items-center justify-between p-3 cursor-pointer hover:bg-blue-50" onClick={() => setExpandedDers(expandedDers === ders.id ? null : ders.id)}>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-blue-600 bg-blue-100 rounded-full w-6 h-6 flex items-center justify-center">{di+1}</span>
+                                    <div>
+                                      <div className="font-medium text-sm">{ders.baslik}</div>
+                                      {ders.ozet && <div className="text-xs text-gray-500">{ders.ozet.slice(0,80)}{ders.ozet.length > 80 ? '...' : ''}</div>}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                                    <span className="text-xs text-gray-400">{(ders.icerikler || []).length} içerik</span>
+                                    <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={async () => {
+                                      if (confirm('Bu dersi silmek istediğinize emin misiniz?')) {
+                                        await axios.delete(`${API}/dersler/${ders.id}`);
+                                        fetchKursDersleri(c.id);
+                                        toast({title: "Ders silindi"});
+                                      }
+                                    }}><Trash2 className="h-3 w-3" /></Button>
+                                  </div>
+                                </div>
+                                {expandedDers === ders.id && (
+                                  <div className="border-t border-gray-100 p-3 space-y-3 bg-blue-50/30">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-xs font-semibold text-gray-600">📎 İçerikler</span>
+                                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setYeniIcerikForm({ders_id: ders.id, kurs_id: c.id, tur: 'video', baslik: '', url: '', ozet: '', _acik: true})}>+ İçerik Ekle</Button>
+                                    </div>
+                                    {yeniIcerikForm?._acik && yeniIcerikForm?.ders_id === ders.id && (
+                                      <div className="bg-white p-3 rounded-lg border border-green-200 space-y-2">
+                                        <div className="flex gap-2">
+                                          {['video','pdf','docx'].map(t => (
+                                            <button key={t} className={`px-3 py-1 rounded-full text-xs font-medium border ${yeniIcerikForm.tur === t ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300'}`} onClick={() => setYeniIcerikForm({...yeniIcerikForm, tur: t})}>
+                                              {t === 'video' ? '🎬 Video' : t === 'pdf' ? '📄 PDF' : '📝 Doküman'}
+                                            </button>
+                                          ))}
+                                        </div>
+                                        <Input placeholder="İçerik başlığı" value={yeniIcerikForm.baslik} onChange={e => setYeniIcerikForm({...yeniIcerikForm, baslik: e.target.value})} />
+                                        <Input placeholder="URL (video linki, dosya linki...)" value={yeniIcerikForm.url} onChange={e => setYeniIcerikForm({...yeniIcerikForm, url: e.target.value})} />
+                                        <textarea className="w-full border rounded-lg p-2 text-sm" rows={2} placeholder="İçerik özeti..." value={yeniIcerikForm.ozet} onChange={e => setYeniIcerikForm({...yeniIcerikForm, ozet: e.target.value})} />
+                                        <div className="flex gap-2">
+                                          <Button size="sm" className="bg-green-600 text-white" onClick={async () => {
+                                            if (!yeniIcerikForm.baslik) return;
+                                            try {
+                                              await axios.post(`${API}/dersler/${ders.id}/icerik`, { tur: yeniIcerikForm.tur, baslik: yeniIcerikForm.baslik, url: yeniIcerikForm.url, ozet: yeniIcerikForm.ozet });
+                                              setYeniIcerikForm(null);
+                                              fetchKursDersleri(c.id);
+                                              toast({title: "İçerik eklendi"});
+                                            } catch { toast({title:"Hata", variant:"destructive"}); }
+                                          }}>Kaydet</Button>
+                                          <Button size="sm" variant="outline" onClick={() => setYeniIcerikForm(null)}>İptal</Button>
+                                        </div>
+                                      </div>
+                                    )}
+                                    {(ders.icerikler || []).length === 0 && !yeniIcerikForm?._acik && <p className="text-xs text-gray-400 italic">Henüz içerik eklenmemiş</p>}
+                                    {(ders.icerikler || []).map(ic => (
+                                      <div key={ic.id} className="bg-white p-2 rounded-lg border border-gray-100 flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-lg">{ic.tur === 'video' ? '🎬' : ic.tur === 'pdf' ? '📄' : '📝'}</span>
+                                          <div>
+                                            <div className="text-sm font-medium">{ic.baslik}</div>
+                                            {ic.ozet && <div className="text-xs text-gray-500">{ic.ozet.slice(0,60)}{ic.ozet.length > 60 ? '...' : ''}</div>}
+                                            {ic.url && <a href={ic.url} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline">🔗 Bağlantı</a>}
+                                          </div>
+                                        </div>
+                                        <Button variant="outline" size="sm" className="h-7 w-7 p-0 text-red-500" onClick={async () => {
+                                          await axios.delete(`${API}/dersler/${ders.id}/icerik/${ic.id}`);
+                                          fetchKursDersleri(c.id);
+                                          toast({title: "İçerik silindi"});
+                                        }}><Trash2 className="h-3 w-3" /></Button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </CardContent>
               </Card>
             </div>
