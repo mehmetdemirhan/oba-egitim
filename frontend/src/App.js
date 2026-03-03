@@ -607,19 +607,48 @@ function AppContent() {
                                   <div className="border-t border-gray-100 p-3 space-y-3 bg-blue-50/30">
                                     <div className="flex items-center justify-between">
                                       <span className="text-xs font-semibold text-gray-600">📎 İçerikler</span>
-                                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setYeniIcerikForm({ders_id: ders.id, kurs_id: c.id, tur: 'video', baslik: '', url: '', ozet: '', _acik: true})}>+ İçerik Ekle</Button>
+                                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setYeniIcerikForm({ders_id: ders.id, kurs_id: c.id, tur: 'video', baslik: '', url: '', ozet: '', _acik: true, _egzersizId: ''})}>+ İçerik Ekle</Button>
                                     </div>
                                     {yeniIcerikForm?._acik && yeniIcerikForm?.ders_id === ders.id && (
                                       <div className="bg-white p-3 rounded-lg border border-green-200 space-y-2">
-                                        <div className="flex gap-2">
+                                        <div className="flex gap-2 flex-wrap">
                                           {['video','pdf','docx','embed','egzersiz'].map(t => (
-                                            <button key={t} className={`px-3 py-1 rounded-full text-xs font-medium border ${yeniIcerikForm.tur === t ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300'}`} onClick={() => setYeniIcerikForm({...yeniIcerikForm, tur: t})}>
+                                            <button key={t} className={`px-3 py-1 rounded-full text-xs font-medium border ${yeniIcerikForm.tur === t ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300'}`} onClick={() => setYeniIcerikForm({...yeniIcerikForm, tur: t, _egzersizId: '', baslik: t === 'egzersiz' ? '' : yeniIcerikForm.baslik, url: t === 'egzersiz' ? '' : yeniIcerikForm.url})}>
                                               {t === 'video' ? '🎬 Video' : t === 'pdf' ? '📄 PDF' : t === 'docx' ? '📝 Doküman' : t === 'embed' ? '🌐 Web Embed' : '🎯 Egzersiz'}
                                             </button>
                                           ))}
                                         </div>
-                                        <Input placeholder="İçerik başlığı" value={yeniIcerikForm.baslik} onChange={e => setYeniIcerikForm({...yeniIcerikForm, baslik: e.target.value})} />
-                                        <Input placeholder="URL (video linki, dosya linki...)" value={yeniIcerikForm.url} onChange={e => setYeniIcerikForm({...yeniIcerikForm, url: e.target.value})} />
+                                        {yeniIcerikForm.tur === 'egzersiz' ? (
+                                          <div className="space-y-2">
+                                            <p className="text-xs text-gray-500 font-medium">Bir egzersiz seçin:</p>
+                                            <div className="grid grid-cols-2 gap-2">
+                                              {[
+                                                {id:'goz-takip', icon:'👁️', ad:'Göz Takip Egzersizi', aciklama:'Hareket eden topu takip edin'},
+                                                {id:'goz-sekiz', icon:'♾️', ad:'Sonsuzluk (∞) Egzersizi', aciklama:'Göz sonsuzluk şeklinde hareket eder'},
+                                                {id:'goz-zigzag', icon:'⚡', ad:'Zigzag Okuma', aciklama:'Satır takip hızını artırır'},
+                                                {id:'goz-genisletme', icon:'🔭', ad:'Görüş Alanı Genişletme', aciklama:'Çevresel görüşü genişletin'},
+                                                {id:'hizli-kelime', icon:'📖', ad:'Hızlı Kelime Okuma (RSVP)', aciklama:'Kelimeler tek tek hızla gösterilir'},
+                                                {id:'odaklanma', icon:'🎯', ad:'Odaklanma Noktası', aciklama:'Merkeze odaklan, çevreyi oku'},
+                                              ].map(eg => (
+                                                <div key={eg.id} className={`p-2 rounded-lg border cursor-pointer transition-all ${yeniIcerikForm._egzersizId === eg.id ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/50'}`}
+                                                  onClick={() => setYeniIcerikForm({...yeniIcerikForm, _egzersizId: eg.id, baslik: eg.ad, url: `egzersiz://${eg.id}`, ozet: eg.aciklama})}>
+                                                  <div className="flex items-center gap-2">
+                                                    <span className="text-xl">{eg.icon}</span>
+                                                    <div>
+                                                      <div className="text-xs font-semibold">{eg.ad}</div>
+                                                      <div className="text-xs text-gray-400">{eg.aciklama}</div>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <>
+                                            <Input placeholder="İçerik başlığı" value={yeniIcerikForm.baslik} onChange={e => setYeniIcerikForm({...yeniIcerikForm, baslik: e.target.value})} />
+                                            <Input placeholder="URL (video linki, dosya linki...)" value={yeniIcerikForm.url} onChange={e => setYeniIcerikForm({...yeniIcerikForm, url: e.target.value})} />
+                                          </>
+                                        )}
                                         <textarea className="w-full border rounded-lg p-2 text-sm" rows={2} placeholder="İçerik özeti..." value={yeniIcerikForm.ozet} onChange={e => setYeniIcerikForm({...yeniIcerikForm, ozet: e.target.value})} />
                                         <div className="flex gap-2">
                                           <Button size="sm" className="bg-green-600 text-white" onClick={async () => {
@@ -639,27 +668,32 @@ function AppContent() {
                                     {(ders.icerikler || []).map(ic => {
                                       const isYoutube = ic.url && (ic.url.includes('youtube.com') || ic.url.includes('youtu.be'));
                                       const ytId = isYoutube ? (ic.url.match(/(?:v=|youtu\.be\/)([\w-]+)/)?.[1] || '') : '';
-                                      const isEmbed = ic.tur === 'embed' || ic.tur === 'egzersiz';
+                                      const isEgzersiz = ic.url && ic.url.startsWith('egzersiz://');
+                                      const egzersizId = isEgzersiz ? ic.url.replace('egzersiz://', '') : '';
+                                      const isEmbed = (ic.tur === 'embed') || (ic.tur === 'egzersiz' && !isEgzersiz);
                                       const isPdf = ic.url && ic.url.endsWith('.pdf');
                                       const showEmbed = ic._embed || false;
                                       return (
                                       <div key={ic.id} className="bg-white rounded-lg border border-gray-100 overflow-hidden">
                                         <div className="flex items-center justify-between p-2">
                                           <div className="flex items-center gap-2 flex-1">
-                                            <span className="text-lg">{ic.tur === 'video' ? '🎬' : ic.tur === 'pdf' ? '📄' : ic.tur === 'embed' || ic.tur === 'egzersiz' ? '🎯' : '📝'}</span>
+                                            <span className="text-lg">{isEgzersiz ? '🎯' : ic.tur === 'video' ? '🎬' : ic.tur === 'pdf' ? '📄' : ic.tur === 'embed' ? '🌐' : '📝'}</span>
                                             <div className="flex-1">
                                               <div className="text-sm font-medium">{ic.baslik}</div>
                                               {ic.ozet && <div className="text-xs text-gray-500">{ic.ozet.slice(0,80)}{ic.ozet.length > 80 ? '...' : ''}</div>}
                                             </div>
                                           </div>
                                           <div className="flex items-center gap-1">
-                                            {ic.url && (isYoutube || isEmbed || isPdf) && (
+                                            {isEgzersiz && (
+                                              <Button size="sm" className="h-7 text-xs bg-gradient-to-r from-blue-500 to-cyan-500 text-white" onClick={() => { setActiveTab('egzersizler'); }}>▶ Egzersizi Başlat</Button>
+                                            )}
+                                            {ic.url && !isEgzersiz && (isYoutube || isEmbed || isPdf) && (
                                               <Button variant="outline" size="sm" className="h-7 text-xs text-blue-600 border-blue-300" onClick={() => {
                                                 const updated = (kursDersleri[c.id] || []).map(d => d.id === ders.id ? {...d, icerikler: d.icerikler.map(i => i.id === ic.id ? {...i, _embed: !i._embed} : i)} : d);
                                                 setKursDersleri(prev => ({...prev, [c.id]: updated}));
                                               }}>{showEmbed ? '▲ Kapat' : '▶ Aç'}</Button>
                                             )}
-                                            {ic.url && !isYoutube && !isEmbed && !isPdf && <a href={ic.url} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline mr-2">🔗 Aç</a>}
+                                            {ic.url && !isYoutube && !isEmbed && !isPdf && !isEgzersiz && <a href={ic.url} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline mr-2">🔗 Aç</a>}
                                             <Button variant="outline" size="sm" className="h-7 w-7 p-0 text-red-500" onClick={async () => {
                                               await axios.delete(`${API}/dersler/${ders.id}/icerik/${ic.id}`);
                                               fetchKursDersleri(c.id);
