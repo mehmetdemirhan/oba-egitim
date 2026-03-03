@@ -631,7 +631,7 @@ function AppContent() {
                                                 {id:'periferik', icon:'👀', ad:'Periferik Görüş', aciklama:'Çevresel görüş egzersizi'},
                                                 {id:'schulte', icon:'🔢', ad:'Schulte Tablosu', aciklama:'Sayıları sırayla bul'},
                                                 {id:'goz-yoga', icon:'🧘', ad:'Göz Yoga', aciklama:'Uzak-yakın odaklanma'},
-                                                {id:'renk-eslestirme', icon:'🎨', ad:'Şekil/Renk Eşleştirme', aciklama:'Hızlı eşleştirme'},
+                                                {id:'renk-eslestir', icon:'🎨', ad:'Renk Eşleştirme', aciklama:'Hızlı renk algılama'},
                                                 {id:'kelime-avcisi', icon:'🔍', ad:'Kelime Avcısı', aciklama:'Metinde hedef kelime bul'},
                                                 {id:'ters-kelime', icon:'🔄', ad:'Ters Kelime Okuma', aciklama:'Beyin jimnastiği'},
                                                 {id:'eksik-harf', icon:'✏️', ad:'Eksik Harf Tamamlama', aciklama:'Eksik harfleri tamamla'},
@@ -2691,14 +2691,34 @@ function EgzersizlerModul({ user, egzersizPuanlari = {}, onTamamla }) {
   const [kalanSure, setKalanSure] = useState(0);
   const [wpmKelimeler, setWpmKelimeler] = useState([]);
   const [wpmIndex, setWpmIndex] = useState(0);
+  // Interactive exercise states
+  const [schulteGrid, setSchulteGrid] = useState([]);
+  const [schulteNext, setSchulteNext] = useState(1);
+  const [schulteSize, setSchulteSize] = useState(5);
+  const [interSkor, setInterSkor] = useState(0);
+  const [interSoru, setInterSoru] = useState(null);
+  const [interCevap, setInterCevap] = useState('');
+  const [interFeedback, setInterFeedback] = useState(null);
+  const [kelimeAvcisiMetin, setKelimeAvcisiMetin] = useState([]);
+  const [kelimeAvcisiHedef, setKelimeAvcisiHedef] = useState('');
+  const [kelimeAvcisiBulunan, setKelimeAvcisiBulunan] = useState(new Set());
+  const [renkSoru, setRenkSoru] = useState(null);
 
   const egzersizler = [
-    { id: 'goz-takip', baslik: 'Göz Takip Egzersizi', icon: '👁️', aciklama: 'Hareket eden topu gözlerinizle takip edin. Göz kaslarını güçlendirir.', renk: 'from-blue-500 to-cyan-500' },
-    { id: 'goz-sekiz', baslik: 'Sonsuzluk (∞) Egzersizi', icon: '♾️', aciklama: 'Göz sonsuzluk şeklinde hareket eder. Odaklanma ve koordinasyonu geliştirir.', renk: 'from-purple-500 to-pink-500' },
-    { id: 'goz-zigzag', baslik: 'Zigzag Okuma', icon: '⚡', aciklama: 'Göz zigzag şeklinde hareket eder. Satır takip hızını artırır.', renk: 'from-orange-500 to-red-500' },
-    { id: 'goz-genisletme', baslik: 'Görüş Alanı Genişletme', icon: '🔭', aciklama: 'Merkeze odaklanırken çevresel görüşü genişletin.', renk: 'from-green-500 to-emerald-500' },
-    { id: 'hizli-kelime', baslik: 'Hızlı Kelime Okuma (RSVP)', icon: '📖', aciklama: 'Kelimeler tek tek hızla gösterilir. Okuma hızını artırır.', renk: 'from-indigo-500 to-blue-500' },
-    { id: 'odaklanma', baslik: 'Odaklanma Noktası', icon: '🎯', aciklama: 'Merkez noktaya odaklanın, çevredeki harfleri okumaya çalışın.', renk: 'from-teal-500 to-cyan-500' },
+    { id: 'goz-takip', baslik: 'Göz Takip Egzersizi', icon: '👁️', aciklama: 'Hareket eden topu gözlerinizle takip edin. Göz kaslarını güçlendirir.', renk: 'from-blue-500 to-cyan-500', kat: 'goz' },
+    { id: 'goz-sekiz', baslik: 'Sonsuzluk (∞) Egzersizi', icon: '♾️', aciklama: 'Göz sonsuzluk şeklinde hareket eder. Odaklanma ve koordinasyonu geliştirir.', renk: 'from-purple-500 to-pink-500', kat: 'goz' },
+    { id: 'goz-zigzag', baslik: 'Zigzag Okuma', icon: '⚡', aciklama: 'Göz zigzag şeklinde hareket eder. Satır takip hızını artırır.', renk: 'from-orange-500 to-red-500', kat: 'goz' },
+    { id: 'goz-genisletme', baslik: 'Görüş Alanı Genişletme', icon: '🔭', aciklama: 'Merkeze odaklanırken çevresel görüşü genişletin.', renk: 'from-green-500 to-emerald-500', kat: 'goz' },
+    { id: 'odaklanma', baslik: 'Odaklanma Noktası', icon: '🎯', aciklama: 'Merkez noktaya odaklanın, çevredeki harfleri okumaya çalışın.', renk: 'from-teal-500 to-cyan-500', kat: 'goz' },
+    { id: 'periferik', baslik: 'Periferik Görüş', icon: '🌀', aciklama: 'Merkeze bakarken kenar harfleri okuyun. Çevresel görüşü güçlendirir.', renk: 'from-rose-500 to-pink-500', kat: 'goz' },
+    { id: 'schulte', baslik: 'Schulte Tablosu', icon: '🔢', aciklama: 'Sayıları sırayla bulun. Göz tarama hızını ve dikkat süresini artırır.', renk: 'from-amber-500 to-orange-500', kat: 'goz' },
+    { id: 'goz-yoga', baslik: 'Göz Yoga (Uzak-Yakın)', icon: '🧘', aciklama: 'Uzak ve yakın noktalara odaklanın. Göz esnekliğini geliştirir.', renk: 'from-lime-500 to-green-500', kat: 'goz' },
+    { id: 'renk-eslestir', baslik: 'Hızlı Renk Eşleştirme', icon: '🎨', aciklama: 'Renkleri hızla eşleştirin. Algı hızını ve dikkat süresini artırır.', renk: 'from-fuchsia-500 to-purple-500', kat: 'goz' },
+    { id: 'hizli-kelime', baslik: 'Hızlı Kelime Okuma (RSVP)', icon: '📖', aciklama: 'Kelimeler tek tek hızla gösterilir. Okuma hızını artırır.', renk: 'from-indigo-500 to-blue-500', kat: 'okuma' },
+    { id: 'kelime-avcisi', baslik: 'Kelime Avcısı', icon: '🔍', aciklama: 'Metinde hedef kelimeyi bulun. Tarama hızını ve dikkatinizi geliştirir.', renk: 'from-sky-500 to-blue-500', kat: 'okuma' },
+    { id: 'ters-kelime', baslik: 'Ters Kelime Okuma', icon: '🔄', aciklama: 'Kelimeleri tersten okuyun. Beyin jimnastiği ve harf farkındalığı.', renk: 'from-violet-500 to-indigo-500', kat: 'okuma' },
+    { id: 'eksik-harf', baslik: 'Eksik Harf Tamamlama', icon: '✏️', aciklama: 'Eksik harfleri tamamlayın. Kelime tanıma ve tahmin becerisini geliştirir.', renk: 'from-cyan-500 to-teal-500', kat: 'okuma' },
+    { id: 'karisik-cumle', baslik: 'Karışık Cümle Düzenleme', icon: '🧩', aciklama: 'Karışık kelimeleri doğru sıraya dizin. Anlama becerisini güçlendirir.', renk: 'from-red-500 to-rose-500', kat: 'okuma' },
   ];
 
   const durdur = () => {
@@ -2706,10 +2726,56 @@ function EgzersizlerModul({ user, egzersizPuanlari = {}, onTamamla }) {
     if (animRef.current) { cancelAnimationFrame(animRef.current); animRef.current = null; }
   };
 
+  const turkceKelimeler = 'okuma kitap harf sözcük metin sayfa satır anlam öğrenci öğretmen kalem defter sınıf tahta pencere kapı masa sandalye bilgi düşünce hikaye masal roman şiir yazar çocuk anne baba kardeş arkadaş oyun park bahçe çiçek ağaç güneş yıldız ay bulut rüzgar yağmur deniz göl nehir dağ orman kuş kedi köpek balık araba tren uçak gemi yol sokak şehir köy'.split(' ');
+  const cumleHavuzu = [
+    {d:'Güneş doğarken kuşlar şarkı söylemeye başladı',k:['başladı','söylemeye','şarkı','kuşlar','doğarken','Güneş']},
+    {d:'Küçük kedi bahçede kelebekleri kovalıyordu',k:['kovalıyordu','kelebekleri','bahçede','kedi','Küçük']},
+    {d:'Çocuklar parkta neşeyle oynuyorlardı',k:['oynuyorlardı','neşeyle','parkta','Çocuklar']},
+    {d:'Öğretmen tahtaya güzel bir resim çizdi',k:['çizdi','resim','bir','güzel','tahtaya','Öğretmen']},
+    {d:'Yağmur yağınca çocuklar eve koştu',k:['koştu','eve','çocuklar','yağınca','Yağmur']},
+    {d:'Annem bize lezzetli bir pasta yaptı',k:['yaptı','pasta','bir','lezzetli','bize','Annem']},
+    {d:'Kütüphanede sessizce kitap okuyan çocuklar vardı',k:['vardı','çocuklar','okuyan','kitap','sessizce','Kütüphanede']},
+    {d:'Denizde yüzen balıklar çok renkli görünüyordu',k:['görünüyordu','renkli','çok','balıklar','yüzen','Denizde']},
+  ];
+
+  const yeniInterSoru = (tip) => {
+    if (tip === 'schulte') {
+      const n = schulteSize;
+      const nums = Array.from({length: n*n}, (_,i) => i+1);
+      for (let i = nums.length-1; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); [nums[i],nums[j]] = [nums[j],nums[i]]; }
+      setSchulteGrid(nums); setSchulteNext(1); setInterSkor(0);
+    } else if (tip === 'renk-eslestir') {
+      const renkler = [{ad:'KIRMIZI',hex:'#ef4444'},{ad:'MAVİ',hex:'#3b82f6'},{ad:'YEŞİL',hex:'#22c55e'},{ad:'SARI',hex:'#eab308'},{ad:'TURUNCU',hex:'#f97316'},{ad:'MOR',hex:'#a855f7'}];
+      const r1 = renkler[Math.floor(Math.random()*renkler.length)];
+      const r2 = renkler[Math.floor(Math.random()*renkler.length)];
+      setRenkSoru({yazi: r1.ad, renk: r2.hex, dogruRenk: r2.ad, secenekler: renkler.sort(() => Math.random()-0.5).slice(0,4)});
+      setInterSkor(0);
+    } else if (tip === 'kelime-avcisi') {
+      const metin = []; for (let i = 0; i < 60; i++) metin.push(turkceKelimeler[Math.floor(Math.random()*turkceKelimeler.length)]);
+      const hedef = metin[Math.floor(Math.random()*metin.length)];
+      setKelimeAvcisiMetin(metin); setKelimeAvcisiHedef(hedef); setKelimeAvcisiBulunan(new Set()); setInterSkor(0);
+    } else if (tip === 'ters-kelime') {
+      const k = turkceKelimeler[Math.floor(Math.random()*turkceKelimeler.length)];
+      setInterSoru({kelime: k, ters: k.split('').reverse().join('')}); setInterCevap(''); setInterFeedback(null); setInterSkor(0);
+    } else if (tip === 'eksik-harf') {
+      const k = turkceKelimeler[Math.floor(Math.random()*turkceKelimeler.length)];
+      const idx = Math.floor(Math.random()*k.length);
+      setInterSoru({kelime: k, eksikIdx: idx, gosterim: k.split('').map((h,i) => i===idx ? '_' : h).join('')}); setInterCevap(''); setInterFeedback(null); setInterSkor(0);
+    } else if (tip === 'karisik-cumle') {
+      const c = cumleHavuzu[Math.floor(Math.random()*cumleHavuzu.length)];
+      setInterSoru({dogru: c.d, karisik: [...c.k].sort(() => Math.random()-0.5), secilen: []}); setInterFeedback(null); setInterSkor(0);
+    }
+  };
+
   const baslat = (id) => {
     setAktifEgzersiz(id);
     setCalisiyorMu(true);
     setKalanSure(egzersizAyar.sure);
+    setInterSkor(0);
+    setInterFeedback(null);
+    if (['schulte','renk-eslestir','kelime-avcisi','ters-kelime','eksik-harf','karisik-cumle'].includes(id)) {
+      yeniInterSoru(id);
+    }
   };
 
   // Geri sayım
@@ -2810,12 +2876,10 @@ function EgzersizlerModul({ user, egzersizPuanlari = {}, onTamamla }) {
       else if (aktifEgzersiz === 'odaklanma') {
         ctx.beginPath(); ctx.arc(W/2, H/2, 10, 0, Math.PI*2);
         ctx.fillStyle = '#ef4444'; ctx.fill();
-        // İç içe halkalar
         for (let r = 1; r <= 4; r++) {
           ctx.beginPath(); ctx.arc(W/2, H/2, r * 50, 0, Math.PI*2);
           ctx.strokeStyle = `rgba(99,102,241,${0.3 - r * 0.05})`; ctx.lineWidth = 1; ctx.stroke();
         }
-        // Rastgele harfler
         const harfler2 = 'ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZ0123456789';
         ctx.font = '16px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         const harfFrame = Math.floor(t * 2);
@@ -2827,6 +2891,54 @@ function EgzersizlerModul({ user, egzersizPuanlari = {}, onTamamla }) {
           ctx.fillStyle = '#4f46e5';
           ctx.fillText(harfler2[(harfFrame + i * 3) % harfler2.length], hx, hy);
         }
+      }
+      else if (aktifEgzersiz === 'periferik') {
+        // Merkez kelime + çevrede genişleyen harfler
+        ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(W/2, H/2, 6, 0, Math.PI*2); ctx.fill();
+        const kelimeler = ['OKUMA','KİTAP','HARF','SÖZCÜK','METİN','SAYFA','SATIR','ANLAM'];
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        const ring1 = 80, ring2 = 150, ring3 = 220;
+        [ring1, ring2, ring3].forEach((ring, ri) => {
+          ctx.beginPath(); ctx.arc(W/2, H/2, ring, 0, Math.PI*2);
+          ctx.strokeStyle = `rgba(244,63,94,${0.15 - ri*0.04})`; ctx.lineWidth = 1; ctx.stroke();
+          const count = 4 + ri * 2;
+          const fontSize = 18 - ri * 3;
+          ctx.font = `bold ${fontSize}px sans-serif`;
+          for (let i = 0; i < count; i++) {
+            const a = (i / count) * Math.PI * 2 + t * (0.2 - ri * 0.05);
+            const px = W/2 + Math.cos(a) * ring;
+            const py = H/2 + Math.sin(a) * ring;
+            ctx.fillStyle = `rgba(244,63,94,${0.9 - ri * 0.25})`;
+            ctx.fillText(kelimeler[(Math.floor(t * 2) + i + ri * 3) % kelimeler.length], px, py);
+          }
+        });
+        ctx.font = '11px sans-serif'; ctx.fillStyle = '#999';
+        ctx.fillText('Kırmızı noktaya odaklanıp çevredeki kelimeleri okuyun', W/2, H - 15);
+      }
+      else if (aktifEgzersiz === 'goz-yoga') {
+        // Uzak-yakın odaklanma: büyüyüp küçülen daire
+        const phase = Math.sin(t * 0.4);
+        const minR = 15, maxR = Math.min(W, H) * 0.35;
+        const r = minR + (phase * 0.5 + 0.5) * (maxR - minR);
+        const isYakin = phase > 0;
+        // Arka plan gradient
+        const bgGrad = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, maxR + 50);
+        bgGrad.addColorStop(0, isYakin ? 'rgba(132,204,22,0.1)' : 'rgba(132,204,22,0.02)');
+        bgGrad.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, W, H);
+        // Ana daire
+        ctx.beginPath(); ctx.arc(W/2, H/2, r, 0, Math.PI*2);
+        const cGrad = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, r);
+        cGrad.addColorStop(0, '#84cc16'); cGrad.addColorStop(1, '#65a30d');
+        ctx.fillStyle = cGrad; ctx.globalAlpha = 0.8; ctx.fill(); ctx.globalAlpha = 1;
+        // İç nokta
+        ctx.beginPath(); ctx.arc(W/2, H/2, 5, 0, Math.PI*2);
+        ctx.fillStyle = '#fff'; ctx.fill();
+        // Yazı
+        ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff';
+        ctx.fillText(isYakin ? 'YAKIN' : 'UZAK', W/2, H/2 + r + 30);
+        ctx.font = '12px sans-serif'; ctx.fillStyle = '#666';
+        ctx.fillText('Yeşil daireye odaklanın — büyürken yakına, küçülürken uzağa bakın', W/2, H - 15);
       }
 
       animRef.current = requestAnimationFrame(draw);
@@ -2855,8 +2967,24 @@ function EgzersizlerModul({ user, egzersizPuanlari = {}, onTamamla }) {
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold flex items-center gap-2"><Eye className="h-6 w-6" /> Egzersiz Merkezi</h2>
           </div>
+          <h3 className="text-sm font-bold text-gray-500 mb-3 uppercase tracking-wide">👁️ Göz Egzersizleri</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+            {egzersizler.filter(e => e.kat === 'goz').map(eg => (
+              <div key={eg.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onClick={() => setAktifEgzersiz(eg.id)}>
+                <div className={`bg-gradient-to-r ${eg.renk} p-6 text-center`}>
+                  <span className="text-5xl">{eg.icon}</span>
+                </div>
+                <div className="p-4">
+                  <h3 className="font-bold text-sm mb-1">{eg.baslik}</h3>
+                  <p className="text-xs text-gray-500">{eg.aciklama}</p>
+                  {egzersizPuanlari[eg.id] > 0 && <span className="inline-block mt-2 text-xs font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded-full">🏆 +{egzersizPuanlari[eg.id]} puan</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+          <h3 className="text-sm font-bold text-gray-500 mb-3 uppercase tracking-wide">📖 Okuma Egzersizleri</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {egzersizler.map(eg => (
+            {egzersizler.filter(e => e.kat === 'okuma').map(eg => (
               <div key={eg.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onClick={() => setAktifEgzersiz(eg.id)}>
                 <div className={`bg-gradient-to-r ${eg.renk} p-6 text-center`}>
                   <span className="text-5xl">{eg.icon}</span>
@@ -2895,6 +3023,9 @@ function EgzersizlerModul({ user, egzersizPuanlari = {}, onTamamla }) {
               {aktifEgzersiz === 'hizli-kelime' && (
                 <div><label className="text-xs text-gray-500 block mb-1">Kelime Hızı</label><input type="range" min="100" max="800" step="50" value={egzersizAyar.kelimeHiz} onChange={e => setEgzersizAyar({...egzersizAyar, kelimeHiz: parseInt(e.target.value)})} className="w-full" /><span className="text-xs font-medium">{egzersizAyar.kelimeHiz} k/dk</span></div>
               )}
+              {aktifEgzersiz === 'schulte' && (
+                <div><label className="text-xs text-gray-500 block mb-1">Tablo Boyutu</label><input type="range" min="3" max="7" step="1" value={schulteSize} onChange={e => { setSchulteSize(parseInt(e.target.value)); }} className="w-full" /><span className="text-xs font-medium">{schulteSize}x{schulteSize}</span></div>
+              )}
             </div>
           </div>
           {aktifEgzersiz === 'hizli-kelime' ? (
@@ -2903,6 +3034,121 @@ function EgzersizlerModul({ user, egzersizPuanlari = {}, onTamamla }) {
                 <div className="text-5xl font-bold text-white mb-4">{wpmKelimeler[wpmIndex] || ''}</div>
                 <div className="text-gray-500 text-sm">{egzersizAyar.kelimeHiz} kelime/dakika • Kelime {wpmIndex + 1}/{wpmKelimeler.length}</div>
               </div>
+            </div>
+          ) : aktifEgzersiz === 'schulte' ? (
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 flex flex-col items-center" style={{minHeight:'400px'}}>
+              <div className="text-sm mb-3 text-gray-600">Sıradaki sayı: <span className="text-2xl font-bold text-amber-600">{schulteNext}</span> • Skor: <span className="font-bold text-green-600">{interSkor}</span></div>
+              <div className="grid gap-1" style={{gridTemplateColumns: `repeat(${schulteSize}, 1fr)`}}>
+                {schulteGrid.map((num, i) => (
+                  <button key={i} className={`w-14 h-14 rounded-lg text-lg font-bold transition-all ${num < schulteNext ? 'bg-green-100 text-green-400' : 'bg-amber-50 border-2 border-amber-200 text-amber-800 hover:bg-amber-100 active:scale-95'}`}
+                    disabled={num < schulteNext}
+                    onClick={() => {
+                      if (num === schulteNext) {
+                        setSchulteNext(schulteNext + 1); setInterSkor(interSkor + 1);
+                        if (schulteNext >= schulteSize * schulteSize) { yeniInterSoru('schulte'); }
+                      }
+                    }}>{num}</button>
+                ))}
+              </div>
+            </div>
+          ) : aktifEgzersiz === 'renk-eslestir' && renkSoru ? (
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col items-center justify-center" style={{minHeight:'400px'}}>
+              <div className="text-sm mb-2 text-gray-500">Yazının <strong>rengini</strong> seçin (yazdığını değil!)</div>
+              <div className="text-6xl font-black mb-8" style={{color: renkSoru.renk}}>{renkSoru.yazi}</div>
+              <div className="grid grid-cols-2 gap-3">
+                {renkSoru.secenekler.map(r => (
+                  <button key={r.ad} className="px-6 py-3 rounded-xl text-sm font-bold border-2 hover:scale-105 transition-all" style={{borderColor: r.hex, color: r.hex}}
+                    onClick={() => {
+                      if (r.ad === renkSoru.dogruRenk) {
+                        setInterSkor(interSkor + 1);
+                        const renkler = [{ad:'KIRMIZI',hex:'#ef4444'},{ad:'MAVİ',hex:'#3b82f6'},{ad:'YEŞİL',hex:'#22c55e'},{ad:'SARI',hex:'#eab308'},{ad:'TURUNCU',hex:'#f97316'},{ad:'MOR',hex:'#a855f7'}];
+                        const r1 = renkler[Math.floor(Math.random()*renkler.length)];
+                        const r2 = renkler[Math.floor(Math.random()*renkler.length)];
+                        setRenkSoru({yazi:r1.ad, renk:r2.hex, dogruRenk:r2.ad, secenekler:renkler.sort(()=>Math.random()-0.5).slice(0,4)});
+                      }
+                    }}>{r.ad}</button>
+                ))}
+              </div>
+              <div className="mt-4 text-lg font-bold text-green-600">Skor: {interSkor}</div>
+            </div>
+          ) : aktifEgzersiz === 'kelime-avcisi' ? (
+            <div className="bg-white rounded-2xl border border-gray-200 p-4" style={{minHeight:'400px'}}>
+              <div className="text-center mb-3">
+                <span className="text-sm text-gray-500">Hedef kelime: </span><span className="text-xl font-black text-sky-600 bg-sky-50 px-3 py-1 rounded-lg">{kelimeAvcisiHedef}</span>
+                <span className="ml-3 text-sm text-green-600 font-bold">Bulunan: {kelimeAvcisiBulunan.size}</span>
+              </div>
+              <div className="flex flex-wrap gap-2 justify-center">
+                {kelimeAvcisiMetin.map((k, i) => {
+                  const isHedef = k === kelimeAvcisiHedef;
+                  const bulundu = kelimeAvcisiBulunan.has(i);
+                  return <button key={i} className={`px-2 py-1 rounded text-sm transition-all ${bulundu ? 'bg-green-500 text-white' : isHedef ? 'bg-white border border-gray-200 hover:bg-sky-100 cursor-pointer' : 'bg-white border border-gray-100 text-gray-600'}`}
+                    onClick={() => { if (isHedef && !bulundu) { setKelimeAvcisiBulunan(new Set([...kelimeAvcisiBulunan, i])); setInterSkor(interSkor+1); } }}>{k}</button>;
+                })}
+              </div>
+            </div>
+          ) : aktifEgzersiz === 'ters-kelime' && interSoru ? (
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col items-center justify-center" style={{minHeight:'400px'}}>
+              <div className="text-sm text-gray-500 mb-2">Bu kelimeyi tersten okuyun ve yazın:</div>
+              <div className="text-5xl font-black text-violet-600 mb-6 tracking-widest">{interSoru.ters}</div>
+              <input className="border-2 border-violet-300 rounded-xl px-4 py-3 text-2xl text-center font-bold w-64 focus:outline-none focus:ring-2 focus:ring-violet-400" placeholder="Cevabınız..."
+                value={interCevap} onChange={e => setInterCevap(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') {
+                  if (interCevap.toLowerCase() === interSoru.kelime.toLowerCase()) {
+                    setInterSkor(interSkor+1); setInterFeedback('dogru');
+                    setTimeout(() => { const k = turkceKelimeler[Math.floor(Math.random()*turkceKelimeler.length)]; setInterSoru({kelime:k, ters:k.split('').reverse().join('')}); setInterCevap(''); setInterFeedback(null); }, 800);
+                  } else { setInterFeedback('yanlis'); }
+                }}} />
+              {interFeedback && <div className={`mt-3 text-lg font-bold ${interFeedback === 'dogru' ? 'text-green-500' : 'text-red-500'}`}>{interFeedback === 'dogru' ? '✅ Doğru!' : '❌ Tekrar deneyin'}</div>}
+              <div className="mt-4 text-sm font-bold text-green-600">Skor: {interSkor}</div>
+            </div>
+          ) : aktifEgzersiz === 'eksik-harf' && interSoru ? (
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col items-center justify-center" style={{minHeight:'400px'}}>
+              <div className="text-sm text-gray-500 mb-2">Eksik harfi tamamlayın:</div>
+              <div className="text-5xl font-black text-cyan-600 mb-6 tracking-widest">{interSoru.gosterim}</div>
+              <input className="border-2 border-cyan-300 rounded-xl px-4 py-3 text-2xl text-center font-bold w-32 focus:outline-none focus:ring-2 focus:ring-cyan-400" placeholder="?" maxLength={1}
+                value={interCevap} onChange={e => {
+                  const val = e.target.value;
+                  setInterCevap(val);
+                  if (val.length === 1) {
+                    if (val.toLowerCase() === interSoru.kelime[interSoru.eksikIdx].toLowerCase()) {
+                      setInterSkor(interSkor+1); setInterFeedback('dogru');
+                      setTimeout(() => { const k = turkceKelimeler[Math.floor(Math.random()*turkceKelimeler.length)]; const idx = Math.floor(Math.random()*k.length); setInterSoru({kelime:k, eksikIdx:idx, gosterim:k.split('').map((h,i)=>i===idx?'_':h).join('')}); setInterCevap(''); setInterFeedback(null); }, 800);
+                    } else { setInterFeedback('yanlis'); setTimeout(() => { setInterCevap(''); setInterFeedback(null); }, 600); }
+                  }
+                }} />
+              {interFeedback && <div className={`mt-3 text-lg font-bold ${interFeedback === 'dogru' ? 'text-green-500' : 'text-red-500'}`}>{interFeedback === 'dogru' ? '✅ Doğru!' : '❌ Yanlış'}</div>}
+              <div className="mt-4 text-sm font-bold text-green-600">Skor: {interSkor}</div>
+            </div>
+          ) : aktifEgzersiz === 'karisik-cumle' && interSoru ? (
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col items-center" style={{minHeight:'400px'}}>
+              <div className="text-sm text-gray-500 mb-3">Kelimeleri doğru sıraya tıklayarak dizin:</div>
+              <div className="min-h-[50px] border-2 border-dashed border-red-200 rounded-xl p-3 mb-4 w-full text-center">
+                {interSoru.secilen.length > 0 ? <span className="text-lg font-medium text-gray-800">{interSoru.secilen.join(' ')}</span> : <span className="text-gray-400 text-sm">Kelimelere sırayla tıklayın...</span>}
+              </div>
+              <div className="flex flex-wrap gap-2 justify-center mb-4">
+                {interSoru.karisik.map((k, i) => {
+                  const used = interSoru.secilen.includes(k) && interSoru.secilen.filter(x => x === k).length > interSoru.karisik.slice(0, i).filter(x => x === k && interSoru.secilen.includes(x)).length;
+                  return <button key={i} className={`px-4 py-2 rounded-xl text-sm font-bold border-2 transition-all ${interSoru.secilen[interSoru.secilen.length - 1] === k && interSoru.secilen.length === i + 1 ? 'opacity-40' : ''} ${interSoru.secilen.length > i ? 'bg-gray-100 text-gray-400 border-gray-200' : 'bg-red-50 border-red-300 text-red-700 hover:bg-red-100 cursor-pointer active:scale-95'}`}
+                    onClick={() => {
+                      if (interSoru.secilen.length <= i || !interSoru.secilen.includes(k)) {
+                        const yeni = [...interSoru.secilen, k];
+                        setInterSoru({...interSoru, secilen: yeni});
+                        if (yeni.length === interSoru.karisik.length) {
+                          if (yeni.join(' ') === interSoru.dogru) {
+                            setInterSkor(interSkor + 1); setInterFeedback('dogru');
+                            setTimeout(() => { yeniInterSoru('karisik-cumle'); setInterFeedback(null); }, 1200);
+                          } else {
+                            setInterFeedback('yanlis');
+                            setTimeout(() => { setInterSoru({...interSoru, secilen: []}); setInterFeedback(null); }, 1000);
+                          }
+                        }
+                      }
+                    }}>{k}</button>;
+                })}
+              </div>
+              <Button variant="outline" size="sm" onClick={() => setInterSoru({...interSoru, secilen: []})}>🔄 Sıfırla</Button>
+              {interFeedback && <div className={`mt-3 text-lg font-bold ${interFeedback === 'dogru' ? 'text-green-500' : 'text-red-500'}`}>{interFeedback === 'dogru' ? '✅ Doğru cümle!' : '❌ Yanlış sıra, tekrar deneyin'}</div>}
+              <div className="mt-2 text-sm font-bold text-green-600">Skor: {interSkor}</div>
             </div>
           ) : (
             <div className="bg-gray-50 rounded-2xl border border-gray-200 overflow-hidden" style={{height:'400px'}}>
@@ -2916,6 +3162,14 @@ function EgzersizlerModul({ user, egzersizPuanlari = {}, onTamamla }) {
             {aktifEgzersiz === 'goz-genisletme' && 'Kırmızı noktaya odaklanın, çevredeki harfleri okumaya çalışın.'}
             {aktifEgzersiz === 'hizli-kelime' && 'Kelimelere odaklanın. Geri dönüp okumayın, sadece ileriye bakın.'}
             {aktifEgzersiz === 'odaklanma' && 'Kırmızı noktaya odaklanın, çevredeki rakam/harfleri okumaya çalışın.'}
+            {aktifEgzersiz === 'periferik' && 'Kırmızı noktaya odaklanıp çevredeki kelimeleri okumaya çalışın.'}
+            {aktifEgzersiz === 'schulte' && 'Sayıları 1\'den başlayarak sırayla bulun. Gözünüzü merkeze sabit tutun.'}
+            {aktifEgzersiz === 'goz-yoga' && 'Yeşil daire büyürken yakına, küçülürken uzağa odaklanın.'}
+            {aktifEgzersiz === 'renk-eslestir' && 'Yazının anlamını değil, RENGINI seçin. Stroop etkisini yenin!'}
+            {aktifEgzersiz === 'kelime-avcisi' && 'Hedef kelimeyi metinde bulup tıklayın. Hepsini bulun!'}
+            {aktifEgzersiz === 'ters-kelime' && 'Kelimenin orijinalini yazıp Enter\'a basın.'}
+            {aktifEgzersiz === 'eksik-harf' && 'Eksik harfi bulup yazın. Otomatik kontrol edilir.'}
+            {aktifEgzersiz === 'karisik-cumle' && 'Kelimelere doğru sırayla tıklayarak cümleyi oluşturun.'}
           </div>
         </div>
       )}
@@ -3456,8 +3710,16 @@ function GelisimAlani({ user }) {
               {id:'goz-sekiz', ad:'♾️ Sonsuzluk (∞)'},
               {id:'goz-zigzag', ad:'⚡ Zigzag Okuma'},
               {id:'goz-genisletme', ad:'🔭 Görüş Alanı Genişletme'},
-              {id:'hizli-kelime', ad:'📖 Hızlı Kelime Okuma'},
               {id:'odaklanma', ad:'🎯 Odaklanma Noktası'},
+              {id:'periferik', ad:'🌀 Periferik Görüş'},
+              {id:'schulte', ad:'🔢 Schulte Tablosu'},
+              {id:'goz-yoga', ad:'🧘 Göz Yoga'},
+              {id:'renk-eslestir', ad:'🎨 Renk Eşleştirme'},
+              {id:'hizli-kelime', ad:'📖 Hızlı Kelime Okuma'},
+              {id:'kelime-avcisi', ad:'🔍 Kelime Avcısı'},
+              {id:'ters-kelime', ad:'🔄 Ters Kelime Okuma'},
+              {id:'eksik-harf', ad:'✏️ Eksik Harf Tamamlama'},
+              {id:'karisik-cumle', ad:'🧩 Karışık Cümle Düzenleme'},
             ].map(eg => (
               <div key={eg.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <span className="text-sm font-medium">{eg.ad}</span>
