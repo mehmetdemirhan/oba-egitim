@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 import uuid
 import random
+import re
 from datetime import datetime, timezone, timedelta
 from enum import Enum
 from passlib.context import CryptContext
@@ -1702,17 +1703,20 @@ async def soru_sil(soru_id: str, current_user=Depends(get_current_user)):
 # ── Kitap Bilgi Çekme (ISBN / Link) ──
 @api_router.post("/kitap-bilgi-cek")
 async def kitap_bilgi_cek(data: dict, current_user=Depends(get_current_user)):
-    import httpx
     deger = data.get("deger", "").strip()
-    tip = data.get("tip", "isbn")  # isbn veya link
-
+    tip = data.get("tip", "isbn")
     result = {"baslik": "", "yazar": "", "isbn": "", "yayinevi": "", "sayfa_sayisi": "", "aciklama": "", "kapak_url": "", "link": ""}
 
+    try:
+        import httpx
+    except ImportError:
+        raise HTTPException(status_code=500, detail="httpx kurulu degil")
+
     if tip == "isbn":
-        # Google Books API ile ISBN/barkod ara
-        isbn_temiz = deger.replace("-", "").replace(" ", "")
+        isbn_temiz = re.sub(r"[^0-9X]", "", deger.upper())
+        # Google Books API
         try:
-            async with httpx.AsyncClient(timeout=10) as client:
+            async with httpx.AsyncClient(timeout=15) as client:
                 r = await client.get(f"https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn_temiz}")
                 if r.status_code == 200:
                     j = r.json()
@@ -1721,19 +1725,19 @@ async def kitap_bilgi_cek(data: dict, current_user=Depends(get_current_user)):
                         result["baslik"] = vol.get("title", "")
                         result["yazar"] = ", ".join(vol.get("authors", []))
                         result["yayinevi"] = vol.get("publisher", "")
-                        result["sayfa_sayisi"] = str(vol.get("pageCount", ""))
+                        result["sayfa_sayisi"] = str(vol.get("pageCount", "") or "")
                         result["aciklama"] = (vol.get("description", "") or "")[:200]
                         result["isbn"] = isbn_temiz
                         imgs = vol.get("imageLinks", {})
                         result["kapak_url"] = imgs.get("thumbnail", imgs.get("smallThumbnail", ""))
                         result["link"] = vol.get("infoLink", "")
-        except Exception as e:
-            pass
+        except Exception as ex:
+            logging.warning(f"Google Books hatasi: {ex}")
 
-        # ISBN bulunamadıysa Open Library dene
+        # Open Library fallback
         if not result["baslik"]:
             try:
-                async with httpx.AsyncClient(timeout=10) as client:
+                async with httpx.AsyncClient(timeout=15) as client:
                     r = await client.get(f"https://openlibrary.org/api/books?bibkeys=ISBN:{isbn_temiz}&format=json&jscmd=data")
                     if r.status_code == 200:
                         j = r.json()
@@ -1743,73 +1747,69 @@ async def kitap_bilgi_cek(data: dict, current_user=Depends(get_current_user)):
                             result["baslik"] = book.get("title", "")
                             result["yazar"] = ", ".join([a.get("name", "") for a in book.get("authors", [])])
                             result["yayinevi"] = ", ".join([p.get("name", "") for p in book.get("publishers", [])])
-                            result["sayfa_sayisi"] = str(book.get("number_of_pages", ""))
+                            result["sayfa_sayisi"] = str(book.get("number_of_pages", "") or "")
                             result["isbn"] = isbn_temiz
                             cover = book.get("cover", {})
                             result["kapak_url"] = cover.get("medium", cover.get("small", ""))
                             result["link"] = book.get("url", "")
-            except:
-                pass
+            except Exception as ex:
+                logging.warning(f"Open Library hatasi: {ex}")
 
     elif tip == "link":
-        # Link'ten title ve meta çek
         try:
-            async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
-                r = await client.get(deger, headers={"User-Agent": "Mozilla/5.0"})
+            async with httpx.AsyncClient(timeout=15, follow_redirects=True, verify=False) as client:
+                hdrs = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+                r = await client.get(deger, headers=hdrs)
                 if r.status_code == 200:
                     html = r.text
-                    import re
-                    # Title
-                    title_match = re.search(r'<title[^>]*>([^<]+)</title>', html, re.IGNORECASE)
-                    if title_match:
-                        raw_title = title_match.group(1).strip()
-                        # Temizle: site adını çıkar
-                        for sep in [' - ', ' | ', ' :: ', ' — ', ' – ']:
-                            if sep in raw_title:
-                                raw_title = raw_title.split(sep)[0].strip()
-                                break
-                        result["baslik"] = raw_title
-
-                    # OG meta tags
-                    og_title = re.search(r'<meta[^>]*property=["\']og:title["\'][^>]*content=["\']([^"\']+)', html, re.IGNORECASE)
-                    if og_title:
-                        result["baslik"] = og_title.group(1).strip()
-
-                    og_desc = re.search(r'<meta[^>]*property=["\']og:description["\'][^>]*content=["\']([^"\']+)', html, re.IGNORECASE)
-                    if og_desc:
-                        result["aciklama"] = og_desc.group(1).strip()[:200]
-
-                    og_img = re.search(r'<meta[^>]*property=["\']og:image["\'][^>]*content=["\']([^"\']+)', html, re.IGNORECASE)
-                    if og_img:
-                        result["kapak_url"] = og_img.group(1).strip()
-
-                    # Yazar arama (kitapyurdu/dr/amazon pattern)
-                    author = re.search(r'(?:Yazar|Author)[^:]*:\s*</[^>]+>\s*<[^>]+>([^<]+)', html, re.IGNORECASE)
-                    if author:
-                        result["yazar"] = author.group(1).strip()
-
-                    # Yayınevi
-                    publisher = re.search(r'(?:Yayınevi|Publisher)[^:]*:\s*</[^>]+>\s*<[^>]+>([^<]+)', html, re.IGNORECASE)
-                    if publisher:
-                        result["yayinevi"] = publisher.group(1).strip()
-
-                    # Sayfa sayısı
-                    pages = re.search(r'(?:Sayfa\s*(?:Sayısı)?|Pages?)[^:]*:\s*(\d+)', html, re.IGNORECASE)
-                    if pages:
-                        result["sayfa_sayisi"] = pages.group(1)
-
+                    QP = '["\x27]'  # quote pattern
+                    # og:title
+                    m = re.search(r'property\s*=\s*' + QP + r'og:title' + QP + r'[^>]*content\s*=\s*' + QP + r'([^"\x27]+)', html, re.I)
+                    if m:
+                        result["baslik"] = m.group(1).strip()
+                    else:
+                        m = re.search(r"<title[^>]*>([^<]+)</title>", html, re.I)
+                        if m:
+                            t = m.group(1).strip()
+                            for sep in [" - ", " | ", " :: "]:
+                                if sep in t:
+                                    t = t.split(sep)[0].strip()
+                                    break
+                            result["baslik"] = t
+                    # og:description
+                    m = re.search(r'property\s*=\s*' + QP + r'og:description' + QP + r'[^>]*content\s*=\s*' + QP + r'([^"\x27]+)', html, re.I)
+                    if m:
+                        result["aciklama"] = m.group(1).strip()[:200]
+                    # og:image
+                    m = re.search(r'property\s*=\s*' + QP + r'og:image' + QP + r'[^>]*content\s*=\s*' + QP + r'([^"\x27]+)', html, re.I)
+                    if m:
+                        result["kapak_url"] = m.group(1).strip()
+                    # Yazar
+                    m = re.search(r'itemprop\s*=\s*' + QP + r'author' + QP + r'[^>]*>([^<]+)', html, re.I)
+                    if not m:
+                        m = re.search(r'Yazar\s*:?\s*</\w+>\s*<[^>]+>([^<]+)', html, re.I)
+                    if m:
+                        result["yazar"] = m.group(1).strip()
+                    # Yayinevi
+                    m = re.search(r'itemprop\s*=\s*' + QP + r'publisher' + QP + r'[^>]*>([^<]+)', html, re.I)
+                    if not m:
+                        m = re.search(r'Yay.nevi\s*:?\s*</\w+>\s*<[^>]+>([^<]+)', html, re.I)
+                    if m:
+                        result["yayinevi"] = m.group(1).strip()
+                    # Sayfa sayisi
+                    m = re.search(r'(?:Sayfa|sayfa)\s*(?:Say.s.)?\s*:?\s*(\d+)', html)
+                    if m:
+                        result["sayfa_sayisi"] = m.group(1)
                     # ISBN
-                    isbn_match = re.search(r'(?:ISBN)[^:]*:\s*([\d\-X]+)', html, re.IGNORECASE)
-                    if isbn_match:
-                        result["isbn"] = isbn_match.group(1).replace("-", "")
-
+                    m = re.search(r'ISBN[^:]*:\s*([\d\-]{10,})', html, re.I)
+                    if m:
+                        result["isbn"] = re.sub(r"[^0-9]", "", m.group(1))
                     result["link"] = deger
-        except:
-            pass
+        except Exception as ex:
+            logging.warning(f"Link bilgi cekme hatasi: {deger} -> {ex}")
 
     if not result["baslik"]:
-        raise HTTPException(status_code=404, detail="Kitap bilgisi bulunamadı")
-
+        raise HTTPException(status_code=404, detail="Kitap bilgisi bulunamadi")
     return result
 
 # ── PDF Rapor Üretimi ──
