@@ -3449,10 +3449,6 @@ function GirisAnaliziModul({ user, students, teachers }) {
 
 
 // ═══════════════════════════════════════════════
-// ═══════════════════════════════════════════════
-// ÖĞRENCİ PANELİ — Öğrenci rolüyle giriş yapınca gösterilen tam ekran
-// Sadece: görevler, gelişim/egzersizler, öğretmen bilgisi, okuma, anonim sıralama
-// ═══════════════════════════════════════════════
 // ÖĞRENCİ PANELİ
 // ═══════════════════════════════════════════════
 
@@ -3464,6 +3460,7 @@ function OgrenciPaneli({ user, logout }) {
   const [istatistik, setIstatistik] = useState(null);
   const [siralama, setSiralama] = useState(null);
   const [aktifSekme, setAktifSekme] = useState("ana");
+  const [gelisimAltSekme, setGelisimAltSekme] = useState("icerikler"); // icerikler, egzersizler, okumalarim
   const [aktifEkran, setAktifEkran] = useState(null);
   const [okumaBasladi, setOkumaBasladi] = useState(false);
   const [okumaSuresi, setOkumaSuresi] = useState(0);
@@ -3471,14 +3468,11 @@ function OgrenciPaneli({ user, logout }) {
   const okumaInterval = useRef(null);
   const [agaclar, setAgaclar] = useState([]);
   const [neOkudunForm, setNeOkudunForm] = useState({ kitap_adi: "", bolum: "", baslangic_sayfa: "", bitis_sayfa: "", not_text: "" });
-  // Mesaj
   const [mesajlar, setMesajlar] = useState([]);
   const [mesajForm, setMesajForm] = useState({ konu: "", icerik: "" });
   const [mesajGonderiliyor, setMesajGonderiliyor] = useState(false);
   const [okunmamisSayisi, setOkunmamisSayisi] = useState(0);
-  // Egzersiz
   const [egzersizPuanlari, setEgzersizPuanlari] = useState({});
-  // Gelişim
   const [gelisimIcerikleri, setGelisimIcerikleri] = useState([]);
   const [gelisimTamamlananlar, setGelisimTamamlananlar] = useState([]);
 
@@ -3528,33 +3522,36 @@ function OgrenciPaneli({ user, logout }) {
   };
 
   const gorevTamamla = async (id) => { try { await axios.put(`${API}/gorevler/${id}/durum`, { durum: "tamamlandi" }); toast({ title: "✅ Görev tamamlandı!" }); fetchAll(); } catch(e) { toast({ title: "Hata", variant: "destructive" }); } };
-
-  const gelisimTamamla = async (id) => {
-    try { const r = await axios.post(`${API}/gelisim/tamamla`, { icerik_id: id, kullanici_id: user.id }); toast({ title: `+${r.data.puan} puan kazandın!` }); fetchAll(); }
-    catch(e) { toast({ title: e.response?.data?.detail || "Hata", variant: "destructive" }); }
-  };
+  const gelisimTamamla = async (id) => { try { const r = await axios.post(`${API}/gelisim/tamamla`, { icerik_id: id, kullanici_id: user.id }); toast({ title: `+${r.data.puan} puan kazandın!` }); fetchAll(); } catch(e) { toast({ title: e.response?.data?.detail || "Hata", variant: "destructive" }); } };
 
   const mesajGonder = async (e) => {
     e.preventDefault();
-    if (!profil?.ogretmen_bilgi) { toast({ title: "Öğretmen bilgisi bulunamadı", variant: "destructive" }); return; }
-    // Öğretmenin user id'sini bul
+    if (!profil?.ogretmen_bilgi) { toast({ title: "Öğretmen bulunamadı", variant: "destructive" }); return; }
     setMesajGonderiliyor(true);
     try {
-      // ogretmen_id students collection'daki teachers ref — users'daki linked_id'den eşleştir
       const usersRes = await axios.get(`${API}/auth/users`);
       const ogretmenUser = usersRes.data.find(u => u.linked_id === profil.ogretmen_id || u.id === profil.ogretmen_id);
-      const aliciId = ogretmenUser ? ogretmenUser.id : profil.ogretmen_id;
-      await axios.post(`${API}/mesajlar`, { alici_id: aliciId, konu: mesajForm.konu, icerik: mesajForm.icerik });
+      await axios.post(`${API}/mesajlar`, { alici_id: ogretmenUser ? ogretmenUser.id : profil.ogretmen_id, konu: mesajForm.konu, icerik: mesajForm.icerik });
       toast({ title: "✉️ Mesaj gönderildi!" }); setMesajForm({ konu: "", icerik: "" }); fetchAll();
     } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
     setMesajGonderiliyor(false);
   };
-
   const mesajOkundu = async (id) => { try { await axios.put(`${API}/mesajlar/${id}/okundu`); fetchAll(); } catch(e) {} };
 
   const bekleyenGorevler = gorevler.filter(g => g.durum !== "tamamlandi");
   const tamamlananGorevler = gorevler.filter(g => g.durum === "tamamlandi");
   const isTamamlandi = (id) => gelisimTamamlananlar.some(t => t.icerik_id === id);
+
+  // Motivasyon hesaplamaları
+  const toplamOkumaSaati = istatistik ? Math.round(istatistik.toplam_dakika / 60) : 0;
+  const okunanSayfa = okumaKayitlari.reduce((t, k) => t + (k.bitis_sayfa && k.baslangic_sayfa ? k.bitis_sayfa - k.baslangic_sayfa : 0), 0);
+  const tamamlananGorevSayisi = tamamlananGorevler.length;
+  const tamamlananGelisim = gelisimTamamlananlar.length;
+
+  // Seviye hesapla (her 100 dakika = 1 seviye)
+  const seviye = istatistik ? Math.floor(istatistik.toplam_dakika / 100) + 1 : 1;
+  const seviyeIlerleme = istatistik ? (istatistik.toplam_dakika % 100) : 0;
+  const seviyeEmoji = seviye <= 2 ? "🌱" : seviye <= 5 ? "🌿" : seviye <= 10 ? "🌳" : seviye <= 20 ? "🏆" : "👑";
 
   // ── OKUMA RİTÜELİ ──
   if (aktifEkran === "okuma") {
@@ -3596,13 +3593,11 @@ function OgrenciPaneli({ user, logout }) {
     );
   }
 
-  // ── ANA PANEL ──
+  // ── ANA PANEL — Sadeleştirilmiş 4 Tab ──
   const sekmeler = [
     { id: "ana", label: "Ana Sayfa", icon: "🏠" },
     { id: "gorevler", label: "Görevlerim", icon: "📌", badge: bekleyenGorevler.length || null },
-    { id: "egzersizler", label: "Egzersizler", icon: "👁️" },
-    { id: "gelisim", label: "Gelişim", icon: "🎓" },
-    { id: "gecmis", label: "Okumalarım", icon: "📖" },
+    { id: "gelisim", label: "Gelişim", icon: "🎯" },
     { id: "siralama", label: "Sıralama", icon: "🏆" },
     { id: "mesajlar", label: "Mesajlar", icon: "✉️", badge: okunmamisSayisi || null },
   ];
@@ -3616,90 +3611,135 @@ function OgrenciPaneli({ user, logout }) {
             <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-red-500 rounded-xl flex items-center justify-center"><BookOpen className="h-5 w-5 text-white" /></div>
             <div><div className="font-bold text-gray-900 text-sm">{user.ad} {user.soyad}</div><div className="text-xs text-gray-500">{profil?.kur ? `Kur: ${profil.kur}` : "Öğrenci"} {profil?.sinif ? `• ${profil.sinif}. sınıf` : ""}</div></div>
           </div>
-          <Button variant="outline" size="sm" onClick={logout} className="text-xs"><LogOut className="h-3 w-3 mr-1" />Çıkış</Button>
+          <div className="flex items-center gap-2">
+            <div className="text-center"><div className="text-lg font-bold text-orange-600">{seviyeEmoji} Sv.{seviye}</div></div>
+            <Button variant="outline" size="sm" onClick={logout} className="text-xs"><LogOut className="h-3 w-3 mr-1" />Çıkış</Button>
+          </div>
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* 5 Tab — temiz, taşmaz */}
       <div className="bg-white border-b sticky top-[60px] z-10">
-        <div className="max-w-2xl mx-auto px-2 flex gap-1 overflow-x-auto py-2">
+        <div className="max-w-2xl mx-auto px-2 flex justify-between py-2">
           {sekmeler.map(s => (
             <button key={s.id} onClick={() => setAktifSekme(s.id)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all ${aktifSekme === s.id ? 'bg-orange-500 text-white shadow' : 'text-gray-600 hover:bg-gray-100'}`}>
-              <span>{s.icon}</span>{s.label}
-              {s.badge && <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${aktifSekme === s.id ? 'bg-white/30' : 'bg-red-100 text-red-600'}`}>{s.badge}</span>}
+              className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl text-[11px] font-medium transition-all min-w-0 flex-1 ${aktifSekme === s.id ? 'bg-orange-500 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>
+              <span className="text-base">{s.icon}</span>
+              <span className="truncate">{s.label}</span>
+              {s.badge > 0 && <span className={`px-1.5 rounded-full text-[9px] font-bold ${aktifSekme === s.id ? 'bg-white/30' : 'bg-red-100 text-red-600'}`}>{s.badge}</span>}
             </button>
           ))}
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto p-4 space-y-5">
+      <div className="max-w-2xl mx-auto p-4 space-y-4">
 
         {/* ═══ ANA SAYFA ═══ */}
         {aktifSekme === "ana" && (<>
-          {istatistik && (<div className="grid grid-cols-3 gap-3">
-            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-orange-600">{istatistik.streak}</div><div className="text-xs text-gray-500">🔥 Streak</div></div>
-            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-green-600">{istatistik.bugun_dakika}</div><div className="text-xs text-gray-500">⏱ Bugün (dk)</div></div>
-            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-blue-600">{istatistik.toplam_kitap}</div><div className="text-xs text-gray-500">📚 Kitap</div></div>
+          {/* Seviye + ilerleme */}
+          <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl p-4 text-white">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-lg font-bold">{seviyeEmoji} Seviye {seviye}</div>
+              <div className="text-sm opacity-80">{seviyeIlerleme}/100 dk</div>
+            </div>
+            <div className="bg-white/20 rounded-full h-2.5 overflow-hidden"><div className="h-full bg-white rounded-full transition-all" style={{ width: `${seviyeIlerleme}%` }} /></div>
+            <p className="text-xs opacity-70 mt-1">Sonraki seviye için {100 - seviyeIlerleme} dakika daha oku</p>
+          </div>
+
+          {/* 2x3 istatistik grid */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-orange-600">{istatistik?.streak || 0}</div><div className="text-[10px] text-gray-500">🔥 Gün Streak</div></div>
+            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-green-600">{istatistik?.bugun_dakika || 0}</div><div className="text-[10px] text-gray-500">⏱ Bugün (dk)</div></div>
+            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-blue-600">{istatistik?.toplam_kitap || 0}</div><div className="text-[10px] text-gray-500">📚 Kitap</div></div>
+            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-purple-600">{toplamOkumaSaati}</div><div className="text-[10px] text-gray-500">⏳ Saat Okuma</div></div>
+            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-pink-600">{okunanSayfa}</div><div className="text-[10px] text-gray-500">📄 Sayfa</div></div>
+            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-teal-600">{tamamlananGorevSayisi + tamamlananGelisim}</div><div className="text-[10px] text-gray-500">✅ Tamamlanan</div></div>
+          </div>
+
+          {/* Haftalık hedef */}
+          {istatistik && (<div className="bg-white rounded-2xl p-4 shadow-sm border"><div className="flex items-center justify-between mb-2"><div className="text-sm font-medium text-gray-700">Haftalık Hedef</div><span className="text-sm font-bold text-gray-700">{istatistik.aktif_gunler_7}/4 gün</span></div><div className="flex gap-1">{[0,1,2,3].map(i => (<div key={i} className={`flex-1 h-3 rounded-full ${i < istatistik.aktif_gunler_7 ? 'bg-gradient-to-r from-orange-400 to-red-500' : 'bg-gray-100'}`} />))}</div><p className="text-xs text-gray-400 mt-2">Haftada en az 4 gün okuma 📖</p></div>)}
+
+          {/* Okumaya Başla */}
+          <button onClick={okumaBaslat} className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-2xl p-5 shadow-lg hover:shadow-xl transition-all active:scale-[0.98]">
+            <div className="text-3xl mb-1">🌳</div><div className="text-lg font-bold">Okumaya Başla</div><div className="text-xs opacity-80">Konsantrasyon Ormanını büyüt</div>
+          </button>
+
+          {/* Bekleyen görevler kısa */}
+          {bekleyenGorevler.length > 0 && (<div className="bg-white rounded-2xl p-4 shadow-sm border">
+            <div className="flex items-center justify-between mb-3"><h3 className="font-bold text-sm text-gray-900">📌 Görevlerin</h3><button onClick={() => setAktifSekme("gorevler")} className="text-xs text-blue-600">Tümü →</button></div>
+            <div className="space-y-2">{bekleyenGorevler.slice(0,3).map(g => (<div key={g.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-xl"><div className="text-sm font-medium truncate flex-1 mr-2">{g.baslik}</div><Button size="sm" className="bg-green-600 text-white text-[10px] px-2 h-7" onClick={() => gorevTamamla(g.id)}>Tamamla</Button></div>))}</div>
           </div>)}
-          {istatistik && (<div className="bg-white rounded-2xl p-4 shadow-sm border"><div className="text-sm font-medium text-gray-700 mb-2">Bu Hafta</div><div className="flex items-center gap-2"><div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden"><div className="h-full bg-gradient-to-r from-orange-400 to-red-500 rounded-full transition-all" style={{ width: `${Math.min(100,(istatistik.aktif_gunler_7/4)*100)}%` }} /></div><span className="text-sm font-bold">{istatistik.aktif_gunler_7}/4 gün</span></div><p className="text-xs text-gray-400 mt-1">Hedef: Haftada en az 4 gün okuma</p></div>)}
-          <button onClick={okumaBaslat} className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all active:scale-[0.98]"><div className="text-3xl mb-2">🌳</div><div className="text-xl font-bold">Okumaya Başla</div><div className="text-sm opacity-80 mt-1">Konsantrasyon Ormanını büyüt</div></button>
-          {bekleyenGorevler.length > 0 && (<div><div className="flex items-center justify-between mb-2"><h3 className="font-bold text-gray-900 text-sm">📌 Bekleyen Görevler</h3><button onClick={() => setAktifSekme("gorevler")} className="text-xs text-blue-600">Tümü →</button></div><div className="space-y-2">
-            {bekleyenGorevler.slice(0,3).map(g => (<div key={g.id} className="bg-white rounded-xl p-3 shadow-sm border flex items-center justify-between"><div><div className="font-medium text-sm">{g.baslik}</div><div className="text-xs text-gray-400">{g.son_tarih ? `Son: ${new Date(g.son_tarih).toLocaleDateString('tr-TR')}` : g.atayan_ad}</div></div><Button size="sm" className="bg-green-600 text-white text-xs" onClick={() => gorevTamamla(g.id)}>Tamamla</Button></div>))}
-          </div></div>)}
-          {profil?.ogretmen_bilgi && (<div className="bg-blue-50 rounded-2xl p-4 border border-blue-100 flex items-center justify-between">
-            <div><div className="text-sm font-medium text-blue-800 mb-1">👩‍🏫 Öğretmenim</div><div className="font-bold text-gray-900">{profil.ogretmen_bilgi.ad} {profil.ogretmen_bilgi.soyad}</div>{profil.ogretmen_bilgi.brans && <div className="text-xs text-gray-500">{profil.ogretmen_bilgi.brans}</div>}</div>
-            <Button size="sm" variant="outline" className="text-xs border-blue-300 text-blue-700" onClick={() => setAktifSekme("mesajlar")}>✉️ Mesaj At</Button>
+
+          {/* Sıralama + Öğretmen yan yana */}
+          <div className="grid grid-cols-2 gap-3">
+            {siralama && (<div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-2xl p-4 border border-yellow-100 cursor-pointer" onClick={() => setAktifSekme("siralama")}>
+              <div className="text-xs font-medium text-yellow-800">🏆 Sıralaman</div>
+              <div className="text-3xl font-bold text-orange-600 mt-1">{siralama.benim_siram}.</div>
+              <div className="text-[10px] text-gray-500">{siralama.toplam_ogrenci} öğrenci</div>
+            </div>)}
+            {profil?.ogretmen_bilgi && (<div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-4 border border-blue-100 cursor-pointer" onClick={() => setAktifSekme("mesajlar")}>
+              <div className="text-xs font-medium text-blue-800">👩‍🏫 Öğretmenin</div>
+              <div className="font-bold text-gray-900 text-sm mt-1">{profil.ogretmen_bilgi.ad} {profil.ogretmen_bilgi.soyad}</div>
+              <div className="text-[10px] text-blue-600 mt-1">✉️ Mesaj gönder</div>
+            </div>)}
+          </div>
+
+          {/* Son 3 okuma */}
+          {okumaKayitlari.length > 0 && (<div className="bg-white rounded-2xl p-4 shadow-sm border">
+            <div className="flex items-center justify-between mb-2"><h3 className="font-bold text-sm text-gray-900">📖 Son Okumalar</h3><button onClick={() => { setAktifSekme("gelisim"); setGelisimAltSekme("okumalarim"); }} className="text-xs text-blue-600">Tümü →</button></div>
+            {okumaKayitlari.slice(0,3).map(k => (<div key={k.id} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0"><div className="text-sm font-medium truncate flex-1">{k.kitap_adi || "—"}</div><div className="text-xs text-gray-400">{k.sure_dakika} dk</div></div>))}
           </div>)}
-          {siralama && (<div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-2xl p-4 border border-yellow-100 flex items-center justify-between">
-            <div><div className="text-sm font-medium text-yellow-800">🏆 Sıralamanız</div><div className="text-3xl font-bold text-orange-600">{siralama.benim_siram}.</div><div className="text-xs text-gray-500">{siralama.toplam_ogrenci} öğrenci arasında</div></div>
-            <button onClick={() => setAktifSekme("siralama")} className="text-xs text-orange-600 hover:underline">Tabloyu Gör →</button>
-          </div>)}
-          {istatistik && (<div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-2xl p-4 text-center border border-indigo-100"><div className="text-3xl font-bold text-indigo-600">{istatistik.toplam_dakika}</div><div className="text-sm text-gray-500">toplam dakika okuma 📚</div></div>)}
         </>)}
 
         {/* ═══ GÖREVLERİM ═══ */}
-        {aktifSekme === "gorevler" && (<div className="space-y-4"><h2 className="text-xl font-bold">📌 Görevlerim</h2>
+        {aktifSekme === "gorevler" && (<div className="space-y-3"><h2 className="text-lg font-bold">📌 Görevlerim</h2>
           {bekleyenGorevler.length === 0 && tamamlananGorevler.length === 0 ? (<div className="text-center py-12"><div className="text-5xl mb-3">✅</div><p className="text-gray-500">Tüm görevler tamamlandı!</p></div>) : (<>
-            {bekleyenGorevler.length > 0 && (<>{bekleyenGorevler.map(g => (<Card key={g.id} className="border-0 shadow-sm"><CardContent className="p-4 flex items-start justify-between gap-3"><div className="min-w-0"><div className="font-bold text-sm">{g.baslik}</div>{g.aciklama && <p className="text-xs text-gray-500 mt-1">{g.aciklama}</p>}<div className="text-xs text-gray-400 mt-1">{g.atayan_ad && `Atayan: ${g.atayan_ad}`}{g.son_tarih && ` • Son: ${new Date(g.son_tarih).toLocaleDateString('tr-TR')}`}</div>{g.film_link && <a href={g.film_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 mt-1 block">🎬 Film Linki</a>}{g.makale_link && <a href={g.makale_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 mt-1 block">📄 Makale Linki</a>}</div><Button size="sm" className="bg-green-600 text-white text-xs shrink-0" onClick={() => gorevTamamla(g.id)}>Tamamla</Button></CardContent></Card>))}</>)}
-            {tamamlananGorevler.length > 0 && (<><h3 className="text-sm font-medium text-gray-400 mt-4">Tamamlanan ({tamamlananGorevler.length})</h3>{tamamlananGorevler.slice(0,5).map(g => (<div key={g.id} className="bg-green-50 rounded-xl p-3 border border-green-100 opacity-70"><div className="font-medium text-sm text-gray-600">✅ {g.baslik}</div></div>))}</>)}
+            {bekleyenGorevler.map(g => (<Card key={g.id} className="border-0 shadow-sm"><CardContent className="p-4 flex items-start justify-between gap-3"><div className="min-w-0"><div className="font-bold text-sm">{g.baslik}</div>{g.aciklama && <p className="text-xs text-gray-500 mt-1">{g.aciklama}</p>}<div className="text-xs text-gray-400 mt-1">{g.atayan_ad && `Atayan: ${g.atayan_ad}`}{g.son_tarih && ` • Son: ${new Date(g.son_tarih).toLocaleDateString('tr-TR')}`}</div>{g.film_link && <a href={g.film_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 block mt-1">🎬 Film Linki</a>}{g.makale_link && <a href={g.makale_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 block mt-1">📄 Makale</a>}</div><Button size="sm" className="bg-green-600 text-white text-xs shrink-0" onClick={() => gorevTamamla(g.id)}>Tamamla</Button></CardContent></Card>))}
+            {tamamlananGorevler.length > 0 && (<><h3 className="text-xs font-medium text-gray-400 mt-4">Tamamlanan ({tamamlananGorevler.length})</h3>{tamamlananGorevler.slice(0,5).map(g => (<div key={g.id} className="bg-green-50 rounded-xl p-3 border border-green-100 opacity-60 text-sm">✅ {g.baslik}</div>))}</>)}
           </>)}
         </div>)}
 
-        {/* ═══ EGZERSİZLER ═══ */}
-        {aktifSekme === "egzersizler" && (
-          <EgzersizlerModul user={user} egzersizPuanlari={egzersizPuanlari} onTamamla={async (egzersizId) => {
-            try {
-              const r = await axios.post(`${API}/egzersiz/tamamla`, { kullanici_id: user.id, egzersiz_id: egzersizId });
-              toast({ title: `🎉 +${r.data.kazanilan_puan} puan kazandın!` }); fetchAll();
-            } catch(e) {
-              if (e.response?.status === 409) toast({ title: "Bu egzersizi bugün zaten yaptın" });
-              else toast({ title: "Hata", variant: "destructive" });
-            }
-          }} />
-        )}
+        {/* ═══ GELİŞİM (İçerikler + Egzersizler + Okumalarım alt sekmeli) ═══ */}
+        {aktifSekme === "gelisim" && (<div className="space-y-4">
+          <h2 className="text-lg font-bold">🎯 Gelişim</h2>
+          {/* Alt sekmeler */}
+          <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
+            {[{id:"icerikler",l:"📚 İçerikler"},{id:"egzersizler",l:"👁️ Egzersizler"},{id:"okumalarim",l:"📖 Okumalarım"}].map(s => (
+              <button key={s.id} onClick={() => setGelisimAltSekme(s.id)}
+                className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${gelisimAltSekme === s.id ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}>{s.l}</button>
+            ))}
+          </div>
 
-        {/* ═══ GELİŞİM ═══ */}
-        {aktifSekme === "gelisim" && (<div className="space-y-4"><h2 className="text-xl font-bold">🎓 Gelişim İçerikleri</h2>
-          {gelisimIcerikleri.length === 0 ? (<div className="text-center py-12"><div className="text-5xl mb-3">📚</div><p className="text-gray-500">Henüz yayında içerik yok</p></div>) : (
-            gelisimIcerikleri.map(ic => { const done = isTamamlandi(ic.id); return (
-              <Card key={ic.id} className={`border-0 shadow-sm ${done ? 'opacity-60' : ''}`}><CardContent className="p-4"><div className="flex items-start justify-between gap-3"><div>
-                <div className="flex items-center gap-2"><span className="text-lg">{({hizmetici:"🎓",film:"🎬",kitap:"📚",makale:"📄"})[ic.tur] || "📋"}</span><div className="font-bold text-sm">{ic.baslik}</div></div>
-                {ic.aciklama && <p className="text-xs text-gray-500 mt-1">{ic.aciklama}</p>}
-              </div>{done ? <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">✅</span> : <Button size="sm" className="bg-orange-500 text-white text-xs shrink-0" onClick={() => gelisimTamamla(ic.id)}>Tamamla</Button>}</div></CardContent></Card>
-            ); })
-          )}
-        </div>)}
+          {/* İçerikler */}
+          {gelisimAltSekme === "icerikler" && (<>
+            {gelisimIcerikleri.length === 0 ? (<div className="text-center py-8"><p className="text-gray-500 text-sm">Henüz içerik yok</p></div>) : (
+              gelisimIcerikleri.map(ic => { const done = isTamamlandi(ic.id); return (
+                <Card key={ic.id} className={`border-0 shadow-sm ${done ? 'opacity-60' : ''}`}><CardContent className="p-4"><div className="flex items-start justify-between gap-3"><div>
+                  <div className="flex items-center gap-2"><span className="text-lg">{({hizmetici:"🎓",film:"🎬",kitap:"📚",makale:"📄"})[ic.tur] || "📋"}</span><div className="font-bold text-sm">{ic.baslik}</div></div>
+                  {ic.aciklama && <p className="text-xs text-gray-500 mt-1">{ic.aciklama}</p>}
+                </div>{done ? <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">✅</span> : <Button size="sm" className="bg-orange-500 text-white text-xs" onClick={() => gelisimTamamla(ic.id)}>Tamamla</Button>}</div></CardContent></Card>
+              ); })
+            )}
+          </>)}
 
-        {/* ═══ OKUMALARIM ═══ */}
-        {aktifSekme === "gecmis" && (<div className="space-y-4"><h2 className="text-xl font-bold">📖 Okuma Geçmişim</h2>
-          {okumaKayitlari.length === 0 ? (<div className="text-center py-12"><div className="text-5xl mb-3">📚</div><p className="text-gray-500">Henüz okuma kaydın yok.</p><Button onClick={okumaBaslat} className="mt-4 bg-green-600 text-white">🌳 Okumaya Başla</Button></div>) : (
-            okumaKayitlari.map(k => (<Card key={k.id} className="border-0 shadow-sm"><CardContent className="p-4"><div className="flex items-start justify-between"><div><div className="font-bold">{k.kitap_adi || "—"}</div><div className="text-sm text-gray-500 mt-1">{k.bolum && `${k.bolum} • `}{k.baslangic_sayfa && k.bitis_sayfa && `s.${k.baslangic_sayfa}-${k.bitis_sayfa} • `}⏱ {k.sure_dakika} dk</div>{k.not_text && <p className="text-xs text-blue-600 mt-1">💬 {k.not_text}</p>}</div><div className="text-xs text-gray-400">{new Date(k.tarih).toLocaleDateString('tr-TR')}</div></div></CardContent></Card>))
+          {/* Egzersizler */}
+          {gelisimAltSekme === "egzersizler" && (
+            <EgzersizlerModul user={user} egzersizPuanlari={egzersizPuanlari} onTamamla={async (egzersizId) => {
+              try { const r = await axios.post(`${API}/egzersiz/tamamla`, { kullanici_id: user.id, egzersiz_id: egzersizId }); toast({ title: `🎉 +${r.data.kazanilan_puan} puan kazandın!` }); fetchAll(); }
+              catch(e) { if (e.response?.status === 409) toast({ title: "Bu egzersizi bugün zaten yaptın" }); else toast({ title: "Hata", variant: "destructive" }); }
+            }} />
           )}
+
+          {/* Okumalarım */}
+          {gelisimAltSekme === "okumalarim" && (<>
+            {okumaKayitlari.length === 0 ? (<div className="text-center py-8"><p className="text-gray-500 text-sm">Henüz okuma kaydı yok</p><Button onClick={okumaBaslat} className="mt-3 bg-green-600 text-white text-sm">🌳 Okumaya Başla</Button></div>) : (
+              okumaKayitlari.map(k => (<Card key={k.id} className="border-0 shadow-sm"><CardContent className="p-3 flex items-center justify-between"><div><div className="font-medium text-sm">{k.kitap_adi || "—"}</div><div className="text-xs text-gray-400">{k.bolum && `${k.bolum} • `}⏱ {k.sure_dakika} dk {k.baslangic_sayfa && k.bitis_sayfa && `• s.${k.baslangic_sayfa}-${k.bitis_sayfa}`}</div>{k.not_text && <p className="text-[10px] text-blue-600 mt-0.5">💬 {k.not_text}</p>}</div><div className="text-[10px] text-gray-400">{new Date(k.tarih).toLocaleDateString('tr-TR')}</div></CardContent></Card>))
+            )}
+          </>)}
         </div>)}
 
         {/* ═══ SIRALAMA ═══ */}
-        {aktifSekme === "siralama" && (<div className="space-y-4"><h2 className="text-xl font-bold">🏆 Okuma Sıralaması</h2><p className="text-sm text-gray-500">Toplam okuma dakikasına göre</p>
+        {aktifSekme === "siralama" && (<div className="space-y-4"><h2 className="text-lg font-bold">🏆 Okuma Sıralaması</h2><p className="text-xs text-gray-500">Toplam okuma dakikasına göre</p>
           {siralama && siralama.siralama.length > 0 ? (<div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
             {siralama.siralama.map((s, i) => (<div key={i} className={`flex items-center justify-between px-4 py-3 ${s.ben ? 'bg-orange-50 border-l-4 border-l-orange-500 font-bold' : i%2===0 ? 'bg-white' : 'bg-gray-50'} ${i>0 ? 'border-t border-gray-100' : ''}`}>
               <div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${s.sira<=3 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'}`}>{s.sira===1?"🥇":s.sira===2?"🥈":s.sira===3?"🥉":s.sira}</div><span className={`text-sm ${s.ben ? 'text-orange-700' : 'text-gray-700'}`}>{s.ad}</span></div>
@@ -3710,37 +3750,25 @@ function OgrenciPaneli({ user, logout }) {
 
         {/* ═══ MESAJLAR ═══ */}
         {aktifSekme === "mesajlar" && (<div className="space-y-4">
-          <h2 className="text-xl font-bold">✉️ Mesajlar</h2>
-
-          {/* Yeni Mesaj Gönder */}
-          {profil?.ogretmen_bilgi ? (
-            <Card className="border-0 shadow-sm border-l-4 border-l-blue-500"><CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2">📝 Öğretmenime Mesaj Gönder</CardTitle><p className="text-xs text-gray-500">{profil.ogretmen_bilgi.ad} {profil.ogretmen_bilgi.soyad}</p></CardHeader>
+          <h2 className="text-lg font-bold">✉️ Mesajlar</h2>
+          {profil?.ogretmen_bilgi && (
+            <Card className="border-0 shadow-sm border-l-4 border-l-blue-500"><CardHeader className="pb-2"><CardTitle className="text-sm">📝 Öğretmenime Mesaj</CardTitle><p className="text-xs text-gray-500">{profil.ogretmen_bilgi.ad} {profil.ogretmen_bilgi.soyad}</p></CardHeader>
               <CardContent><form onSubmit={mesajGonder} className="space-y-3">
                 <div><Label className="text-xs">Konu</Label><Input value={mesajForm.konu} onChange={e => setMesajForm({...mesajForm, konu: e.target.value})} placeholder="Konu..." className="text-sm" /></div>
                 <div><Label className="text-xs">Mesaj *</Label><textarea value={mesajForm.icerik} onChange={e => setMesajForm({...mesajForm, icerik: e.target.value})} required placeholder="Mesajınızı yazın..." className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px]" /></div>
-                <Button type="submit" disabled={mesajGonderiliyor || !mesajForm.icerik.trim()} className="w-full bg-blue-600 text-white text-sm">{mesajGonderiliyor ? "Gönderiliyor..." : "✉️ Gönder"}</Button>
+                <Button type="submit" disabled={mesajGonderiliyor || !mesajForm.icerik.trim()} className="w-full bg-blue-600 text-white text-sm">{mesajGonderiliyor ? "..." : "✉️ Gönder"}</Button>
               </form></CardContent>
             </Card>
-          ) : (<div className="bg-yellow-50 rounded-xl p-4 border border-yellow-200 text-sm text-yellow-800">Henüz bir öğretmen atanmamış. Mesaj göndermek için öğretmen ataması gerekiyor.</div>)}
-
-          {/* Mesaj Geçmişi */}
-          {mesajlar.length > 0 && (<>
-            <h3 className="text-sm font-medium text-gray-500 mt-2">Geçmiş Mesajlar</h3>
-            {mesajlar.map(m => {
-              const benGonderdim = m.gonderen_id === user.id;
-              return (
-                <div key={m.id} className={`rounded-xl p-3 border ${benGonderdim ? 'bg-blue-50 border-blue-100 ml-4' : 'bg-white border-gray-100 mr-4'}`} onClick={() => !benGonderdim && !m.okundu && mesajOkundu(m.id)}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium text-gray-600">{benGonderdim ? `Sen → ${m.alici_ad}` : `${m.gonderen_ad} → Sen`}</span>
-                    <div className="flex items-center gap-1"><span className="text-xs text-gray-400">{new Date(m.tarih).toLocaleDateString('tr-TR')}</span>{!benGonderdim && !m.okundu && <span className="w-2 h-2 bg-red-500 rounded-full" />}</div>
-                  </div>
-                  {m.konu && <div className="text-xs font-bold text-gray-700">{m.konu}</div>}
-                  <p className="text-sm text-gray-800 mt-1">{m.icerik}</p>
-                </div>
-              );
-            })}
-          </>)}
-          {mesajlar.length === 0 && !profil?.ogretmen_bilgi && (<div className="text-center py-8"><div className="text-4xl mb-2">✉️</div><p className="text-gray-500 text-sm">Henüz mesaj yok</p></div>)}
+          )}
+          {!profil?.ogretmen_bilgi && (<div className="bg-yellow-50 rounded-xl p-4 border border-yellow-200 text-sm text-yellow-800">Henüz öğretmen atanmamış.</div>)}
+          {mesajlar.length > 0 && (<><h3 className="text-xs font-medium text-gray-500">Geçmiş</h3>
+            {mesajlar.map(m => { const ben = m.gonderen_id === user.id; return (
+              <div key={m.id} className={`rounded-xl p-3 border ${ben ? 'bg-blue-50 border-blue-100 ml-8' : 'bg-white border-gray-100 mr-8'}`} onClick={() => !ben && !m.okundu && mesajOkundu(m.id)}>
+                <div className="flex items-center justify-between mb-1"><span className="text-xs text-gray-500">{ben ? `Sen → ${m.alici_ad}` : `${m.gonderen_ad}`}</span><div className="flex items-center gap-1"><span className="text-[10px] text-gray-400">{new Date(m.tarih).toLocaleDateString('tr-TR')}</span>{!ben && !m.okundu && <span className="w-2 h-2 bg-red-500 rounded-full" />}</div></div>
+                {m.konu && <div className="text-xs font-bold text-gray-700">{m.konu}</div>}
+                <p className="text-sm text-gray-800 mt-0.5">{m.icerik}</p>
+              </div>);
+            })}</>)}
         </div>)}
 
       </div>
@@ -3748,6 +3776,7 @@ function OgrenciPaneli({ user, logout }) {
     </div>
   );
 }
+
 
 // ═══════════════════════════════════════════════
 // MESAJLAR PANELİ — Tüm roller için ortak
