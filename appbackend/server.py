@@ -1701,50 +1701,36 @@ async def soru_sil(soru_id: str, current_user=Depends(get_current_user)):
     return {"message": "Silindi"}
 
 # ── Kitap Bilgi Çekme (ISBN / Link) ──
-import urllib.request
-import urllib.error
-import json as _json
-import ssl as _ssl
-
-def _fetch_url(url, timeout=12):
-    """Sync URL fetch - stdlib only, no httpx needed"""
-    ctx = _ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = _ssl.CERT_NONE
-    req = urllib.request.Request(url, headers={
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "tr-TR,tr;q=0.9,en;q=0.7",
-    })
-    try:
-        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
-            data = resp.read()
-            # Try utf-8, fallback to latin-1
-            try:
-                return data.decode("utf-8")
-            except UnicodeDecodeError:
-                return data.decode("latin-1")
-    except Exception as e:
-        logging.warning(f"URL fetch hatasi: {url} -> {e}")
-        return None
-
 @api_router.post("/kitap-bilgi-cek")
 async def kitap_bilgi_cek(data: dict, current_user=Depends(get_current_user)):
+    import urllib.request, urllib.error, ssl, json, asyncio
+
     deger = data.get("deger", "").strip()
     tip = data.get("tip", "isbn")
     result = {"baslik": "", "yazar": "", "isbn": "", "yayinevi": "", "sayfa_sayisi": "", "aciklama": "", "kapak_url": "", "link": ""}
 
-    import asyncio
+    def fetch_url(url):
+        try:
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
+            with urllib.request.urlopen(req, timeout=12, context=ctx) as resp:
+                raw = resp.read()
+                try:
+                    return raw.decode("utf-8")
+                except Exception:
+                    return raw.decode("latin-1")
+        except Exception:
+            return None
 
     if tip == "isbn":
         isbn_temiz = re.sub(r"[^0-9X]", "", deger.upper())
-
         # Google Books API
-        gbooks_url = f"https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn_temiz}"
-        raw = await asyncio.to_thread(_fetch_url, gbooks_url)
+        raw = await asyncio.to_thread(fetch_url, f"https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn_temiz}")
         if raw:
             try:
-                j = _json.loads(raw)
+                j = json.loads(raw)
                 if j.get("totalItems", 0) > 0:
                     vol = j["items"][0]["volumeInfo"]
                     result["baslik"] = vol.get("title", "")
@@ -1758,14 +1744,12 @@ async def kitap_bilgi_cek(data: dict, current_user=Depends(get_current_user)):
                     result["link"] = vol.get("infoLink", "")
             except Exception:
                 pass
-
         # Open Library fallback
         if not result["baslik"]:
-            ol_url = f"https://openlibrary.org/api/books?bibkeys=ISBN:{isbn_temiz}&format=json&jscmd=data"
-            raw = await asyncio.to_thread(_fetch_url, ol_url)
+            raw = await asyncio.to_thread(fetch_url, f"https://openlibrary.org/api/books?bibkeys=ISBN:{isbn_temiz}&format=json&jscmd=data")
             if raw:
                 try:
-                    j = _json.loads(raw)
+                    j = json.loads(raw)
                     key = f"ISBN:{isbn_temiz}"
                     if key in j:
                         book = j[key]
@@ -1781,10 +1765,9 @@ async def kitap_bilgi_cek(data: dict, current_user=Depends(get_current_user)):
                     pass
 
     elif tip == "link":
-        html = await asyncio.to_thread(_fetch_url, deger)
+        html = await asyncio.to_thread(fetch_url, deger)
         if html:
             QP = """[\"']"""
-            # og:title
             m = re.search(r'property\s*=\s*' + QP + r'og:title' + QP + r'[^>]*content\s*=\s*' + QP + r'([^"\']+)', html, re.I)
             if m:
                 result["baslik"] = m.group(1).strip()
@@ -1797,31 +1780,25 @@ async def kitap_bilgi_cek(data: dict, current_user=Depends(get_current_user)):
                             t = t.split(sep)[0].strip()
                             break
                     result["baslik"] = t
-            # og:description
             m = re.search(r'property\s*=\s*' + QP + r'og:description' + QP + r'[^>]*content\s*=\s*' + QP + r'([^"\']+)', html, re.I)
             if m:
                 result["aciklama"] = m.group(1).strip()[:200]
-            # og:image
             m = re.search(r'property\s*=\s*' + QP + r'og:image' + QP + r'[^>]*content\s*=\s*' + QP + r'([^"\']+)', html, re.I)
             if m:
                 result["kapak_url"] = m.group(1).strip()
-            # Yazar
             m = re.search(r'itemprop\s*=\s*' + QP + r'author' + QP + r'[^>]*>([^<]+)', html, re.I)
             if not m:
                 m = re.search(r'Yazar\s*:?\s*</\w+>\s*<[^>]+>([^<]+)', html, re.I)
             if m:
                 result["yazar"] = m.group(1).strip()
-            # Yayinevi
             m = re.search(r'itemprop\s*=\s*' + QP + r'publisher' + QP + r'[^>]*>([^<]+)', html, re.I)
             if not m:
                 m = re.search(r'Yay.nevi\s*:?\s*</\w+>\s*<[^>]+>([^<]+)', html, re.I)
             if m:
                 result["yayinevi"] = m.group(1).strip()
-            # Sayfa sayisi
             m = re.search(r'(?:Sayfa|sayfa)\s*(?:Say.s.)?\s*:?\s*(\d+)', html)
             if m:
                 result["sayfa_sayisi"] = m.group(1)
-            # ISBN
             m = re.search(r'ISBN[^:]*:\s*([\d\-]{10,})', html, re.I)
             if m:
                 result["isbn"] = re.sub(r"[^0-9]", "", m.group(1))
