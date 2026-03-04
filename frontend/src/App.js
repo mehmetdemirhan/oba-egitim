@@ -3613,44 +3613,49 @@ function GelisimAlani({ user }) {
           <CardContent className="p-6">
             <form onSubmit={icerikKaydet} className="space-y-5">
               <div><Label>Başlık *</Label><Input value={adminForm.baslik} onChange={e => setAdminForm({...adminForm, baslik: e.target.value})} required /></div>
-              <div className="grid grid-cols-2 gap-4">
-                <div><Label>Tür</Label>
-                  <Select value={adminForm.tur} onValueChange={v => setAdminForm({...adminForm, tur: v})}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent position="popper" sideOffset={4} className="z-[200]">
-                      <SelectItem value="hizmetici">🎓 Hizmetiçi Eğitim</SelectItem>
-                      <SelectItem value="film">🎬 Film</SelectItem>
-                      <SelectItem value="kitap">📚 Kitap</SelectItem>
-                      <SelectItem value="makale">📄 Makale</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div><Label>Hedef Kitle</Label>
-                  <Select value={adminForm.hedef_kitle} onValueChange={v => setAdminForm({...adminForm, hedef_kitle: v})}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent position="popper" sideOffset={4} className="z-[200]">
-                      <SelectItem value="hepsi">👥 Herkes</SelectItem>
-                      <SelectItem value="ogretmen">👩‍🏫 Öğretmenler</SelectItem>
-                      <SelectItem value="ogrenci">🎓 Öğrenciler</SelectItem>
-                    </SelectContent>
-                  </Select>
+
+              {/* Tür - Buton Grubu */}
+              <div>
+                <Label className="mb-2 block">Tür</Label>
+                <div className="flex flex-wrap gap-2">
+                  {[{v:"hizmetici",l:"🎓 Hizmetiçi Eğitim"},{v:"film",l:"🎬 Film"},{v:"kitap",l:"📚 Kitap"},{v:"makale",l:"📄 Makale"}].map(t => (
+                    <button key={t.v} type="button" onClick={() => setAdminForm({...adminForm, tur: t.v})}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all border ${adminForm.tur === t.v ? 'bg-orange-500 text-white border-orange-500 shadow-md' : 'bg-white text-gray-600 border-gray-200 hover:border-orange-300 hover:bg-orange-50'}`}>
+                      {t.l}
+                    </button>
+                  ))}
                 </div>
               </div>
+
+              {/* Hedef Kitle - Buton Grubu */}
+              <div>
+                <Label className="mb-2 block">Hedef Kitle</Label>
+                <div className="flex flex-wrap gap-2">
+                  {[{v:"hepsi",l:"👥 Herkes"},{v:"ogretmen",l:"👩‍🏫 Öğretmenler"},{v:"ogrenci",l:"🎓 Öğrenciler"}].map(t => (
+                    <button key={t.v} type="button" onClick={() => setAdminForm({...adminForm, hedef_kitle: t.v})}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all border ${adminForm.hedef_kitle === t.v ? 'bg-blue-500 text-white border-blue-500 shadow-md' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:bg-blue-50'}`}>
+                      {t.l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div><Label>Açıklama</Label><Input value={adminForm.aciklama} onChange={e => setAdminForm({...adminForm, aciklama: e.target.value})} placeholder="Kısa açıklama..." /></div>
 
               {/* Makale alanları */}
               {adminForm.tur === "makale" && (
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl space-y-3">
                   <div className="font-semibold text-sm text-blue-800">📎 Makale Kaynağı</div>
-                  <div><Label>Dosya Türü</Label>
-                    <Select value={adminForm.makale_dosya_turu || "link"} onValueChange={v => setAdminForm({...adminForm, makale_dosya_turu: v})}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent position="popper" sideOffset={4} className="z-[200]">
-                        <SelectItem value="link">🔗 Web Linki</SelectItem>
-                        <SelectItem value="pdf">📕 PDF</SelectItem>
-                        <SelectItem value="word">📘 Word</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div>
+                    <Label className="mb-2 block">Dosya Türü</Label>
+                    <div className="flex gap-2">
+                      {[{v:"link",l:"🔗 Web Linki"},{v:"pdf",l:"📕 PDF"},{v:"word",l:"📘 Word"}].map(t => (
+                        <button key={t.v} type="button" onClick={() => setAdminForm({...adminForm, makale_dosya_turu: t.v})}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${(adminForm.makale_dosya_turu || "link") === t.v ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}>
+                          {t.l}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <div>
                     <Label>{(adminForm.makale_dosya_turu || "link") === "link" ? "URL" : "Paylaşım Linki (Drive/Dropbox)"}</Label>
