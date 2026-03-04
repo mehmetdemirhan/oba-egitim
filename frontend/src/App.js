@@ -214,6 +214,9 @@ function AppContent() {
 
   if (!user) return <LoginPage />;
 
+  // Öğrenci rolü → ayrı panel
+  if (user.role === "student") return <OgrenciPaneli user={user} logout={logout} />;
+
   const fetchTeachers = async () => { try { const r = await axios.get(`${API}/teachers`); setTeachers(r.data); } catch(e) {} };
   const fetchStudents = async () => { try { const r = await axios.get(`${API}/students`); setStudents(r.data); } catch(e) {} };
   const fetchCourses = async () => { try { const r = await axios.get(`${API}/courses`); setCourses(r.data); } catch(e) {} };
@@ -3437,6 +3440,321 @@ function GirisAnaliziModul({ user, students, teachers }) {
 
 
 // ═══════════════════════════════════════════════
+// ═══════════════════════════════════════════════
+// ÖĞRENCİ PANELİ — Öğrenci rolüyle giriş yapınca gösterilen tam ekran
+// ═══════════════════════════════════════════════
+
+function OgrenciPaneli({ user, logout }) {
+  const { toast } = useToast();
+  const [profil, setProfil] = useState(null);
+  const [gorevler, setGorevler] = useState([]);
+  const [okumaKayitlari, setOkumaKayitlari] = useState([]);
+  const [istatistik, setIstatistik] = useState(null);
+  const [aktifEkran, setAktifEkran] = useState("ana"); // ana, okuma, ne-okudun, gecmis
+  const [okumaBasladi, setOkumaBasladi] = useState(false);
+  const [okumaSuresi, setOkumaSuresi] = useState(0);
+  const [okumaDuraklatildi, setOkumaDuraklatildi] = useState(false);
+  const okumaInterval = useRef(null);
+  const [agaclar, setAgaclar] = useState([]);
+  const [neOkudunForm, setNeOkudunForm] = useState({ kitap_adi: "", bolum: "", baslangic_sayfa: "", bitis_sayfa: "", not_text: "" });
+
+  const ogrenciId = user.linked_id || user.id;
+
+  const fetchAll = useCallback(async () => {
+    try { const r = await axios.get(`${API}/ogrenci-panel/profil`); setProfil(r.data); } catch(e) {}
+    try { const r = await axios.get(`${API}/ogrenci-panel/gorevler`); setGorevler(r.data); } catch(e) {}
+    try { const r = await axios.get(`${API}/reading-logs/${ogrenciId}`); setOkumaKayitlari(r.data); } catch(e) {}
+    try { const r = await axios.get(`${API}/reading-logs/${ogrenciId}/istatistik`); setIstatistik(r.data); } catch(e) {}
+  }, [ogrenciId]);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  // Okuma sayacı
+  useEffect(() => {
+    if (okumaBasladi && !okumaDuraklatildi) {
+      okumaInterval.current = setInterval(() => {
+        setOkumaSuresi(prev => {
+          const yeni = prev + 1;
+          // Her 60 saniyede bir ağaç ekle
+          if (yeni % 60 === 0) {
+            setAgaclar(a => [...a, { id: Date.now(), buyume: 0 }]);
+          }
+          return yeni;
+        });
+      }, 1000);
+    } else {
+      clearInterval(okumaInterval.current);
+    }
+    return () => clearInterval(okumaInterval.current);
+  }, [okumaBasladi, okumaDuraklatildi]);
+
+  // Ağaç büyütme animasyonu
+  useEffect(() => {
+    if (agaclar.length > 0) {
+      const timer = setInterval(() => {
+        setAgaclar(prev => prev.map(a => a.buyume < 100 ? { ...a, buyume: Math.min(a.buyume + 2, 100) } : a));
+      }, 100);
+      return () => clearInterval(timer);
+    }
+  }, [agaclar.length]);
+
+  const dakikaStr = (sn) => {
+    const dk = Math.floor(sn / 60);
+    const s = sn % 60;
+    return `${dk.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const okumaBaslat = () => {
+    setOkumaBasladi(true); setOkumaDuraklatildi(false); setOkumaSuresi(0); setAgaclar([]); setAktifEkran("okuma");
+  };
+
+  const okumaBitir = () => {
+    clearInterval(okumaInterval.current);
+    setOkumaBasladi(false);
+    setNeOkudunForm({ kitap_adi: "", bolum: "", baslangic_sayfa: "", bitis_sayfa: "", not_text: "" });
+    setAktifEkran("ne-okudun");
+  };
+
+  const okumaKaydet = async (e) => {
+    e.preventDefault();
+    const dakika = Math.max(1, Math.round(okumaSuresi / 60));
+    try {
+      await axios.post(`${API}/reading-logs`, {
+        ...neOkudunForm,
+        baslangic_sayfa: neOkudunForm.baslangic_sayfa ? parseInt(neOkudunForm.baslangic_sayfa) : null,
+        bitis_sayfa: neOkudunForm.bitis_sayfa ? parseInt(neOkudunForm.bitis_sayfa) : null,
+        sure_dakika: dakika,
+      });
+      toast({ title: `🌳 ${dakika} dakika okuma kaydedildi!` });
+      setOkumaSuresi(0); setAgaclar([]); setAktifEkran("ana"); fetchAll();
+    } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
+  };
+
+  const gorevTamamla = async (gorevId) => {
+    try {
+      await axios.put(`${API}/gorevler/${gorevId}/durum`, { durum: "tamamlandi" });
+      toast({ title: "✅ Görev tamamlandı!" }); fetchAll();
+    } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
+  };
+
+  const bekleyenGorevler = gorevler.filter(g => g.durum !== "tamamlandi");
+  const agacEmoji = (buyume) => buyume < 30 ? "🌱" : buyume < 70 ? "🌿" : "🌳";
+
+  // ── OKUMA RİTÜELİ EKRANI (Konsantrasyon Ormanı) ──
+  if (aktifEkran === "okuma") {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-green-50 to-emerald-100 flex flex-col items-center justify-center p-4">
+        <div className="max-w-md w-full text-center space-y-8">
+          <div className="text-lg text-green-800 font-medium">Fiziksel kitabını aç ve oku 📖</div>
+
+          {/* Orman */}
+          <div className="min-h-[120px] flex items-end justify-center gap-1 flex-wrap p-4 bg-white/50 rounded-3xl">
+            {agaclar.length === 0 && <div className="text-4xl opacity-30">🌱</div>}
+            {agaclar.map(a => (
+              <span key={a.id} className="text-3xl transition-all duration-500" style={{ transform: `scale(${0.5 + a.buyume / 200})`, opacity: 0.5 + a.buyume / 200 }}>
+                {agacEmoji(a.buyume)}
+              </span>
+            ))}
+          </div>
+          <div className="text-xs text-green-600">Her dakika ormanda bir ağaç büyür</div>
+
+          {/* Sayaç */}
+          <div className="text-6xl font-mono font-bold text-green-900">{dakikaStr(okumaSuresi)}</div>
+
+          <div className="flex gap-4 justify-center">
+            <Button onClick={() => setOkumaDuraklatildi(!okumaDuraklatildi)}
+              variant="outline" className="rounded-full px-8 py-3 text-lg border-green-300 text-green-700 hover:bg-green-50">
+              {okumaDuraklatildi ? "▶ Devam Et" : "⏸ Duraklat"}
+            </Button>
+            <Button onClick={okumaBitir}
+              className="rounded-full px-8 py-3 text-lg bg-gradient-to-r from-green-500 to-emerald-600 text-white"
+              disabled={okumaSuresi < 30}>
+              ✅ Bitirdim
+            </Button>
+          </div>
+          {okumaSuresi < 30 && <p className="text-xs text-gray-400">En az 30 saniye okuman gerekiyor</p>}
+        </div>
+      </div>
+    );
+  }
+
+  // ── NE OKUDUN? EKRANI ──
+  if (aktifEkran === "ne-okudun") {
+    const dakika = Math.max(1, Math.round(okumaSuresi / 60));
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-orange-50 to-yellow-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full">
+          <Card className="border-0 shadow-lg">
+            <CardHeader className="text-center">
+              <div className="text-4xl mb-2">🌳🌳🌳</div>
+              <CardTitle>Harika! {dakika} dakika okudun.</CardTitle>
+              <p className="text-gray-500 text-sm">Bugün ne okudun?</p>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={okumaKaydet} className="space-y-4">
+                <div><Label>Kitap Adı *</Label><Input value={neOkudunForm.kitap_adi} onChange={e => setNeOkudunForm({...neOkudunForm, kitap_adi: e.target.value})} required placeholder="Okuduğun kitabın adı" /></div>
+                <div><Label>Bölüm</Label><Input value={neOkudunForm.bolum} onChange={e => setNeOkudunForm({...neOkudunForm, bolum: e.target.value})} placeholder="Bölüm 3" /></div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><Label>Başlangıç Sayfa</Label><Input type="number" value={neOkudunForm.baslangic_sayfa} onChange={e => setNeOkudunForm({...neOkudunForm, baslangic_sayfa: e.target.value})} placeholder="24" /></div>
+                  <div><Label>Bitiş Sayfa</Label><Input type="number" value={neOkudunForm.bitis_sayfa} onChange={e => setNeOkudunForm({...neOkudunForm, bitis_sayfa: e.target.value})} placeholder="38" /></div>
+                </div>
+                <div><Label>Not (opsiyonel)</Label><Input value={neOkudunForm.not_text} onChange={e => setNeOkudunForm({...neOkudunForm, not_text: e.target.value})} placeholder="Kısa bir not..." /></div>
+                <Button type="submit" className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 rounded-xl">Kaydet 📝</Button>
+                <Button type="button" variant="outline" className="w-full" onClick={() => { setOkumaSuresi(0); setAktifEkran("ana"); }}>Atla</Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // ── OKUMA GEÇMİŞİ ──
+  if (aktifEkran === "gecmis") {
+    return (
+      <div className="min-h-screen bg-gray-50 p-4">
+        <div className="max-w-2xl mx-auto space-y-4">
+          <div className="flex items-center gap-3">
+            <Button variant="outline" size="sm" onClick={() => setAktifEkran("ana")}>← Geri</Button>
+            <h2 className="text-xl font-bold">Okuma Geçmişim</h2>
+          </div>
+          {okumaKayitlari.length === 0 ? (
+            <div className="text-center py-12"><div className="text-5xl mb-3">📚</div><p className="text-gray-500">Henüz okuma kaydın yok. Hadi başlayalım!</p></div>
+          ) : (
+            okumaKayitlari.map(k => (
+              <Card key={k.id} className="border-0 shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="font-bold text-gray-900">{k.kitap_adi || "Kitap belirtilmedi"}</div>
+                      <div className="text-sm text-gray-500 mt-1">
+                        {k.bolum && <span>{k.bolum} • </span>}
+                        {k.baslangic_sayfa && k.bitis_sayfa && <span>s.{k.baslangic_sayfa}-{k.bitis_sayfa} • </span>}
+                        <span>⏱ {k.sure_dakika} dakika</span>
+                      </div>
+                      {k.not_text && <p className="text-xs text-blue-600 mt-1">💬 {k.not_text}</p>}
+                    </div>
+                    <div className="text-xs text-gray-400">{new Date(k.tarih).toLocaleDateString('tr-TR')}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── ANA EKRAN ──
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white">
+      <div className="max-w-lg mx-auto p-4 space-y-5">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Merhaba, {user.ad}! 👋</h1>
+            <p className="text-gray-500 text-sm">{profil?.kur ? `Kur: ${profil.kur}` : ""} {profil?.sinif ? `• ${profil.sinif}. sınıf` : ""}</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={logout}><LogOut className="h-4 w-4" /></Button>
+        </div>
+
+        {/* İstatistik Kartları */}
+        {istatistik && (
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border border-gray-100">
+              <div className="text-2xl font-bold text-orange-600">{istatistik.streak}</div>
+              <div className="text-xs text-gray-500">🔥 Streak</div>
+            </div>
+            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border border-gray-100">
+              <div className="text-2xl font-bold text-green-600">{istatistik.bugun_dakika}</div>
+              <div className="text-xs text-gray-500">⏱ Bugün (dk)</div>
+            </div>
+            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border border-gray-100">
+              <div className="text-2xl font-bold text-blue-600">{istatistik.toplam_kitap}</div>
+              <div className="text-xs text-gray-500">📚 Kitap</div>
+            </div>
+          </div>
+        )}
+
+        {/* Haftalık Aktivite */}
+        {istatistik && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+            <div className="text-sm font-medium text-gray-700 mb-2">Bu Hafta</div>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-orange-400 to-red-500 rounded-full transition-all" style={{ width: `${Math.min(100, (istatistik.aktif_gunler_7 / 4) * 100)}%` }} />
+              </div>
+              <span className="text-sm font-bold text-gray-700">{istatistik.aktif_gunler_7}/4 gün</span>
+            </div>
+            <p className="text-xs text-gray-400 mt-1">Hedef: Haftada en az 4 gün okuma</p>
+          </div>
+        )}
+
+        {/* Okumaya Başla Butonu */}
+        <button onClick={okumaBaslat}
+          className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all active:scale-[0.98]">
+          <div className="text-3xl mb-2">🌳</div>
+          <div className="text-xl font-bold">Okumaya Başla</div>
+          <div className="text-sm opacity-80 mt-1">Konsantrasyon Ormanını büyüt</div>
+        </button>
+
+        {/* Atanan Görevler */}
+        {bekleyenGorevler.length > 0 && (
+          <div>
+            <h3 className="font-bold text-gray-900 mb-3">📌 Görevlerin ({bekleyenGorevler.length})</h3>
+            <div className="space-y-2">
+              {bekleyenGorevler.slice(0, 5).map(g => (
+                <Card key={g.id} className="border-0 shadow-sm">
+                  <CardContent className="p-3 flex items-center justify-between">
+                    <div>
+                      <div className="font-medium text-sm">{g.baslik}</div>
+                      <div className="text-xs text-gray-400">
+                        {g.atayan_ad && `Atayan: ${g.atayan_ad}`}
+                        {g.son_tarih && ` • Son: ${new Date(g.son_tarih).toLocaleDateString('tr-TR')}`}
+                      </div>
+                    </div>
+                    <Button size="sm" className="bg-green-600 text-white text-xs" onClick={() => gorevTamamla(g.id)}>Tamamla</Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Son Okumalar */}
+        {okumaKayitlari.length > 0 && (
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-bold text-gray-900">📖 Son Okumalar</h3>
+              <button onClick={() => setAktifEkran("gecmis")} className="text-xs text-blue-600 hover:underline">Tümünü Gör →</button>
+            </div>
+            <div className="space-y-2">
+              {okumaKayitlari.slice(0, 3).map(k => (
+                <div key={k.id} className="bg-white rounded-xl p-3 shadow-sm border border-gray-100 flex items-center justify-between">
+                  <div>
+                    <div className="font-medium text-sm">{k.kitap_adi || "—"}</div>
+                    <div className="text-xs text-gray-400">{k.bolum} • {k.sure_dakika} dk</div>
+                  </div>
+                  <div className="text-xs text-gray-400">{new Date(k.tarih).toLocaleDateString('tr-TR')}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Toplam İstatistik */}
+        {istatistik && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-4 text-center">
+            <div className="text-3xl font-bold text-indigo-600">{istatistik.toplam_dakika}</div>
+            <div className="text-sm text-gray-500">toplam dakika okuma 📚</div>
+          </div>
+        )}
+      </div>
+      <Toaster />
+    </div>
+  );
+}
+
 // GÖREV YÖNETİMİ
 // ═══════════════════════════════════════════════
 
