@@ -2440,7 +2440,6 @@ class GorevCreate(BaseModel):
     kitap_link: Optional[str] = None
     kitap_kapak: Optional[str] = None
     film_link: Optional[str] = None
-    sorular: List[dict] = []
 
 class GorevModel(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -2458,14 +2457,12 @@ class GorevModel(BaseModel):
     durum: str = "bekliyor"
     tamamlama_tarihi: Optional[str] = None
     tamamlama_notu: Optional[str] = None
-    test_sonuc: Optional[dict] = None
     makale_link: Optional[str] = None
     kitap_yazar: Optional[str] = None
     kitap_isbn: Optional[str] = None
     kitap_link: Optional[str] = None
     kitap_kapak: Optional[str] = None
     film_link: Optional[str] = None
-    sorular: List[dict] = []
     olusturma_tarihi: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
 
 
@@ -2529,7 +2526,7 @@ async def create_toplu_gorev(payload: dict, current_user=Depends(get_current_use
             hedef_id=hid, hedef_tip=hedef_tip, hedef_ad=hedef_ad,
             baslik=gorev_bilgi.get("baslik", ""), aciklama=gorev_bilgi.get("aciklama", ""),
             tur=gorev_bilgi.get("tur", "ozel"), icerik_id=gorev_bilgi.get("icerik_id"),
-            son_tarih=gorev_bilgi.get("son_tarih"), sorular=gorev_bilgi.get("sorular", []),
+            son_tarih=gorev_bilgi.get("son_tarih"),
             makale_link=gorev_bilgi.get("makale_link"), kitap_yazar=gorev_bilgi.get("kitap_yazar"),
             kitap_isbn=gorev_bilgi.get("kitap_isbn"), kitap_link=gorev_bilgi.get("kitap_link"),
             kitap_kapak=gorev_bilgi.get("kitap_kapak"), film_link=gorev_bilgi.get("film_link"),
@@ -2590,8 +2587,6 @@ async def update_gorev_durum(gorev_id: str, payload: dict, current_user=Depends(
         update["tamamlama_tarihi"] = datetime.utcnow().isoformat()
         if payload.get("not"):
             update["tamamlama_notu"] = payload["not"]
-        if payload.get("test_sonuc"):
-            update["test_sonuc"] = payload["test_sonuc"]
 
     await db.gorevler.update_one({"id": gorev_id}, {"$set": update})
     return {"durum": yeni_durum}
