@@ -3445,21 +3445,18 @@ function GorevYonetimi({ user, students, teachers }) {
   const [gorevler, setGorevler] = useState([]);
   const [istatistik, setIstatistik] = useState(null);
   const [gorunum, setGorunum] = useState("liste");
-  const [aktifGorev, setAktifGorev] = useState(null);
   const [seciliHedefler, setSeciliHedefler] = useState([]);
   const [tamamlamaDialogu, setTamamlamaDialogu] = useState(null);
   const [tamamlamaNotu, setTamamlamaNotu] = useState("");
-  const [testCevaplari, setTestCevaplari] = useState([]);
   const [filtre, setFiltre] = useState("hepsi");
   const [hedefTipFiltre, setHedefTipFiltre] = useState("hepsi");
   const [aramaMetni, setAramaMetni] = useState("");
 
   const [form, setForm] = useState({
     baslik: "", aciklama: "", tur: "ozel", hedef_tip: user.role === "teacher" ? "ogrenci" : "ogretmen",
-    son_tarih: "", icerik_id: "", sorular: [],
+    son_tarih: "", icerik_id: "",
     makale_link: "", kitap_yazar: "", kitap_isbn: "", kitap_link: "", kitap_kapak: "", film_link: ""
   });
-  const [yeniSoru, setYeniSoru] = useState({ soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0 });
   const [kitapYukleniyor, setKitapYukleniyor] = useState(false);
   const [gelisimIcerikleri, setGelisimIcerikleri] = useState([]);
   const [icerikSecDialogu, setIcerikSecDialogu] = useState(false);
@@ -3489,6 +3486,8 @@ function GorevYonetimi({ user, students, teachers }) {
     ? <span className="px-2 py-0.5 bg-indigo-100 text-indigo-600 text-xs rounded-full font-medium">👩‍🏫 Öğretmen</span>
     : <span className="px-2 py-0.5 bg-emerald-100 text-emerald-600 text-xs rounded-full font-medium">🎓 Öğrenci</span>;
 
+  const resetForm = () => setForm({ baslik: "", aciklama: "", tur: "ozel", hedef_tip: form.hedef_tip, son_tarih: "", icerik_id: "", makale_link: "", kitap_yazar: "", kitap_isbn: "", kitap_link: "", kitap_kapak: "", film_link: "" });
+
   const gorevOlustur = async (e) => {
     e.preventDefault();
     if (seciliHedefler.length === 0) { toast({ title: "Uyarı", description: "En az bir kişi seçmelisiniz", variant: "destructive" }); return; }
@@ -3499,8 +3498,7 @@ function GorevYonetimi({ user, students, teachers }) {
         await axios.post(`${API}/gorevler/toplu`, { hedef_idler: seciliHedefler, hedef_tip: form.hedef_tip, gorev: form });
       }
       toast({ title: "✅ Görev atandı", description: `${seciliHedefler.length} kişiye görev oluşturuldu` });
-      setForm({ baslik: "", aciklama: "", tur: "ozel", hedef_tip: form.hedef_tip, son_tarih: "", icerik_id: "", sorular: [], makale_link: "", kitap_yazar: "", kitap_isbn: "", kitap_link: "", kitap_kapak: "", film_link: "" });
-      setSeciliHedefler([]); setGorunum("liste"); fetchAll();
+      resetForm(); setSeciliHedefler([]); setGorunum("liste"); fetchAll();
     } catch(e) { toast({ title: "Hata", description: e.response?.data?.detail || "Görev oluşturulamadı", variant: "destructive" }); }
   };
 
@@ -3517,12 +3515,6 @@ function GorevYonetimi({ user, students, teachers }) {
     catch(e) { toast({ title: "Hata", variant: "destructive" }); }
   };
 
-  const soruEkleGorev = () => {
-    if (!yeniSoru.soru || yeniSoru.secenekler.some(s => !s)) { toast({ title: "Soru ve tüm seçenekler dolu olmalı", variant: "destructive" }); return; }
-    setForm({ ...form, sorular: [...form.sorular, { ...yeniSoru, id: Date.now().toString() }] });
-    setYeniSoru({ soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0 });
-  };
-
   const kitapBilgiCekGorev = async (deger, tip) => {
     if (!deger.trim()) return;
     setKitapYukleniyor(true);
@@ -3536,12 +3528,11 @@ function GorevYonetimi({ user, students, teachers }) {
   };
 
   const iceriktenGorev = (icerik) => {
-    setForm({ ...form, baslik: icerik.baslik, aciklama: icerik.aciklama, tur: icerik.tur, icerik_id: icerik.id, sorular: icerik.sorular || [], makale_link: icerik.makale_link || "", kitap_yazar: icerik.kitap_yazar || "", kitap_isbn: icerik.kitap_isbn || "", kitap_link: icerik.kitap_link || "", kitap_kapak: icerik.kitap_kapak || "" });
+    setForm({ ...form, baslik: icerik.baslik, aciklama: icerik.aciklama, tur: icerik.tur, icerik_id: icerik.id, makale_link: icerik.makale_link || "", kitap_yazar: icerik.kitap_yazar || "", kitap_isbn: icerik.kitap_isbn || "", kitap_link: icerik.kitap_link || "", kitap_kapak: icerik.kitap_kapak || "" });
     setIcerikSecDialogu(false);
     toast({ title: `"${icerik.baslik}" içeriği görev olarak seçildi` });
   };
 
-  // Öğretmenleri user listesinden al (id eşleştirmesi için)
   const [ogretmenUsers, setOgretmenUsers] = useState([]);
   useEffect(() => {
     if (user.role === "admin" || user.role === "coordinator") {
@@ -3568,29 +3559,22 @@ function GorevYonetimi({ user, students, teachers }) {
   // ── TAMAMLAMA DİALOGU ──
   if (tamamlamaDialogu) {
     const g = tamamlamaDialogu;
-    const hasSorular = g.sorular && g.sorular.length > 0;
     return (
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => { setTamamlamaDialogu(null); setTestCevaplari([]); setTamamlamaNotu(""); }}>← Geri</Button>
+          <Button variant="outline" size="sm" onClick={() => { setTamamlamaDialogu(null); setTamamlamaNotu(""); }}>← Geri</Button>
           <h2 className="text-xl font-bold">Görevi Tamamla</h2>
         </div>
-        <Card className="border-0 shadow-sm"><CardHeader><div className="flex items-center gap-2"><span className="text-2xl">{turIcon(g.tur)}</span><CardTitle>{g.baslik}</CardTitle></div>{g.aciklama && <p className="text-gray-500 text-sm mt-1">{g.aciklama}</p>}</CardHeader></Card>
-        {hasSorular && (<><h3 className="font-bold text-lg">Test Soruları</h3>
-          {g.sorular.map((soru, i) => (
-            <Card key={i} className="border-0 shadow-sm"><CardContent className="p-6"><p className="font-medium mb-4">{i + 1}. {soru.soru}</p><div className="space-y-2">
-              {soru.secenekler.map((s, j) => (<button key={j} onClick={() => { const c = [...testCevaplari]; c[i] = j; setTestCevaplari(c); }}
-                className={`w-full text-left p-3 rounded-xl border-2 transition-all ${testCevaplari[i] === j ? 'border-orange-500 bg-orange-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                <span className="font-medium mr-2">{['A','B','C','D'][j]})</span>{s}</button>))}
-            </div></CardContent></Card>))}</>)}
-        <div><Label>Tamamlama Notu (opsiyonel)</Label><Input value={tamamlamaNotu} onChange={e => setTamamlamaNotu(e.target.value)} placeholder="Kısa bir değerlendirme..." /></div>
-        <Button onClick={() => {
-          const ek = { not: tamamlamaNotu };
-          if (hasSorular) { const dogru = g.sorular.reduce((acc, s, i) => acc + (testCevaplari[i] === s.dogru_cevap ? 1 : 0), 0); ek.test_sonuc = { dogru, toplam: g.sorular.length, puan: Math.round(dogru / g.sorular.length * 100) }; }
-          durumGuncelle(g.id, "tamamlandi", ek);
-        }} disabled={hasSorular && testCevaplari.filter(c => c !== undefined).length < g.sorular.length}
+        <Card className="border-0 shadow-sm"><CardHeader><div className="flex items-center gap-2"><span className="text-2xl">{turIcon(g.tur)}</span><CardTitle>{g.baslik}</CardTitle></div>
+          {g.aciklama && <p className="text-gray-500 text-sm mt-1">{g.aciklama}</p>}
+          {g.kitap_yazar && <p className="text-sm text-gray-500">📚 {g.kitap_yazar}</p>}
+          {g.film_link && <a href={g.film_link} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline">🎬 Film Linki</a>}
+          {g.makale_link && <a href={g.makale_link} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline">📄 Makale Linki</a>}
+        </CardHeader></Card>
+        <div><Label>Tamamlama Notu (opsiyonel)</Label><Input value={tamamlamaNotu} onChange={e => setTamamlamaNotu(e.target.value)} placeholder="Ne yaptığınızı kısaca yazın..." /></div>
+        <Button onClick={() => durumGuncelle(g.id, "tamamlandi", { not: tamamlamaNotu })}
           className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3">
-          {hasSorular ? `Testi Tamamla (${testCevaplari.filter(c => c !== undefined).length}/${g.sorular.length})` : "Görevi Tamamla ✅"}
+          Görevi Tamamla ✅
         </Button>
       </div>
     );
@@ -3634,7 +3618,7 @@ function GorevYonetimi({ user, students, teachers }) {
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${form.tur === t.v ? 'bg-orange-500 text-white border-orange-500 shadow' : 'bg-white text-gray-600 border-gray-200 hover:border-orange-300'}`}>{t.l}</button>))}
               </div></div>
               <div><Label>Başlık *</Label><Input value={form.baslik} onChange={e => setForm({...form, baslik: e.target.value})} required placeholder="Görev başlığı..." /></div>
-              <div><Label>Açıklama</Label><Input value={form.aciklama} onChange={e => setForm({...form, aciklama: e.target.value})} placeholder="Detaylı açıklama..." /></div>
+              <div><Label>Açıklama</Label><textarea value={form.aciklama} onChange={e => setForm({...form, aciklama: e.target.value})} placeholder="Detaylı açıklama..." className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px]" /></div>
               <div><Label>Son Tarih</Label><Input type="date" value={form.son_tarih} onChange={e => setForm({...form, son_tarih: e.target.value})} /></div>
 
               {form.tur === "film" && (<div className="p-4 bg-purple-50 border border-purple-200 rounded-xl space-y-3"><div className="font-semibold text-sm text-purple-800">🎬 Film Bilgileri</div><div><Label>Film Linki</Label><Input value={form.film_link} onChange={e => setForm({...form, film_link: e.target.value})} placeholder="https://..." /></div></div>)}
@@ -3648,18 +3632,6 @@ function GorevYonetimi({ user, students, teachers }) {
                 <div><Label>Yazar</Label><Input value={form.kitap_yazar} onChange={e => setForm({...form, kitap_yazar: e.target.value})} /></div></div>)}
 
               {form.tur === "makale" && (<div className="p-4 bg-orange-50 border border-orange-200 rounded-xl space-y-3"><div className="font-semibold text-sm text-orange-800">📄 Makale Linki</div><Input value={form.makale_link} onChange={e => setForm({...form, makale_link: e.target.value})} placeholder="https://..." /></div>)}
-
-              <div className="border-2 border-dashed border-gray-200 rounded-xl p-4 space-y-4">
-                <h4 className="font-semibold text-gray-700">Test Soruları ({form.sorular.length} soru)</h4>
-                {form.sorular.map((s, i) => (<div key={i} className="bg-green-50 p-3 rounded-lg text-sm flex items-start justify-between"><span><strong>{i+1}.</strong> {s.soru}</span><button type="button" onClick={() => setForm({...form, sorular: form.sorular.filter((_,idx) => idx!==i)})} className="text-red-500 ml-2">✕</button></div>))}
-                <div className="space-y-3 border-t pt-4">
-                  <Input placeholder="Soru metni" value={yeniSoru.soru} onChange={e => setYeniSoru({...yeniSoru, soru: e.target.value})} />
-                  {yeniSoru.secenekler.map((s, i) => (<div key={i} className="flex items-center gap-2"><span className="text-sm font-bold w-5">{['A','B','C','D'][i]}</span>
-                    <Input placeholder={`${['A','B','C','D'][i]} seçeneği`} value={s} onChange={e => { const sec=[...yeniSoru.secenekler]; sec[i]=e.target.value; setYeniSoru({...yeniSoru, secenekler:sec}); }} />
-                    <input type="radio" name="gorevDogru" checked={yeniSoru.dogru_cevap===i} onChange={() => setYeniSoru({...yeniSoru, dogru_cevap:i})} className="w-4 h-4 accent-orange-500" /></div>))}
-                  <Button type="button" variant="outline" size="sm" onClick={soruEkleGorev} className="w-full">+ Soru Ekle</Button>
-                </div>
-              </div>
             </CardContent>
           </Card>
 
@@ -3675,8 +3647,7 @@ function GorevYonetimi({ user, students, teachers }) {
             {gelisimIcerikleri.map(ic => (<button key={ic.id} onClick={() => iceriktenGorev(ic)}
               className="w-full text-left p-3 rounded-xl border border-gray-200 hover:border-orange-300 hover:bg-orange-50 transition-all">
               <div className="flex items-center gap-2"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${turColorGorev(ic.tur)}`}>{turIcon(ic.tur)} {turLabelGorev(ic.tur)}</span><span className="font-medium text-sm">{ic.baslik}</span></div>
-              {ic.aciklama && <p className="text-xs text-gray-500 mt-1 truncate">{ic.aciklama}</p>}
-              {ic.sorular?.length > 0 && <p className="text-xs text-blue-500 mt-1">{ic.sorular.length} test sorusu</p>}</button>))}
+              {ic.aciklama && <p className="text-xs text-gray-500 mt-1 truncate">{ic.aciklama}</p>}</button>))}
           </div></DialogContent></Dialog>
       </div>
     );
@@ -3706,7 +3677,7 @@ function GorevYonetimi({ user, students, teachers }) {
             {benimGorevlerim.filter(g => g.durum !== "tamamlandi").map(g => (<div key={g.id} className="flex items-center justify-between p-3 bg-indigo-50 rounded-xl">
               <div className="flex items-center gap-3"><span className="text-lg">{turIcon(g.tur)}</span><div><div className="font-medium text-sm">{g.baslik}</div><div className="text-xs text-gray-500">Atayan: {g.atayan_ad} {g.son_tarih && `• Son: ${new Date(g.son_tarih).toLocaleDateString('tr-TR')}`}</div></div></div>
               <div className="flex items-center gap-2">{durumBadgeGorev(g.durum)}
-                {g.durum !== "tamamlandi" && (<Button size="sm" className="bg-green-600 text-white text-xs" onClick={() => { if (g.sorular?.length > 0) { setTamamlamaDialogu(g); setTestCevaplari([]); } else durumGuncelle(g.id, "tamamlandi"); }}>Tamamla</Button>)}
+                {g.durum !== "tamamlandi" && (<Button size="sm" className="bg-green-600 text-white text-xs" onClick={() => { setTamamlamaDialogu(g); setTamamlamaNotu(""); }}>Tamamla</Button>)}
               </div></div>))}
           </div></CardContent></Card>)}
 
@@ -3729,12 +3700,10 @@ function GorevYonetimi({ user, students, teachers }) {
           <Card key={g.id} className={`border-0 shadow-sm transition-all hover:shadow-md ${g.durum === "tamamlandi" ? "opacity-70" : ""}`}><CardContent className="p-4"><div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3 flex-1 min-w-0"><span className="text-2xl mt-0.5">{turIcon(g.tur)}</span><div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap"><h4 className="font-bold text-gray-900 truncate">{g.baslik}</h4><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${turColorGorev(g.tur)}`}>{turLabelGorev(g.tur)}</span>{hedefTipBadge(g.hedef_tip)}</div>
-              {g.aciklama && <p className="text-gray-500 text-sm mt-1 line-clamp-1">{g.aciklama}</p>}
+              {g.aciklama && <p className="text-gray-500 text-sm mt-1 line-clamp-2">{g.aciklama}</p>}
               <div className="flex items-center gap-3 mt-2 text-xs text-gray-400 flex-wrap">
                 <span>📌 {g.hedef_ad}</span><span>🔄 Atayan: {g.atayan_ad}</span>
                 {g.son_tarih && <span>📅 Son: {new Date(g.son_tarih).toLocaleDateString('tr-TR')}</span>}
-                {g.sorular?.length > 0 && <span>📝 {g.sorular.length} soru</span>}
-                {g.test_sonuc && <span className="text-green-600 font-medium">🎯 {g.test_sonuc.dogru}/{g.test_sonuc.toplam} doğru (%{g.test_sonuc.puan})</span>}
               </div>
               {g.tamamlama_notu && <p className="text-xs text-blue-600 mt-1 italic">💬 "{g.tamamlama_notu}"</p>}
             </div></div>
@@ -3742,7 +3711,7 @@ function GorevYonetimi({ user, students, teachers }) {
               {durumBadgeGorev(g.durum)}
               {g.durum === "bekliyor" && g.hedef_id === user.id && (<Button size="sm" variant="outline" className="text-xs" onClick={() => durumGuncelle(g.id, "devam_ediyor")}>Başla</Button>)}
               {(g.durum === "bekliyor" || g.durum === "devam_ediyor") && g.hedef_id === user.id && (
-                <Button size="sm" className="bg-green-600 text-white text-xs" onClick={() => { if (g.sorular?.length > 0) { setTamamlamaDialogu(g); setTestCevaplari([]); } else durumGuncelle(g.id, "tamamlandi"); }}>Tamamla</Button>)}
+                <Button size="sm" className="bg-green-600 text-white text-xs" onClick={() => { setTamamlamaDialogu(g); setTamamlamaNotu(""); }}>Tamamla</Button>)}
               {(g.atayan_id === user.id || user.role === "admin") && (<Button size="sm" variant="outline" className="text-xs text-red-500 hover:bg-red-50" onClick={() => gorevSil(g.id)}><Trash2 className="h-3 w-3" /></Button>)}
             </div>
           </div></CardContent></Card>))}
@@ -3750,6 +3719,7 @@ function GorevYonetimi({ user, students, teachers }) {
     </div>
   );
 }
+
 
 function GelisimAlani({ user }) {
   const { toast } = useToast();
