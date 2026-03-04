@@ -2543,7 +2543,13 @@ async def get_ogrenci_profil(current_user=Depends(get_current_user)):
         student = await db.students.find_one({"id": linked_id})
         if student:
             student.pop("_id", None)
-            return {**student, "user_ad": current_user.get("ad"), "user_soyad": current_user.get("soyad"), "email": current_user.get("email")}
+            # Öğretmen bilgisini ekle
+            ogretmen_bilgi = None
+            if student.get("ogretmen_id"):
+                t = await db.teachers.find_one({"id": student["ogretmen_id"]})
+                if t:
+                    ogretmen_bilgi = {"ad": t.get("ad",""), "soyad": t.get("soyad",""), "brans": t.get("brans",""), "telefon": t.get("telefon","")}
+            return {**student, "user_ad": current_user.get("ad"), "user_soyad": current_user.get("soyad"), "email": current_user.get("email"), "ogretmen_bilgi": ogretmen_bilgi}
     return {
         "id": current_user.get("id"),
         "ad": current_user.get("ad", ""),
@@ -2551,7 +2557,43 @@ async def get_ogrenci_profil(current_user=Depends(get_current_user)):
         "email": current_user.get("email", ""),
         "sinif": "",
         "kur": "",
+        "ogretmen_bilgi": None,
     }
+
+
+# Öğrenci paneli: anonim puan tablosu (sadece sıra + kendi konumu)
+@api_router.get("/ogrenci-panel/siralama")
+async def get_ogrenci_siralama(current_user=Depends(get_current_user)):
+    ogrenci_id = current_user.get("linked_id") or current_user.get("id")
+    # Tüm öğrencilerin okuma istatistiklerini çek
+    tum_loglar = await db.reading_logs.find().to_list(length=None)
+
+    # Öğrenci bazlı toplam dakika
+    ogrenci_dakika = {}
+    for log in tum_loglar:
+        oid = log.get("ogrenci_id", "")
+        ogrenci_dakika[oid] = ogrenci_dakika.get(oid, 0) + log.get("sure_dakika", 0)
+
+    # Sırala
+    siralama = sorted(ogrenci_dakika.items(), key=lambda x: x[1], reverse=True)
+
+    # Anonim tablo oluştur
+    tablo = []
+    benim_siram = None
+    for i, (oid, dakika) in enumerate(siralama):
+        sira = i + 1
+        if oid == ogrenci_id:
+            benim_siram = sira
+            tablo.append({"sira": sira, "dakika": dakika, "ben": True, "ad": "Sen 🌟"})
+        else:
+            tablo.append({"sira": sira, "dakika": dakika, "ben": False, "ad": f"Öğrenci #{sira}"})
+
+    # Eğer ben listede yoksa ekle
+    if benim_siram is None:
+        tablo.append({"sira": len(tablo) + 1, "dakika": 0, "ben": True, "ad": "Sen 🌟"})
+        benim_siram = len(tablo)
+
+    return {"siralama": tablo[:20], "benim_siram": benim_siram, "toplam_ogrenci": len(siralama) or 1}
 
 
 # ─────────────────────────────────────────────
