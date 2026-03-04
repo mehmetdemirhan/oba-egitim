@@ -614,17 +614,23 @@ async def get_bekleyenler(current_user=Depends(require_role(UserRole.ADMIN, User
     gelisim_bekleyen = await db.gelisim_icerik.find({"durum": "beklemede"}).sort("olusturma_tarihi", -1).to_list(length=None)
     gelisim_oylama = await db.gelisim_icerik.find({"durum": "oylama"}).sort("olusturma_tarihi", -1).to_list(length=None)
 
-    for lst in [metin_bekleyen, metin_oylama, gelisim_bekleyen, gelisim_oylama]:
+    # Kitaplar - beklemede olanlar
+    kitap_bekleyen = await db.kitaplar.find({"durum": "beklemede"}).sort("olusturma_tarihi", -1).to_list(length=None)
+    kitap_oylama = await db.kitaplar.find({"durum": "oylama"}).sort("olusturma_tarihi", -1).to_list(length=None)
+
+    for lst in [metin_bekleyen, metin_oylama, gelisim_bekleyen, gelisim_oylama, kitap_bekleyen, kitap_oylama]:
         for item in lst:
             item.pop("_id", None)
-            item.pop("icerik", None)  # İçerik metnini kırp, sadece meta
+            item.pop("icerik", None)
 
     return {
         "metin_bekleyen": metin_bekleyen,
         "metin_oylama": metin_oylama,
         "gelisim_bekleyen": gelisim_bekleyen,
         "gelisim_oylama": gelisim_oylama,
-        "toplam": len(metin_bekleyen) + len(metin_oylama) + len(gelisim_bekleyen) + len(gelisim_oylama)
+        "kitap_bekleyen": kitap_bekleyen,
+        "kitap_oylama": kitap_oylama,
+        "toplam": len(metin_bekleyen) + len(metin_oylama) + len(gelisim_bekleyen) + len(gelisim_oylama) + len(kitap_bekleyen) + len(kitap_oylama)
     }
 
 @api_router.get("/stats/weekly", response_model=List[WeeklyStats])
@@ -1541,6 +1547,157 @@ async def egzersiz_tamamla(data: dict, current_user=Depends(get_current_user)):
     # Kullanıcı puanını güncelle
     await db.users.update_one({"id": kullanici_id}, {"$inc": {"puan": kazanilan}})
     return {"kazanilan_puan": kazanilan, "egzersiz_id": egzersiz_id}
+
+# ── Kitap + Soru Havuzu ──
+class KitapCreate(BaseModel):
+    baslik: str
+    yazar: str = ""
+    yas_grubu: str = "8-10"
+    zorluk: str = "orta"
+    bolum_sayisi: int = 1
+
+@api_router.post("/kitaplar")
+async def kitap_ekle(data: KitapCreate, current_user=Depends(get_current_user)):
+    role = current_user.get("role", "")
+    if role not in ("admin", "coordinator", "teacher"):
+        raise HTTPException(status_code=403, detail="Yetki yok")
+    durum = "oylama" if role in ("admin", "coordinator") else "beklemede"
+    kitap = {
+        "id": str(uuid.uuid4()),
+        "baslik": data.baslik,
+        "yazar": data.yazar,
+        "yas_grubu": data.yas_grubu,
+        "zorluk": data.zorluk,
+        "bolum_sayisi": data.bolum_sayisi,
+        "ekleyen_id": current_user["id"],
+        "ekleyen_ad": f"{current_user.get('ad','')} {current_user.get('soyad','')}".strip(),
+        "durum": durum,
+        "oylar": {},
+        "olusturma_tarihi": datetime.utcnow().isoformat(),
+    }
+    await db.kitaplar.insert_one(kitap)
+    kitap.pop("_id", None)
+    return kitap
+
+@api_router.get("/kitaplar")
+async def kitap_listele(current_user=Depends(get_current_user)):
+    role = current_user.get("role", "")
+    kitaplar = await db.kitaplar.find().sort("olusturma_tarihi", -1).to_list(length=None)
+    for k in kitaplar:
+        k.pop("_id", None)
+    if role in ("admin", "coordinator"):
+        return kitaplar
+    # Öğretmen: kendi eklediği + oylamada + havuzda
+    return [k for k in kitaplar if k.get("durum") in ("oylama", "havuzda") or k.get("ekleyen_id") == current_user["id"]]
+
+@api_router.put("/kitaplar/{kitap_id}")
+async def kitap_guncelle(kitap_id: str, data: dict, current_user=Depends(get_current_user)):
+    kitap = await db.kitaplar.find_one({"id": kitap_id})
+    if not kitap:
+        raise HTTPException(status_code=404, detail="Kitap bulunamadı")
+    update = {k: v for k, v in data.items() if k in ("baslik", "yazar", "yas_grubu", "zorluk", "bolum_sayisi")}
+    if update:
+        await db.kitaplar.update_one({"id": kitap_id}, {"$set": update})
+    return {"message": "Güncellendi"}
+
+@api_router.delete("/kitaplar/{kitap_id}")
+async def kitap_sil(kitap_id: str, current_user=Depends(get_current_user)):
+    if current_user.get("role") not in ("admin", "coordinator"):
+        raise HTTPException(status_code=403, detail="Yetki yok")
+    await db.kitaplar.delete_one({"id": kitap_id})
+    await db.sorular.delete_many({"kitap_id": kitap_id})
+    return {"message": "Kitap ve soruları silindi"}
+
+# Kitap admin karar (oylama başlat / direkt havuza al / reddet)
+@api_router.post("/kitaplar/{kitap_id}/admin-karar")
+async def kitap_admin_karar(kitap_id: str, data: dict, current_user=Depends(get_current_user)):
+    if current_user.get("role") not in ("admin", "coordinator"):
+        raise HTTPException(status_code=403, detail="Yetki yok")
+    onay = data.get("onay", True)
+    direkt = data.get("direkt", False)
+    if not onay:
+        await db.kitaplar.update_one({"id": kitap_id}, {"$set": {"durum": "reddedildi", "red_sebep": data.get("sebep", "")}})
+        return {"message": "Reddedildi"}
+    if direkt:
+        await db.kitaplar.update_one({"id": kitap_id}, {"$set": {"durum": "havuzda"}})
+        return {"message": "Direkt havuza alındı"}
+    await db.kitaplar.update_one({"id": kitap_id}, {"$set": {"durum": "oylama"}})
+    return {"message": "Oylama başlatıldı"}
+
+# Kitap oylama
+@api_router.post("/kitaplar/{kitap_id}/oy")
+async def kitap_oy_ver(kitap_id: str, data: dict, current_user=Depends(get_current_user)):
+    kitap = await db.kitaplar.find_one({"id": kitap_id})
+    if not kitap or kitap.get("durum") != "oylama":
+        raise HTTPException(status_code=400, detail="Bu kitap oylamada değil")
+    user_id = current_user["id"]
+    oylar = kitap.get("oylar", {})
+    if user_id in oylar:
+        raise HTTPException(status_code=400, detail="Zaten oy kullandınız")
+    onay = data.get("onay", True)
+    oylar[user_id] = {"onay": onay, "sebep": data.get("sebep", ""), "tarih": datetime.utcnow().isoformat()}
+    update = {"oylar": oylar}
+    # Oy eşiği kontrolü
+    ayar = await db.ayarlar.find_one({"tip": "puan_ayarlari"})
+    esik = ayar.get("oy_esik", 3) if ayar else 3
+    onay_sayisi = sum(1 for o in oylar.values() if o.get("onay"))
+    red_sayisi = sum(1 for o in oylar.values() if not o.get("onay"))
+    if red_sayisi >= 1:
+        update["durum"] = "reddedildi"
+    elif onay_sayisi >= esik:
+        update["durum"] = "havuzda"
+    await db.kitaplar.update_one({"id": kitap_id}, {"$set": update})
+    # Katkı puanı
+    await db.users.update_one({"id": user_id}, {"$inc": {"puan": 3}})
+    return {"message": "Oy kaydedildi"}
+
+# ── Soru CRUD ──
+class SoruCreate(BaseModel):
+    kitap_id: str
+    bolum: int = 1
+    soru_metni: str
+    secenekler: list = []
+    dogru_cevap: int = 0
+
+@api_router.post("/sorular")
+async def soru_ekle(data: SoruCreate, current_user=Depends(get_current_user)):
+    soru = {
+        "id": str(uuid.uuid4()),
+        "kitap_id": data.kitap_id,
+        "bolum": data.bolum,
+        "soru_metni": data.soru_metni,
+        "secenekler": data.secenekler,
+        "dogru_cevap": data.dogru_cevap,
+        "ekleyen_id": current_user["id"],
+        "ekleyen_ad": f"{current_user.get('ad','')} {current_user.get('soyad','')}".strip(),
+        "kullanim_sayisi": 0,
+        "olusturma_tarihi": datetime.utcnow().isoformat(),
+    }
+    await db.sorular.insert_one(soru)
+    soru.pop("_id", None)
+    return soru
+
+@api_router.get("/sorular/{kitap_id}")
+async def soru_listele(kitap_id: str, bolum: int = None, current_user=Depends(get_current_user)):
+    filtre = {"kitap_id": kitap_id}
+    if bolum is not None:
+        filtre["bolum"] = bolum
+    sorular = await db.sorular.find(filtre).sort("bolum", 1).to_list(length=None)
+    for s in sorular:
+        s.pop("_id", None)
+    return sorular
+
+@api_router.put("/sorular/{soru_id}")
+async def soru_guncelle(soru_id: str, data: dict, current_user=Depends(get_current_user)):
+    update = {k: v for k, v in data.items() if k in ("soru_metni", "secenekler", "dogru_cevap", "bolum")}
+    if update:
+        await db.sorular.update_one({"id": soru_id}, {"$set": update})
+    return {"message": "Güncellendi"}
+
+@api_router.delete("/sorular/{soru_id}")
+async def soru_sil(soru_id: str, current_user=Depends(get_current_user)):
+    await db.sorular.delete_one({"id": soru_id})
+    return {"message": "Silindi"}
 
 # ── PDF Rapor Üretimi ──
 def _tr_upper(text):
