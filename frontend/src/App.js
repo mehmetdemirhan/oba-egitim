@@ -321,7 +321,6 @@ function AppContent() {
             {user.role === "admin" && <TabsTrigger value="users" className={tabClass}><Shield className="h-4 w-4 mr-2" />Kullanıcılar</TabsTrigger>}
             <TabsTrigger value="gelisim" className={tabClass}><Trophy className="h-4 w-4 mr-2" />Gelişim</TabsTrigger>
             <TabsTrigger value="giris-analizi" className={tabClass}><Stethoscope className="h-4 w-4 mr-2" />Giriş Analizi</TabsTrigger>
-            <TabsTrigger value="kitap-havuzu" className={tabClass}><BookMarked className="h-4 w-4 mr-2" />Kitap Havuzu</TabsTrigger>
           </TabsList>
 
           {/* Dashboard */}
@@ -1004,10 +1003,6 @@ function AppContent() {
           {/* Giris Analizi */}
           <TabsContent value="giris-analizi">
             <GirisAnaliziModul user={user} students={students} teachers={teachers} />
-          </TabsContent>
-
-          <TabsContent value="kitap-havuzu">
-            <KitapHavuzuModul user={user} />
           </TabsContent>
 
           {/* Gelisim Alani */}
@@ -3434,347 +3429,6 @@ function GirisAnaliziModul({ user, students, teachers }) {
 }
 
 
-// ═══════════════════════════════════════════════
-// KİTAP + SORU HAVUZU MODÜLÜ
-// ═══════════════════════════════════════════════
-function KitapHavuzuModul({ user }) {
-  const { toast } = useToast();
-  const [kitaplar, setKitaplar] = useState([]);
-  const [gorunum, setGorunum] = useState("liste"); // liste, kitapEkle, kitapDetay
-  const [seciliKitap, setSeciliKitap] = useState(null);
-  const [sorular, setSorular] = useState([]);
-  const [kitapForm, setKitapForm] = useState({ baslik: "", yazar: "", yas_grubu: "8-10", zorluk: "orta", bolum_sayisi: 1 });
-  const [soruForm, setSoruForm] = useState({ bolum: 1, soru_metni: "", secenekler: ["", "", "", ""], dogru_cevap: 0 });
-  const [redSebep, setRedSebep] = useState("");
-  const [redDialog, setRedDialog] = useState(null);
-  const [filtre, setFiltre] = useState("hepsi"); // hepsi, havuzda, oylama, beklemede
-
-  const fetchKitaplar = useCallback(async () => {
-    try { const r = await axios.get(`${API}/kitaplar`); setKitaplar(r.data); } catch(e) {}
-  }, []);
-
-  useEffect(() => { fetchKitaplar(); }, [fetchKitaplar]);
-
-  const fetchSorular = async (kitapId) => {
-    try { const r = await axios.get(`${API}/sorular/${kitapId}`); setSorular(r.data); } catch(e) {}
-  };
-
-  const kitapKaydet = async () => {
-    if (!kitapForm.baslik.trim()) { toast({ title: "Kitap adı gerekli", variant: "destructive" }); return; }
-    try {
-      const r = await axios.post(`${API}/kitaplar`, kitapForm);
-      toast({ title: "📚 Kitap eklendi!" });
-      setGorunum("kitapDetay");
-      setSeciliKitap(r.data);
-      fetchKitaplar();
-      setKitapForm({ baslik: "", yazar: "", yas_grubu: "8-10", zorluk: "orta", bolum_sayisi: 1 });
-    } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
-  };
-
-  const soruKaydet = async () => {
-    if (!soruForm.soru_metni.trim()) return;
-    if (soruForm.secenekler.filter(s => s.trim()).length < 2) { toast({ title: "En az 2 seçenek gerekli", variant: "destructive" }); return; }
-    try {
-      await axios.post(`${API}/sorular`, { ...soruForm, kitap_id: seciliKitap.id, secenekler: soruForm.secenekler.filter(s => s.trim()) });
-      toast({ title: "✅ Soru eklendi" });
-      setSoruForm({ bolum: soruForm.bolum, soru_metni: "", secenekler: ["", "", "", ""], dogru_cevap: 0 });
-      fetchSorular(seciliKitap.id);
-    } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
-  };
-
-  const soruSil = async (soruId) => {
-    try { await axios.delete(`${API}/sorular/${soruId}`); fetchSorular(seciliKitap.id); } catch(e) {}
-  };
-
-  const adminKarar = async (kitapId, onay, direkt = false) => {
-    try {
-      await axios.post(`${API}/kitaplar/${kitapId}/admin-karar`, { onay, direkt, sebep: redSebep });
-      toast({ title: direkt ? "✅ Havuza alındı" : onay ? "🗳️ Oylama başlatıldı" : "❌ Reddedildi" });
-      setRedDialog(null); setRedSebep("");
-      fetchKitaplar();
-    } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
-  };
-
-  const oyVer = async (kitapId, onay) => {
-    try {
-      await axios.post(`${API}/kitaplar/${kitapId}/oy`, { onay, sebep: redSebep });
-      toast({ title: onay ? "👍 Onayladınız (+3 puan)" : "👎 Reddettiniz (+3 puan)" });
-      setRedDialog(null); setRedSebep("");
-      fetchKitaplar();
-    } catch(e) { toast({ title: e.response?.data?.detail || "Hata", variant: "destructive" }); }
-  };
-
-  const durumBadge = (d) => ({
-    beklemede: <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full font-medium">⏳ Onay Bekliyor</span>,
-    oylama: <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">🗳️ Oylamada</span>,
-    havuzda: <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium">✅ Havuzda</span>,
-    reddedildi: <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full font-medium">❌ Reddedildi</span>,
-  }[d] || null);
-
-  const zorlukBadge = (z) => ({
-    kolay: <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Kolay</span>,
-    orta: <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">Orta</span>,
-    zor: <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Zor</span>,
-  }[z] || <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{z}</span>);
-
-  const filtrelenmis = kitaplar.filter(k => filtre === "hepsi" || k.durum === filtre);
-
-  const oyKullandi = (kitap) => kitap.oylar && kitap.oylar[user.id];
-  const onayOrani = (kitap) => {
-    const oylar = kitap.oylar || {};
-    const toplam = Object.keys(oylar).length;
-    if (toplam === 0) return null;
-    const onay = Object.values(oylar).filter(o => o.onay).length;
-    return Math.round(onay / toplam * 100);
-  };
-
-  // ═══ KİTAP DETAY EKRANI ═══
-  if (gorunum === "kitapDetay" && seciliKitap) {
-    const bolumler = Array.from({ length: seciliKitap.bolum_sayisi }, (_, i) => i + 1);
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <Button variant="outline" onClick={() => { setGorunum("liste"); setSeciliKitap(null); setSorular([]); }}>← Geri</Button>
-          <div className="text-right">
-            <h2 className="text-lg font-bold">{seciliKitap.baslik}</h2>
-            <p className="text-sm text-gray-500">{seciliKitap.yazar} • {seciliKitap.bolum_sayisi} bölüm</p>
-          </div>
-        </div>
-
-        {/* Soru Ekleme Formu */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h3 className="font-bold mb-4">📝 Yeni Soru Ekle</h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Bölüm</label>
-              <select className="w-full border rounded-lg px-3 py-2 text-sm" value={soruForm.bolum} onChange={e => setSoruForm({...soruForm, bolum: parseInt(e.target.value)})}>
-                {bolumler.map(b => <option key={b} value={b}>Bölüm {b}</option>)}
-              </select>
-            </div>
-            <div className="md:col-span-3">
-              <label className="text-xs text-gray-500 block mb-1">Soru</label>
-              <input className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Soruyu yazın..." value={soruForm.soru_metni} onChange={e => setSoruForm({...soruForm, soru_metni: e.target.value})} />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-            {soruForm.secenekler.map((sec, i) => (
-              <div key={i} className="relative">
-                <label className="text-xs text-gray-500 block mb-1">{String.fromCharCode(65 + i)})</label>
-                <input className={`w-full border rounded-lg px-3 py-2 text-sm ${soruForm.dogru_cevap === i ? 'border-green-500 bg-green-50' : ''}`}
-                  placeholder={`Seçenek ${String.fromCharCode(65 + i)}`}
-                  value={sec} onChange={e => { const yeni = [...soruForm.secenekler]; yeni[i] = e.target.value; setSoruForm({...soruForm, secenekler: yeni}); }} />
-                <button className={`absolute right-2 top-7 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center ${soruForm.dogru_cevap === i ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400 hover:bg-green-200'}`}
-                  onClick={() => setSoruForm({...soruForm, dogru_cevap: i})}>✓</button>
-              </div>
-            ))}
-          </div>
-          <div className="flex items-center gap-3">
-            <Button className="bg-blue-600 text-white" onClick={soruKaydet}><Plus className="h-4 w-4 mr-1" />Soruyu Ekle</Button>
-            <span className="text-xs text-gray-400">Yeşil işaretli seçenek doğru cevaptır</span>
-          </div>
-        </div>
-
-        {/* Bölüm bazlı sorular */}
-        {bolumler.map(bolum => {
-          const bolumSorulari = sorular.filter(s => s.bolum === bolum);
-          if (bolumSorulari.length === 0) return null;
-          return (
-            <div key={bolum} className="bg-white rounded-xl border border-gray-200 p-5">
-              <h4 className="font-bold text-sm mb-3 text-indigo-700">📖 Bölüm {bolum} — {bolumSorulari.length} soru</h4>
-              <div className="space-y-3">
-                {bolumSorulari.map((soru, si) => (
-                  <div key={soru.id} className="border border-gray-100 rounded-lg p-3 bg-gray-50">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <p className="text-sm font-medium mb-2">{si + 1}. {soru.soru_metni}</p>
-                        <div className="flex flex-wrap gap-2">
-                          {soru.secenekler.map((sec, i) => (
-                            <span key={i} className={`text-xs px-2 py-1 rounded ${i === soru.dogru_cevap ? 'bg-green-100 text-green-700 font-bold' : 'bg-gray-100 text-gray-600'}`}>
-                              {String.fromCharCode(65 + i)}) {sec}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                      <button className="text-red-400 hover:text-red-600 ml-2" onClick={() => soruSil(soru.id)}><Trash2 className="h-4 w-4" /></button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-        {sorular.length === 0 && <p className="text-center text-gray-400 py-8">Henüz soru eklenmemiş. Yukarıdan soru ekleyin.</p>}
-      </div>
-    );
-  }
-
-  // ═══ KİTAP EKLEME FORMU ═══
-  if (gorunum === "kitapEkle") {
-    return (
-      <div className="max-w-2xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <Button variant="outline" onClick={() => setGorunum("liste")}>← Geri</Button>
-          <h2 className="text-lg font-bold">📚 Yeni Kitap Ekle</h2>
-          <div />
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
-          <div>
-            <label className="text-sm font-medium block mb-1">Kitap Adı *</label>
-            <input className="w-full border rounded-lg px-3 py-2" placeholder="Örn: Küçük Prens" value={kitapForm.baslik} onChange={e => setKitapForm({...kitapForm, baslik: e.target.value})} />
-          </div>
-          <div>
-            <label className="text-sm font-medium block mb-1">Yazar</label>
-            <input className="w-full border rounded-lg px-3 py-2" placeholder="Yazar adı" value={kitapForm.yazar} onChange={e => setKitapForm({...kitapForm, yazar: e.target.value})} />
-          </div>
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="text-sm font-medium block mb-1">Yaş Grubu</label>
-              <select className="w-full border rounded-lg px-3 py-2" value={kitapForm.yas_grubu} onChange={e => setKitapForm({...kitapForm, yas_grubu: e.target.value})}>
-                <option value="6-8">6-8 yaş</option>
-                <option value="8-10">8-10 yaş</option>
-                <option value="10-12">10-12 yaş</option>
-                <option value="12-14">12-14 yaş</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-sm font-medium block mb-1">Zorluk</label>
-              <select className="w-full border rounded-lg px-3 py-2" value={kitapForm.zorluk} onChange={e => setKitapForm({...kitapForm, zorluk: e.target.value})}>
-                <option value="kolay">Kolay</option>
-                <option value="orta">Orta</option>
-                <option value="zor">Zor</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-sm font-medium block mb-1">Bölüm Sayısı</label>
-              <input type="number" min="1" max="100" className="w-full border rounded-lg px-3 py-2" value={kitapForm.bolum_sayisi} onChange={e => setKitapForm({...kitapForm, bolum_sayisi: parseInt(e.target.value) || 1})} />
-            </div>
-          </div>
-          <div className="flex gap-3 pt-2">
-            <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex-1" onClick={kitapKaydet}>📚 Havuza Gönder</Button>
-            <Button variant="outline" onClick={() => setGorunum("liste")}>İptal</Button>
-          </div>
-          <p className="text-xs text-gray-400 text-center">Kitap eklendikten sonra bölüm bazlı sorular ekleyebilirsiniz.</p>
-        </div>
-      </div>
-    );
-  }
-
-  // ═══ KİTAP LİSTESİ ═══
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold flex items-center gap-2"><BookMarked className="h-6 w-6" /> Kitap + Soru Havuzu</h2>
-        {(user.role === "admin" || user.role === "teacher" || user.role === "coordinator") && (
-          <Button onClick={() => setGorunum("kitapEkle")} className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white"><Plus className="h-4 w-4 mr-2"/>Kitap Ekle</Button>
-        )}
-      </div>
-
-      {/* İstatistik */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl border p-4 text-center cursor-pointer hover:shadow-md transition-shadow" onClick={() => setFiltre("hepsi")}>
-          <div className="text-2xl font-bold text-gray-700">{kitaplar.length}</div>
-          <div className="text-xs text-gray-500">Toplam Kitap</div>
-        </div>
-        <div className="bg-white rounded-xl border p-4 text-center cursor-pointer hover:shadow-md transition-shadow" onClick={() => setFiltre("havuzda")}>
-          <div className="text-2xl font-bold text-green-600">{kitaplar.filter(k => k.durum === "havuzda").length}</div>
-          <div className="text-xs text-gray-500">Havuzda</div>
-        </div>
-        <div className="bg-white rounded-xl border p-4 text-center cursor-pointer hover:shadow-md transition-shadow" onClick={() => setFiltre("oylama")}>
-          <div className="text-2xl font-bold text-blue-600">{kitaplar.filter(k => k.durum === "oylama").length}</div>
-          <div className="text-xs text-gray-500">Oylamada</div>
-        </div>
-        <div className="bg-white rounded-xl border p-4 text-center cursor-pointer hover:shadow-md transition-shadow" onClick={() => setFiltre("beklemede")}>
-          <div className="text-2xl font-bold text-yellow-600">{kitaplar.filter(k => k.durum === "beklemede").length}</div>
-          <div className="text-xs text-gray-500">Beklemede</div>
-        </div>
-      </div>
-
-      {/* Kitap kartları */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtrelenmis.map(kitap => {
-          const oran = onayOrani(kitap);
-          const oylandiMi = oyKullandi(kitap);
-          return (
-            <div key={kitap.id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-              <div className={`p-4 ${kitap.durum === 'havuzda' ? 'bg-gradient-to-r from-green-500 to-emerald-500' : kitap.durum === 'oylama' ? 'bg-gradient-to-r from-blue-500 to-indigo-500' : kitap.durum === 'reddedildi' ? 'bg-gradient-to-r from-red-400 to-red-500' : 'bg-gradient-to-r from-yellow-500 to-amber-500'} text-white`}>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="font-bold">{kitap.baslik}</h3>
-                    <p className="text-sm opacity-90">{kitap.yazar || "Yazar belirtilmemiş"}</p>
-                  </div>
-                  <span className="text-3xl">📚</span>
-                </div>
-              </div>
-              <div className="p-4">
-                <div className="flex items-center gap-2 mb-2 flex-wrap">
-                  {durumBadge(kitap.durum)}
-                  {zorlukBadge(kitap.zorluk)}
-                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{kitap.yas_grubu} yaş</span>
-                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{kitap.bolum_sayisi} bölüm</span>
-                </div>
-                <p className="text-xs text-gray-400 mb-3">Ekleyen: {kitap.ekleyen_ad} • {kitap.olusturma_tarihi?.slice(0,10)}</p>
-
-                {/* Oylama durumu */}
-                {kitap.durum === "oylama" && oran !== null && (
-                  <div className="mb-3">
-                    <div className="flex justify-between text-xs text-gray-500 mb-1"><span>Onay oranı</span><span>%{oran}</span></div>
-                    <div className="w-full bg-gray-200 rounded-full h-2"><div className="bg-blue-500 rounded-full h-2 transition-all" style={{width: `${oran}%`}} /></div>
-                    <p className="text-xs text-gray-400 mt-1">{Object.keys(kitap.oylar || {}).length} oy kullanıldı</p>
-                  </div>
-                )}
-
-                <div className="flex gap-2 flex-wrap">
-                  {/* Detay/soru butonu */}
-                  <Button size="sm" variant="outline" className="flex-1" onClick={() => { setSeciliKitap(kitap); setGorunum("kitapDetay"); fetchSorular(kitap.id); }}>
-                    📝 Sorular
-                  </Button>
-
-                  {/* Admin: beklemede → karar */}
-                  {kitap.durum === "beklemede" && (user.role === "admin" || user.role === "coordinator") && (<>
-                    <Button size="sm" className="bg-green-500 text-white" onClick={() => adminKarar(kitap.id, true, true)}>✅ Havuza</Button>
-                    <Button size="sm" className="bg-blue-500 text-white" onClick={() => adminKarar(kitap.id, true, false)}>🗳️ Oyla</Button>
-                    <Button size="sm" variant="destructive" onClick={() => setRedDialog(kitap)}>❌</Button>
-                  </>)}
-
-                  {/* Öğretmen: oylamada → oy ver */}
-                  {kitap.durum === "oylama" && !oylandiMi && kitap.ekleyen_id !== user.id && (<>
-                    <Button size="sm" className="bg-green-500 text-white" onClick={() => oyVer(kitap.id, true)}>👍</Button>
-                    <Button size="sm" variant="destructive" onClick={() => setRedDialog(kitap)}>👎</Button>
-                  </>)}
-
-                  {/* Admin: kitap sil */}
-                  {(user.role === "admin") && (
-                    <Button size="sm" variant="ghost" className="text-red-400" onClick={async () => { await axios.delete(`${API}/kitaplar/${kitap.id}`); fetchKitaplar(); }}><Trash2 className="h-4 w-4" /></Button>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      {filtrelenmis.length === 0 && <p className="text-center text-gray-400 py-12">Henüz kitap eklenmemiş.</p>}
-
-      {/* Red Sebebi Dialog */}
-      <Dialog open={!!redDialog} onOpenChange={() => { setRedDialog(null); setRedSebep(""); }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>❌ Red Sebebi</DialogTitle>
-            <DialogDescription>"{redDialog?.baslik}" için red sebebi yazın.</DialogDescription>
-          </DialogHeader>
-          <textarea value={redSebep} onChange={e => setRedSebep(e.target.value)} placeholder="Reddetme sebebi..." rows={3}
-            className="w-full border rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
-          <div className="flex gap-2">
-            <Button variant="destructive" className="flex-1" disabled={!redSebep.trim()} onClick={() => {
-              if (user.role === "admin" || user.role === "coordinator") adminKarar(redDialog.id, false);
-              else oyVer(redDialog.id, false);
-            }}>Reddet</Button>
-            <Button variant="outline" className="flex-1" onClick={() => { setRedDialog(null); setRedSebep(""); }}>İptal</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
 
 function GelisimAlani({ user }) {
   const { toast } = useToast();
@@ -3787,7 +3441,8 @@ function GelisimAlani({ user }) {
   const [sonuc, setSonuc] = useState(null);
   const [redSebep, setRedSebep] = useState("");
   const [redDialogIcerik, setRedDialogIcerik] = useState(null);
-  const [adminForm, setAdminForm] = useState({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [], makale_link: "", makale_dosya_turu: "link" });
+  const [adminForm, setAdminForm] = useState({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [], makale_link: "", makale_dosya_turu: "link", kitap_yazar: "", kitap_isbn: "", kitap_yayinevi: "", kitap_sayfa: "", kitap_yas_grubu: "", kitap_link: "", kitap_kapak: "" });
+  const [kitapYukleniyor, setKitapYukleniyor] = useState(false);
   const [yeniSoru, setYeniSoru] = useState({ soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0 });
   const [gelisimSekme, setGelisimSekme] = useState("icerikler");
   const [egzersizPuanlari, setEgzersizPuanlari] = useState({});
@@ -3858,11 +3513,36 @@ function GelisimAlani({ user }) {
     setYeniSoru({ soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0 });
   };
 
+  const kitapBilgiCek = async (deger, tip) => {
+    // tip: 'isbn', 'link'
+    if (!deger.trim()) return;
+    setKitapYukleniyor(true);
+    try {
+      const r = await axios.post(`${API}/kitap-bilgi-cek`, { deger, tip });
+      const d = r.data;
+      setAdminForm(prev => ({
+        ...prev,
+        baslik: d.baslik || prev.baslik,
+        aciklama: d.aciklama || prev.aciklama,
+        kitap_yazar: d.yazar || prev.kitap_yazar,
+        kitap_isbn: d.isbn || prev.kitap_isbn,
+        kitap_yayinevi: d.yayinevi || prev.kitap_yayinevi,
+        kitap_sayfa: d.sayfa_sayisi || prev.kitap_sayfa,
+        kitap_kapak: d.kapak_url || prev.kitap_kapak,
+        kitap_link: d.link || prev.kitap_link || deger,
+      }));
+      toast({ title: "📚 Kitap bilgileri çekildi!" });
+    } catch(e) {
+      toast({ title: "Bilgi çekilemedi, manuel girin", variant: "destructive" });
+    }
+    setKitapYukleniyor(false);
+  };
+
   const icerikKaydet = async (e) => {
     e.preventDefault();
     try {
       await axios.post(`${API}/gelisim/icerik`, adminForm);
-      setAdminForm({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [], makale_link: "", makale_dosya_turu: "link" });
+      setAdminForm({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [], makale_link: "", makale_dosya_turu: "link", kitap_yazar: "", kitap_isbn: "", kitap_yayinevi: "", kitap_sayfa: "", kitap_yas_grubu: "", kitap_link: "", kitap_kapak: "" });
       setGorunum("liste"); fetchAll();
       toast({ title: (user.role === "admin" || user.role === "coordinator") ? "İçerik oylama aşamasına alındı" : "İçerik yönetici onayına gönderildi" });
     } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
@@ -3976,6 +3656,47 @@ function GelisimAlani({ user }) {
                     <Label>{(adminForm.makale_dosya_turu || "link") === "link" ? "URL" : "Paylaşım Linki (Drive/Dropbox)"}</Label>
                     <Input value={adminForm.makale_link || ""} onChange={e => setAdminForm({...adminForm, makale_link: e.target.value})} placeholder="https://..." />
                     {(adminForm.makale_dosya_turu || "link") !== "link" && <p className="text-xs text-gray-500 mt-1">Dosyayı Google Drive'a yükleyip "Herkesle paylaş" linkini yapıştırın.</p>}
+                  </div>
+                </div>
+              )}
+
+              {/* Kitap alanları */}
+              {adminForm.tur === "kitap" && (
+                <div className="p-4 bg-green-50 border border-green-200 rounded-xl space-y-4">
+                  <div className="font-semibold text-sm text-green-800">📚 Kitap Bilgileri</div>
+
+                  {/* Hızlı ekleme: ISBN veya Link */}
+                  <div className="bg-white rounded-lg p-3 border border-green-100 space-y-3">
+                    <p className="text-xs text-gray-500 font-medium">🔍 ISBN, barkod veya kitap sitesi linki ile otomatik bilgi çekin:</p>
+                    <div className="flex gap-2">
+                      <Input placeholder="ISBN veya Barkod (978...)" value={adminForm.kitap_isbn} onChange={e => setAdminForm({...adminForm, kitap_isbn: e.target.value})} className="flex-1" />
+                      <Button type="button" size="sm" className="bg-green-600 text-white whitespace-nowrap" disabled={kitapYukleniyor || !adminForm.kitap_isbn.trim()} onClick={() => kitapBilgiCek(adminForm.kitap_isbn, 'isbn')}>
+                        {kitapYukleniyor ? '⏳' : '🔍'} Ara
+                      </Button>
+                    </div>
+                    <div className="flex gap-2">
+                      <Input placeholder="Kitapyurdu, Amazon, D&R linki yapıştırın..." value={adminForm.kitap_link} onChange={e => setAdminForm({...adminForm, kitap_link: e.target.value})} className="flex-1" />
+                      <Button type="button" size="sm" className="bg-blue-600 text-white whitespace-nowrap" disabled={kitapYukleniyor || !adminForm.kitap_link.trim()} onClick={() => kitapBilgiCek(adminForm.kitap_link, 'link')}>
+                        {kitapYukleniyor ? '⏳' : '🔗'} Çek
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Kapak önizleme + manuel alanlar */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {adminForm.kitap_kapak && (
+                      <div className="flex justify-center">
+                        <img src={adminForm.kitap_kapak} alt="Kapak" className="h-40 rounded-lg shadow-md object-cover" onError={e => { e.target.style.display = 'none'; }} />
+                      </div>
+                    )}
+                    <div className={`space-y-3 ${adminForm.kitap_kapak ? 'md:col-span-2' : 'md:col-span-3'}`}>
+                      <div><Label>Yazar</Label><Input value={adminForm.kitap_yazar} onChange={e => setAdminForm({...adminForm, kitap_yazar: e.target.value})} placeholder="Yazar adı" /></div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div><Label>Yayınevi</Label><Input value={adminForm.kitap_yayinevi} onChange={e => setAdminForm({...adminForm, kitap_yayinevi: e.target.value})} placeholder="Yayınevi" /></div>
+                        <div><Label>Sayfa Sayısı</Label><Input value={adminForm.kitap_sayfa} onChange={e => setAdminForm({...adminForm, kitap_sayfa: e.target.value})} placeholder="Sayfa" /></div>
+                      </div>
+                      <div><Label>Yaş Grubu / Sınıf</Label><Input value={adminForm.kitap_yas_grubu} onChange={e => setAdminForm({...adminForm, kitap_yas_grubu: e.target.value})} placeholder="Örn: 8-10 yaş, 3. sınıf" /></div>
+                    </div>
                   </div>
                 </div>
               )}
