@@ -179,6 +179,7 @@ function AppContent() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [showArchived, setShowArchived] = useState({ teachers: false, students: false, courses: false });
   const [expandedCourse, setExpandedCourse] = useState(null);
+  const [ogrenciRiskler, setOgrenciRiskler] = useState([]);
   const [expandedDers, setExpandedDers] = useState(null);
   const [kursDersleri, setKursDersleri] = useState({});
   const [yeniDersForm, setYeniDersForm] = useState(null);
@@ -196,6 +197,7 @@ function AppContent() {
     try { const r = await axios.get(`${API}/students`); setStudents(r.data); } catch(e) {}
     try { const r = await axios.get(`${API}/courses`); setCourses(r.data); } catch(e) {}
     try { const r = await axios.get(`${API}/payments`); setPayments(r.data); } catch(e) {}
+    try { const r = await axios.get(`${API}/risk-skor/toplu`); setOgrenciRiskler(r.data); } catch(e) {}
   }, []);
 
   useEffect(() => {
@@ -336,6 +338,51 @@ function AppContent() {
           <TabsContent value="dashboard">
             {dashboardStats && (
               <div className="space-y-6">
+                {/* KPI: Risk Durumu + Okuma Aktivitesi */}
+                {ogrenciRiskler.length > 0 && (
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="bg-gradient-to-br from-green-50 to-emerald-100 rounded-2xl p-4 border border-green-200">
+                      <div className="text-xs text-green-600 font-medium">🟢 Düşük Risk</div>
+                      <div className="text-3xl font-bold text-green-800">{ogrenciRiskler.filter(r => r.risk_seviye === "dusuk").length}</div>
+                      <div className="text-[10px] text-green-500">öğrenci</div>
+                    </div>
+                    <div className="bg-gradient-to-br from-yellow-50 to-amber-100 rounded-2xl p-4 border border-yellow-200">
+                      <div className="text-xs text-yellow-600 font-medium">🟡 Orta Risk</div>
+                      <div className="text-3xl font-bold text-yellow-800">{ogrenciRiskler.filter(r => r.risk_seviye === "orta").length}</div>
+                      <div className="text-[10px] text-yellow-500">öğrenci</div>
+                    </div>
+                    <div className="bg-gradient-to-br from-red-50 to-rose-100 rounded-2xl p-4 border border-red-200">
+                      <div className="text-xs text-red-600 font-medium">🔴 Yüksek Risk</div>
+                      <div className="text-3xl font-bold text-red-800">{ogrenciRiskler.filter(r => r.risk_seviye === "yuksek").length}</div>
+                      <div className="text-[10px] text-red-500">öğrenci — müdahale gerekli</div>
+                    </div>
+                    <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-2xl p-4 border border-blue-200">
+                      <div className="text-xs text-blue-600 font-medium">📊 North Star</div>
+                      <div className="text-3xl font-bold text-blue-800">{ogrenciRiskler.length > 0 ? Math.round(ogrenciRiskler.filter(r => r.aktif_gunler_7 >= 4).length / ogrenciRiskler.length * 100) : 0}%</div>
+                      <div className="text-[10px] text-blue-500">haftada 4+ gün okuyan</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Riskli öğrenciler uyarısı */}
+                {ogrenciRiskler.filter(r => r.risk_seviye === "yuksek").length > 0 && (
+                  <Card className="border-0 shadow-sm border-l-4 border-l-red-500">
+                    <CardHeader className="pb-2"><CardTitle className="text-sm text-red-700">🚨 Yüksek Riskli Öğrenciler</CardTitle></CardHeader>
+                    <CardContent><div className="space-y-2">
+                      {ogrenciRiskler.filter(r => r.risk_seviye === "yuksek").slice(0,5).map(r => (
+                        <div key={r.id} className="flex items-center justify-between p-2 bg-red-50 rounded-lg">
+                          <div><span className="font-medium text-sm">{r.ad} {r.soyad}</span><span className="text-xs text-gray-500 ml-2">{r.sinif}. sınıf</span></div>
+                          <div className="flex items-center gap-3 text-xs">
+                            <span className="text-gray-500">Streak: {r.streak}</span>
+                            <span className="text-gray-500">7g: {r.dakika_7}dk</span>
+                            <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold">Risk: {r.risk_skoru}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div></CardContent>
+                  </Card>
+                )}
+
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-blue-100 cursor-pointer" onClick={() => setActiveTab("teachers")}>
                     <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-blue-600">Öğretmen</p><p className="text-3xl font-bold text-blue-900">{dashboardStats.toplam_ogretmen}</p></div><div className="w-12 h-12 bg-blue-500 rounded-2xl flex items-center justify-center"><UserCheck className="h-6 w-6 text-white" /></div></div></CardContent>
@@ -507,15 +554,21 @@ function AppContent() {
                 <CardHeader><CardTitle className="flex items-center justify-between">Öğrenciler <label className="flex items-center gap-2 text-sm font-normal cursor-pointer"><input type="checkbox" checked={showArchived.students} onChange={e => setShowArchived(p => ({...p, students: e.target.checked}))} className="rounded" /> Arşivi göster</label></CardTitle></CardHeader>
                 <CardContent>
                   <Table>
-                    <TableHeader><TableRow><TableHead>Ad Soyad</TableHead><TableHead>Sınıf</TableHead>{user.role !== "coordinator" && <TableHead>Veli</TableHead>}<TableHead>Öğretmen</TableHead>{user.role !== "coordinator" && <TableHead>Borç</TableHead>}<TableHead>İşlem</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow><TableHead>Ad Soyad</TableHead><TableHead>Sınıf</TableHead><TableHead>Kur</TableHead><TableHead>Risk</TableHead><TableHead>Streak</TableHead><TableHead>XP</TableHead><TableHead>Öğretmen</TableHead>{user.role !== "coordinator" && <TableHead>Borç</TableHead>}<TableHead>İşlem</TableHead></TableRow></TableHeader>
                     <TableBody>
                       {students.filter(s => showArchived.students || !s.arsivli).map(s => {
                         const t = teachers.find(t => t.id === s.ogretmen_id);
+                        const risk = ogrenciRiskler.find(r => r.id === s.id);
+                        const riskRenk = risk ? (risk.risk_seviye === "yuksek" ? "bg-red-100 text-red-700" : risk.risk_seviye === "orta" ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700") : "bg-gray-100 text-gray-500";
+                        const riskIcon = risk ? (risk.risk_seviye === "yuksek" ? "🔴" : risk.risk_seviye === "orta" ? "🟡" : "🟢") : "⚪";
                         return (
                           <TableRow key={s.id} className={s.arsivli ? 'opacity-50 bg-gray-50' : ''}>
                             <TableCell className="font-medium">{s.ad} {s.soyad}</TableCell>
                             <TableCell>{s.sinif}</TableCell>
-                            {user.role !== "coordinator" && <TableCell>{s.veli_ad} {s.veli_soyad}</TableCell>}
+                            <TableCell><span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">{s.kur || "—"}</span></TableCell>
+                            <TableCell><span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${riskRenk}`}>{riskIcon} {risk?.risk_skoru || 0}</span></TableCell>
+                            <TableCell>{risk ? <span className="text-sm">{risk.streak > 0 ? `🔥${risk.streak}` : "—"}</span> : "—"}</TableCell>
+                            <TableCell><span className="text-xs font-medium text-orange-600">{risk?.toplam_xp || s.toplam_xp || 0}</span></TableCell>
                             <TableCell>{t ? `${t.ad} ${t.soyad}` : '-'}</TableCell>
                             {user.role !== "coordinator" && <TableCell className="text-green-600 font-semibold">{formatCurrency(Math.max(0, s.yapilmasi_gereken_odeme - s.yapilan_odeme))}</TableCell>}
                             <TableCell><div className="flex gap-2">{user.role !== "coordinator" && <Button variant="outline" size="sm" className="text-green-600 border-green-300 hover:bg-green-50" onClick={() => setTahsilatDialog({tip:'ogrenci', kisi:s, miktar:0, aciklama:''})}><CreditCard className="h-4 w-4" /></Button>}<Button variant="outline" size="sm" onClick={() => { setEditingItem({type:'student',data:s}); setEditDialogOpen(true); }}><Edit2 className="h-4 w-4" /></Button><Button variant="outline" size="sm" className={s.arsivli ? "text-green-600 border-green-300" : "text-yellow-600 border-yellow-300"} onClick={() => toggleArsiv('student', s.id, s.arsivli)} title={s.arsivli ? "Arşivden Çıkar" : "Arşivle"}>{s.arsivli ? "📂" : "📦"}</Button><Button variant="destructive" size="sm" onClick={() => deleteStudent(s.id)}><Trash2 className="h-4 w-4" /></Button></div></TableCell>
