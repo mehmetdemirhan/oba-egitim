@@ -2597,6 +2597,177 @@ async def get_ogrenci_siralama(current_user=Depends(get_current_user)):
 
 
 # ─────────────────────────────────────────────
+# XP + LİG + KUR SİSTEMİ (Faz 3)
+# ─────────────────────────────────────────────
+
+XP_TABLOSU = {
+    "okuma_gorevi": 10, "anlama_testi": 15, "kelime_gorevi": 8,
+    "gunluk_streak": 5, "kitap_bitirme": 30, "yazili_ozet": 20,
+    "egzersiz": 5, "gelisim_tamamla": 5, "gorev_tamamla": 10,
+}
+
+LIG_ESIKLERI = {
+    "bronz": 0, "gumus": 200, "altin": 500, "elmas": 1000,
+}
+
+LIG_SIRA = ["bronz", "gumus", "altin", "elmas"]
+
+
+# XP kazan
+@api_router.post("/xp/kazan")
+async def xp_kazan(payload: dict, current_user=Depends(get_current_user)):
+    ogrenci_id = current_user.get("linked_id") or current_user.get("id")
+    eylem = payload.get("eylem", "")
+    xp = XP_TABLOSU.get(eylem, 0)
+    if xp == 0:
+        return {"xp": 0, "mesaj": "Bilinmeyen eylem"}
+
+    log = {
+        "id": str(uuid.uuid4()),
+        "ogrenci_id": ogrenci_id,
+        "eylem": eylem,
+        "xp": xp,
+        "tarih": datetime.utcnow().isoformat(),
+    }
+    await db.xp_logs.insert_one(log)
+
+    # Toplam XP güncelle
+    await db.students.update_one({"id": ogrenci_id}, {"$inc": {"toplam_xp": xp}})
+
+    return {"xp": xp, "toplam": await _get_toplam_xp(ogrenci_id)}
+
+
+async def _get_toplam_xp(ogrenci_id):
+    student = await db.students.find_one({"id": ogrenci_id})
+    return student.get("toplam_xp", 0) if student else 0
+
+
+# XP durumu
+@api_router.get("/xp/durum/{ogrenci_id}")
+async def xp_durum(ogrenci_id: str, current_user=Depends(get_current_user)):
+    toplam = await _get_toplam_xp(ogrenci_id)
+    # Lig hesapla
+    lig = "bronz"
+    for l in reversed(LIG_SIRA):
+        if toplam >= LIG_ESIKLERI[l]:
+            lig = l
+            break
+    # Sonraki lig
+    idx = LIG_SIRA.index(lig)
+    sonraki_lig = LIG_SIRA[idx + 1] if idx < len(LIG_SIRA) - 1 else None
+    sonraki_esik = LIG_ESIKLERI.get(sonraki_lig, 0) if sonraki_lig else 0
+    kalan = max(0, sonraki_esik - toplam)
+
+    # Son XP kayıtları
+    son_xp = await db.xp_logs.find({"ogrenci_id": ogrenci_id}).sort("tarih", -1).to_list(length=10)
+    for x in son_xp:
+        x.pop("_id", None)
+
+    return {
+        "toplam_xp": toplam,
+        "lig": lig,
+        "lig_label": {"bronz": "🥉 Bronz", "gumus": "🥈 Gümüş", "altin": "🥇 Altın", "elmas": "💎 Elmas"}.get(lig, lig),
+        "sonraki_lig": sonraki_lig,
+        "sonraki_esik": sonraki_esik,
+        "kalan_xp": kalan,
+        "son_xp": son_xp,
+    }
+
+
+# Lig sıralaması (anonim)
+@api_router.get("/xp/lig-siralama")
+async def lig_siralama(current_user=Depends(get_current_user)):
+    ogrenci_id = current_user.get("linked_id") or current_user.get("id")
+    students = await db.students.find().to_list(length=None)
+    siralama = sorted(students, key=lambda s: s.get("toplam_xp", 0), reverse=True)
+
+    tablo = []
+    benim_siram = None
+    for i, s in enumerate(siralama):
+        sira = i + 1
+        xp = s.get("toplam_xp", 0)
+        lig = "bronz"
+        for l in reversed(LIG_SIRA):
+            if xp >= LIG_ESIKLERI[l]:
+                lig = l
+                break
+        ben = s.get("id") == ogrenci_id
+        if ben:
+            benim_siram = sira
+        tablo.append({
+            "sira": sira,
+            "xp": xp,
+            "lig": lig,
+            "lig_label": {"bronz": "🥉", "gumus": "🥈", "altin": "🥇", "elmas": "💎"}.get(lig, ""),
+            "ben": ben,
+            "ad": "Sen 🌟" if ben else f"Öğrenci #{sira}",
+        })
+
+    return {"siralama": tablo[:30], "benim_siram": benim_siram or len(tablo) + 1, "toplam": len(siralama)}
+
+
+# Kur atlama kontrolü
+@api_router.get("/kur/kontrol/{ogrenci_id}")
+async def kur_kontrol(ogrenci_id: str, current_user=Depends(get_current_user)):
+    # Kriterleri kontrol et
+    gorevler = await db.gorevler.find({"hedef_id": ogrenci_id, "durum": "tamamlandi"}).to_list(length=None)
+    reading_logs = await db.reading_logs.find({"ogrenci_id": ogrenci_id}).to_list(length=None)
+    kitaplar = set(l.get("kitap_adi", "") for l in reading_logs if l.get("kitap_adi"))
+
+    # Streak
+    from datetime import timedelta
+    simdi = datetime.utcnow()
+    tarihler = sorted(set(l.get("tarih", "")[:10] for l in reading_logs), reverse=True)
+    streak = 0
+    for i in range(60):
+        gun = (simdi - timedelta(days=i)).strftime("%Y-%m-%d")
+        if gun in tarihler:
+            streak += 1
+        elif i > 0:
+            break
+
+    tamamlanan_gorev = len(gorevler)
+    kitap_sayisi = len(kitaplar)
+
+    # Anlama yüzdesi (gelişim tamamlamalardan)
+    tamamlamalar = await db.gelisim_tamamlama.find({"kullanici_id": ogrenci_id}).to_list(length=None)
+    if tamamlamalar:
+        toplam_dogru = sum(t.get("dogru_sayisi", 0) for t in tamamlamalar if t.get("test_yapildi"))
+        toplam_soru = sum(t.get("toplam_soru", 0) for t in tamamlamalar if t.get("test_yapildi"))
+        anlama_yuzdesi = round((toplam_dogru / max(toplam_soru, 1)) * 100)
+    else:
+        anlama_yuzdesi = 0
+
+    kriterler = {
+        "gorev_12": {"gerekli": 12, "mevcut": tamamlanan_gorev, "tamam": tamamlanan_gorev >= 12},
+        "anlama_75": {"gerekli": 75, "mevcut": anlama_yuzdesi, "tamam": anlama_yuzdesi >= 75},
+        "kitap_4": {"gerekli": 4, "mevcut": kitap_sayisi, "tamam": kitap_sayisi >= 4},
+        "streak_10": {"gerekli": 10, "mevcut": streak, "tamam": streak >= 10},
+    }
+
+    hepsi_tamam = all(k["tamam"] for k in kriterler.values())
+
+    return {
+        "kriterler": kriterler,
+        "kur_atlayabilir": hepsi_tamam,
+        "mevcut_kur": (await db.students.find_one({"id": ogrenci_id}) or {}).get("kur", ""),
+    }
+
+
+# Kur atla (öğretmen onayı ile)
+@api_router.post("/kur/atla")
+async def kur_atla(payload: dict, current_user=Depends(get_current_user)):
+    role = current_user.get("role", "")
+    if role not in ["admin", "coordinator", "teacher"]:
+        raise HTTPException(status_code=403, detail="Sadece öğretmen/yönetici kur atlatabilir")
+
+    ogrenci_id = payload.get("ogrenci_id")
+    yeni_kur = payload.get("yeni_kur", "")
+    await db.students.update_one({"id": ogrenci_id}, {"$set": {"kur": yeni_kur}})
+    return {"ok": True, "yeni_kur": yeni_kur}
+
+
+# ─────────────────────────────────────────────
 # MESAJLAŞMA SİSTEMİ
 # ─────────────────────────────────────────────
 
