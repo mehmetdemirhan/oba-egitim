@@ -3512,7 +3512,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
 
 function OgretmenPaneli({ user, logout }) {
   const { toast } = useToast();
-  const [aktifSekme, setAktifSekme] = useState("ogrencilerim");
+  const [aktifSekme, setAktifSekme] = useState("dashboard");
   const [ogrenciler, setOgrenciler] = useState([]);
   const [riskler, setRiskler] = useState([]);
   const [gorevler, setGorevler] = useState([]);
@@ -3603,6 +3603,7 @@ function OgretmenPaneli({ user, logout }) {
   const riskIcon = (s) => s === "yuksek" ? "🔴" : s === "orta" ? "🟡" : "🟢";
 
   const sekmeler = [
+    { id: "dashboard", label: "Dashboard", icon: "📊" },
     { id: "ogrencilerim", label: "Öğrencilerim", icon: "👥" },
     { id: "gorevler", label: "Görevler", icon: "📌", badge: benimGorevlerim.filter(g => g.durum !== "tamamlandi").length || null },
     { id: "giris-analizi", label: "Analiz", icon: "🔬" },
@@ -3670,6 +3671,155 @@ function OgretmenPaneli({ user, logout }) {
       </div>
 
       <div className="max-w-4xl mx-auto p-4 space-y-4">
+
+        {/* ═══ DASHBOARD ═══ */}
+        {aktifSekme === "dashboard" && (<>
+          {/* Özet kartlar */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-4 text-white">
+              <div className="text-3xl font-bold">{ogrenciler.length}</div>
+              <div className="text-xs opacity-80">👥 Toplam Öğrenci</div>
+            </div>
+            <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl p-4 text-white">
+              <div className="text-3xl font-bold">{riskler.filter(r => r.aktif_gunler_7 >= 4).length}</div>
+              <div className="text-xs opacity-80">✅ Hedefte ({riskler.length > 0 ? Math.round(riskler.filter(r => r.aktif_gunler_7 >= 4).length / riskler.length * 100) : 0}%)</div>
+            </div>
+            <div className="bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl p-4 text-white">
+              <div className="text-3xl font-bold">{atadiklarim.filter(g => g.durum === "bekliyor").length}</div>
+              <div className="text-xs opacity-80">📌 Bekleyen Görev</div>
+            </div>
+            <div className="bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl p-4 text-white">
+              <div className="text-3xl font-bold">{okunmamisSayisi}</div>
+              <div className="text-xs opacity-80">✉️ Okunmamış Mesaj</div>
+            </div>
+          </div>
+
+          {/* Risk dağılımı */}
+          {riskler.length > 0 && (
+            <Card className="border-0 shadow-sm">
+              <CardHeader className="pb-2"><CardTitle className="text-base">📊 Öğrenci Risk Dağılımı</CardTitle></CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  <div className="bg-green-50 rounded-xl p-3 text-center border border-green-200">
+                    <div className="text-2xl font-bold text-green-700">{riskler.filter(r => r.risk_seviye === "dusuk").length}</div>
+                    <div className="text-xs text-green-600">🟢 Düşük Risk</div>
+                    <div className="text-[10px] text-gray-400">Düzenli okuyor</div>
+                  </div>
+                  <div className="bg-yellow-50 rounded-xl p-3 text-center border border-yellow-200">
+                    <div className="text-2xl font-bold text-yellow-700">{riskler.filter(r => r.risk_seviye === "orta").length}</div>
+                    <div className="text-xs text-yellow-600">🟡 Orta Risk</div>
+                    <div className="text-[10px] text-gray-400">Takip gerekli</div>
+                  </div>
+                  <div className="bg-red-50 rounded-xl p-3 text-center border border-red-200">
+                    <div className="text-2xl font-bold text-red-700">{riskler.filter(r => r.risk_seviye === "yuksek").length}</div>
+                    <div className="text-xs text-red-600">🔴 Yüksek Risk</div>
+                    <div className="text-[10px] text-gray-400">Müdahale gerekli</div>
+                  </div>
+                </div>
+                {/* İlerleme çubuğu */}
+                <div className="flex h-4 rounded-full overflow-hidden">
+                  {riskler.filter(r => r.risk_seviye === "dusuk").length > 0 && <div className="bg-green-500 transition-all" style={{ width: `${riskler.filter(r => r.risk_seviye === "dusuk").length / riskler.length * 100}%` }} />}
+                  {riskler.filter(r => r.risk_seviye === "orta").length > 0 && <div className="bg-yellow-400 transition-all" style={{ width: `${riskler.filter(r => r.risk_seviye === "orta").length / riskler.length * 100}%` }} />}
+                  {riskler.filter(r => r.risk_seviye === "yuksek").length > 0 && <div className="bg-red-500 transition-all" style={{ width: `${riskler.filter(r => r.risk_seviye === "yuksek").length / riskler.length * 100}%` }} />}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Yüksek riskli öğrenciler */}
+          {riskler.filter(r => r.risk_seviye === "yuksek").length > 0 && (
+            <Card className="border-0 shadow-sm border-l-4 border-l-red-500">
+              <CardHeader className="pb-2"><CardTitle className="text-sm text-red-700">🚨 Acil Müdahale Gerekli</CardTitle></CardHeader>
+              <CardContent><div className="space-y-2">
+                {riskler.filter(r => r.risk_seviye === "yuksek").map(r => (
+                  <div key={r.id} className="flex items-center justify-between p-2.5 bg-red-50 rounded-xl cursor-pointer hover:bg-red-100 transition-all" onClick={() => ogrenciDetayCek(r)}>
+                    <div className="flex items-center gap-2"><div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center text-sm">🔴</div><div><div className="font-medium text-sm">{r.ad} {r.soyad}</div><div className="text-[10px] text-gray-500">{r.sinif}. sınıf</div></div></div>
+                    <div className="text-right"><div className="text-xs text-red-600 font-bold">Risk: {r.risk_skoru}</div><div className="text-[10px] text-gray-400">Streak: {r.streak} • 7g: {r.dakika_7}dk</div></div>
+                  </div>
+                ))}
+              </div></CardContent>
+            </Card>
+          )}
+
+          {/* Genel istatistikler */}
+          {riskler.length > 0 && (
+            <div className="grid grid-cols-2 gap-3">
+              <Card className="border-0 shadow-sm"><CardContent className="p-4">
+                <div className="text-xs text-gray-500 mb-1">📖 Ortalama Haftalık Okuma</div>
+                <div className="text-2xl font-bold text-blue-600">{riskler.length > 0 ? Math.round(riskler.reduce((t, r) => t + r.dakika_7, 0) / riskler.length) : 0} dk</div>
+                <div className="text-[10px] text-gray-400">öğrenci başına / hafta</div>
+              </CardContent></Card>
+              <Card className="border-0 shadow-sm"><CardContent className="p-4">
+                <div className="text-xs text-gray-500 mb-1">🔥 Ortalama Streak</div>
+                <div className="text-2xl font-bold text-orange-600">{riskler.length > 0 ? Math.round(riskler.reduce((t, r) => t + r.streak, 0) / riskler.length * 10) / 10 : 0} gün</div>
+                <div className="text-[10px] text-gray-400">öğrenci başına</div>
+              </CardContent></Card>
+              <Card className="border-0 shadow-sm"><CardContent className="p-4">
+                <div className="text-xs text-gray-500 mb-1">⭐ Toplam XP</div>
+                <div className="text-2xl font-bold text-purple-600">{riskler.reduce((t, r) => t + (r.toplam_xp || 0), 0)}</div>
+                <div className="text-[10px] text-gray-400">tüm öğrenciler</div>
+              </CardContent></Card>
+              <Card className="border-0 shadow-sm"><CardContent className="p-4">
+                <div className="text-xs text-gray-500 mb-1">📌 Görev Tamamlama</div>
+                <div className="text-2xl font-bold text-green-600">{atadiklarim.length > 0 ? Math.round(atadiklarim.filter(g => g.durum === "tamamlandi").length / atadiklarim.length * 100) : 0}%</div>
+                <div className="text-[10px] text-gray-400">{atadiklarim.filter(g => g.durum === "tamamlandi").length}/{atadiklarim.length} görev</div>
+              </CardContent></Card>
+            </div>
+          )}
+
+          {/* Bana atanan görevler */}
+          {benimGorevlerim.filter(g => g.durum !== "tamamlandi").length > 0 && (
+            <Card className="border-0 shadow-sm border-l-4 border-l-indigo-500">
+              <CardHeader className="pb-2"><CardTitle className="text-sm text-indigo-700">📌 Yöneticiden Gelen Görevlerim</CardTitle></CardHeader>
+              <CardContent><div className="space-y-2">
+                {benimGorevlerim.filter(g => g.durum !== "tamamlandi").map(g => (
+                  <div key={g.id} className="flex items-center justify-between p-2 bg-indigo-50 rounded-xl">
+                    <div><div className="font-medium text-sm">{g.baslik}</div><div className="text-[10px] text-gray-500">Atayan: {g.atayan_ad}{g.son_tarih && ` • Son: ${new Date(g.son_tarih).toLocaleDateString('tr-TR')}`}</div></div>
+                    <Button size="sm" className="bg-green-600 text-white text-xs h-7" onClick={async () => { try { await axios.put(`${API}/gorevler/${g.id}/durum`, { durum: "tamamlandi" }); toast({ title: "✅ Tamamlandı" }); fetchAll(); } catch(e) {} }}>Tamamla</Button>
+                  </div>
+                ))}
+              </div></CardContent>
+            </Card>
+          )}
+
+          {/* Öğrenci sıralaması */}
+          {riskler.length > 0 && (
+            <Card className="border-0 shadow-sm">
+              <CardHeader className="pb-2"><CardTitle className="text-base">🏆 Öğrenci Sıralaması (XP)</CardTitle></CardHeader>
+              <CardContent><div className="space-y-2">
+                {[...riskler].sort((a, b) => (b.toplam_xp || 0) - (a.toplam_xp || 0)).map((r, i) => (
+                  <div key={r.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100" onClick={() => ogrenciDetayCek(r)}>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${i === 0 ? 'bg-yellow-100 text-yellow-700' : i === 1 ? 'bg-gray-100 text-gray-600' : i === 2 ? 'bg-orange-100 text-orange-700' : 'bg-gray-50 text-gray-500'}`}>{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}</div>
+                      <div><div className="font-medium text-sm">{r.ad} {r.soyad}</div><div className="text-[10px] text-gray-400">{r.sinif}. sınıf • {r.kur || "—"}</div></div>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs">
+                      <span className={`${r.risk_seviye === "yuksek" ? "text-red-500" : r.risk_seviye === "orta" ? "text-yellow-500" : "text-green-500"}`}>{r.risk_seviye === "yuksek" ? "🔴" : r.risk_seviye === "orta" ? "🟡" : "🟢"}</span>
+                      <span className="text-gray-500">🔥{r.streak}</span>
+                      <span className="font-bold text-orange-600">{r.toplam_xp || 0} XP</span>
+                    </div>
+                  </div>
+                ))}
+              </div></CardContent>
+            </Card>
+          )}
+
+          {/* Hızlı eylemler */}
+          <div className="grid grid-cols-2 gap-3">
+            <button onClick={() => setAktifSekme("ogrencilerim")} className="bg-white rounded-2xl p-4 shadow-sm border text-left hover:shadow-md transition-all">
+              <div className="text-lg mb-1">👥</div><div className="text-sm font-bold text-gray-900">Öğrencileri Gör</div><div className="text-[10px] text-gray-500">Detaylı profil ve takip</div>
+            </button>
+            <button onClick={() => { setAktifSekme("ogrencilerim"); setGorevAtaGoster(true); }} className="bg-white rounded-2xl p-4 shadow-sm border text-left hover:shadow-md transition-all">
+              <div className="text-lg mb-1">📌</div><div className="text-sm font-bold text-gray-900">Görev Ata</div><div className="text-[10px] text-gray-500">Toplu veya tekli görev</div>
+            </button>
+            <button onClick={() => setAktifSekme("giris-analizi")} className="bg-white rounded-2xl p-4 shadow-sm border text-left hover:shadow-md transition-all">
+              <div className="text-lg mb-1">🔬</div><div className="text-sm font-bold text-gray-900">Analiz Yap</div><div className="text-[10px] text-gray-500">Giriş analizi başlat</div>
+            </button>
+            <button onClick={() => setAktifSekme("mesajlar")} className="bg-white rounded-2xl p-4 shadow-sm border text-left hover:shadow-md transition-all">
+              <div className="text-lg mb-1">✉️</div><div className="text-sm font-bold text-gray-900">Mesajlar</div><div className="text-[10px] text-gray-500">{okunmamisSayisi > 0 ? `${okunmamisSayisi} okunmamış` : "Tüm mesajlar"}</div>
+            </button>
+          </div>
+        </>)}
 
         {/* ═══ ÖĞRENCİLERİM ═══ */}
         {aktifSekme === "ogrencilerim" && (<>
