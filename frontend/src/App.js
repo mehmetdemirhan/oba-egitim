@@ -4948,6 +4948,7 @@ function GelisimAlani({ user }) {
   const [testCevaplari, setTestCevaplari] = useState([]);
   const [sonuc, setSonuc] = useState(null);
   const [redSebep, setRedSebep] = useState("");
+  const [acikDetayId, setAcikDetayId] = useState(null);
   const [redDialogIcerik, setRedDialogIcerik] = useState(null);
   const [adminForm, setAdminForm] = useState({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [], makale_link: "", makale_dosya_turu: "link", kitap_yazar: "", kitap_isbn: "", kitap_yayinevi: "", kitap_sayfa: "", kitap_yas_grubu: "", kitap_link: "", kitap_kapak: "" });
   const [kitapYukleniyor, setKitapYukleniyor] = useState(false);
@@ -5342,27 +5343,37 @@ function GelisimAlani({ user }) {
             <div>
               <h3 className="font-semibold text-yellow-700 mb-3">⏳ Onay Bekleyenler ({bekleyenler.length})</h3>
               <div className="space-y-3">
-                {bekleyenler.map(icerik => (
-                  <Card key={icerik.id} className="border-2 border-yellow-200 shadow-sm">
-                    <CardContent className="p-5">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${turColor(icerik.tur)}`}>{turIcon(icerik.tur)}</div>
-                          <div>
-                            <div className="font-semibold">{icerik.baslik}</div>
-                            <div className="text-xs text-gray-500">{turLabel(icerik.tur)} • Ekleyen: {icerik.ekleyen_ad} • {icerik.sorular?.length || 0} soru</div>
+                {bekleyenler.map(icerik => {
+                  const isAcik = acikDetayId === "bek-" + icerik.id;
+                  return (
+                    <Card key={icerik.id} className="border-2 border-yellow-200 shadow-sm">
+                      <CardContent className="p-0">
+                        <div className="flex items-start justify-between p-5 cursor-pointer hover:bg-yellow-50/50 transition-colors" onClick={() => setAcikDetayId(isAcik ? null : "bek-" + icerik.id)}>
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${turColor(icerik.tur)}`}>{turIcon(icerik.tur)}</div>
+                            <div><div className="font-semibold">{icerik.baslik}</div><div className="text-xs text-gray-500">{turLabel(icerik.tur)} • Ekleyen: {icerik.ekleyen_ad} • {icerik.sorular?.length || 0} soru</div></div>
                           </div>
+                          <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isAcik ? 'rotate-180' : ''}`} />
                         </div>
-                      </div>
-                      {icerik.aciklama && <p className="text-sm text-gray-600 mb-3">{icerik.aciklama}</p>}
-                      <div className="flex gap-2 flex-wrap">
-                        <Button size="sm" onClick={() => adminKarar(icerik.id, true, false)} className="bg-blue-600 hover:bg-blue-700 text-white">🗳️ Oylama Başlat</Button>
-                        <Button size="sm" onClick={() => adminKarar(icerik.id, true, true)} className="bg-green-600 hover:bg-green-700 text-white">✅ Direkt Yayına Al</Button>
-                        <Button size="sm" variant="destructive" onClick={() => adminKarar(icerik.id, false)}>❌ Reddet</Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                        {isAcik && (
+                          <div className="px-5 pb-3 space-y-3 border-t border-yellow-100 pt-3">
+                            {icerik.aciklama && <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3">{icerik.aciklama}</p>}
+                            {icerik.makale_link && <a href={icerik.makale_link} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline block">📎 {icerik.makale_link}</a>}
+                            {icerik.kitap_yazar && <div className="text-sm text-gray-600">📚 Yazar: {icerik.kitap_yazar}</div>}
+                            {icerik.kitap_kapak && <img src={icerik.kitap_kapak} alt="Kapak" className="h-28 rounded-lg shadow" onError={e => { e.target.style.display='none'; }} />}
+                            {icerik.sorular?.length > 0 && (<div className="bg-blue-50 rounded-lg p-3"><div className="text-xs font-medium text-blue-700 mb-2">📝 {icerik.sorular.length} Test Sorusu</div>{icerik.sorular.map((s, i) => (<div key={i} className="text-xs text-gray-700 mb-1"><strong>{i+1}.</strong> {s.soru}</div>))}</div>)}
+                            <div className="text-xs text-gray-400">Hedef: {({"hepsi":"Herkes","ogretmen":"Öğretmenler","ogrenci":"Öğrenciler"})[icerik.hedef_kitle] || icerik.hedef_kitle}</div>
+                          </div>
+                        )}
+                        <div className="px-5 pb-5 flex gap-2 flex-wrap">
+                          <Button size="sm" onClick={() => adminKarar(icerik.id, true, false)} className="bg-blue-600 hover:bg-blue-700 text-white">🗳️ Oylama Başlat</Button>
+                          <Button size="sm" onClick={() => adminKarar(icerik.id, true, true)} className="bg-green-600 hover:bg-green-700 text-white">✅ Direkt Yayına Al</Button>
+                          <Button size="sm" variant="destructive" onClick={() => adminKarar(icerik.id, false)}>❌ Reddet</Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -5376,10 +5387,12 @@ function GelisimAlani({ user }) {
                   const kullandi = oyKullandi(icerik);
                   const oran = onayOrani(icerik);
                   const oyCount = Object.keys(icerik.oylar || {}).length;
+                  const isAcik = acikDetayId === icerik.id;
                   return (
                     <Card key={icerik.id} className="border-2 border-blue-200 shadow-sm">
-                      <CardContent className="p-5">
-                        <div className="flex items-start justify-between mb-3">
+                      <CardContent className="p-0">
+                        {/* Başlık - tıklanabilir */}
+                        <div className="flex items-start justify-between p-5 cursor-pointer hover:bg-blue-50/50 transition-colors" onClick={() => setAcikDetayId(isAcik ? null : icerik.id)}>
                           <div className="flex items-center gap-3">
                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${turColor(icerik.tur)}`}>{turIcon(icerik.tur)}</div>
                             <div>
@@ -5387,36 +5400,31 @@ function GelisimAlani({ user }) {
                               <div className="text-xs text-gray-500">{turLabel(icerik.tur)} • Ekleyen: {icerik.ekleyen_ad}</div>
                             </div>
                           </div>
-                          {oran !== null && (
-                            <div className="text-right">
-                              <div className="text-lg font-bold text-blue-600">%{oran}</div>
-                              <div className="text-xs text-gray-500">{oyCount} oy</div>
-                            </div>
-                          )}
+                          <div className="flex items-center gap-2">
+                            {oran !== null && (<div className="text-right"><div className="text-lg font-bold text-blue-600">%{oran}</div><div className="text-xs text-gray-500">{oyCount} oy</div></div>)}
+                            <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isAcik ? 'rotate-180' : ''}`} />
+                          </div>
                         </div>
-                        {icerik.aciklama && <p className="text-sm text-gray-600 mb-3">{icerik.aciklama}</p>}
 
-                        {/* Oy bar */}
-                        {oran !== null && (
-                          <div className="mb-3">
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div className={`h-2 rounded-full transition-all ${oran >= 60 ? 'bg-green-500' : 'bg-orange-500'}`} style={{width:`${oran}%`}}></div>
-                            </div>
-                            <p className="text-xs text-gray-500 mt-1">%60 onay gerekli • Şu an %{oran}</p>
+                        {/* Detay - açılır */}
+                        {isAcik && (
+                          <div className="px-5 pb-5 space-y-3 border-t border-blue-100 pt-3">
+                            {icerik.aciklama && <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3">{icerik.aciklama}</p>}
+                            {icerik.makale_link && <a href={icerik.makale_link} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline block">📎 {icerik.makale_dosya_turu === "link" ? "Makale Linki" : "Dosya Linki"}: {icerik.makale_link}</a>}
+                            {icerik.kitap_yazar && <div className="text-sm text-gray-600">📚 Yazar: {icerik.kitap_yazar}</div>}
+                            {icerik.kitap_yayinevi && <div className="text-sm text-gray-600">🏢 Yayınevi: {icerik.kitap_yayinevi}</div>}
+                            {icerik.kitap_kapak && <img src={icerik.kitap_kapak} alt="Kapak" className="h-28 rounded-lg shadow" onError={e => { e.target.style.display='none'; }} />}
+                            {icerik.sorular?.length > 0 && (<div className="bg-blue-50 rounded-lg p-3"><div className="text-xs font-medium text-blue-700 mb-2">📝 {icerik.sorular.length} Test Sorusu</div>{icerik.sorular.map((s, i) => (<div key={i} className="text-xs text-gray-700 mb-1"><strong>{i+1}.</strong> {s.soru} <span className="text-gray-400">(Doğru: {['A','B','C','D'][s.dogru_cevap]})</span></div>))}</div>)}
+                            <div className="text-xs text-gray-400">Hedef: {({"hepsi":"Herkes","ogretmen":"Öğretmenler","ogrenci":"Öğrenciler"})[icerik.hedef_kitle] || icerik.hedef_kitle} • Eklenme: {new Date(icerik.olusturma_tarihi).toLocaleDateString("tr-TR")}</div>
                           </div>
                         )}
 
-                        {kullandi ? (
-                          <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
-                            ✓ Oyunuzu kullandınız: <strong>{kullandi.onay ? "Onay ✅" : "Red ❌"}</strong>
-                            {!kullandi.onay && kullandi.sebep && <span className="text-gray-600"> — {kullandi.sebep}</span>}
-                          </div>
-                        ) : (
-                          <div className="flex gap-2">
-                            <Button size="sm" onClick={() => oyVer(true, "", icerik)} className="bg-green-600 hover:bg-green-700 text-white flex-1">✅ Onayla (+2 puan)</Button>
-                            <Button size="sm" variant="destructive" className="flex-1" onClick={() => { setRedDialogIcerik(icerik); }}>❌ Reddet</Button>
-                          </div>
-                        )}
+                        {/* Oy bar + butonlar */}
+                        <div className="px-5 pb-5">
+                          {oran !== null && (<div className="mb-3"><div className="w-full bg-gray-200 rounded-full h-2"><div className={`h-2 rounded-full transition-all ${oran >= 60 ? 'bg-green-500' : 'bg-orange-500'}`} style={{width:`${oran}%`}}></div></div><p className="text-xs text-gray-500 mt-1">%60 onay gerekli • Şu an %{oran}</p></div>)}
+                          {kullandi ? (<div className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">✓ Oyunuzu kullandınız: <strong>{kullandi.onay ? "Onay ✅" : "Red ❌"}</strong>{!kullandi.onay && kullandi.sebep && <span className="text-gray-600"> — {kullandi.sebep}</span>}</div>
+                          ) : (<div className="flex gap-2"><Button size="sm" onClick={() => oyVer(true, "", icerik)} className="bg-green-600 hover:bg-green-700 text-white flex-1">✅ Onayla (+2 puan)</Button><Button size="sm" variant="destructive" className="flex-1" onClick={() => { setRedDialogIcerik(icerik); }}>❌ Reddet</Button></div>)}
+                        </div>
                       </CardContent>
                     </Card>
                   );
