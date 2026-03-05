@@ -394,102 +394,103 @@ async def create_default_admin():
     demo_student_email = "demo-ogrenci@oba.com"
     demo_teacher_email = "demo-ogretmen@oba.com"
     demo_parent_email = "demo-veli@oba.com"
+    DEMO_PASSWORD = "Demo123!"
 
-    existing_demo = await db.users.find_one({"email": demo_student_email})
-    if not existing_demo:
-        logging.info("🎓 Demo verileri oluşturuluyor...")
+    from datetime import timedelta
+    simdi = datetime.now(timezone.utc)
 
-        # 1. Demo öğretmen (teachers collection)
+    # --- DEMO ÖĞRETMEN ---
+    existing_teacher = await db.users.find_one({"email": demo_teacher_email})
+    if not existing_teacher:
         demo_teacher_id = str(uuid.uuid4())
-        await db.teachers.insert_one({
-            "id": demo_teacher_id, "ad": "Ayşe", "soyad": "Öğretmen", "brans": "Türkçe",
-            "telefon": "05001112233", "seviye": "uzman", "ogrenci_sayisi": 3,
-            "yapilmasi_gereken_odeme": 0, "yapilan_odeme": 0, "arsivli": False,
-            "olusturma_tarihi": datetime.now(timezone.utc).isoformat()
-        })
+        # teachers collection
+        existing_t_col = await db.teachers.find_one({"ad": "Ayşe", "soyad": "Öğretmen"})
+        if not existing_t_col:
+            await db.teachers.insert_one({
+                "id": demo_teacher_id, "ad": "Ayşe", "soyad": "Öğretmen", "brans": "Türkçe",
+                "telefon": "05001112233", "seviye": "uzman", "ogrenci_sayisi": 3,
+                "yapilmasi_gereken_odeme": 0, "yapilan_odeme": 0, "arsivli": False,
+                "olusturma_tarihi": simdi.isoformat()
+            })
+        else:
+            demo_teacher_id = existing_t_col["id"]
 
-        # Demo öğretmen user hesabı
         demo_teacher_user_id = str(uuid.uuid4())
         await db.users.insert_one({
             "id": demo_teacher_user_id, "ad": "Ayşe", "soyad": "Öğretmen",
-            "email": demo_teacher_email, "password_hash": hash_password("Demo123!"),
+            "email": demo_teacher_email, "password_hash": hash_password(DEMO_PASSWORD),
             "role": "teacher", "linked_id": demo_teacher_id, "telefon": "05001112233",
-            "olusturma_tarihi": datetime.now(timezone.utc).isoformat()
+            "olusturma_tarihi": simdi.isoformat()
         })
+        logging.info(f"✅ Demo öğretmen oluşturuldu: {demo_teacher_email} / {DEMO_PASSWORD}")
+    else:
+        demo_teacher_user_id = existing_teacher["id"]
+        demo_teacher_id = existing_teacher.get("linked_id", "")
+        logging.info(f"ℹ️ Demo öğretmen zaten var: {demo_teacher_email}")
 
-        # 2. Demo öğrenciler (students collection)
-        demo_students = []
+    # --- DEMO ÖĞRENCİLER ---
+    existing_student = await db.users.find_one({"email": demo_student_email})
+    if not existing_student:
         ogrenci_adlari = [
             ("Ali", "Yılmaz", "4", "Kur 2"), ("Zeynep", "Demir", "3", "Kur 1"),
             ("Mehmet", "Kaya", "5", "Kur 3"),
         ]
+        demo_students = []
         for ad, soyad, sinif, kur in ogrenci_adlari:
             sid = str(uuid.uuid4())
             demo_students.append(sid)
-            await db.students.insert_one({
-                "id": sid, "ad": ad, "soyad": soyad, "sinif": sinif, "kur": kur,
-                "veli_ad": "Demo", "veli_soyad": "Veli", "veli_telefon": "05009998877",
-                "aldigi_egitim": "Okuma Becerileri Temel", "ogretmen_id": demo_teacher_id,
-                "yapilmasi_gereken_odeme": 2400, "yapilan_odeme": 0, "ogretmene_yapilacak_odeme": 800,
-                "arsivli": False, "toplam_xp": 0,
-                "olusturma_tarihi": datetime.now(timezone.utc).isoformat()
-            })
+            existing_s_col = await db.students.find_one({"ad": ad, "soyad": soyad})
+            if not existing_s_col:
+                await db.students.insert_one({
+                    "id": sid, "ad": ad, "soyad": soyad, "sinif": sinif, "kur": kur,
+                    "veli_ad": "Demo", "veli_soyad": "Veli", "veli_telefon": "05009998877",
+                    "aldigi_egitim": "Okuma Becerileri Temel", "ogretmen_id": demo_teacher_id,
+                    "yapilmasi_gereken_odeme": 2400, "yapilan_odeme": 0, "ogretmene_yapilacak_odeme": 800,
+                    "arsivli": False, "toplam_xp": 0, "olusturma_tarihi": simdi.isoformat()
+                })
+            else:
+                demo_students[-1] = existing_s_col["id"]
 
-        # Ana demo öğrenci user hesabı (Ali Yılmaz)
+        # Ana öğrenci user
         demo_student_user_id = str(uuid.uuid4())
         await db.users.insert_one({
             "id": demo_student_user_id, "ad": "Ali", "soyad": "Yılmaz",
-            "email": demo_student_email, "password_hash": hash_password("Demo123!"),
+            "email": demo_student_email, "password_hash": hash_password(DEMO_PASSWORD),
             "role": "student", "linked_id": demo_students[0], "telefon": "",
-            "olusturma_tarihi": datetime.now(timezone.utc).isoformat()
+            "olusturma_tarihi": simdi.isoformat()
         })
-
-        # Diğer öğrenciler için de user hesabı
+        # Diğer öğrenciler
         for i, (ad, soyad, _, _) in enumerate(ogrenci_adlari[1:], 1):
             await db.users.insert_one({
                 "id": str(uuid.uuid4()), "ad": ad, "soyad": soyad,
-                "email": f"demo-ogrenci{i+1}@oba.com", "password_hash": hash_password("Demo123!"),
+                "email": f"demo-ogrenci{i+1}@oba.com", "password_hash": hash_password(DEMO_PASSWORD),
                 "role": "student", "linked_id": demo_students[i], "telefon": "",
-                "olusturma_tarihi": datetime.now(timezone.utc).isoformat()
+                "olusturma_tarihi": simdi.isoformat()
             })
 
-        # 3. Demo veli user hesabı
-        await db.users.insert_one({
-            "id": str(uuid.uuid4()), "ad": "Demo", "soyad": "Veli",
-            "email": demo_parent_email, "password_hash": hash_password("Demo123!"),
-            "role": "parent", "linked_id": demo_students[0], "telefon": "05009998877",
-            "olusturma_tarihi": datetime.now(timezone.utc).isoformat()
-        })
-
-        # 4. Örnek okuma kayıtları (Ali için)
+        # Okuma kayıtları
         kitaplar = ["Küçük Prens", "Charlie'nin Çikolata Fabrikası", "Pollyanna"]
-        from datetime import timedelta
-        simdi = datetime.now(timezone.utc)
         for gun in range(14):
             tarih = (simdi - timedelta(days=gun)).isoformat()
-            kitap = kitaplar[gun % len(kitaplar)]
             await db.reading_logs.insert_one({
                 "id": str(uuid.uuid4()), "ogrenci_id": demo_students[0],
-                "ogrenci_ad": "Ali Yılmaz", "kitap_adi": kitap,
+                "ogrenci_ad": "Ali Yılmaz", "kitap_adi": kitaplar[gun % len(kitaplar)],
                 "bolum": f"Bölüm {gun % 8 + 1}", "baslangic_sayfa": gun * 10 + 1,
                 "bitis_sayfa": gun * 10 + 12, "sure_dakika": random.randint(8, 25),
                 "not_text": "", "tarih": tarih,
             })
-
-        # Zeynep ve Mehmet için de birkaç kayıt
         for i, sid in enumerate(demo_students[1:], 1):
             for gun in range(random.randint(3, 10)):
-                tarih = (simdi - timedelta(days=gun)).isoformat()
                 await db.reading_logs.insert_one({
                     "id": str(uuid.uuid4()), "ogrenci_id": sid,
                     "ogrenci_ad": ogrenci_adlari[i][0] + " " + ogrenci_adlari[i][1],
                     "kitap_adi": kitaplar[gun % len(kitaplar)],
                     "bolum": f"Bölüm {gun % 5 + 1}", "baslangic_sayfa": gun * 8 + 1,
                     "bitis_sayfa": gun * 8 + 10, "sure_dakika": random.randint(5, 20),
-                    "not_text": "", "tarih": tarih,
+                    "not_text": "", "tarih": (simdi - timedelta(days=gun)).isoformat(),
                 })
 
-        # 5. XP kayıtları (Ali için)
+        # XP
         xp_eylemleri = ["okuma_gorevi"] * 10 + ["gorev_tamamla"] * 3 + ["egzersiz"] * 5 + ["gelisim_tamamla"] * 2
         toplam_xp = 0
         for eylem in xp_eylemleri:
@@ -500,18 +501,15 @@ async def create_default_admin():
                 "eylem": eylem, "xp": xp, "tarih": (simdi - timedelta(hours=random.randint(1, 200))).isoformat(),
             })
         await db.students.update_one({"id": demo_students[0]}, {"$set": {"toplam_xp": toplam_xp}})
+        for sid in demo_students[1:]:
+            await db.students.update_one({"id": sid}, {"$set": {"toplam_xp": random.randint(30, 150)}})
 
-        # Diğer öğrencilere de XP
-        for i, sid in enumerate(demo_students[1:], 1):
-            xp = random.randint(30, 150)
-            await db.students.update_one({"id": sid}, {"$set": {"toplam_xp": xp}})
-
-        # 6. Örnek görevler
+        # Görevler
         await db.gorevler.insert_one({
             "id": str(uuid.uuid4()), "hedef_id": demo_students[0], "hedef_tip": "ogrenci",
             "hedef_ad": "Ali Yılmaz", "baslik": "Küçük Prens — Bölüm 5-6 oku",
-            "aciklama": "Bu hafta Küçük Prens'in 5. ve 6. bölümlerini oku ve notlarını yaz.",
-            "tur": "kitap", "son_tarih": (simdi + timedelta(days=5)).strftime("%Y-%m-%d"),
+            "aciklama": "Bu hafta Küçük Prens'in 5. ve 6. bölümlerini oku.", "tur": "kitap",
+            "son_tarih": (simdi + timedelta(days=5)).strftime("%Y-%m-%d"),
             "atayan_id": demo_teacher_user_id, "atayan_ad": "Ayşe Öğretmen", "atayan_rol": "teacher",
             "durum": "bekliyor", "olusturma_tarihi": simdi.isoformat(),
             "makale_link": None, "kitap_yazar": "Antoine de Saint-Exupéry",
@@ -520,8 +518,8 @@ async def create_default_admin():
         await db.gorevler.insert_one({
             "id": str(uuid.uuid4()), "hedef_id": demo_students[0], "hedef_tip": "ogrenci",
             "hedef_ad": "Ali Yılmaz", "baslik": "Hızlı Okuma Egzersizi yap",
-            "aciklama": "Egzersizler bölümünden 'Hızlı Kelime Okuma' egzersizini tamamla.",
-            "tur": "egzersiz", "son_tarih": (simdi + timedelta(days=3)).strftime("%Y-%m-%d"),
+            "aciklama": "Egzersizlerden 'Hızlı Kelime Okuma' tamamla.", "tur": "egzersiz",
+            "son_tarih": (simdi + timedelta(days=3)).strftime("%Y-%m-%d"),
             "atayan_id": demo_teacher_user_id, "atayan_ad": "Ayşe Öğretmen", "atayan_rol": "teacher",
             "durum": "bekliyor", "olusturma_tarihi": simdi.isoformat(),
             "makale_link": None, "kitap_yazar": None, "kitap_isbn": None,
@@ -530,8 +528,7 @@ async def create_default_admin():
         await db.gorevler.insert_one({
             "id": str(uuid.uuid4()), "hedef_id": demo_students[0], "hedef_tip": "ogrenci",
             "hedef_ad": "Ali Yılmaz", "baslik": "Doğa belgeseli izle",
-            "aciklama": "Aşağıdaki belgeseli izleyip 3 cümle özet yaz.",
-            "tur": "film", "son_tarih": None,
+            "aciklama": "Belgeseli izleyip 3 cümle özet yaz.", "tur": "film", "son_tarih": None,
             "atayan_id": demo_teacher_user_id, "atayan_ad": "Ayşe Öğretmen", "atayan_rol": "teacher",
             "durum": "tamamlandi", "tamamlama_tarihi": (simdi - timedelta(days=2)).isoformat(),
             "tamamlama_notu": "Belgeseli izledim, çok güzeldi!", "olusturma_tarihi": (simdi - timedelta(days=5)).isoformat(),
@@ -539,21 +536,40 @@ async def create_default_admin():
             "kitap_link": None, "kitap_kapak": None, "film_link": "https://youtube.com/watch?v=example",
         })
 
-        # 7. Örnek mesaj
+        # Mesaj
         await db.mesajlar.insert_one({
             "id": str(uuid.uuid4()), "gonderen_id": demo_teacher_user_id,
             "gonderen_ad": "Ayşe Öğretmen", "gonderen_rol": "teacher",
             "alici_id": demo_student_user_id, "alici_ad": "Ali Yılmaz", "alici_rol": "student",
-            "konu": "Tebrikler! 🎉", "icerik": "Ali, bu hafta çok güzel ilerleme kaydettin. Okuma streak'in 14 güne ulaştı. Böyle devam et!",
+            "konu": "Tebrikler! 🎉", "icerik": "Ali, bu hafta çok güzel ilerleme kaydettin. Böyle devam et!",
             "okundu": False, "tarih": (simdi - timedelta(hours=3)).isoformat(),
         })
-
-        logging.info(f"✅ Demo verileri oluşturuldu!")
-        logging.info(f"   📧 Öğrenci: {demo_student_email} / Demo123!")
-        logging.info(f"   📧 Öğretmen: {demo_teacher_email} / Demo123!")
-        logging.info(f"   📧 Veli: {demo_parent_email} / Demo123!")
+        logging.info(f"✅ Demo öğrenciler oluşturuldu: {demo_student_email} / {DEMO_PASSWORD}")
     else:
-        logging.info("ℹ️ Demo verileri zaten mevcut")
+        demo_student_user_id = existing_student["id"]
+        logging.info(f"ℹ️ Demo öğrenci zaten var: {demo_student_email}")
+
+    # --- DEMO VELİ ---
+    existing_parent = await db.users.find_one({"email": demo_parent_email})
+    if not existing_parent:
+        # Ali Yılmaz'ın student id'sini bul
+        ali = await db.users.find_one({"email": demo_student_email})
+        ali_linked = ali.get("linked_id", "") if ali else ""
+        await db.users.insert_one({
+            "id": str(uuid.uuid4()), "ad": "Demo", "soyad": "Veli",
+            "email": demo_parent_email, "password_hash": hash_password(DEMO_PASSWORD),
+            "role": "parent", "linked_id": ali_linked, "telefon": "05009998877",
+            "olusturma_tarihi": simdi.isoformat()
+        })
+        logging.info(f"✅ Demo veli oluşturuldu: {demo_parent_email} / {DEMO_PASSWORD}")
+    else:
+        logging.info(f"ℹ️ Demo veli zaten var: {demo_parent_email}")
+
+    logging.info("📋 Demo Hesapları:")
+    logging.info(f"   🎓 Öğrenci: {demo_student_email} / {DEMO_PASSWORD}")
+    logging.info(f"   👩‍🏫 Öğretmen: {demo_teacher_email} / {DEMO_PASSWORD}")
+    logging.info(f"   👪 Veli: {demo_parent_email} / {DEMO_PASSWORD}")
+    logging.info(f"   🔑 Admin: {admin_email} / {admin_password}")
 
 # ─────────────────────────────────────────────
 # MEVCUT MODELLER (değişmeden korunuyor)
