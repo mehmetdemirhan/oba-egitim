@@ -191,13 +191,13 @@ function AppContent() {
   const fetchAll = useCallback(async () => {
     try { const r = await axios.get(`${API}/dashboard`); setDashboardStats(r.data); } catch(e) {}
     try { if ((user?.role === 'admin' || user?.role === 'coordinator')) { const r = await axios.get(`${API}/dashboard/bekleyenler`); setBekleyenler(r.data); } } catch(e) { setBekleyenler({ metin_bekleyen:[], metin_oylama:[], gelisim_bekleyen:[], gelisim_oylama:[], kitap_bekleyen:[], kitap_oylama:[], toplam:0 }); }
-    try { const r = await axios.get(`${API}/stats/weekly`); setWeeklyStats(r.data); } catch(e) {}
-    try { const r = await axios.get(`${API}/stats/monthly`); setMonthlyStats(r.data); } catch(e) {}
-    try { const r = await axios.get(`${API}/teachers`); setTeachers(r.data); } catch(e) {}
-    try { const r = await axios.get(`${API}/students`); setStudents(r.data); } catch(e) {}
-    try { const r = await axios.get(`${API}/courses`); setCourses(r.data); } catch(e) {}
-    try { const r = await axios.get(`${API}/payments`); setPayments(r.data); } catch(e) {}
-    try { const r = await axios.get(`${API}/risk-skor/toplu`); setOgrenciRiskler(r.data); } catch(e) {}
+    try { const r = await axios.get(`${API}/stats/weekly`); setWeeklyStats(Array.isArray(r.data) ? r.data : []); } catch(e) {}
+    try { const r = await axios.get(`${API}/stats/monthly`); setMonthlyStats(Array.isArray(r.data) ? r.data : []); } catch(e) {}
+    try { const r = await axios.get(`${API}/teachers`); setTeachers(Array.isArray(r.data) ? r.data : []); } catch(e) {}
+    try { const r = await axios.get(`${API}/students`); setStudents(Array.isArray(r.data) ? r.data : []); } catch(e) {}
+    try { const r = await axios.get(`${API}/courses`); setCourses(Array.isArray(r.data) ? r.data : []); } catch(e) {}
+    try { const r = await axios.get(`${API}/payments`); setPayments(Array.isArray(r.data) ? r.data : []); } catch(e) {}
+    try { const r = await axios.get(`${API}/risk-skor/toplu`); setOgrenciRiskler(Array.isArray(r.data) ? r.data : []); } catch(e) { setOgrenciRiskler([]); }
   }, []);
 
   useEffect(() => {
@@ -1291,7 +1291,7 @@ function MetinSecimListesi({ onMetinSec }) {
 
   useEffect(() => {
     axios.get(`${API}/diagnostic/texts`)
-      .then(r => setMetinler(r.data.filter(m => m.durum === "havuzda")))
+      .then(r => { const d = Array.isArray(r.data) ? r.data : []; setMetinler(d.filter(m => m.durum === "havuzda")); })
       .catch(() => {})
       .finally(() => setYukleniyor(false));
   }, []);
@@ -3535,19 +3535,18 @@ function OgretmenPaneli({ user, logout }) {
   const fetchAll = useCallback(async () => {
     try {
       const r = await axios.get(`${API}/risk-skor/toplu`);
-      const benimOgrencilerim = r.data.filter(s => s.ogretmen_id === ogretmenId);
-      setRiskler(benimOgrencilerim);
-      // Ayrıca students'tan da çek
+      const data = Array.isArray(r.data) ? r.data : [];
+      setRiskler(data.filter(s => s.ogretmen_id === ogretmenId));
+    } catch(e) { setRiskler([]); }
+    try {
       const sr = await axios.get(`${API}/students`);
-      setOgrenciler(sr.data.filter(s => s.ogretmen_id === ogretmenId && !s.arsivli));
-    } catch(e) {
-      // Fallback - sadece students
-      try { const sr = await axios.get(`${API}/students`); setOgrenciler(sr.data.filter(s => s.ogretmen_id === ogretmenId && !s.arsivli)); } catch(e2) {}
-    }
-    try { const r = await axios.get(`${API}/gorevler`); setGorevler(r.data); } catch(e) {}
-    try { const r = await axios.get(`${API}/mesajlar`); setMesajlar(r.data); } catch(e) {}
-    try { const r = await axios.get(`${API}/mesajlar/okunmamis-sayisi`); setOkunmamisSayisi(r.data.sayi); } catch(e) {}
-    try { const r = await axios.get(`${API}/auth/users`); setKullanicilar(r.data); } catch(e) {}
+      const data = Array.isArray(sr.data) ? sr.data : [];
+      setOgrenciler(data.filter(s => s.ogretmen_id === ogretmenId && !s.arsivli));
+    } catch(e) { setOgrenciler([]); }
+    try { const r = await axios.get(`${API}/gorevler`); setGorevler(Array.isArray(r.data) ? r.data : []); } catch(e) { setGorevler([]); }
+    try { const r = await axios.get(`${API}/mesajlar`); setMesajlar(Array.isArray(r.data) ? r.data : []); } catch(e) { setMesajlar([]); }
+    try { const r = await axios.get(`${API}/mesajlar/okunmamis-sayisi`); setOkunmamisSayisi(r.data?.sayi || 0); } catch(e) {}
+    try { const r = await axios.get(`${API}/auth/users`); setKullanicilar(Array.isArray(r.data) ? r.data : []); } catch(e) { setKullanicilar([]); }
   }, [ogretmenId]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
@@ -3794,17 +3793,17 @@ function OgrenciPaneli({ user, logout }) {
 
   const fetchAll = useCallback(async () => {
     try { const r = await axios.get(`${API}/ogrenci-panel/profil`); setProfil(r.data); } catch(e) {}
-    try { const r = await axios.get(`${API}/ogrenci-panel/gorevler`); setGorevler(r.data); } catch(e) {}
-    try { const r = await axios.get(`${API}/reading-logs/${ogrenciId}`); setOkumaKayitlari(r.data); } catch(e) {}
+    try { const r = await axios.get(`${API}/ogrenci-panel/gorevler`); setGorevler(Array.isArray(r.data) ? r.data : []); } catch(e) { setGorevler([]); }
+    try { const r = await axios.get(`${API}/reading-logs/${ogrenciId}`); setOkumaKayitlari(Array.isArray(r.data) ? r.data : []); } catch(e) { setOkumaKayitlari([]); }
     try { const r = await axios.get(`${API}/reading-logs/${ogrenciId}/istatistik`); setIstatistik(r.data); } catch(e) {}
     try { const r = await axios.get(`${API}/ogrenci-panel/siralama`); setSiralama(r.data); } catch(e) {}
     try { const r = await axios.get(`${API}/xp/durum/${ogrenciId}`); setXpDurum(r.data); } catch(e) {}
     try { const r = await axios.get(`${API}/xp/lig-siralama`); setLigSiralama(r.data); } catch(e) {}
-    try { const r = await axios.get(`${API}/mesajlar`); setMesajlar(r.data); } catch(e) {}
-    try { const r = await axios.get(`${API}/mesajlar/okunmamis-sayisi`); setOkunmamisSayisi(r.data.sayi); } catch(e) {}
-    try { const r = await axios.get(`${API}/egzersiz/puanlar`); setEgzersizPuanlari(r.data); } catch(e) {}
-    try { const r = await axios.get(`${API}/gelisim/icerik`); setGelisimIcerikleri(r.data.filter(i => i.durum === "yayinda" && (i.hedef_kitle === "hepsi" || i.hedef_kitle === "ogrenci"))); } catch(e) {}
-    try { const r = await axios.get(`${API}/gelisim/tamamlama/${user.id}`); setGelisimTamamlananlar(r.data); } catch(e) {}
+    try { const r = await axios.get(`${API}/mesajlar`); setMesajlar(Array.isArray(r.data) ? r.data : []); } catch(e) { setMesajlar([]); }
+    try { const r = await axios.get(`${API}/mesajlar/okunmamis-sayisi`); setOkunmamisSayisi(r.data?.sayi || 0); } catch(e) {}
+    try { const r = await axios.get(`${API}/egzersiz/puanlar`); setEgzersizPuanlari(r.data || {}); } catch(e) {}
+    try { const r = await axios.get(`${API}/gelisim/icerik`); const d = Array.isArray(r.data) ? r.data : []; setGelisimIcerikleri(d.filter(i => i.durum === "yayinda" && (i.hedef_kitle === "hepsi" || i.hedef_kitle === "ogrenci"))); } catch(e) { setGelisimIcerikleri([]); }
+    try { const r = await axios.get(`${API}/gelisim/tamamlama/${user.id}`); setGelisimTamamlananlar(Array.isArray(r.data) ? r.data : []); } catch(e) { setGelisimTamamlananlar([]); }
   }, [ogrenciId, user.id]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
@@ -4134,9 +4133,9 @@ function MesajlarPanel({ user }) {
   const [filtre, setFiltre] = useState("hepsi"); // hepsi, okunmamis
 
   const fetchAll = useCallback(async () => {
-    try { const r = await axios.get(`${API}/mesajlar`); setMesajlar(r.data); } catch(e) {}
-    try { const r = await axios.get(`${API}/mesajlar/okunmamis-sayisi`); setOkunmamisSayisi(r.data.sayi); } catch(e) {}
-    try { const r = await axios.get(`${API}/auth/users`); setKullanicilar(r.data); } catch(e) {}
+    try { const r = await axios.get(`${API}/mesajlar`); setMesajlar(Array.isArray(r.data) ? r.data : []); } catch(e) { setMesajlar([]); }
+    try { const r = await axios.get(`${API}/mesajlar/okunmamis-sayisi`); setOkunmamisSayisi(r.data?.sayi || 0); } catch(e) {}
+    try { const r = await axios.get(`${API}/auth/users`); setKullanicilar(Array.isArray(r.data) ? r.data : []); } catch(e) { setKullanicilar([]); }
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
@@ -4321,37 +4320,36 @@ function VeliPaneli({ user, logout }) {
     const fetchCocuklar = async () => {
       try {
         const r = await axios.get(`${API}/students`);
-        // Velinin linked_id'si veya veli_telefon eşleşmesi
+        const data = Array.isArray(r.data) ? r.data : [];
         const linkedId = user.linked_id;
         let cocuklist = [];
         if (linkedId) {
-          cocuklist = r.data.filter(s => s.id === linkedId);
+          cocuklist = data.filter(s => s.id === linkedId);
         }
         if (cocuklist.length === 0) {
-          // telefon eşleşmesi
-          cocuklist = r.data.filter(s => s.veli_telefon && user.telefon && s.veli_telefon === user.telefon);
+          cocuklist = data.filter(s => s.veli_telefon && user.telefon && s.veli_telefon === user.telefon);
         }
         setCocuklar(cocuklist);
         if (cocuklist.length > 0 && !seciliCocuk) setSeciliCocuk(cocuklist[0]);
-      } catch(e) {}
+      } catch(e) { setCocuklar([]); }
     };
     fetchCocuklar();
   }, [user]);
 
   const fetchCocukVerileri = useCallback(async () => {
     if (!seciliCocuk) return;
-    try { const r = await axios.get(`${API}/reading-logs/${seciliCocuk.id}`); setOkumaKayitlari(r.data); } catch(e) {}
+    try { const r = await axios.get(`${API}/reading-logs/${seciliCocuk.id}`); setOkumaKayitlari(Array.isArray(r.data) ? r.data : []); } catch(e) { setOkumaKayitlari([]); }
     try { const r = await axios.get(`${API}/reading-logs/${seciliCocuk.id}/istatistik`); setIstatistik(r.data); } catch(e) {}
-    try { const r = await axios.get(`${API}/gorevler?hedef_id=${seciliCocuk.id}&hedef_tip=ogrenci`); setGorevler(r.data); } catch(e) {}
+    try { const r = await axios.get(`${API}/gorevler?hedef_id=${seciliCocuk.id}&hedef_tip=ogrenci`); setGorevler(Array.isArray(r.data) ? r.data : []); } catch(e) { setGorevler([]); }
   }, [seciliCocuk]);
 
   useEffect(() => { fetchCocukVerileri(); }, [fetchCocukVerileri]);
 
   // Mesajlar
   useEffect(() => {
-    axios.get(`${API}/mesajlar`).then(r => setMesajlar(r.data)).catch(() => {});
-    axios.get(`${API}/mesajlar/okunmamis-sayisi`).then(r => setOkunmamisSayisi(r.data.sayi)).catch(() => {});
-    axios.get(`${API}/auth/users`).then(r => setKullanicilar(r.data.filter(u => u.role === "teacher" || u.role === "admin" || u.role === "coordinator"))).catch(() => {});
+    axios.get(`${API}/mesajlar`).then(r => setMesajlar(Array.isArray(r.data) ? r.data : [])).catch(() => { setMesajlar([]); });
+    axios.get(`${API}/mesajlar/okunmamis-sayisi`).then(r => setOkunmamisSayisi(r.data?.sayi || 0)).catch(() => {});
+    axios.get(`${API}/auth/users`).then(r => { const d = Array.isArray(r.data) ? r.data : []; setKullanicilar(d.filter(u => u.role === "teacher" || u.role === "admin" || u.role === "coordinator")); }).catch(() => {});
   }, []);
 
   const mesajGonder = async (e) => {
@@ -4536,7 +4534,7 @@ function GorevYonetimi({ user, students, teachers }) {
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const fetchGelisimIcerikleri = async () => {
-    try { const r = await axios.get(`${API}/gelisim/icerik`); setGelisimIcerikleri(r.data.filter(i => i.durum === "yayinda")); } catch(e) {}
+    try { const r = await axios.get(`${API}/gelisim/icerik`); const gd = Array.isArray(r.data) ? r.data : []; setGelisimIcerikleri(gd.filter(i => i.durum === "yayinda")); } catch(e) {}
   };
 
   const turIcon = (tur) => ({ ozel: "📝", film: "🎬", kitap: "📚", makale: "📄", hizmetici: "🎓", egzersiz: "🎯" }[tur] || "📋");
@@ -4603,7 +4601,7 @@ function GorevYonetimi({ user, students, teachers }) {
   const [ogretmenUsers, setOgretmenUsers] = useState([]);
   useEffect(() => {
     if (user.role === "admin" || user.role === "coordinator") {
-      axios.get(`${API}/auth/users`).then(r => setOgretmenUsers(r.data.filter(u => u.role === "teacher" || u.role === "coordinator"))).catch(() => {});
+      axios.get(`${API}/auth/users`).then(r => { const d = Array.isArray(r.data) ? r.data : []; setOgretmenUsers(d.filter(u => u.role === "teacher" || u.role === "coordinator")); }).catch(() => {});
     }
   }, [user.role]);
 
