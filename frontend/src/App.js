@@ -1247,13 +1247,13 @@ function BekleyenlerKarti({ bekleyenler, onRefresh, onTabChange }) {
                   {isAcik && (
                     <div className="p-4 bg-white border-t space-y-3">
                       {/* İçerik detayı */}
-                      {item.aciklama && <p className="text-sm text-gray-700">{item.aciklama}</p>}
+                      {item.aciklama && <div className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3 whitespace-pre-wrap">{item.aciklama}</div>}
                       {item._tip === "metin" && item.icerik && <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-800 max-h-48 overflow-y-auto whitespace-pre-wrap">{item.icerik}</div>}
                       {item._tip === "metin" && (<div className="flex gap-4 text-xs text-gray-500"><span>Sınıf: {item.sinif_seviyesi}</span><span>Tür: {turLabel[item.tur] || item.tur}</span>{item.kelime_sayisi && <span>Kelime: {item.kelime_sayisi}</span>}</div>)}
                       {item._tip === "gelisim" && item.makale_link && <a href={item.makale_link} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline block">📎 {item.makale_dosya_turu === "link" ? "Makale Linki" : "Dosya Linki"}</a>}
                       {item._tip === "gelisim" && item.hedef_kitle && <div className="text-xs text-gray-500">Hedef: {({"hepsi":"Herkes","ogretmen":"Öğretmenler","ogrenci":"Öğrenciler"})[item.hedef_kitle] || item.hedef_kitle}</div>}
                       {item._tip === "kitap" && (<div className="flex gap-4 text-xs text-gray-500">{item.yazar && <span>Yazar: {item.yazar}</span>}{item.yayinevi && <span>Yayınevi: {item.yayinevi}</span>}{item.sayfa_sayisi && <span>Sayfa: {item.sayfa_sayisi}</span>}</div>)}
-                      {item.sorular?.length > 0 && (<div className="bg-blue-50 rounded-lg p-3"><div className="text-xs font-medium text-blue-700 mb-2">📝 {item.sorular.length} Test Sorusu</div>{item.sorular.map((s, i) => (<div key={i} className="text-xs text-gray-700 mb-1"><strong>{i+1}.</strong> {s.soru}</div>))}</div>)}
+                      {item.sorular?.length > 0 && (<div className="bg-blue-50 rounded-lg p-3"><div className="text-xs font-medium text-blue-700 mb-2">📝 {item.sorular.length} Test Sorusu</div>{item.sorular.map((s, i) => (<div key={i} className="text-sm text-gray-700 mb-3 pb-3 border-b border-blue-100 last:border-0"><div className="font-medium mb-1">{i+1}. {s.soru}</div><div className="grid grid-cols-2 gap-1 ml-4">{(s.secenekler || []).map((sec, j) => (<div key={j} className={`text-xs px-2 py-1 rounded ${j === s.dogru_cevap ? 'bg-green-100 text-green-700 font-bold' : 'bg-white text-gray-600'}`}>{['A','B','C','D'][j]}) {sec}</div>))}</div></div>))}</div>)}
 
                       {/* Oylama durumu */}
                       {!isBekleyen && Object.keys(item.oylar || {}).length > 0 && (
@@ -5357,11 +5357,11 @@ function GelisimAlani({ user }) {
                         </div>
                         {isAcik && (
                           <div className="px-5 pb-3 space-y-3 border-t border-yellow-100 pt-3">
-                            {icerik.aciklama && <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3">{icerik.aciklama}</p>}
+                            {icerik.aciklama && <div className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3 whitespace-pre-wrap">{icerik.aciklama}</div>}
                             {icerik.makale_link && <a href={icerik.makale_link} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline block">📎 {icerik.makale_link}</a>}
                             {icerik.kitap_yazar && <div className="text-sm text-gray-600">📚 Yazar: {icerik.kitap_yazar}</div>}
                             {icerik.kitap_kapak && <img src={icerik.kitap_kapak} alt="Kapak" className="h-28 rounded-lg shadow" onError={e => { e.target.style.display='none'; }} />}
-                            {icerik.sorular?.length > 0 && (<div className="bg-blue-50 rounded-lg p-3"><div className="text-xs font-medium text-blue-700 mb-2">📝 {icerik.sorular.length} Test Sorusu</div>{icerik.sorular.map((s, i) => (<div key={i} className="text-xs text-gray-700 mb-1"><strong>{i+1}.</strong> {s.soru}</div>))}</div>)}
+                            {icerik.sorular?.length > 0 && (<div className="bg-blue-50 rounded-lg p-3"><div className="text-xs font-medium text-blue-700 mb-2">📝 {icerik.sorular.length} Test Sorusu</div>{icerik.sorular.map((s, i) => (<div key={i} className="text-sm text-gray-700 mb-3 pb-3 border-b border-blue-100 last:border-0"><div className="font-medium mb-1">{i+1}. {s.soru}</div><div className="grid grid-cols-2 gap-1 ml-4">{(s.secenekler || []).map((sec, j) => (<div key={j} className={`text-xs px-2 py-1 rounded ${j === s.dogru_cevap ? 'bg-green-100 text-green-700 font-bold' : 'bg-white text-gray-600'}`}>{['A','B','C','D'][j]}) {sec}</div>))}</div></div>))}</div>)}
                             <div className="text-xs text-gray-400">Hedef: {({"hepsi":"Herkes","ogretmen":"Öğretmenler","ogrenci":"Öğrenciler"})[icerik.hedef_kitle] || icerik.hedef_kitle}</div>
                           </div>
                         )}
@@ -5409,12 +5409,12 @@ function GelisimAlani({ user }) {
                         {/* Detay - açılır */}
                         {isAcik && (
                           <div className="px-5 pb-5 space-y-3 border-t border-blue-100 pt-3">
-                            {icerik.aciklama && <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3">{icerik.aciklama}</p>}
+                            {icerik.aciklama && <div className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3 whitespace-pre-wrap">{icerik.aciklama}</div>}
                             {icerik.makale_link && <a href={icerik.makale_link} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline block">📎 {icerik.makale_dosya_turu === "link" ? "Makale Linki" : "Dosya Linki"}: {icerik.makale_link}</a>}
                             {icerik.kitap_yazar && <div className="text-sm text-gray-600">📚 Yazar: {icerik.kitap_yazar}</div>}
                             {icerik.kitap_yayinevi && <div className="text-sm text-gray-600">🏢 Yayınevi: {icerik.kitap_yayinevi}</div>}
                             {icerik.kitap_kapak && <img src={icerik.kitap_kapak} alt="Kapak" className="h-28 rounded-lg shadow" onError={e => { e.target.style.display='none'; }} />}
-                            {icerik.sorular?.length > 0 && (<div className="bg-blue-50 rounded-lg p-3"><div className="text-xs font-medium text-blue-700 mb-2">📝 {icerik.sorular.length} Test Sorusu</div>{icerik.sorular.map((s, i) => (<div key={i} className="text-xs text-gray-700 mb-1"><strong>{i+1}.</strong> {s.soru} <span className="text-gray-400">(Doğru: {['A','B','C','D'][s.dogru_cevap]})</span></div>))}</div>)}
+                            {icerik.sorular?.length > 0 && (<div className="bg-blue-50 rounded-lg p-3"><div className="text-xs font-medium text-blue-700 mb-2">📝 {icerik.sorular.length} Test Sorusu</div>{icerik.sorular.map((s, i) => (<div key={i} className="text-sm text-gray-700 mb-3 pb-3 border-b border-blue-100 last:border-0"><div className="font-medium mb-1">{i+1}. {s.soru}</div><div className="grid grid-cols-2 gap-1 ml-4">{(s.secenekler || []).map((sec, j) => (<div key={j} className={`text-xs px-2 py-1 rounded ${j === s.dogru_cevap ? 'bg-green-100 text-green-700 font-bold' : 'bg-white text-gray-600'}`}>{['A','B','C','D'][j]}) {sec}</div>))}</div></div>))}</div>)}
                             <div className="text-xs text-gray-400">Hedef: {({"hepsi":"Herkes","ogretmen":"Öğretmenler","ogrenci":"Öğrenciler"})[icerik.hedef_kitle] || icerik.hedef_kitle} • Eklenme: {new Date(icerik.olusturma_tarihi).toLocaleDateString("tr-TR")}</div>
                           </div>
                         )}
