@@ -21,6 +21,7 @@ import { saveAs } from 'file-saver';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
+const LIG_ESIKLERI_FE = { bronz: 0, gumus: 200, altin: 500, elmas: 1000 };
 
 function roleLabel(role) {
   const labels = { admin: "Yönetici", coordinator: "Koordinatör", teacher: "Öğretmen", student: "Öğrenci", parent: "Veli" };
@@ -3459,6 +3460,8 @@ function OgrenciPaneli({ user, logout }) {
   const [okumaKayitlari, setOkumaKayitlari] = useState([]);
   const [istatistik, setIstatistik] = useState(null);
   const [siralama, setSiralama] = useState(null);
+  const [xpDurum, setXpDurum] = useState(null);
+  const [ligSiralama, setLigSiralama] = useState(null);
   const [aktifSekme, setAktifSekme] = useState("ana");
   const [gelisimAltSekme, setGelisimAltSekme] = useState("icerikler"); // icerikler, egzersizler, okumalarim
   const [aktifEkran, setAktifEkran] = useState(null);
@@ -3484,6 +3487,8 @@ function OgrenciPaneli({ user, logout }) {
     try { const r = await axios.get(`${API}/reading-logs/${ogrenciId}`); setOkumaKayitlari(r.data); } catch(e) {}
     try { const r = await axios.get(`${API}/reading-logs/${ogrenciId}/istatistik`); setIstatistik(r.data); } catch(e) {}
     try { const r = await axios.get(`${API}/ogrenci-panel/siralama`); setSiralama(r.data); } catch(e) {}
+    try { const r = await axios.get(`${API}/xp/durum/${ogrenciId}`); setXpDurum(r.data); } catch(e) {}
+    try { const r = await axios.get(`${API}/xp/lig-siralama`); setLigSiralama(r.data); } catch(e) {}
     try { const r = await axios.get(`${API}/mesajlar`); setMesajlar(r.data); } catch(e) {}
     try { const r = await axios.get(`${API}/mesajlar/okunmamis-sayisi`); setOkunmamisSayisi(r.data.sayi); } catch(e) {}
     try { const r = await axios.get(`${API}/egzersiz/puanlar`); setEgzersizPuanlari(r.data); } catch(e) {}
@@ -3517,12 +3522,15 @@ function OgrenciPaneli({ user, logout }) {
     const dk = Math.max(1, Math.round(okumaSuresi / 60));
     try {
       await axios.post(`${API}/reading-logs`, { ...neOkudunForm, baslangic_sayfa: neOkudunForm.baslangic_sayfa ? parseInt(neOkudunForm.baslangic_sayfa) : null, bitis_sayfa: neOkudunForm.bitis_sayfa ? parseInt(neOkudunForm.bitis_sayfa) : null, sure_dakika: dk });
-      toast({ title: `🌳 ${dk} dakika okuma kaydedildi!` }); setOkumaSuresi(0); setAgaclar([]); setAktifEkran(null); fetchAll();
+      toast({ title: `🌳 ${dk} dakika okuma kaydedildi!` }); setOkumaSuresi(0); setAgaclar([]); setAktifEkran(null);
+      // Otomatik XP kazan
+      try { await axios.post(`${API}/xp/kazan`, { eylem: "okuma_gorevi" }); } catch(e) {}
+      fetchAll();
     } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
   };
 
-  const gorevTamamla = async (id) => { try { await axios.put(`${API}/gorevler/${id}/durum`, { durum: "tamamlandi" }); toast({ title: "✅ Görev tamamlandı!" }); fetchAll(); } catch(e) { toast({ title: "Hata", variant: "destructive" }); } };
-  const gelisimTamamla = async (id) => { try { const r = await axios.post(`${API}/gelisim/tamamla`, { icerik_id: id, kullanici_id: user.id }); toast({ title: `+${r.data.puan} puan kazandın!` }); fetchAll(); } catch(e) { toast({ title: e.response?.data?.detail || "Hata", variant: "destructive" }); } };
+  const gorevTamamla = async (id) => { try { await axios.put(`${API}/gorevler/${id}/durum`, { durum: "tamamlandi" }); toast({ title: "✅ Görev tamamlandı!" }); try { await axios.post(`${API}/xp/kazan`, { eylem: "gorev_tamamla" }); } catch(e) {} fetchAll(); } catch(e) { toast({ title: "Hata", variant: "destructive" }); } };
+  const gelisimTamamla = async (id) => { try { const r = await axios.post(`${API}/gelisim/tamamla`, { icerik_id: id, kullanici_id: user.id }); toast({ title: `+${r.data.puan} puan kazandın!` }); try { await axios.post(`${API}/xp/kazan`, { eylem: "gelisim_tamamla" }); } catch(e) {} fetchAll(); } catch(e) { toast({ title: e.response?.data?.detail || "Hata", variant: "destructive" }); } };
 
   const mesajGonder = async (e) => {
     e.preventDefault();
@@ -3636,15 +3644,27 @@ function OgrenciPaneli({ user, logout }) {
 
         {/* ═══ ANA SAYFA ═══ */}
         {aktifSekme === "ana" && (<>
-          {/* Seviye + ilerleme */}
-          <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl p-4 text-white">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-lg font-bold">{seviyeEmoji} Seviye {seviye}</div>
-              <div className="text-sm opacity-80">{seviyeIlerleme}/100 dk</div>
+          {/* XP + Lig Durumu */}
+          {xpDurum && (
+            <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl p-4 text-white">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-lg font-bold">{xpDurum.lig_label}</div>
+                <div className="text-sm opacity-80">{xpDurum.toplam_xp} XP</div>
+              </div>
+              {xpDurum.sonraki_lig && (<>
+                <div className="bg-white/20 rounded-full h-2.5 overflow-hidden"><div className="h-full bg-white rounded-full transition-all" style={{ width: `${Math.min(100, ((xpDurum.toplam_xp - (LIG_ESIKLERI_FE[xpDurum.lig] || 0)) / Math.max(1, xpDurum.sonraki_esik - (LIG_ESIKLERI_FE[xpDurum.lig] || 0))) * 100)}%` }} /></div>
+                <p className="text-xs opacity-70 mt-1">{xpDurum.kalan_xp} XP daha → {({"gumus":"🥈 Gümüş","altin":"🥇 Altın","elmas":"💎 Elmas"})[xpDurum.sonraki_lig]}</p>
+              </>)}
+              {!xpDurum.sonraki_lig && <p className="text-xs opacity-80 mt-1">En yüksek lige ulaştın! 🎉</p>}
             </div>
-            <div className="bg-white/20 rounded-full h-2.5 overflow-hidden"><div className="h-full bg-white rounded-full transition-all" style={{ width: `${seviyeIlerleme}%` }} /></div>
-            <p className="text-xs opacity-70 mt-1">Sonraki seviye için {100 - seviyeIlerleme} dakika daha oku</p>
-          </div>
+          )}
+          {!xpDurum && (
+            <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl p-4 text-white">
+              <div className="text-lg font-bold">{seviyeEmoji} Seviye {seviye}</div>
+              <div className="bg-white/20 rounded-full h-2.5 overflow-hidden mt-2"><div className="h-full bg-white rounded-full" style={{ width: `${seviyeIlerleme}%` }} /></div>
+              <p className="text-xs opacity-70 mt-1">Sonraki seviye için {100 - seviyeIlerleme} dk oku</p>
+            </div>
+          )}
 
           {/* 2x3 istatistik grid */}
           <div className="grid grid-cols-3 gap-2">
@@ -3672,10 +3692,10 @@ function OgrenciPaneli({ user, logout }) {
 
           {/* Sıralama + Öğretmen yan yana */}
           <div className="grid grid-cols-2 gap-3">
-            {siralama && (<div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-2xl p-4 border border-yellow-100 cursor-pointer" onClick={() => setAktifSekme("siralama")}>
+            {(ligSiralama || siralama) && (<div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-2xl p-4 border border-yellow-100 cursor-pointer" onClick={() => setAktifSekme("siralama")}>
               <div className="text-xs font-medium text-yellow-800">🏆 Sıralaman</div>
-              <div className="text-3xl font-bold text-orange-600 mt-1">{siralama.benim_siram}.</div>
-              <div className="text-[10px] text-gray-500">{siralama.toplam_ogrenci} öğrenci</div>
+              <div className="text-3xl font-bold text-orange-600 mt-1">{ligSiralama?.benim_siram || siralama?.benim_siram || "—"}.</div>
+              <div className="text-[10px] text-gray-500">{xpDurum ? `${xpDurum.toplam_xp} XP` : `${ligSiralama?.toplam || siralama?.toplam_ogrenci || 0} öğrenci`}</div>
             </div>)}
             {profil?.ogretmen_bilgi && (<div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-4 border border-blue-100 cursor-pointer" onClick={() => setAktifSekme("mesajlar")}>
               <div className="text-xs font-medium text-blue-800">👩‍🏫 Öğretmenin</div>
@@ -3738,12 +3758,21 @@ function OgrenciPaneli({ user, logout }) {
           </>)}
         </div>)}
 
-        {/* ═══ SIRALAMA ═══ */}
-        {aktifSekme === "siralama" && (<div className="space-y-4"><h2 className="text-lg font-bold">🏆 Okuma Sıralaması</h2><p className="text-xs text-gray-500">Toplam okuma dakikasına göre</p>
-          {siralama && siralama.siralama.length > 0 ? (<div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
-            {siralama.siralama.map((s, i) => (<div key={i} className={`flex items-center justify-between px-4 py-3 ${s.ben ? 'bg-orange-50 border-l-4 border-l-orange-500 font-bold' : i%2===0 ? 'bg-white' : 'bg-gray-50'} ${i>0 ? 'border-t border-gray-100' : ''}`}>
-              <div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${s.sira<=3 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'}`}>{s.sira===1?"🥇":s.sira===2?"🥈":s.sira===3?"🥉":s.sira}</div><span className={`text-sm ${s.ben ? 'text-orange-700' : 'text-gray-700'}`}>{s.ad}</span></div>
-              <span className={`text-sm font-medium ${s.ben ? 'text-orange-600' : 'text-gray-500'}`}>{s.dakika} dk</span>
+        {/* ═══ SIRALAMA (XP Lig Bazlı) ═══ */}
+        {aktifSekme === "siralama" && (<div className="space-y-4">
+          <h2 className="text-lg font-bold">🏆 Lig Sıralaması</h2>
+          {xpDurum && (<div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-2xl p-4 border border-yellow-100 flex items-center justify-between">
+            <div><div className="text-2xl font-bold">{xpDurum.lig_label}</div><div className="text-sm text-gray-600">{xpDurum.toplam_xp} XP</div></div>
+            {xpDurum.sonraki_lig && <div className="text-right"><div className="text-xs text-gray-500">Sonraki: {({"gumus":"🥈 Gümüş","altin":"🥇 Altın","elmas":"💎 Elmas"})[xpDurum.sonraki_lig]}</div><div className="text-sm font-bold text-orange-600">{xpDurum.kalan_xp} XP kaldı</div></div>}
+          </div>)}
+          {xpDurum?.son_xp?.length > 0 && (<div className="bg-white rounded-2xl p-3 shadow-sm border"><div className="text-xs font-medium text-gray-500 mb-2">Son Kazanımlar</div>
+            {xpDurum.son_xp.slice(0,5).map((x,i) => (<div key={i} className="flex items-center justify-between py-1 text-xs"><span className="text-gray-600">{({"okuma_gorevi":"📖 Okuma","anlama_testi":"📝 Test","egzersiz":"🎯 Egzersiz","gorev_tamamla":"✅ Görev","gelisim_tamamla":"🎓 Gelişim","kitap_bitirme":"📚 Kitap","gunluk_streak":"🔥 Streak"})[x.eylem] || x.eylem}</span><span className="font-bold text-green-600">+{x.xp} XP</span></div>))}
+          </div>)}
+          <p className="text-xs text-gray-500">Toplam XP'ye göre sıralama</p>
+          {ligSiralama && ligSiralama.siralama.length > 0 ? (<div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
+            {ligSiralama.siralama.map((s, i) => (<div key={i} className={`flex items-center justify-between px-4 py-3 ${s.ben ? 'bg-orange-50 border-l-4 border-l-orange-500 font-bold' : i%2===0 ? 'bg-white' : 'bg-gray-50'} ${i>0 ? 'border-t border-gray-100' : ''}`}>
+              <div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${s.sira<=3 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'}`}>{s.sira===1?"🥇":s.sira===2?"🥈":s.sira===3?"🥉":s.sira}</div><span className={`text-sm ${s.ben ? 'text-orange-700' : 'text-gray-700'}`}>{s.ad}</span><span className="text-xs">{s.lig_label}</span></div>
+              <span className={`text-sm font-medium ${s.ben ? 'text-orange-600' : 'text-gray-500'}`}>{s.xp} XP</span>
             </div>))}
           </div>) : (<div className="text-center py-12"><div className="text-5xl mb-3">🏆</div><p className="text-gray-500">Henüz yeterli veri yok</p></div>)}
         </div>)}
