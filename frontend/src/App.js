@@ -1174,114 +1174,113 @@ function AppContent() {
 // ── DASHBOARD: ONAY BEKLEYENLERKarti ──
 function BekleyenlerKarti({ bekleyenler, onRefresh, onTabChange }) {
   const { toast } = useToast();
+  const [acikDetay, setAcikDetay] = useState(null);
 
   const adminKararMetin = async (id, onay, direkt = false) => {
-    try {
-      await axios.post(`${API}/diagnostic/texts/${id}/admin-karar`, { onay, direkt });
-      toast({ title: direkt ? "✅ Direkt havuza alındı" : onay ? "🗳️ Oylama başlatıldı" : "❌ Reddedildi" });
-      onRefresh();
-    } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
+    try { await axios.post(`${API}/diagnostic/texts/${id}/admin-karar`, { onay, direkt }); toast({ title: direkt ? "✅ Direkt havuza alındı" : onay ? "🗳️ Oylama başlatıldı" : "❌ Reddedildi" }); onRefresh(); }
+    catch(e) { toast({ title: "Hata", variant: "destructive" }); }
   };
-
   const adminKararGelisim = async (id, onay, direkt = false) => {
-    try {
-      await axios.post(`${API}/gelisim/icerik/${id}/admin-karar`, { onay, direkt });
-      toast({ title: direkt ? "✅ Direkt yayına alındı" : onay ? "🗳️ Oylama başlatıldı" : "❌ Reddedildi" });
-      onRefresh();
-    } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
+    try { await axios.post(`${API}/gelisim/icerik/${id}/admin-karar`, { onay, direkt }); toast({ title: direkt ? "✅ Direkt yayına alındı" : onay ? "🗳️ Oylama başlatıldı" : "❌ Reddedildi" }); onRefresh(); }
+    catch(e) { toast({ title: "Hata", variant: "destructive" }); }
+  };
+  const adminKararKitap = async (id, onay, direkt = false) => {
+    try { await axios.post(`${API}/kitaplar/${id}/admin-karar`, { onay, direkt }); toast({ title: direkt ? "✅ Direkt onaylandı" : onay ? "🗳️ Oylama başlatıldı" : "❌ Reddedildi" }); onRefresh(); }
+    catch(e) { toast({ title: "Hata", variant: "destructive" }); }
   };
 
-  const turLabel = { hikaye: "Hikaye", bilgilendirici: "Bilgilendirici", siir: "Şiir", hizmetici: "Hizmetiçi", film: "Film", kitap: "Kitap" };
-
-  const satir = (item, tip) => {
-    const isMetin = tip === "metin";
-    const isBekleyen = (isMetin ? item.durum : item.durum) === "beklemede";
-    return (
-      <div key={item.id} className={`flex items-center justify-between p-3 rounded-xl border ${isBekleyen ? 'border-yellow-200 bg-yellow-50' : 'border-blue-100 bg-blue-50'}`}>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${isBekleyen ? 'bg-yellow-200 text-yellow-800' : 'bg-blue-200 text-blue-800'}`}>
-              {isMetin ? "📄 Metin" : "📚 Gelişim"}
-            </span>
-            <span className={`text-xs px-2 py-0.5 rounded-full ${isBekleyen ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'}`}>
-              {isBekleyen ? "⏳ Onay Bekliyor" : "🗳️ Oylamada"}
-            </span>
-          </div>
-          <div className="font-semibold text-sm text-gray-800 mt-1 truncate">{item.baslik}</div>
-          <div className="text-xs text-gray-500">
-            {item.ekleyen_ad} •{" "}
-            {isMetin ? `${item.sinif_seviyesi}. Sınıf • ${turLabel[item.tur] || item.tur}` : turLabel[item.tur] || item.tur}
-            {" • "}{new Date(item.olusturma_tarihi).toLocaleDateString("tr-TR")}
-          </div>
-        </div>
-        {isBekleyen && (
-          <div className="flex gap-1 ml-3 shrink-0">
-            <button onClick={() => isMetin ? adminKararMetin(item.id, true, true) : adminKararGelisim(item.id, true, true)}
-              className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-medium transition-colors">
-              ✅ Direkt
-            </button>
-            <button onClick={() => isMetin ? adminKararMetin(item.id, true, false) : adminKararGelisim(item.id, true, false)}
-              className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors">
-              🗳️ Oylama
-            </button>
-            <button onClick={() => isMetin ? adminKararMetin(item.id, false) : adminKararGelisim(item.id, false)}
-              className="px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-medium transition-colors">
-              ❌
-            </button>
-          </div>
-        )}
-        {!isBekleyen && (
-          <div className="ml-3 text-xs text-blue-600 font-medium shrink-0">
-            {Object.keys(item.oylar || {}).length} oy
-          </div>
-        )}
-      </div>
-    );
-  };
+  const turLabel = { hikaye: "Hikaye", bilgilendirici: "Bilgilendirici", siir: "Şiir", hizmetici: "Hizmetiçi", film: "Film", kitap: "Kitap", makale: "Makale" };
+  const tipRenk = { metin: "bg-blue-100 text-blue-700", gelisim: "bg-purple-100 text-purple-700", kitap: "bg-green-100 text-green-700" };
+  const tipIcon = { metin: "📄", gelisim: "🎓", kitap: "📚" };
+  const tipLabel = { metin: "Metin", gelisim: "Gelişim", kitap: "Kitap" };
 
   const tumListe = [
-    ...bekleyenler.metin_bekleyen.map(i => ({ ...i, _tip: "metin" })),
-    ...bekleyenler.gelisim_bekleyen.map(i => ({ ...i, _tip: "gelisim" })),
-    ...bekleyenler.metin_oylama.map(i => ({ ...i, _tip: "metin" })),
-    ...bekleyenler.gelisim_oylama.map(i => ({ ...i, _tip: "gelisim" })),
+    ...(bekleyenler.metin_bekleyen || []).map(i => ({ ...i, _tip: "metin" })),
+    ...(bekleyenler.gelisim_bekleyen || []).map(i => ({ ...i, _tip: "gelisim" })),
+    ...(bekleyenler.kitap_bekleyen || []).map(i => ({ ...i, _tip: "kitap" })),
+    ...(bekleyenler.metin_oylama || []).map(i => ({ ...i, _tip: "metin" })),
+    ...(bekleyenler.gelisim_oylama || []).map(i => ({ ...i, _tip: "gelisim" })),
+    ...(bekleyenler.kitap_oylama || []).map(i => ({ ...i, _tip: "kitap" })),
   ];
+
+  const karar = (item) => {
+    if (item._tip === "metin") return { onayla: (d) => adminKararMetin(item.id, true, d), reddet: () => adminKararMetin(item.id, false) };
+    if (item._tip === "kitap") return { onayla: (d) => adminKararKitap(item.id, true, d), reddet: () => adminKararKitap(item.id, false) };
+    return { onayla: (d) => adminKararGelisim(item.id, true, d), reddet: () => adminKararGelisim(item.id, false) };
+  };
 
   return (
     <Card className="border-2 border-orange-200 shadow-sm">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-red-500 rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold text-sm">{bekleyenler.toplam}</span>
-            </div>
-            <div>
-              <div className="text-base font-bold">Onay Bekleyenler</div>
-              <div className="text-xs text-gray-500 font-normal">
-                {bekleyenler.metin_bekleyen.length + bekleyenler.gelisim_bekleyen.length} karar bekliyor •{" "}
-                {bekleyenler.metin_oylama.length + bekleyenler.gelisim_oylama.length} oylamada
-              </div>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={() => onTabChange("giris-analizi")}
-              className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-              📄 Metinler
-            </button>
-            <button onClick={() => onTabChange("gelisim")}
-              className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-              📚 Gelişim
-            </button>
+            <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-red-500 rounded-xl flex items-center justify-center"><span className="text-white font-bold text-sm">{bekleyenler.toplam}</span></div>
+            <div><div className="text-base font-bold">Onay Bekleyenler</div>
+              <div className="text-xs text-gray-500 font-normal">{(bekleyenler.metin_bekleyen?.length||0) + (bekleyenler.gelisim_bekleyen?.length||0) + (bekleyenler.kitap_bekleyen?.length||0)} karar • {(bekleyenler.metin_oylama?.length||0) + (bekleyenler.gelisim_oylama?.length||0) + (bekleyenler.kitap_oylama?.length||0)} oylama</div></div>
           </div>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-2 max-h-80 overflow-y-auto">
-        {tumListe.length === 0 && <p className="text-gray-400 text-sm text-center py-4">Bekleyen içerik yok</p>}
-        {tumListe.map(item => satir(item, item._tip))}
+      <CardContent>
+        {tumListe.length === 0 ? <p className="text-sm text-gray-500 text-center py-4">Bekleyen içerik yok</p> : (
+          <div className="space-y-2">
+            {tumListe.map(item => {
+              const isBekleyen = item.durum === "beklemede";
+              const isAcik = acikDetay === item.id;
+              const k = karar(item);
+              return (
+                <div key={item.id} className={`rounded-xl border overflow-hidden ${isBekleyen ? 'border-yellow-200' : 'border-blue-100'}`}>
+                  {/* Başlık satırı - tıklanabilir */}
+                  <div className={`flex items-center justify-between p-3 cursor-pointer ${isBekleyen ? 'bg-yellow-50 hover:bg-yellow-100' : 'bg-blue-50 hover:bg-blue-100'} transition-colors`}
+                    onClick={() => setAcikDetay(isAcik ? null : item.id)}>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${tipRenk[item._tip]}`}>{tipIcon[item._tip]} {tipLabel[item._tip]}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${isBekleyen ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'}`}>{isBekleyen ? "⏳ Onay" : `🗳️ ${Object.keys(item.oylar || {}).length} oy`}</span>
+                      </div>
+                      <div className="font-semibold text-sm text-gray-800 mt-1 truncate">{item.baslik}</div>
+                      <div className="text-xs text-gray-500">{item.ekleyen_ad} • {turLabel[item.tur] || item.tur} • {new Date(item.olusturma_tarihi).toLocaleDateString("tr-TR")}</div>
+                    </div>
+                    <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isAcik ? 'rotate-180' : ''}`} />
+                  </div>
+
+                  {/* Detay - açılır kapanır */}
+                  {isAcik && (
+                    <div className="p-4 bg-white border-t space-y-3">
+                      {/* İçerik detayı */}
+                      {item.aciklama && <p className="text-sm text-gray-700">{item.aciklama}</p>}
+                      {item._tip === "metin" && item.icerik && <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-800 max-h-48 overflow-y-auto whitespace-pre-wrap">{item.icerik}</div>}
+                      {item._tip === "metin" && (<div className="flex gap-4 text-xs text-gray-500"><span>Sınıf: {item.sinif_seviyesi}</span><span>Tür: {turLabel[item.tur] || item.tur}</span>{item.kelime_sayisi && <span>Kelime: {item.kelime_sayisi}</span>}</div>)}
+                      {item._tip === "gelisim" && item.makale_link && <a href={item.makale_link} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline block">📎 {item.makale_dosya_turu === "link" ? "Makale Linki" : "Dosya Linki"}</a>}
+                      {item._tip === "gelisim" && item.hedef_kitle && <div className="text-xs text-gray-500">Hedef: {({"hepsi":"Herkes","ogretmen":"Öğretmenler","ogrenci":"Öğrenciler"})[item.hedef_kitle] || item.hedef_kitle}</div>}
+                      {item._tip === "kitap" && (<div className="flex gap-4 text-xs text-gray-500">{item.yazar && <span>Yazar: {item.yazar}</span>}{item.yayinevi && <span>Yayınevi: {item.yayinevi}</span>}{item.sayfa_sayisi && <span>Sayfa: {item.sayfa_sayisi}</span>}</div>)}
+                      {item.sorular?.length > 0 && (<div className="bg-blue-50 rounded-lg p-3"><div className="text-xs font-medium text-blue-700 mb-2">📝 {item.sorular.length} Test Sorusu</div>{item.sorular.map((s, i) => (<div key={i} className="text-xs text-gray-700 mb-1"><strong>{i+1}.</strong> {s.soru}</div>))}</div>)}
+
+                      {/* Oylama durumu */}
+                      {!isBekleyen && Object.keys(item.oylar || {}).length > 0 && (
+                        <div className="bg-gray-50 rounded-lg p-3"><div className="text-xs font-medium text-gray-600 mb-1">Oylar ({Object.keys(item.oylar).length})</div>
+                          {Object.entries(item.oylar).map(([uid, oy]) => (<div key={uid} className="text-xs flex items-center gap-2">{oy.onay ? "✅" : "❌"} <span className="text-gray-500">{oy.sebep || "Onayladı"}</span></div>))}
+                        </div>
+                      )}
+
+                      {/* Karar butonları */}
+                      {isBekleyen && (
+                        <div className="flex gap-2 pt-2">
+                          <Button size="sm" className="bg-green-600 text-white flex-1" onClick={() => k.onayla(true)}>✅ Direkt Onayla</Button>
+                          <Button size="sm" className="bg-blue-600 text-white flex-1" onClick={() => k.onayla(false)}>🗳️ Oylamaya Al</Button>
+                          <Button size="sm" variant="destructive" className="flex-1" onClick={() => k.reddet()}>❌ Reddet</Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
 }
-
 
 // ── Sadece havuzdaki metinleri listele (analiz için) ──
 function MetinSecimListesi({ onMetinSec }) {
@@ -3863,7 +3862,10 @@ function OgretmenPaneli({ user, logout }) {
 
         {/* ═══ GÖREVLER ═══ */}
         {aktifSekme === "gorevler" && (<div className="space-y-4">
-          <h2 className="text-lg font-bold">📌 Görev Yönetimi</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold">📌 Görev Yönetimi</h2>
+            <Button size="sm" onClick={() => { setAktifSekme("ogrencilerim"); setGorevAtaGoster(true); }} className="bg-orange-500 text-white text-xs"><Plus className="h-3 w-3 mr-1" />Yeni Görev Ata</Button>
+          </div>
           {benimGorevlerim.filter(g => g.durum !== "tamamlandi").length > 0 && (<div className="bg-indigo-50 rounded-xl p-3 border border-indigo-100"><div className="text-sm font-medium text-indigo-700 mb-2">📌 Bana Atanan Görevler</div>{benimGorevlerim.filter(g => g.durum !== "tamamlandi").map(g => (<div key={g.id} className="flex items-center justify-between py-1"><span className="text-sm">{g.baslik}</span><Button size="sm" className="bg-green-600 text-white text-xs h-7" onClick={async () => { try { await axios.put(`${API}/gorevler/${g.id}/durum`, { durum: "tamamlandi" }); toast({ title: "✅ Tamamlandı" }); fetchAll(); } catch(e) {} }}>Tamamla</Button></div>))}</div>)}
           <h3 className="text-sm font-medium text-gray-500">Atadığım Görevler ({atadiklarim.length})</h3>
           {atadiklarim.length === 0 ? <p className="text-center text-gray-400 py-8">Henüz görev atamadınız</p> : atadiklarim.map(g => (
@@ -5001,9 +5003,11 @@ function GelisimAlani({ user }) {
     } catch(e) { console.error('Session error:', e.response?.data); toast({ title: "Hata", description: e.response?.data?.detail || "Hata", variant: "destructive" }); }
   };
 
-  const handleTamamla = async (testYapildi) => {
+  const handleTamamla = async (testYapildi, icerikParam = null) => {
+    const hedef = icerikParam || aktifIcerik;
+    if (!hedef) { toast({ title: "İçerik seçilmedi", variant: "destructive" }); return; }
     try {
-      const data = { icerik_id: aktifIcerik.id, kullanici_id: user.id };
+      const data = { icerik_id: hedef.id, kullanici_id: user.id };
       if (testYapildi) data.test_cevaplari = testCevaplari;
       const r = await axios.post(`${API}/gelisim/tamamla`, data);
       setSonuc(r.data); setGorunum("sonuc"); fetchAll();
@@ -5454,7 +5458,7 @@ function GelisimAlani({ user }) {
                                 📝 Testi Çöz (+10 puan)
                               </Button>
                             )}
-                            <Button size="sm" variant="outline" onClick={() => { setAktifIcerik(icerik); handleTamamla(false); }}>
+                            <Button size="sm" variant="outline" onClick={() => handleTamamla(false, icerik)}>
                               ✓ Tamamlandı (+1 puan)
                             </Button>
                           </div>
