@@ -696,6 +696,23 @@ async def create_default_admin():
     else:
         logging.info("ℹ️ Demo rozet + anket verileri zaten mevcut")
 
+    # --- VARSAYILAN AYARLAR (boş ise seed et) ---
+    ayar_defaults = {
+        "xp_tablosu": XP_TABLOSU_DEFAULT,
+        "lig_esikleri": LIG_ESIKLERI_DEFAULT,
+        "ogretmen_rozetleri": OGRETMEN_ROZETLERI_DEFAULT,
+        "ogrenci_rozetleri": OGRENCI_ROZETLERI_DEFAULT,
+        "anket_sorulari": ANKET_SORULARI_DEFAULT,
+    }
+    for tip, default_val in ayar_defaults.items():
+        doc = await db.sistem_ayarlari.find_one({"tip": tip})
+        if not doc:
+            await db.sistem_ayarlari.insert_one({"tip": tip, "degerler": default_val})
+            logging.info(f"  ✅ Varsayılan ayar oluşturuldu: {tip}")
+        elif not doc.get("degerler") or (isinstance(doc["degerler"], list) and len(doc["degerler"]) == 0) or (isinstance(doc["degerler"], dict) and len(doc["degerler"]) == 0):
+            await db.sistem_ayarlari.update_one({"tip": tip}, {"$set": {"degerler": default_val}})
+            logging.info(f"  🔄 Boş ayar düzeltildi: {tip}")
+
     logging.info("📋 Demo Hesapları:")
     logging.info(f"   🎓 Öğrenci: {demo_student_email} / {DEMO_PASSWORD}")
     logging.info(f"   👩‍🏫 Öğretmen: {demo_teacher_email} / {DEMO_PASSWORD}")
