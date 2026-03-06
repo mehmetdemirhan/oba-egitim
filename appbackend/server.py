@@ -2590,6 +2590,27 @@ async def create_icerik(icerik: IcerikCreate, current_user=Depends(get_current_u
     if data.get("yayin_tarihi"):
         data["yayin_tarihi"] = data["yayin_tarihi"].isoformat()
     await db.gelisim_icerik.insert_one(data)
+
+    # Kitap türünde içerik eklendiyse kitap havuzuna da kaydet (bölüm bazlı soru için)
+    if data.get("tur") == "kitap":
+        mevcut = await db.kitap_havuzu.find_one({"baslik": data.get("baslik", ""), "yazar": data.get("kitap_yazar", "")})
+        if not mevcut:
+            await db.kitap_havuzu.insert_one({
+                "id": str(uuid.uuid4()),
+                "baslik": data.get("baslik", ""),
+                "yazar": data.get("kitap_yazar", ""),
+                "yas_grubu": data.get("kitap_yas_grubu", ""),
+                "zorluk": "orta",
+                "bolum_sayisi": data.get("kitap_bolum_sayisi", 10),
+                "kapak_url": data.get("kitap_kapak", ""),
+                "ekleyen_id": current_user["id"],
+                "ekleyen_ad": f"{current_user.get('ad','')} {current_user.get('soyad','')}",
+                "durum": durum,
+                "oylar": {},
+                "gelisim_icerik_id": data.get("id"),
+                "olusturma_tarihi": datetime.utcnow().isoformat(),
+            })
+
     return data
 
 # İçerikleri listele
@@ -2605,10 +2626,13 @@ async def get_icerik_list(current_user=Depends(get_current_user)):
         durum = item.get("durum", "")
         hedef = item.get("hedef_kitle", "hepsi")
         
+        # Kitap türü ise bölüm bazlı soru sayısını ekle
+        if item.get("tur") == "kitap":
+            item["_soru_sayisi"] = await db.kitap_sorulari.count_documents({"kitap_id": item["id"]})
+        
         # Admin her şeyi görür
-        if role == "admin":
+        if role in ["admin", "coordinator"]:
             result.append(item)
-        # Öğretmen: kendi eklediği + oylama bekleyenler + yayındakiler
         elif role == "teacher":
             if item.get("ekleyen_id") == user_id:
                 result.append(item)
@@ -2616,7 +2640,6 @@ async def get_icerik_list(current_user=Depends(get_current_user)):
                 result.append(item)
             elif durum == "yayinda" and hedef in ["hepsi", "ogretmen"]:
                 result.append(item)
-        # Öğrenci: sadece yayındakiler
         elif role == "student":
             if durum == "yayinda" and hedef in ["hepsi", "ogrenci"]:
                 result.append(item)
@@ -4002,6 +4025,7 @@ async def create_soru(kitap_id: str, payload: dict, current_user=Depends(get_cur
         "soru": payload.get("soru", ""),
         "secenekler": payload.get("secenekler", []),
         "dogru_cevap": payload.get("dogru_cevap", 0),
+        "taksonomi": payload.get("taksonomi", "kavrama"),
         "ekleyen_id": current_user["id"],
         "ekleyen_ad": f"{current_user.get('ad', '')} {current_user.get('soyad', '')}".strip(),
         "kullanim_sayisi": 0,
