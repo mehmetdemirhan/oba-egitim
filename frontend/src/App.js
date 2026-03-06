@@ -180,6 +180,8 @@ function AppContent() {
   const [showArchived, setShowArchived] = useState({ teachers: false, students: false, courses: false });
   const [expandedCourse, setExpandedCourse] = useState(null);
   const [ogrenciRiskler, setOgrenciRiskler] = useState([]);
+  const [adminRozetOzet, setAdminRozetOzet] = useState(null);
+  const [adminAnketOzet, setAdminAnketOzet] = useState([]);
   const [expandedDers, setExpandedDers] = useState(null);
   const [kursDersleri, setKursDersleri] = useState({});
   const [yeniDersForm, setYeniDersForm] = useState(null);
@@ -198,6 +200,38 @@ function AppContent() {
     try { const r = await axios.get(`${API}/courses`); setCourses(Array.isArray(r.data) ? r.data : []); } catch(e) {}
     try { const r = await axios.get(`${API}/payments`); setPayments(Array.isArray(r.data) ? r.data : []); } catch(e) {}
     try { const r = await axios.get(`${API}/risk-skor/toplu`); setOgrenciRiskler(Array.isArray(r.data) ? r.data : []); } catch(e) { setOgrenciRiskler([]); }
+    // Rozet + anket istatistikleri
+    try {
+      const [rozetR, tanimR, teachersR] = await Promise.all([
+        axios.get(`${API}/rozetler/tanim`),
+        axios.get(`${API}/teachers`),
+        Promise.resolve(null),
+      ]);
+      const ogretmenTanim = rozetR.data?.ogretmen || [];
+      const ogrenciTanim = rozetR.data?.ogrenci || [];
+      const tTeachers = Array.isArray(teachersR?.data) ? teachersR.data : [];
+      // Her öğretmenin rozet + anket özetini çek
+      const usersR = await axios.get(`${API}/auth/users`);
+      const allUsers = Array.isArray(usersR.data) ? usersR.data : [];
+      const ogretmenUsers = allUsers.filter(u => u.role === "teacher");
+      const anketOzetleri = [];
+      for (const ou of ogretmenUsers.slice(0, 10)) {
+        try {
+          const [rozR, ankR] = await Promise.all([
+            axios.get(`${API}/rozetler/${ou.id}`),
+            axios.get(`${API}/anketler/ogretmen/${ou.linked_id || ou.id}/ozet`),
+          ]);
+          anketOzetleri.push({
+            id: ou.id, ad: ou.ad, soyad: ou.soyad,
+            rozet_sayisi: Array.isArray(rozR.data) ? rozR.data.length : 0,
+            rozet_toplam: ogretmenTanim.length,
+            anket: ankR.data || {},
+          });
+        } catch(e) {}
+      }
+      setAdminRozetOzet({ ogretmen_tanim: ogretmenTanim.length, ogrenci_tanim: ogrenciTanim.length });
+      setAdminAnketOzet(anketOzetleri);
+    } catch(e) {}
   }, []);
 
   useEffect(() => {
@@ -410,6 +444,43 @@ function AppContent() {
                     <CardContent><div className="h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={monthlyStats}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="ay" /><YAxis /><Tooltip /><Bar dataKey="yeni_ogrenciler" fill="#3b82f6" /><Bar dataKey="gelir" fill="#f97316" /></BarChart></ResponsiveContainer></div></CardContent>
                   </Card>
                 </div>
+
+                {/* Öğretmen Rozet + Veli Anket Özeti */}
+                {adminAnketOzet.length > 0 && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <Card className="border-0 shadow-sm">
+                      <CardHeader><CardTitle className="text-base">🏅 Öğretmen Rozet Durumu</CardTitle></CardHeader>
+                      <CardContent><div className="space-y-3">
+                        {adminAnketOzet.map(o => (
+                          <div key={o.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                            <div><div className="font-medium text-sm">{o.ad} {o.soyad}</div></div>
+                            <div className="flex items-center gap-2">
+                              <div className="bg-orange-100 rounded-full h-2 w-24 overflow-hidden"><div className="h-2 bg-orange-500 rounded-full" style={{width: `${(o.rozet_sayisi / Math.max(o.rozet_toplam, 1)) * 100}%`}} /></div>
+                              <span className="text-xs font-medium text-orange-600">{o.rozet_sayisi}/{o.rozet_toplam}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div></CardContent>
+                    </Card>
+                    <Card className="border-0 shadow-sm">
+                      <CardHeader><CardTitle className="text-base">💜 Veli Değerlendirme Özeti</CardTitle></CardHeader>
+                      <CardContent><div className="space-y-3">
+                        {adminAnketOzet.map(o => (
+                          <div key={o.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                            <div><div className="font-medium text-sm">{o.ad} {o.soyad}</div><div className="text-xs text-gray-400">{o.anket?.anket_sayisi || 0} anket</div></div>
+                            <div className="flex items-center gap-3">
+                              {o.anket?.anket_sayisi > 0 ? (<>
+                                <span className="text-lg font-bold text-purple-600">⭐{o.anket.ortalama}</span>
+                                <span className="text-xs text-green-600 font-medium">%{o.anket.tavsiye_oran} tavsiye</span>
+                              </>) : (<span className="text-xs text-gray-400">Anket yok</span>)}
+                            </div>
+                          </div>
+                        ))}
+                      </div></CardContent>
+                    </Card>
+                  </div>
+                )}
+
               </div>
             )}
           </TabsContent>
