@@ -5432,7 +5432,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
   // Bölüm bazlı soru yönetimi
   const [soruYonetimiIcerik, setSoruYonetimiIcerik] = useState(null);
   const [kitapSorulari, setKitapSorulari] = useState([]);
-  const [soruForm, setSoruForm] = useState({ bolum: 1, soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0 });
+  const [soruForm, setSoruForm] = useState({ bolum: 1, soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0, taksonomi: "kavrama" });
   const [adminForm, setAdminForm] = useState({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [], makale_link: "", makale_dosya_turu: "link", kitap_yazar: "", kitap_isbn: "", kitap_yayinevi: "", kitap_sayfa: "", kitap_yas_grubu: "", kitap_link: "", kitap_kapak: "" });
   const [kitapYukleniyor, setKitapYukleniyor] = useState(false);
   const [yeniSoru, setYeniSoru] = useState({ soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0 });
@@ -5554,7 +5554,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
       try {
         await axios.post(`${API}/kitaplar/${soruYonetimiIcerik.id}/sorular`, soruForm);
         toast({ title: "✅ Soru eklendi!" });
-        setSoruForm({ bolum: soruForm.bolum, soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0 });
+        setSoruForm({ bolum: soruForm.bolum, soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0, taksonomi: soruForm.taksonomi });
         const r = await axios.get(`${API}/kitaplar/${soruYonetimiIcerik.id}/sorular`);
         setKitapSorulari(Array.isArray(r.data) ? r.data : []);
       } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
@@ -5580,11 +5580,23 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
           <CardHeader className="pb-2"><CardTitle className="text-sm">📝 Yeni Soru Ekle</CardTitle></CardHeader>
           <CardContent>
             <form onSubmit={soruEkle} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div><Label className="text-xs">Bölüm</Label>
                   <Select value={String(soruForm.bolum)} onValueChange={v => setSoruForm({...soruForm, bolum: parseInt(v)})}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>{bolumler.map(b => <SelectItem key={b} value={String(b)}>Bölüm {b}</SelectItem>)}</SelectContent>
+                  </Select></div>
+                <div><Label className="text-xs">Bloom Basamağı</Label>
+                  <Select value={soruForm.taksonomi} onValueChange={v => setSoruForm({...soruForm, taksonomi: v})}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="bilgi">1️⃣ Bilgi (Hatırlama)</SelectItem>
+                      <SelectItem value="kavrama">2️⃣ Kavrama (Anlama)</SelectItem>
+                      <SelectItem value="uygulama">3️⃣ Uygulama</SelectItem>
+                      <SelectItem value="analiz">4️⃣ Analiz</SelectItem>
+                      <SelectItem value="sentez">5️⃣ Sentez (Değerlendirme)</SelectItem>
+                      <SelectItem value="degerlendirme">6️⃣ Yaratma</SelectItem>
+                    </SelectContent>
                   </Select></div>
                 <div><Label className="text-xs">Doğru Cevap</Label>
                   <Select value={String(soruForm.dogru_cevap)} onValueChange={v => setSoruForm({...soruForm, dogru_cevap: parseInt(v)})}>
@@ -5592,7 +5604,32 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                     <SelectContent>{["A","B","C","D"].map((s,i) => <SelectItem key={i} value={String(i)}>{s}</SelectItem>)}</SelectContent>
                   </Select></div>
               </div>
-              <div><Label className="text-xs">Soru</Label><Input value={soruForm.soru} onChange={e => setSoruForm({...soruForm, soru: e.target.value})} required placeholder="Soru metni..." /></div>
+
+              {/* Bloom Taksonomisi ipucu */}
+              <div className={`rounded-xl p-3 text-xs border ${
+                soruForm.taksonomi === "bilgi" ? "bg-blue-50 border-blue-200" :
+                soruForm.taksonomi === "kavrama" ? "bg-green-50 border-green-200" :
+                soruForm.taksonomi === "uygulama" ? "bg-yellow-50 border-yellow-200" :
+                soruForm.taksonomi === "analiz" ? "bg-orange-50 border-orange-200" :
+                soruForm.taksonomi === "sentez" ? "bg-red-50 border-red-200" :
+                "bg-purple-50 border-purple-200"
+              }`}>
+                {soruForm.taksonomi === "bilgi" && (<><span className="font-bold text-blue-700">1️⃣ Bilgi (Hatırlama):</span> Metinde doğrudan geçen bilgiyi sorun. <span className="text-gray-500 italic">Örnek kalıplar: "Kim?", "Ne zaman?", "Nerede?", "Adı neydi?", "Hangisi metinde geçmiştir?"</span></>)}
+                {soruForm.taksonomi === "kavrama" && (<><span className="font-bold text-green-700">2️⃣ Kavrama (Anlama):</span> Bilgiyi kendi cümleleriyle ifade etmesini isteyin. <span className="text-gray-500 italic">Örnek kalıplar: "Ne anlatılmak istenmiştir?", "Özetleyiniz", "Hangi anlama gelir?", "Ana fikir nedir?"</span></>)}
+                {soruForm.taksonomi === "uygulama" && (<><span className="font-bold text-yellow-700">3️⃣ Uygulama:</span> Öğrenileni farklı bir durumda kullanmasını isteyin. <span className="text-gray-500 italic">Örnek kalıplar: "Sen olsaydın ne yapardın?", "Bu bilgiyi nerede kullanabilirsin?", "Başka bir örnek ver"</span></>)}
+                {soruForm.taksonomi === "analiz" && (<><span className="font-bold text-orange-700">4️⃣ Analiz:</span> Parçalara ayırma, neden-sonuç, karşılaştırma sorun. <span className="text-gray-500 italic">Örnek kalıplar: "Neden böyle davrandı?", "Aradaki fark nedir?", "Hangi kanıt destekler?", "Sebebi ne olabilir?"</span></>)}
+                {soruForm.taksonomi === "sentez" && (<><span className="font-bold text-red-700">5️⃣ Sentez (Değerlendirme):</span> Yargılama, görüş bildirme, savunma isteyin. <span className="text-gray-500 italic">Örnek kalıplar: "Katılıyor musun? Neden?", "Doğru mu yanlış mı? Gerekçele", "En önemli mesaj nedir?"</span></>)}
+                {soruForm.taksonomi === "degerlendirme" && (<><span className="font-bold text-purple-700">6️⃣ Yaratma:</span> Yeni bir şey üretme, tasarlama, tahmin etme. <span className="text-gray-500 italic">Örnek kalıplar: "Farklı bir son yaz", "Başlık öner", "Devamını tahmin et", "Yeni bir karakter ekle"</span></>)}
+              </div>
+
+              <div><Label className="text-xs">Soru</Label><Input value={soruForm.soru} onChange={e => setSoruForm({...soruForm, soru: e.target.value})} required placeholder={
+                soruForm.taksonomi === "bilgi" ? "Metinde ... kim / ne zaman / nerede?" :
+                soruForm.taksonomi === "kavrama" ? "Bu bölümde anlatılmak istenen nedir?" :
+                soruForm.taksonomi === "uygulama" ? "Sen olsaydın bu durumda ne yapardın?" :
+                soruForm.taksonomi === "analiz" ? "Karakterin böyle davranmasının sebebi nedir?" :
+                soruForm.taksonomi === "sentez" ? "Bu karara katılıyor musun? Neden?" :
+                "Hikayenin farklı bir sonunu tasarla"
+              } /></div>
               <div className="grid grid-cols-2 gap-2">
                 {["A","B","C","D"].map((s,i) => (
                   <div key={i}><Label className="text-xs">{s})</Label>
@@ -5611,11 +5648,17 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
           if (bolumSorulari.length === 0) return null;
           return (<div key={b}>
             <h3 className="font-medium text-sm text-gray-700 mt-3 mb-2">Bölüm {b} ({bolumSorulari.length} soru)</h3>
-            {bolumSorulari.map((s, i) => (
+            {bolumSorulari.map((s, i) => {
+              const taksLabel = {"bilgi":"1️⃣ Bilgi","kavrama":"2️⃣ Kavrama","uygulama":"3️⃣ Uygulama","analiz":"4️⃣ Analiz","sentez":"5️⃣ Sentez","degerlendirme":"6️⃣ Yaratma"};
+              const taksRenk = {"bilgi":"bg-blue-100 text-blue-700","kavrama":"bg-green-100 text-green-700","uygulama":"bg-yellow-100 text-yellow-700","analiz":"bg-orange-100 text-orange-700","sentez":"bg-red-100 text-red-700","degerlendirme":"bg-purple-100 text-purple-700"};
+              return (
               <div key={s.id} className="bg-white rounded-xl p-3 shadow-sm border mb-2">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <div className="font-medium text-sm">{i+1}. {s.soru}</div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-medium text-sm">{i+1}. {s.soru}</span>
+                    </div>
+                    {s.taksonomi && <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${taksRenk[s.taksonomi] || "bg-gray-100 text-gray-600"}`}>{taksLabel[s.taksonomi] || s.taksonomi}</span>}
                     <div className="grid grid-cols-2 gap-1 mt-1 ml-3">
                       {(s.secenekler || []).map((sec, j) => (
                         <div key={j} className={`text-xs px-2 py-0.5 rounded ${j === s.dogru_cevap ? 'bg-green-100 text-green-700 font-bold' : 'text-gray-500'}`}>
@@ -5627,7 +5670,8 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                   <Button variant="destructive" size="sm" className="text-xs h-6" onClick={() => soruSil(s.id)}>Sil</Button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>);
         })}
 
