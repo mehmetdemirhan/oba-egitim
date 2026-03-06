@@ -494,7 +494,7 @@ async def create_default_admin():
         xp_eylemleri = ["okuma_gorevi"] * 10 + ["gorev_tamamla"] * 3 + ["egzersiz"] * 5 + ["gelisim_tamamla"] * 2
         toplam_xp = 0
         for eylem in xp_eylemleri:
-            xp = XP_TABLOSU.get(eylem, 5)
+            xp = (await get_xp_tablosu()).get(eylem, 5)
             toplam_xp += xp
             await db.xp_logs.insert_one({
                 "id": str(uuid.uuid4()), "ogrenci_id": demo_students[0],
@@ -3039,17 +3039,42 @@ async def get_toplu_risk(current_user=Depends(get_current_user)):
 # XP + LİG + KUR SİSTEMİ (Faz 3)
 # ─────────────────────────────────────────────
 
-XP_TABLOSU = {
+XP_TABLOSU_DEFAULT = {
     "okuma_gorevi": 10, "anlama_testi": 15, "kelime_gorevi": 8,
     "gunluk_streak": 5, "kitap_bitirme": 30, "yazili_ozet": 20,
     "egzersiz": 5, "gelisim_tamamla": 5, "gorev_tamamla": 10,
 }
 
-LIG_ESIKLERI = {
+LIG_ESIKLERI_DEFAULT = {
     "bronz": 0, "gumus": 200, "altin": 500, "elmas": 1000,
 }
 
 LIG_SIRA = ["bronz", "gumus", "altin", "elmas"]
+
+
+async def get_xp_tablosu():
+    doc = await db.sistem_ayarlari.find_one({"tip": "xp_tablosu"})
+    return doc.get("degerler", XP_TABLOSU_DEFAULT) if doc else XP_TABLOSU_DEFAULT
+
+
+async def get_lig_esikleri():
+    doc = await db.sistem_ayarlari.find_one({"tip": "lig_esikleri"})
+    return doc.get("degerler", LIG_ESIKLERI_DEFAULT) if doc else LIG_ESIKLERI_DEFAULT
+
+
+async def get_ogretmen_rozetleri():
+    doc = await db.sistem_ayarlari.find_one({"tip": "ogretmen_rozetleri"})
+    return doc.get("degerler", OGRETMEN_ROZETLERI_DEFAULT) if doc else OGRETMEN_ROZETLERI_DEFAULT
+
+
+async def get_ogrenci_rozetleri():
+    doc = await db.sistem_ayarlari.find_one({"tip": "ogrenci_rozetleri"})
+    return doc.get("degerler", OGRENCI_ROZETLERI_DEFAULT) if doc else OGRENCI_ROZETLERI_DEFAULT
+
+
+async def get_anket_sorulari():
+    doc = await db.sistem_ayarlari.find_one({"tip": "anket_sorulari"})
+    return doc.get("degerler", ANKET_SORULARI_DEFAULT) if doc else ANKET_SORULARI_DEFAULT
 
 
 # XP kazan
@@ -3057,7 +3082,7 @@ LIG_SIRA = ["bronz", "gumus", "altin", "elmas"]
 async def xp_kazan(payload: dict, current_user=Depends(get_current_user)):
     ogrenci_id = current_user.get("linked_id") or current_user.get("id")
     eylem = payload.get("eylem", "")
-    xp = XP_TABLOSU.get(eylem, 0)
+    xp = (await get_xp_tablosu()).get(eylem, 0)
     if xp == 0:
         return {"xp": 0, "mesaj": "Bilinmeyen eylem"}
 
@@ -3088,13 +3113,13 @@ async def xp_durum(ogrenci_id: str, current_user=Depends(get_current_user)):
     # Lig hesapla
     lig = "bronz"
     for l in reversed(LIG_SIRA):
-        if toplam >= LIG_ESIKLERI[l]:
+        if toplam >= (await get_lig_esikleri()).get(l, 0):
             lig = l
             break
     # Sonraki lig
     idx = LIG_SIRA.index(lig)
     sonraki_lig = LIG_SIRA[idx + 1] if idx < len(LIG_SIRA) - 1 else None
-    sonraki_esik = LIG_ESIKLERI.get(sonraki_lig, 0) if sonraki_lig else 0
+    sonraki_esik = (await get_lig_esikleri()).get(sonraki_lig, 0) if sonraki_lig else 0
     kalan = max(0, sonraki_esik - toplam)
 
     # Son XP kayıtları
@@ -3127,7 +3152,7 @@ async def lig_siralama(current_user=Depends(get_current_user)):
         xp = s.get("toplam_xp", 0)
         lig = "bronz"
         for l in reversed(LIG_SIRA):
-            if xp >= LIG_ESIKLERI[l]:
+            if xp >= (await get_lig_esikleri()).get(l, 0):
                 lig = l
                 break
         ben = s.get("id") == ogrenci_id
@@ -3225,10 +3250,91 @@ async def kur_atla(payload: dict, current_user=Depends(get_current_user)):
 
 
 # ─────────────────────────────────────────────
+# SİSTEM AYARLARI YÖNETİMİ (Admin CRUD)
+# ─────────────────────────────────────────────
+
+@api_router.get("/ayarlar/{tip}")
+async def get_ayar(tip: str, current_user=Depends(get_current_user)):
+    doc = await db.sistem_ayarlari.find_one({"tip": tip})
+    if doc:
+        doc.pop("_id", None)
+        return doc
+    # Varsayılan değerleri döndür
+    defaults = {
+        "xp_tablosu": XP_TABLOSU_DEFAULT,
+        "lig_esikleri": LIG_ESIKLERI_DEFAULT,
+        "ogretmen_rozetleri": OGRETMEN_ROZETLERI_DEFAULT,
+        "ogrenci_rozetleri": OGRENCI_ROZETLERI_DEFAULT,
+        "anket_sorulari": ANKET_SORULARI_DEFAULT,
+    }
+    return {"tip": tip, "degerler": defaults.get(tip, {})}
+
+
+@api_router.put("/ayarlar/{tip}")
+async def update_ayar(tip: str, payload: dict, current_user=Depends(get_current_user)):
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Sadece admin ayar değiştirebilir")
+    degerler = payload.get("degerler", {})
+    await db.sistem_ayarlari.update_one(
+        {"tip": tip},
+        {"$set": {"tip": tip, "degerler": degerler, "guncelleme_tarihi": datetime.utcnow().isoformat(), "guncelleyen": current_user.get("ad", "")}},
+        upsert=True
+    )
+    return {"ok": True, "tip": tip}
+
+
+@api_router.get("/ayarlar")
+async def get_tum_ayarlar(current_user=Depends(get_current_user)):
+    if current_user.get("role") not in ["admin", "coordinator"]:
+        raise HTTPException(status_code=403, detail="Yetkisiz")
+    ayarlar = await db.sistem_ayarlari.find().to_list(length=None)
+    for a in ayarlar:
+        a.pop("_id", None)
+    return ayarlar
+
+
+# Birleştirilmiş Puan Tablosu (gelişim + rozet puanları)
+@api_router.get("/puan-tablosu/birlesik")
+async def get_birlesik_puan_tablosu(current_user=Depends(get_current_user)):
+    users = await db.users.find().to_list(length=None)
+    tablo = []
+    for u in users:
+        uid = u["id"]
+        gelisim_puan = u.get("puan", 0)
+
+        # Rozet puanları
+        rozetler = await db.kazanilan_rozetler.find({"kullanici_id": uid}).to_list(length=None)
+        rozet_kodlar = [r["rozet_kodu"] for r in rozetler]
+
+        ogretmen_rozet_list = await get_ogretmen_rozetleri()
+        ogrenci_rozet_list = await get_ogrenci_rozetleri()
+        tum_rozetler = ogretmen_rozet_list + ogrenci_rozet_list
+
+        rozet_puan = 0
+        for rk in rozet_kodlar:
+            tanim = next((r for r in tum_rozetler if r["kod"] == rk), None)
+            if tanim:
+                rozet_puan += tanim.get("puan", tanim.get("xp", 0))
+
+        toplam = gelisim_puan + rozet_puan
+
+        tablo.append({
+            "ad": u.get("ad", ""), "soyad": u.get("soyad", ""),
+            "role": u.get("role", ""),
+            "gelisim_puan": gelisim_puan,
+            "rozet_puan": rozet_puan,
+            "rozet_sayisi": len(rozet_kodlar),
+            "toplam_puan": toplam,
+        })
+    tablo.sort(key=lambda x: x["toplam_puan"], reverse=True)
+    return tablo
+
+
+# ─────────────────────────────────────────────
 # ROZET SİSTEMİ (Öğretmen + Öğrenci)
 # ─────────────────────────────────────────────
 
-OGRETMEN_ROZETLERI = [
+OGRETMEN_ROZETLERI_DEFAULT = [
     # İçerik Katkısı
     {"kod": "icerik_ilk", "ad": "İlk Adım", "ikon": "🌱", "kategori": "icerik", "seviye": "bronz", "puan": 5},
     {"kod": "icerik_5", "ad": "İçerik Üreticisi", "ikon": "✍️", "kategori": "icerik", "seviye": "gumus", "puan": 10},
@@ -3264,7 +3370,7 @@ OGRETMEN_ROZETLERI = [
     {"kod": "egz_tamset", "ad": "Tam Set", "ikon": "🎖️", "kategori": "egzersiz", "seviye": "altin", "puan": 20},
 ]
 
-OGRENCI_ROZETLERI = [
+OGRENCI_ROZETLERI_DEFAULT = [
     {"kod": "okuma_ilk", "ad": "İlk Sayfa", "ikon": "📖", "kategori": "okuma", "seviye": "bronz", "xp": 5},
     {"kod": "okuma_100", "ad": "Kitap Kurdu", "ikon": "🐛", "kategori": "okuma", "seviye": "gumus", "xp": 15},
     {"kod": "okuma_500", "ad": "Okuma Yıldızı", "ikon": "⭐", "kategori": "okuma", "seviye": "altin", "xp": 30},
@@ -3295,7 +3401,7 @@ OGRENCI_ROZETLERI = [
 
 @api_router.get("/rozetler/tanim")
 async def rozet_tanimlari():
-    return {"ogretmen": OGRETMEN_ROZETLERI, "ogrenci": OGRENCI_ROZETLERI}
+    return {"ogretmen": await get_ogretmen_rozetleri(), "ogrenci": await get_ogrenci_rozetleri()}
 
 
 @api_router.get("/rozetler/{user_id}")
@@ -3389,7 +3495,7 @@ async def rozet_kontrol(current_user=Depends(get_current_user)):
             if kosul and kod not in mevcut_kodlar:
                 doc = {"id": str(uuid.uuid4()), "kullanici_id": user_id, "rozet_kodu": kod, "kazanma_tarihi": datetime.utcnow().isoformat()}
                 await db.kazanilan_rozetler.insert_one(doc)
-                rozet_bilgi = next((r for r in OGRETMEN_ROZETLERI if r["kod"] == kod), None)
+                rozet_bilgi = next((r for r in (await get_ogretmen_rozetleri()) if r["kod"] == kod), None)
                 yeni_rozetler.append({**doc, "rozet": rozet_bilgi})
 
     elif role == "student":
@@ -3426,7 +3532,7 @@ async def rozet_kontrol(current_user=Depends(get_current_user)):
             if kosul and kod not in mevcut_kodlar:
                 doc = {"id": str(uuid.uuid4()), "kullanici_id": user_id, "rozet_kodu": kod, "kazanma_tarihi": datetime.utcnow().isoformat()}
                 await db.kazanilan_rozetler.insert_one(doc)
-                rozet_bilgi = next((r for r in OGRENCI_ROZETLERI if r["kod"] == kod), None)
+                rozet_bilgi = next((r for r in (await get_ogrenci_rozetleri()) if r["kod"] == kod), None)
                 yeni_rozetler.append({**doc, "rozet": rozet_bilgi})
 
     return {"yeni_rozetler": yeni_rozetler, "toplam": len(mevcut_kodlar) + len(yeni_rozetler)}
@@ -3436,7 +3542,7 @@ async def rozet_kontrol(current_user=Depends(get_current_user)):
 # VELİ DEĞERLENDİRME ANKETİ
 # ─────────────────────────────────────────────
 
-ANKET_SORULARI = [
+ANKET_SORULARI_DEFAULT = [
     {"no": 1, "soru": "Öğretmenin çocuğunuzla iletişimi nasıl?", "tip": "puan", "kategori": "iletisim"},
     {"no": 2, "soru": "Görev ve ödevler düzenli veriliyor mu?", "tip": "puan", "kategori": "duzen"},
     {"no": 3, "soru": "Çocuğunuzun okuma alışkanlığında gelişme görüyor musunuz?", "tip": "puan", "kategori": "etki"},
@@ -3450,8 +3556,8 @@ ANKET_SORULARI = [
 
 
 @api_router.get("/anketler/sorular")
-async def get_anket_sorulari():
-    return ANKET_SORULARI
+async def get_anket_sorulari_endpoint():
+    return await get_anket_sorulari()
 
 
 @api_router.post("/anketler")
