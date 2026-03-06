@@ -369,6 +369,7 @@ function AppContent() {
             <TabsTrigger value="giris-analizi" className={tabClass}><Stethoscope className="h-4 w-4 mr-2" />Giriş Analizi</TabsTrigger>
             <TabsTrigger value="gorevler" className={tabClass}><CheckCircle className="h-4 w-4 mr-2" />Görevler</TabsTrigger>
             <TabsTrigger value="mesajlar" className={tabClass}><Mail className="h-4 w-4 mr-2" />Mesajlar</TabsTrigger>
+            {user.role === "admin" && <TabsTrigger value="ayarlar" className={tabClass}><Star className="h-4 w-4 mr-2" />Ayarlar</TabsTrigger>}
           </TabsList>
 
           {/* Dashboard */}
@@ -1155,6 +1156,13 @@ function AppContent() {
           <TabsContent value="mesajlar">
             <MesajlarPanel user={user} />
           </TabsContent>
+
+          {/* Ayarlar - Sadece Admin */}
+          {user.role === "admin" && (
+            <TabsContent value="ayarlar">
+              <SistemAyarlari user={user} />
+            </TabsContent>
+          )}
 
         </Tabs>
 
@@ -4874,6 +4882,127 @@ function VeliPaneli({ user, logout }) {
   );
 }
 
+// ═══════════════════════════════════════════════
+// SİSTEM AYARLARI — Admin panel (Rozet, XP, Lig, Anket yönetimi)
+// ═══════════════════════════════════════════════
+
+function SistemAyarlari({ user }) {
+  const { toast } = useToast();
+  const [ayarSekme, setAyarSekme] = useState("xp");
+  const [xpTablosu, setXpTablosu] = useState({});
+  const [ligEsikleri, setLigEsikleri] = useState({});
+  const [ogretmenRozetler, setOgretmenRozetler] = useState([]);
+  const [ogrenciRozetler, setOgrenciRozetler] = useState([]);
+  const [anketSorulari, setAnketSorulari] = useState([]);
+  const [kayitEdiliyor, setKayitEdiliyor] = useState(false);
+
+  useEffect(() => {
+    const fetchAyarlar = async () => {
+      try { const r = await axios.get(`${API}/ayarlar/xp_tablosu`); setXpTablosu(r.data?.degerler || {}); } catch(e) {}
+      try { const r = await axios.get(`${API}/ayarlar/lig_esikleri`); setLigEsikleri(r.data?.degerler || {}); } catch(e) {}
+      try { const r = await axios.get(`${API}/ayarlar/ogretmen_rozetleri`); setOgretmenRozetler(Array.isArray(r.data?.degerler) ? r.data.degerler : []); } catch(e) {}
+      try { const r = await axios.get(`${API}/ayarlar/ogrenci_rozetleri`); setOgrenciRozetler(Array.isArray(r.data?.degerler) ? r.data.degerler : []); } catch(e) {}
+      try { const r = await axios.get(`${API}/ayarlar/anket_sorulari`); setAnketSorulari(Array.isArray(r.data?.degerler) ? r.data.degerler : []); } catch(e) {}
+    };
+    fetchAyarlar();
+  }, []);
+
+  const kaydet = async (tip, degerler) => {
+    setKayitEdiliyor(true);
+    try { await axios.put(`${API}/ayarlar/${tip}`, { degerler }); toast({ title: "✅ Ayarlar kaydedildi!" }); }
+    catch(e) { toast({ title: "Hata", variant: "destructive" }); }
+    setKayitEdiliyor(false);
+  };
+
+  const xpEylemLabel = { okuma_gorevi: "📖 Okuma Görevi", anlama_testi: "📝 Anlama Testi", kelime_gorevi: "🔤 Kelime Görevi", gunluk_streak: "🔥 Günlük Streak", kitap_bitirme: "📚 Kitap Bitirme", yazili_ozet: "✍️ Yazılı Özet", egzersiz: "👁️ Egzersiz", gelisim_tamamla: "🎓 Gelişim Tamamla", gorev_tamamla: "✅ Görev Tamamla" };
+  const ligLabel = { bronz: "🥉 Bronz", gumus: "🥈 Gümüş", altin: "🥇 Altın", elmas: "💎 Elmas" };
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold">⚙️ Sistem Ayarları</h2>
+      <p className="text-gray-500 text-sm">Rozet, XP, lig ve anket ayarlarını buradan yönetin. Değişiklikler anında uygulanır.</p>
+
+      <div className="flex gap-2 flex-wrap">
+        {[{id:"xp",l:"💰 XP Değerleri"},{id:"lig",l:"🏆 Lig Eşikleri"},{id:"ogretmen_rozet",l:"🏅 Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"🎓 Öğrenci Rozetleri"},{id:"anket",l:"⭐ Anket Soruları"}].map(s => (
+          <button key={s.id} onClick={() => setAyarSekme(s.id)}
+            className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${ayarSekme === s.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200'}`}>{s.l}</button>
+        ))}
+      </div>
+
+      {/* XP Değerleri */}
+      {ayarSekme === "xp" && (<Card className="border-0 shadow-sm"><CardHeader><CardTitle>💰 XP Değerleri</CardTitle><p className="text-sm text-gray-500">Her eylem için kazanılan XP miktarı</p></CardHeader><CardContent><div className="space-y-3">
+        {Object.entries(xpTablosu).map(([key, val]) => (
+          <div key={key} className="flex items-center justify-between gap-4">
+            <Label className="text-sm flex-1">{xpEylemLabel[key] || key}</Label>
+            <Input type="number" className="w-24 text-center" value={val} onChange={e => setXpTablosu({...xpTablosu, [key]: parseInt(e.target.value) || 0})} />
+            <span className="text-xs text-gray-400 w-8">XP</span>
+          </div>
+        ))}
+        <Button onClick={() => kaydet("xp_tablosu", xpTablosu)} disabled={kayitEdiliyor} className="w-full bg-blue-600 text-white mt-4">💾 XP Değerlerini Kaydet</Button>
+      </div></CardContent></Card>)}
+
+      {/* Lig Eşikleri */}
+      {ayarSekme === "lig" && (<Card className="border-0 shadow-sm"><CardHeader><CardTitle>🏆 Lig Eşikleri</CardTitle><p className="text-sm text-gray-500">Her lig seviyesi için gereken minimum XP</p></CardHeader><CardContent><div className="space-y-3">
+        {Object.entries(ligEsikleri).map(([key, val]) => (
+          <div key={key} className="flex items-center justify-between gap-4">
+            <Label className="text-sm flex-1">{ligLabel[key] || key}</Label>
+            <Input type="number" className="w-32 text-center" value={val} onChange={e => setLigEsikleri({...ligEsikleri, [key]: parseInt(e.target.value) || 0})} />
+            <span className="text-xs text-gray-400 w-8">XP</span>
+          </div>
+        ))}
+        <Button onClick={() => kaydet("lig_esikleri", ligEsikleri)} disabled={kayitEdiliyor} className="w-full bg-blue-600 text-white mt-4">💾 Lig Eşiklerini Kaydet</Button>
+      </div></CardContent></Card>)}
+
+      {/* Öğretmen Rozetleri */}
+      {ayarSekme === "ogretmen_rozet" && (<Card className="border-0 shadow-sm"><CardHeader><CardTitle>🏅 Öğretmen Rozetleri ({ogretmenRozetler.length})</CardTitle></CardHeader><CardContent><div className="space-y-3">
+        {ogretmenRozetler.map((r, i) => (
+          <div key={r.kod} className="bg-gray-50 rounded-xl p-3 space-y-2">
+            <div className="flex items-center gap-2"><span className="text-xl">{r.ikon}</span><span className="font-medium text-sm">{r.ad}</span><span className={`text-xs px-2 py-0.5 rounded-full ${r.seviye === "elmas" ? "bg-purple-100 text-purple-700" : r.seviye === "altin" ? "bg-yellow-100 text-yellow-700" : r.seviye === "gumus" ? "bg-gray-100 text-gray-700" : "bg-orange-100 text-orange-700"}`}>{r.seviye}</span><span className="text-xs text-gray-400">{r.kategori}</span></div>
+            <div className="grid grid-cols-3 gap-2">
+              <div><Label className="text-[10px]">İkon</Label><Input className="text-center" value={r.ikon} onChange={e => { const n = [...ogretmenRozetler]; n[i] = {...n[i], ikon: e.target.value}; setOgretmenRozetler(n); }} /></div>
+              <div><Label className="text-[10px]">Puan</Label><Input type="number" value={r.puan} onChange={e => { const n = [...ogretmenRozetler]; n[i] = {...n[i], puan: parseInt(e.target.value) || 0}; setOgretmenRozetler(n); }} /></div>
+              <div><Label className="text-[10px]">Seviye</Label><Select value={r.seviye} onValueChange={v => { const n = [...ogretmenRozetler]; n[i] = {...n[i], seviye: v}; setOgretmenRozetler(n); }}><SelectTrigger className="text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="bronz">Bronz</SelectItem><SelectItem value="gumus">Gümüş</SelectItem><SelectItem value="altin">Altın</SelectItem><SelectItem value="platin">Platin</SelectItem><SelectItem value="elmas">Elmas</SelectItem></SelectContent></Select></div>
+            </div>
+          </div>
+        ))}
+        <Button onClick={() => kaydet("ogretmen_rozetleri", ogretmenRozetler)} disabled={kayitEdiliyor} className="w-full bg-blue-600 text-white mt-4">💾 Öğretmen Rozetlerini Kaydet</Button>
+      </div></CardContent></Card>)}
+
+      {/* Öğrenci Rozetleri */}
+      {ayarSekme === "ogrenci_rozet" && (<Card className="border-0 shadow-sm"><CardHeader><CardTitle>🎓 Öğrenci Rozetleri ({ogrenciRozetler.length})</CardTitle></CardHeader><CardContent><div className="space-y-3">
+        {ogrenciRozetler.map((r, i) => (
+          <div key={r.kod} className="bg-gray-50 rounded-xl p-3 space-y-2">
+            <div className="flex items-center gap-2"><span className="text-xl">{r.ikon}</span><span className="font-medium text-sm">{r.ad}</span><span className="text-xs text-gray-400">{r.kategori}</span></div>
+            <div className="grid grid-cols-3 gap-2">
+              <div><Label className="text-[10px]">İkon</Label><Input className="text-center" value={r.ikon} onChange={e => { const n = [...ogrenciRozetler]; n[i] = {...n[i], ikon: e.target.value}; setOgrenciRozetler(n); }} /></div>
+              <div><Label className="text-[10px]">XP</Label><Input type="number" value={r.xp || 0} onChange={e => { const n = [...ogrenciRozetler]; n[i] = {...n[i], xp: parseInt(e.target.value) || 0}; setOgrenciRozetler(n); }} /></div>
+              <div><Label className="text-[10px]">Seviye</Label><Select value={r.seviye} onValueChange={v => { const n = [...ogrenciRozetler]; n[i] = {...n[i], seviye: v}; setOgrenciRozetler(n); }}><SelectTrigger className="text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="bronz">Bronz</SelectItem><SelectItem value="gumus">Gümüş</SelectItem><SelectItem value="altin">Altın</SelectItem><SelectItem value="elmas">Elmas</SelectItem></SelectContent></Select></div>
+            </div>
+          </div>
+        ))}
+        <Button onClick={() => kaydet("ogrenci_rozetleri", ogrenciRozetler)} disabled={kayitEdiliyor} className="w-full bg-blue-600 text-white mt-4">💾 Öğrenci Rozetlerini Kaydet</Button>
+      </div></CardContent></Card>)}
+
+      {/* Anket Soruları */}
+      {ayarSekme === "anket" && (<Card className="border-0 shadow-sm"><CardHeader><CardTitle>⭐ Veli Anket Soruları ({anketSorulari.length})</CardTitle><p className="text-sm text-gray-500">Velilerin öğretmenleri değerlendirirken göreceği sorular</p></CardHeader><CardContent><div className="space-y-3">
+        {anketSorulari.map((s, i) => (
+          <div key={i} className="bg-gray-50 rounded-xl p-3 space-y-2">
+            <div className="flex items-center gap-2"><span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{s.tip}</span><span className="text-xs text-gray-400">{s.kategori}</span></div>
+            <Input value={s.soru} onChange={e => { const n = [...anketSorulari]; n[i] = {...n[i], soru: e.target.value}; setAnketSorulari(n); }} className="text-sm" />
+            <div className="grid grid-cols-2 gap-2">
+              <div><Label className="text-[10px]">Tip</Label><Select value={s.tip} onValueChange={v => { const n = [...anketSorulari]; n[i] = {...n[i], tip: v}; setAnketSorulari(n); }}><SelectTrigger className="text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="puan">⭐ Puan (1-5)</SelectItem><SelectItem value="evet_hayir">👍 Evet/Hayır</SelectItem><SelectItem value="metin">📝 Metin</SelectItem></SelectContent></Select></div>
+              <div><Label className="text-[10px]">Kategori</Label><Input value={s.kategori} onChange={e => { const n = [...anketSorulari]; n[i] = {...n[i], kategori: e.target.value}; setAnketSorulari(n); }} className="text-xs" /></div>
+            </div>
+            <Button variant="destructive" size="sm" className="text-xs" onClick={() => setAnketSorulari(anketSorulari.filter((_, j) => j !== i))}>Soru Sil</Button>
+          </div>
+        ))}
+        <Button variant="outline" className="w-full" onClick={() => setAnketSorulari([...anketSorulari, { no: anketSorulari.length + 1, soru: "", tip: "puan", kategori: "genel" }])}><Plus className="h-4 w-4 mr-2" />Yeni Soru Ekle</Button>
+        <Button onClick={() => kaydet("anket_sorulari", anketSorulari)} disabled={kayitEdiliyor} className="w-full bg-blue-600 text-white mt-2">💾 Anket Sorularını Kaydet</Button>
+      </div></CardContent></Card>)}
+    </div>
+  );
+}
+
 // GÖREV YÖNETİMİ
 // ═══════════════════════════════════════════════
 
@@ -5179,7 +5308,7 @@ function GelisimAlani({ user }) {
   const fetchAll = useCallback(async () => {
     try { const r = await axios.get(`${API}/gelisim/icerik`); setIcerikler(r.data); } catch(e) {}
     try { const r = await axios.get(`${API}/gelisim/tamamlama/${user.id}`); setTamamlananlar(r.data); } catch(e) {}
-    try { const r = await axios.get(`${API}/gelisim/puan-tablosu`); setPuanTablosu(r.data); } catch(e) {}
+    try { const r = await axios.get(`${API}/puan-tablosu/birlesik`); setPuanTablosu(Array.isArray(r.data) ? r.data : []); } catch(e) {}
     try { const r = await axios.get(`${API}/egzersiz/puanlar`); setEgzersizPuanlari(r.data); } catch(e) {}
   }, [user.id]);
 
@@ -5720,10 +5849,13 @@ function GelisimAlani({ user }) {
                       <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold ${i===0?'bg-yellow-400 text-white':i===1?'bg-gray-300 text-gray-700':i===2?'bg-orange-300 text-white':'bg-gray-100 text-gray-600'}`}>{i+1}</span>
                       <div>
                         <div className="text-sm font-medium">{u.ad} {u.soyad}</div>
-                        <div className="text-xs text-gray-400">{roleLabel(u.role)}</div>
+                        <div className="text-xs text-gray-400">{roleLabel(u.role)} {u.rozet_sayisi > 0 && `• 🏅${u.rozet_sayisi}`}</div>
                       </div>
                     </div>
-                    <span className="font-bold text-orange-600">{u.puan} puan</span>
+                    <div className="text-right">
+                      <span className="font-bold text-orange-600">{u.toplam_puan} puan</span>
+                      {u.rozet_puan > 0 && <div className="text-[10px] text-gray-400">🏅{u.rozet_puan} + ✍️{u.gelisim_puan}</div>}
+                    </div>
                   </div>
                 ))}
                 {puanTablosu.length === 0 && <p className="text-sm text-gray-400 text-center py-4">Henüz puan yok</p>}
