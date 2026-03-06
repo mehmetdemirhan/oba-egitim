@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./components/ui/dialog";
 import { Badge } from "./components/ui/badge";
-import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send } from "lucide-react";
+import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send, Bell } from "lucide-react";
 import { useToast } from "./hooks/use-toast";
 import { Toaster } from "./components/ui/toaster";
 import { ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Tooltip, XAxis, YAxis, CartesianGrid, AreaChart, Area } from 'recharts';
@@ -348,6 +348,7 @@ function AppContent() {
                 <div className="text-sm font-medium text-gray-900">{user.ad} {user.soyad}</div>
                 <div className="text-xs text-gray-500">{roleLabel(user.role)}</div>
               </div>
+              <BildirimZili user={user} />
               <Button onClick={exportToExcel} disabled={loadingAction} className="bg-green-600 hover:bg-green-700 text-white"><Download className="h-4 w-4 mr-2" />Excel</Button>
               <Button variant="outline" size="sm" onClick={logout} className="flex items-center gap-2"><LogOut className="h-4 w-4" />Çıkış</Button>
             </div>
@@ -1246,6 +1247,69 @@ function AppContent() {
 
 
 // ── DASHBOARD: ONAY BEKLEYENLERKarti ──
+// ═══════════════════════════════════════════════
+// BİLDİRİM ZİLİ — Tüm paneller için ortak
+// ═══════════════════════════════════════════════
+
+function BildirimZili({ user }) {
+  const { toast } = useToast();
+  const [bildirimler, setBildirimler] = useState([]);
+  const [okunmamis, setOkunmamis] = useState(0);
+  const [acik, setAcik] = useState(false);
+
+  const fetchBildirimler = useCallback(async () => {
+    try { const r = await axios.get(`${API}/bildirimler`); setBildirimler(Array.isArray(r.data) ? r.data.slice(0, 20) : []); } catch(e) {}
+    try { const r = await axios.get(`${API}/bildirimler/okunmamis`); setOkunmamis(r.data?.sayi || 0); } catch(e) {}
+  }, []);
+
+  useEffect(() => { fetchBildirimler(); const iv = setInterval(fetchBildirimler, 30000); return () => clearInterval(iv); }, [fetchBildirimler]);
+
+  const oku = async (id) => { try { await axios.put(`${API}/bildirimler/${id}/okundu`); fetchBildirimler(); } catch(e) {} };
+  const tumunuOku = async () => { try { await axios.put(`${API}/bildirimler/tumunu-oku`); fetchBildirimler(); } catch(e) {} };
+
+  const turIkon = { rapor_tamamlandi: "📋", gorev_atandi: "📌", gorev_tamamlandi: "✅", gorev_hatirlatma: "⏰", streak_kirildi: "🔥", streak_tebrik: "🎉", kur_atladi: "🎓", mesaj_geldi: "✉️", rozet_kazandi: "🏅", risk_yuksek: "🚨", anket_hatirlatma: "⭐", lig_yukseldi: "🏆", haftalik_ozet: "📊" };
+
+  return (
+    <div className="relative">
+      <button onClick={() => setAcik(!acik)} className="relative p-2 rounded-xl hover:bg-gray-100 transition-all">
+        <Bell className="h-5 w-5 text-gray-600" />
+        {okunmamis > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">{okunmamis > 9 ? "9+" : okunmamis}</span>}
+      </button>
+      {acik && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setAcik(false)} />
+          <div className="absolute right-0 top-12 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border z-50 max-h-[70vh] flex flex-col">
+            <div className="flex items-center justify-between p-3 border-b">
+              <span className="font-bold text-sm">Bildirimler {okunmamis > 0 && `(${okunmamis})`}</span>
+              {okunmamis > 0 && <button onClick={tumunuOku} className="text-xs text-blue-600 hover:underline">Tümünü oku</button>}
+            </div>
+            <div className="overflow-y-auto flex-1">
+              {bildirimler.length === 0 ? (
+                <div className="p-6 text-center text-gray-400 text-sm">Bildirim yok</div>
+              ) : bildirimler.map(b => (
+                <div key={b.id} onClick={() => !b.okundu && oku(b.id)}
+                  className={`p-3 border-b border-gray-50 cursor-pointer hover:bg-gray-50 transition-all ${!b.okundu ? 'bg-blue-50/50' : ''}`}>
+                  <div className="flex items-start gap-2">
+                    <span className="text-lg">{turIkon[b.tur] || "🔔"}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className={`text-xs font-medium ${!b.okundu ? 'text-blue-700' : 'text-gray-600'}`}>{b.baslik}</span>
+                        {!b.okundu && <span className="w-2 h-2 bg-blue-500 rounded-full shrink-0" />}
+                      </div>
+                      <p className="text-xs text-gray-600 mt-0.5 line-clamp-2">{b.icerik}</p>
+                      <span className="text-[10px] text-gray-400">{new Date(b.tarih).toLocaleDateString('tr-TR')} {new Date(b.tarih).toLocaleTimeString('tr-TR', {hour:'2-digit',minute:'2-digit'})}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function BekleyenlerKarti({ bekleyenler, onRefresh, onTabChange }) {
   const { toast } = useToast();
   const [acikDetay, setAcikDetay] = useState(null);
@@ -3735,7 +3799,10 @@ function OgretmenPaneli({ user, logout }) {
             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center"><BookOpen className="h-5 w-5 text-white" /></div>
             <div><div className="font-bold text-gray-900">{user.ad} {user.soyad}</div><div className="text-xs text-gray-500">Öğretmen • {ogrenciler.length} öğrenci</div></div>
           </div>
-          <Button variant="outline" size="sm" onClick={logout}><LogOut className="h-3 w-3 mr-1" />Çıkış</Button>
+          <div className="flex items-center gap-2">
+            <BildirimZili user={user} />
+            <Button variant="outline" size="sm" onClick={logout}><LogOut className="h-3 w-3 mr-1" />Çıkış</Button>
+          </div>
         </div>
       </div>
 
@@ -4212,6 +4279,7 @@ function OgrenciPaneli({ user, logout }) {
           </div>
           <div className="flex items-center gap-2">
             <div className="text-center"><div className="text-lg font-bold text-orange-600">{seviyeEmoji} Sv.{seviye}</div></div>
+            <BildirimZili user={user} />
             <Button variant="outline" size="sm" onClick={logout} className="text-xs"><LogOut className="h-3 w-3 mr-1" />Çıkış</Button>
           </div>
         </div>
@@ -4689,7 +4757,10 @@ function VeliPaneli({ user, logout }) {
             <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-pink-500 rounded-xl flex items-center justify-center"><BookOpen className="h-5 w-5 text-white" /></div>
             <div><div className="font-bold text-gray-900 text-sm">{user.ad} {user.soyad}</div><div className="text-xs text-gray-500">Veli Paneli</div></div>
           </div>
-          <Button variant="outline" size="sm" onClick={logout} className="text-xs"><LogOut className="h-3 w-3 mr-1" />Çıkış</Button>
+          <div className="flex items-center gap-2">
+            <BildirimZili user={user} />
+            <Button variant="outline" size="sm" onClick={logout} className="text-xs"><LogOut className="h-3 w-3 mr-1" />Çıkış</Button>
+          </div>
         </div>
       </div>
 
