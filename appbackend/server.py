@@ -565,6 +565,137 @@ async def create_default_admin():
     else:
         logging.info(f"ℹ️ Demo veli zaten var: {demo_parent_email}")
 
+    # --- DEMO ROZET + ANKET VERİLERİ ---
+    existing_rozetler = await db.kazanilan_rozetler.find_one({"kullanici_id": {"$regex": "^demo-"}})
+    if not existing_rozetler:
+        logging.info("🏅 Demo rozet + anket verileri oluşturuluyor...")
+
+        # Demo user id'lerini bul
+        demo_ogretmen_user = await db.users.find_one({"email": demo_teacher_email})
+        demo_ogrenci_user = await db.users.find_one({"email": demo_student_email})
+        demo_veli_user = await db.users.find_one({"email": demo_parent_email})
+
+        if demo_ogretmen_user and demo_ogrenci_user:
+            ogretmen_uid = demo_ogretmen_user["id"]
+            ogretmen_lid = demo_ogretmen_user.get("linked_id", "")
+            ogrenci_uid = demo_ogrenci_user["id"]
+            ogrenci_lid = demo_ogrenci_user.get("linked_id", "")
+
+            # Öğretmen rozetleri
+            ogretmen_rozetler = [
+                "icerik_ilk", "icerik_5",  # İçerik katkısı
+                "oy_ilk", "oy_20",  # Kalite kontrol
+                "gorev_ilk", "gorev_20",  # Eğitimci
+                "kur_ilk",  # Kur atlama
+                "gelisim_ilk", "gelisim_10",  # Gelişim
+                "mesaj_ilk",  # İletişim
+                "egz_ilk",  # Egzersiz
+            ]
+            for kod in ogretmen_rozetler:
+                await db.kazanilan_rozetler.insert_one({
+                    "id": str(uuid.uuid4()),
+                    "kullanici_id": ogretmen_uid,
+                    "rozet_kodu": kod,
+                    "kazanma_tarihi": (simdi - timedelta(days=random.randint(1, 30))).isoformat(),
+                })
+
+            # Öğrenci rozetleri (Ali Yılmaz)
+            ogrenci_rozetler = [
+                "okuma_ilk", "okuma_100",  # Okuma
+                "streak_3", "streak_7",  # Streak
+                "kitap_1", "kitap_5",  # Kitap
+                "gorev_ilk", "gorev_10",  # Görev
+                "egz_ilk",  # Egzersiz
+                "orman_ilk", "orman_50",  # Orman
+            ]
+            for kod in ogrenci_rozetler:
+                await db.kazanilan_rozetler.insert_one({
+                    "id": str(uuid.uuid4()),
+                    "kullanici_id": ogrenci_uid,
+                    "rozet_kodu": kod,
+                    "kazanma_tarihi": (simdi - timedelta(days=random.randint(1, 20))).isoformat(),
+                })
+
+            # Diğer demo öğrencilere de birkaç rozet
+            for email_suffix in ["2", "3"]:
+                other = await db.users.find_one({"email": f"demo-ogrenci{email_suffix}@oba.com"})
+                if other:
+                    for kod in ["okuma_ilk", "streak_3", "kitap_1", "gorev_ilk"]:
+                        await db.kazanilan_rozetler.insert_one({
+                            "id": str(uuid.uuid4()),
+                            "kullanici_id": other["id"],
+                            "rozet_kodu": kod,
+                            "kazanma_tarihi": (simdi - timedelta(days=random.randint(1, 15))).isoformat(),
+                        })
+
+            # Kur atlama kayıtları (öğretmen rozeti için)
+            for i in range(3):
+                await db.kur_atlamalari.insert_one({
+                    "id": str(uuid.uuid4()),
+                    "ogrenci_id": ogrenci_lid if i == 0 else str(uuid.uuid4()),
+                    "ogretmen_id": ogretmen_lid,
+                    "eski_kur": f"Kur {i+1}",
+                    "yeni_kur": f"Kur {i+2}",
+                    "tarih": (simdi - timedelta(days=random.randint(5, 60))).isoformat(),
+                })
+
+            # Veli anketleri (öğretmen rozeti + dashboard için)
+            if demo_veli_user:
+                veli_uid = demo_veli_user["id"]
+                anket_kategoriler = ["iletisim", "duzen", "etki", "geri_bildirim", "motivasyon", "icerik", "genel"]
+
+                # 3 farklı dönem için anket
+                for donem_offset in [0, 1, 2]:
+                    donem_ay = (simdi - timedelta(days=donem_offset * 30)).strftime("%Y-D%m")
+                    yanitlar = []
+                    for j, kat in enumerate(anket_kategoriler):
+                        puan = random.choice([4, 4, 5, 5, 5, 4, 5])  # yüksek puanlar
+                        yanitlar.append({"soru_no": j + 1, "puan": puan, "kategori": kat})
+
+                    await db.veli_anketleri.insert_one({
+                        "id": str(uuid.uuid4()),
+                        "veli_id": veli_uid,
+                        "veli_ad": "Demo Veli",
+                        "ogretmen_id": ogretmen_lid,
+                        "ogrenci_id": ogrenci_lid,
+                        "donem": donem_ay,
+                        "yanitlar": yanitlar,
+                        "tavsiye": random.choice([True, True, True, False]),  # %75 tavsiye
+                        "not_text": random.choice([
+                            "Çocuğum çok gelişti, teşekkürler!",
+                            "Öğretmenimizden memnunuz.",
+                            "Okuma alışkanlığı kazandı, çok mutluyuz.",
+                            "",
+                        ]),
+                        "tarih": (simdi - timedelta(days=donem_offset * 30 + random.randint(0, 5))).isoformat(),
+                    })
+
+                # Birkaç tane daha farklı "veli"den anket (aynı öğretmene)
+                sahte_veliler = ["Veli A", "Veli B", "Veli C", "Veli D", "Veli E"]
+                for veli_ad in sahte_veliler:
+                    yanitlar = []
+                    for j, kat in enumerate(anket_kategoriler):
+                        yanitlar.append({"soru_no": j + 1, "puan": random.choice([3, 4, 4, 5, 5]), "kategori": kat})
+                    await db.veli_anketleri.insert_one({
+                        "id": str(uuid.uuid4()),
+                        "veli_id": str(uuid.uuid4()),  # sahte veli id
+                        "veli_ad": veli_ad,
+                        "ogretmen_id": ogretmen_lid,
+                        "ogrenci_id": str(uuid.uuid4()),
+                        "donem": simdi.strftime("%Y-D%m"),
+                        "yanitlar": yanitlar,
+                        "tavsiye": random.choice([True, True, True, True, False]),
+                        "not_text": random.choice(["Memnunuz", "Teşekkürler", "Güzel çalışma", ""]),
+                        "tarih": (simdi - timedelta(days=random.randint(1, 20))).isoformat(),
+                    })
+
+            logging.info(f"✅ Demo rozet + anket verileri oluşturuldu!")
+            logging.info(f"   🏅 Öğretmen: {len(ogretmen_rozetler)} rozet")
+            logging.info(f"   🏅 Öğrenci: {len(ogrenci_rozetler)} rozet")
+            logging.info(f"   ⭐ Veli anketleri: 8 adet")
+    else:
+        logging.info("ℹ️ Demo rozet + anket verileri zaten mevcut")
+
     logging.info("📋 Demo Hesapları:")
     logging.info(f"   🎓 Öğrenci: {demo_student_email} / {DEMO_PASSWORD}")
     logging.info(f"   👩‍🏫 Öğretmen: {demo_teacher_email} / {DEMO_PASSWORD}")
@@ -3071,8 +3202,351 @@ async def kur_atla(payload: dict, current_user=Depends(get_current_user)):
 
     ogrenci_id = payload.get("ogrenci_id")
     yeni_kur = payload.get("yeni_kur", "")
+
+    # Mevcut kuru al
+    student = await db.students.find_one({"id": ogrenci_id})
+    eski_kur = student.get("kur", "") if student else ""
+
+    # Kur güncelle
     await db.students.update_one({"id": ogrenci_id}, {"$set": {"kur": yeni_kur}})
-    return {"ok": True, "yeni_kur": yeni_kur}
+
+    # Kur atlama kaydı (rozet sistemi için)
+    ogretmen_id = current_user.get("linked_id") or current_user.get("id")
+    await db.kur_atlamalari.insert_one({
+        "id": str(uuid.uuid4()),
+        "ogrenci_id": ogrenci_id,
+        "ogretmen_id": ogretmen_id,
+        "eski_kur": eski_kur,
+        "yeni_kur": yeni_kur,
+        "tarih": datetime.utcnow().isoformat(),
+    })
+
+    return {"ok": True, "yeni_kur": yeni_kur, "eski_kur": eski_kur}
+
+
+# ─────────────────────────────────────────────
+# ROZET SİSTEMİ (Öğretmen + Öğrenci)
+# ─────────────────────────────────────────────
+
+OGRETMEN_ROZETLERI = [
+    # İçerik Katkısı
+    {"kod": "icerik_ilk", "ad": "İlk Adım", "ikon": "🌱", "kategori": "icerik", "seviye": "bronz", "puan": 5},
+    {"kod": "icerik_5", "ad": "İçerik Üreticisi", "ikon": "✍️", "kategori": "icerik", "seviye": "gumus", "puan": 10},
+    {"kod": "icerik_20", "ad": "Kütüphane Kurucusu", "ikon": "📚", "kategori": "icerik", "seviye": "altin", "puan": 25},
+    {"kod": "icerik_50", "ad": "Bilgi Kaynağı", "ikon": "🏛️", "kategori": "icerik", "seviye": "elmas", "puan": 50},
+    # Kalite Kontrol
+    {"kod": "oy_ilk", "ad": "İlk Oy", "ikon": "🗳️", "kategori": "kalite", "seviye": "bronz", "puan": 3},
+    {"kod": "oy_20", "ad": "Kalite Bekçisi", "ikon": "🛡️", "kategori": "kalite", "seviye": "gumus", "puan": 10},
+    {"kod": "oy_50", "ad": "Baş Editör", "ikon": "📋", "kategori": "kalite", "seviye": "altin", "puan": 25},
+    # Eğitimci
+    {"kod": "gorev_ilk", "ad": "İlk Görev", "ikon": "📌", "kategori": "egitimci", "seviye": "bronz", "puan": 3},
+    {"kod": "gorev_20", "ad": "Aktif Eğitimci", "ikon": "🎯", "kategori": "egitimci", "seviye": "gumus", "puan": 15},
+    {"kod": "ilham_veren", "ad": "İlham Veren", "ikon": "💡", "kategori": "egitimci", "seviye": "altin", "puan": 20},
+    {"kod": "yildiz_egitimci", "ad": "Yıldız Eğitimci", "ikon": "⭐", "kategori": "egitimci", "seviye": "elmas", "puan": 40},
+    # Kur Atlama
+    {"kod": "kur_ilk", "ad": "İlk Kur Atlatan", "ikon": "🎓", "kategori": "kur", "seviye": "bronz", "puan": 10},
+    {"kod": "kur_20", "ad": "Kur Ustası", "ikon": "🏅", "kategori": "kur", "seviye": "gumus", "puan": 25},
+    {"kod": "kur_30", "ad": "Seviye Atlatan", "ikon": "🚀", "kategori": "kur", "seviye": "altin", "puan": 40},
+    {"kod": "kur_50", "ad": "Süper Eğitimci", "ikon": "🦸", "kategori": "kur", "seviye": "platin", "puan": 75},
+    {"kod": "kur_100", "ad": "Dönüşüm Lideri", "ikon": "👑", "kategori": "kur", "seviye": "elmas", "puan": 100},
+    # Veli Değerlendirme
+    {"kod": "veli_ilk", "ad": "İlk Beğeni", "ikon": "👍", "kategori": "veli", "seviye": "bronz", "puan": 5},
+    {"kod": "veli_20", "ad": "Veli Favorisi", "ikon": "💜", "kategori": "veli", "seviye": "gumus", "puan": 20},
+    {"kod": "veli_30", "ad": "Ailelerin Güveni", "ikon": "🏠", "kategori": "veli", "seviye": "altin", "puan": 35},
+    {"kod": "veli_100", "ad": "Efsane Öğretmen", "ikon": "🌟", "kategori": "veli", "seviye": "elmas", "puan": 100},
+    # Gelişim + İletişim + Egzersiz
+    {"kod": "gelisim_ilk", "ad": "Meraklı Öğretmen", "ikon": "🔍", "kategori": "gelisim", "seviye": "bronz", "puan": 3},
+    {"kod": "gelisim_10", "ad": "Sürekli Öğrenen", "ikon": "📖", "kategori": "gelisim", "seviye": "gumus", "puan": 15},
+    {"kod": "gelisim_uzman", "ad": "Uzman Öğretmen", "ikon": "🎓", "kategori": "gelisim", "seviye": "elmas", "puan": 50},
+    {"kod": "mesaj_ilk", "ad": "İlk Mesaj", "ikon": "💬", "kategori": "iletisim", "seviye": "bronz", "puan": 2},
+    {"kod": "kopru_kurucu", "ad": "Köprü Kurucu", "ikon": "🌉", "kategori": "iletisim", "seviye": "altin", "puan": 15},
+    {"kod": "egz_ilk", "ad": "İlk Egzersiz", "ikon": "👁️", "kategori": "egzersiz", "seviye": "bronz", "puan": 2},
+    {"kod": "egz_tamset", "ad": "Tam Set", "ikon": "🎖️", "kategori": "egzersiz", "seviye": "altin", "puan": 20},
+]
+
+OGRENCI_ROZETLERI = [
+    {"kod": "okuma_ilk", "ad": "İlk Sayfa", "ikon": "📖", "kategori": "okuma", "seviye": "bronz", "xp": 5},
+    {"kod": "okuma_100", "ad": "Kitap Kurdu", "ikon": "🐛", "kategori": "okuma", "seviye": "gumus", "xp": 15},
+    {"kod": "okuma_500", "ad": "Okuma Yıldızı", "ikon": "⭐", "kategori": "okuma", "seviye": "altin", "xp": 30},
+    {"kod": "okuma_2000", "ad": "Okuma Efsanesi", "ikon": "🌟", "kategori": "okuma", "seviye": "elmas", "xp": 50},
+    {"kod": "streak_3", "ad": "İlk Alışkanlık", "ikon": "🔥", "kategori": "streak", "seviye": "bronz", "xp": 5},
+    {"kod": "streak_7", "ad": "Kararlı Okuyucu", "ikon": "💪", "kategori": "streak", "seviye": "gumus", "xp": 10},
+    {"kod": "streak_21", "ad": "Demir İrade", "ikon": "🏔️", "kategori": "streak", "seviye": "altin", "xp": 25},
+    {"kod": "streak_60", "ad": "Durdurulamaz", "ikon": "🚀", "kategori": "streak", "seviye": "elmas", "xp": 50},
+    {"kod": "kitap_1", "ad": "İlk Kitap", "ikon": "📕", "kategori": "kitap", "seviye": "bronz", "xp": 5},
+    {"kod": "kitap_5", "ad": "Kitap Kaşifi", "ikon": "🗺️", "kategori": "kitap", "seviye": "gumus", "xp": 15},
+    {"kod": "kitap_15", "ad": "Kütüphane Dostu", "ikon": "📚", "kategori": "kitap", "seviye": "altin", "xp": 30},
+    {"kod": "kitap_30", "ad": "Kitap Efsanesi", "ikon": "🏰", "kategori": "kitap", "seviye": "elmas", "xp": 50},
+    {"kod": "gorev_ilk", "ad": "Görev Başlangıcı", "ikon": "✅", "kategori": "gorev", "seviye": "bronz", "xp": 5},
+    {"kod": "gorev_10", "ad": "Görev Avcısı", "ikon": "🎯", "kategori": "gorev", "seviye": "gumus", "xp": 15},
+    {"kod": "gorev_30", "ad": "Görev Ustası", "ikon": "🏹", "kategori": "gorev", "seviye": "altin", "xp": 30},
+    {"kod": "gorev_100", "ad": "Görev Efsanesi", "ikon": "👑", "kategori": "gorev", "seviye": "elmas", "xp": 50},
+    {"kod": "egz_ilk", "ad": "Göz Jimnastiği", "ikon": "👁️", "kategori": "egzersiz", "seviye": "bronz", "xp": 3},
+    {"kod": "egz_20", "ad": "Egzersiz Yıldızı", "ikon": "💫", "kategori": "egzersiz", "seviye": "gumus", "xp": 10},
+    {"kod": "egz_14", "ad": "Beyin Atleti", "ikon": "🧠", "kategori": "egzersiz", "seviye": "altin", "xp": 20},
+    {"kod": "orman_ilk", "ad": "İlk Fidan", "ikon": "🌱", "kategori": "orman", "seviye": "bronz", "xp": 3},
+    {"kod": "orman_50", "ad": "Küçük Orman", "ikon": "🌿", "kategori": "orman", "seviye": "gumus", "xp": 10},
+    {"kod": "orman_200", "ad": "Orman Korucusu", "ikon": "🌳", "kategori": "orman", "seviye": "altin", "xp": 25},
+    {"kod": "lig_gumus", "ad": "Gümüş Yolcusu", "ikon": "🥈", "kategori": "lig", "seviye": "gumus", "xp": 10},
+    {"kod": "lig_altin", "ad": "Altın Savaşçısı", "ikon": "🥇", "kategori": "lig", "seviye": "altin", "xp": 20},
+    {"kod": "lig_elmas", "ad": "Elmas Efsanesi", "ikon": "💎", "kategori": "lig", "seviye": "elmas", "xp": 50},
+]
+
+
+@api_router.get("/rozetler/tanim")
+async def rozet_tanimlari():
+    return {"ogretmen": OGRETMEN_ROZETLERI, "ogrenci": OGRENCI_ROZETLERI}
+
+
+@api_router.get("/rozetler/{user_id}")
+async def get_rozetler(user_id: str, current_user=Depends(get_current_user)):
+    rozetler = await db.kazanilan_rozetler.find({"kullanici_id": user_id}).to_list(length=None)
+    for r in rozetler:
+        r.pop("_id", None)
+    return rozetler
+
+
+@api_router.post("/rozetler/kontrol")
+async def rozet_kontrol(current_user=Depends(get_current_user)):
+    user_id = current_user["id"]
+    role = current_user.get("role", "")
+    linked_id = current_user.get("linked_id", "")
+
+    mevcut = await db.kazanilan_rozetler.find({"kullanici_id": user_id}).to_list(length=None)
+    mevcut_kodlar = set(r["rozet_kodu"] for r in mevcut)
+    yeni_rozetler = []
+
+    if role == "teacher":
+        ogretmen_id = linked_id or user_id
+        # İçerik sayısı
+        icerikler = await db.gelisim_icerik.count_documents({"ekleyen_id": user_id, "durum": "yayinda"})
+        # Oylama sayısı
+        tum_icerikler = await db.gelisim_icerik.find({"durum": {"$in": ["yayinda", "oylama"]}}).to_list(length=None)
+        oy_sayisi = sum(1 for ic in tum_icerikler if user_id in (ic.get("oylar") or {}))
+        # Görev atama
+        gorevler = await db.gorevler.find({"atayan_id": user_id}).to_list(length=None)
+        gorev_sayisi = len(gorevler)
+        tamamlanan_gorev = len([g for g in gorevler if g.get("durum") == "tamamlandi"])
+        # Öğrenci streak ortalaması
+        ogrenciler = await db.students.find({"ogretmen_id": ogretmen_id, "arsivli": {"$ne": True}}).to_list(length=None)
+        from datetime import timedelta
+        simdi = datetime.utcnow()
+        streakler = []
+        for s in ogrenciler:
+            logs = await db.reading_logs.find({"ogrenci_id": s["id"]}).to_list(length=None)
+            tarihler = sorted(set(l.get("tarih", "")[:10] for l in logs), reverse=True)
+            st = 0
+            for i in range(60):
+                gun = (simdi - timedelta(days=i)).strftime("%Y-%m-%d")
+                if gun in tarihler: st += 1
+                elif i > 0: break
+            streakler.append(st)
+        ort_streak = sum(streakler) / max(len(streakler), 1)
+        # Kur atlama
+        kur_sayisi = await db.kur_atlamalari.count_documents({"ogretmen_id": ogretmen_id})
+        # Gelişim tamamlama
+        gelisim_tam = await db.gelisim_tamamlama.count_documents({"kullanici_id": user_id})
+        # Mesaj
+        mesajlar = await db.mesajlar.find({"gonderen_id": user_id}).to_list(length=None)
+        mesaj_sayisi = len(mesajlar)
+        mesaj_roller = set(m.get("alici_rol", "") for m in mesajlar)
+        # Egzersiz
+        egz_tam = await db.egzersiz_tamamlama.find({"kullanici_id": user_id}).to_list(length=None)
+        egz_turler = set(e.get("egzersiz_id", "") for e in egz_tam)
+        # Veli anketi
+        anketler = await db.veli_anketleri.find({"ogretmen_id": ogretmen_id}).to_list(length=None)
+        anket_sayisi = len(anketler)
+        anket_ort = 0
+        tavsiye_oran = 0
+        if anket_sayisi > 0:
+            puanlar = []
+            tavsiyeler = 0
+            for a in anketler:
+                yanitlar = a.get("yanitlar", [])
+                puan_yanitlar = [y.get("puan", 0) for y in yanitlar if y.get("puan")]
+                if puan_yanitlar:
+                    puanlar.append(sum(puan_yanitlar) / len(puan_yanitlar))
+                if a.get("tavsiye"):
+                    tavsiyeler += 1
+            anket_ort = sum(puanlar) / max(len(puanlar), 1)
+            tavsiye_oran = (tavsiyeler / anket_sayisi) * 100
+
+        # Kontrol
+        checks = [
+            ("icerik_ilk", icerikler >= 1), ("icerik_5", icerikler >= 5), ("icerik_20", icerikler >= 20), ("icerik_50", icerikler >= 50),
+            ("oy_ilk", oy_sayisi >= 1), ("oy_20", oy_sayisi >= 20), ("oy_50", oy_sayisi >= 50),
+            ("gorev_ilk", gorev_sayisi >= 1), ("gorev_20", gorev_sayisi >= 20 and tamamlanan_gorev >= 10),
+            ("ilham_veren", ort_streak >= 7), ("yildiz_egitimci", ort_streak >= 10),
+            ("kur_ilk", kur_sayisi >= 1), ("kur_20", kur_sayisi >= 20), ("kur_30", kur_sayisi >= 30), ("kur_50", kur_sayisi >= 50), ("kur_100", kur_sayisi >= 100),
+            ("veli_ilk", anket_sayisi >= 1 and anket_ort >= 4), ("veli_20", anket_sayisi >= 20 and anket_ort >= 4.5),
+            ("veli_30", anket_sayisi >= 30 and anket_ort >= 4.5 and tavsiye_oran >= 90),
+            ("veli_100", anket_sayisi >= 100 and anket_ort >= 4.8 and tavsiye_oran >= 95),
+            ("gelisim_ilk", gelisim_tam >= 1), ("gelisim_10", gelisim_tam >= 10), ("gelisim_uzman", gelisim_tam >= 30),
+            ("mesaj_ilk", mesaj_sayisi >= 1), ("kopru_kurucu", "student" in mesaj_roller and "parent" in mesaj_roller),
+            ("egz_ilk", len(egz_turler) >= 1), ("egz_tamset", len(egz_turler) >= 14),
+        ]
+        for kod, kosul in checks:
+            if kosul and kod not in mevcut_kodlar:
+                doc = {"id": str(uuid.uuid4()), "kullanici_id": user_id, "rozet_kodu": kod, "kazanma_tarihi": datetime.utcnow().isoformat()}
+                await db.kazanilan_rozetler.insert_one(doc)
+                rozet_bilgi = next((r for r in OGRETMEN_ROZETLERI if r["kod"] == kod), None)
+                yeni_rozetler.append({**doc, "rozet": rozet_bilgi})
+
+    elif role == "student":
+        ogrenci_id = linked_id or user_id
+        logs = await db.reading_logs.find({"ogrenci_id": ogrenci_id}).to_list(length=None)
+        toplam_dk = sum(l.get("sure_dakika", 0) for l in logs)
+        kitaplar = set(l.get("kitap_adi", "") for l in logs if l.get("kitap_adi"))
+        from datetime import timedelta
+        simdi = datetime.utcnow()
+        tarihler = sorted(set(l.get("tarih", "")[:10] for l in logs), reverse=True)
+        streak = 0
+        for i in range(60):
+            gun = (simdi - timedelta(days=i)).strftime("%Y-%m-%d")
+            if gun in tarihler: streak += 1
+            elif i > 0: break
+        gorevler_tam = await db.gorevler.count_documents({"hedef_id": ogrenci_id, "durum": "tamamlandi"})
+        egz_tam = await db.egzersiz_tamamlama.find({"kullanici_id": user_id}).to_list(length=None)
+        egz_turler = set(e.get("egzersiz_id", "") for e in egz_tam)
+        egz_toplam = len(egz_tam)
+        agac_sayisi = toplam_dk  # 1 dk = 1 ağaç
+        student = await db.students.find_one({"id": ogrenci_id})
+        toplam_xp = student.get("toplam_xp", 0) if student else 0
+
+        checks = [
+            ("okuma_ilk", len(logs) >= 1), ("okuma_100", toplam_dk >= 100), ("okuma_500", toplam_dk >= 500), ("okuma_2000", toplam_dk >= 2000),
+            ("streak_3", streak >= 3), ("streak_7", streak >= 7), ("streak_21", streak >= 21), ("streak_60", streak >= 60),
+            ("kitap_1", len(kitaplar) >= 1), ("kitap_5", len(kitaplar) >= 5), ("kitap_15", len(kitaplar) >= 15), ("kitap_30", len(kitaplar) >= 30),
+            ("gorev_ilk", gorevler_tam >= 1), ("gorev_10", gorevler_tam >= 10), ("gorev_30", gorevler_tam >= 30), ("gorev_100", gorevler_tam >= 100),
+            ("egz_ilk", egz_toplam >= 1), ("egz_20", egz_toplam >= 20), ("egz_14", len(egz_turler) >= 14),
+            ("orman_ilk", agac_sayisi >= 1), ("orman_50", agac_sayisi >= 50), ("orman_200", agac_sayisi >= 200),
+            ("lig_gumus", toplam_xp >= 200), ("lig_altin", toplam_xp >= 500), ("lig_elmas", toplam_xp >= 1000),
+        ]
+        for kod, kosul in checks:
+            if kosul and kod not in mevcut_kodlar:
+                doc = {"id": str(uuid.uuid4()), "kullanici_id": user_id, "rozet_kodu": kod, "kazanma_tarihi": datetime.utcnow().isoformat()}
+                await db.kazanilan_rozetler.insert_one(doc)
+                rozet_bilgi = next((r for r in OGRENCI_ROZETLERI if r["kod"] == kod), None)
+                yeni_rozetler.append({**doc, "rozet": rozet_bilgi})
+
+    return {"yeni_rozetler": yeni_rozetler, "toplam": len(mevcut_kodlar) + len(yeni_rozetler)}
+
+
+# ─────────────────────────────────────────────
+# VELİ DEĞERLENDİRME ANKETİ
+# ─────────────────────────────────────────────
+
+ANKET_SORULARI = [
+    {"no": 1, "soru": "Öğretmenin çocuğunuzla iletişimi nasıl?", "tip": "puan", "kategori": "iletisim"},
+    {"no": 2, "soru": "Görev ve ödevler düzenli veriliyor mu?", "tip": "puan", "kategori": "duzen"},
+    {"no": 3, "soru": "Çocuğunuzun okuma alışkanlığında gelişme görüyor musunuz?", "tip": "puan", "kategori": "etki"},
+    {"no": 4, "soru": "Öğretmen geri bildirimleri yeterli mi?", "tip": "puan", "kategori": "geri_bildirim"},
+    {"no": 5, "soru": "Çocuğunuzun motivasyonu arttı mı?", "tip": "puan", "kategori": "motivasyon"},
+    {"no": 6, "soru": "Öğretmenin egzersiz ve içerik çeşitliliği yeterli mi?", "tip": "puan", "kategori": "icerik"},
+    {"no": 7, "soru": "Genel olarak öğretmenden memnun musunuz?", "tip": "puan", "kategori": "genel"},
+    {"no": 8, "soru": "Bu öğretmeni başka velilere tavsiye eder misiniz?", "tip": "evet_hayir", "kategori": "tavsiye"},
+    {"no": 9, "soru": "Eklemek istediğiniz not (opsiyonel)", "tip": "metin", "kategori": "not"},
+]
+
+
+@api_router.get("/anketler/sorular")
+async def get_anket_sorulari():
+    return ANKET_SORULARI
+
+
+@api_router.post("/anketler")
+async def create_anket(payload: dict, current_user=Depends(get_current_user)):
+    if current_user.get("role") != "parent":
+        raise HTTPException(status_code=403, detail="Sadece veliler anket doldurabilir")
+
+    ogretmen_id = payload.get("ogretmen_id", "")
+    ogrenci_id = payload.get("ogrenci_id", "")
+    yanitlar = payload.get("yanitlar", [])
+    tavsiye = payload.get("tavsiye", None)
+    not_text = payload.get("not_text", "")
+    donem = payload.get("donem", datetime.utcnow().strftime("%Y-D%m"))
+
+    # Aynı dönem + aynı öğretmen kontrolü
+    mevcut = await db.veli_anketleri.find_one({
+        "veli_id": current_user["id"], "ogretmen_id": ogretmen_id, "donem": donem
+    })
+    if mevcut:
+        raise HTTPException(status_code=409, detail="Bu dönem için zaten anket doldurdunuz")
+
+    doc = {
+        "id": str(uuid.uuid4()),
+        "veli_id": current_user["id"],
+        "veli_ad": f"{current_user.get('ad', '')} {current_user.get('soyad', '')}".strip(),
+        "ogretmen_id": ogretmen_id,
+        "ogrenci_id": ogrenci_id,
+        "donem": donem,
+        "yanitlar": yanitlar,
+        "tavsiye": tavsiye,
+        "not_text": not_text,
+        "tarih": datetime.utcnow().isoformat(),
+    }
+    await db.veli_anketleri.insert_one(doc)
+    return doc
+
+
+@api_router.get("/anketler/ogretmen/{ogretmen_id}/ozet")
+async def anket_ozet(ogretmen_id: str, current_user=Depends(get_current_user)):
+    anketler = await db.veli_anketleri.find({"ogretmen_id": ogretmen_id}).to_list(length=None)
+    if not anketler:
+        return {"anket_sayisi": 0, "ortalama": 0, "tavsiye_oran": 0, "kategoriler": {}, "son_anketler": []}
+
+    puanlar = []
+    tavsiyeler = 0
+    kategori_toplam = {}
+    kategori_sayac = {}
+
+    for a in anketler:
+        for y in a.get("yanitlar", []):
+            if y.get("puan"):
+                puanlar.append(y["puan"])
+                kat = y.get("kategori", "genel")
+                kategori_toplam[kat] = kategori_toplam.get(kat, 0) + y["puan"]
+                kategori_sayac[kat] = kategori_sayac.get(kat, 0) + 1
+        if a.get("tavsiye"):
+            tavsiyeler += 1
+
+    ortalama = round(sum(puanlar) / max(len(puanlar), 1), 1)
+    tavsiye_oran = round((tavsiyeler / len(anketler)) * 100)
+    kategoriler = {k: round(kategori_toplam[k] / kategori_sayac[k], 1) for k in kategori_toplam}
+
+    # Öğretmen isimleri görmez
+    role = current_user.get("role", "")
+    son_anketler = []
+    for a in sorted(anketler, key=lambda x: x.get("tarih", ""), reverse=True)[:10]:
+        a.pop("_id", None)
+        entry = {"donem": a.get("donem"), "tarih": a.get("tarih"), "tavsiye": a.get("tavsiye")}
+        puan_yanitlar = [y.get("puan") for y in a.get("yanitlar", []) if y.get("puan")]
+        entry["ortalama"] = round(sum(puan_yanitlar) / max(len(puan_yanitlar), 1), 1) if puan_yanitlar else 0
+        if role in ["admin", "coordinator"]:
+            entry["veli_ad"] = a.get("veli_ad", "")
+            entry["not_text"] = a.get("not_text", "")
+        son_anketler.append(entry)
+
+    return {
+        "anket_sayisi": len(anketler), "ortalama": ortalama, "tavsiye_oran": tavsiye_oran,
+        "kategoriler": kategoriler, "son_anketler": son_anketler,
+    }
+
+
+@api_router.get("/anketler/veli/{veli_id}")
+async def veli_anketleri(veli_id: str, current_user=Depends(get_current_user)):
+    anketler = await db.veli_anketleri.find({"veli_id": veli_id}).to_list(length=None)
+    for a in anketler:
+        a.pop("_id", None)
+    return anketler
+
+
+# ─────────────────────────────────────────────
+# KUR ATLAMA KAYDI (rozet için güncelleme)
+# ─────────────────────────────────────────────
+
+# kur/atla endpoint'ini güncelle — kur_atlamalari collection'ına da kaydet
+_original_kur_atla = None  # placeholder
 
 
 # ─────────────────────────────────────────────
