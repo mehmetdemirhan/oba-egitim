@@ -4898,18 +4898,47 @@ function SistemAyarlari({ user }) {
 
   useEffect(() => {
     const fetchAyarlar = async () => {
-      try { const r = await axios.get(`${API}/ayarlar/xp_tablosu`); setXpTablosu(r.data?.degerler || r.data || {}); } catch(e) {}
-      try { const r = await axios.get(`${API}/ayarlar/lig_esikleri`); setLigEsikleri(r.data?.degerler || r.data || {}); } catch(e) {}
-      try { const r = await axios.get(`${API}/ayarlar/ogretmen_rozetleri`); const d = r.data?.degerler || r.data; setOgretmenRozetler(Array.isArray(d) ? d : []); } catch(e) {
-      // Fallback: rozetler/tanim endpoint'inden çek
-      try { const r2 = await axios.get(`${API}/rozetler/tanim`); setOgretmenRozetler(Array.isArray(r2.data?.ogretmen) ? r2.data.ogretmen : []); } catch(e2) {}
-    }
-      try { const r = await axios.get(`${API}/ayarlar/ogrenci_rozetleri`); const d = r.data?.degerler || r.data; setOgrenciRozetler(Array.isArray(d) ? d : []); } catch(e) {
-      try { const r2 = await axios.get(`${API}/rozetler/tanim`); setOgrenciRozetler(Array.isArray(r2.data?.ogrenci) ? r2.data.ogrenci : []); } catch(e2) {}
-    }
-      try { const r = await axios.get(`${API}/ayarlar/anket_sorulari`); const d = r.data?.degerler || r.data; setAnketSorulari(Array.isArray(d) ? d : []); } catch(e) {
-      try { const r2 = await axios.get(`${API}/anketler/sorular`); setAnketSorulari(Array.isArray(r2.data) ? r2.data : []); } catch(e2) {}
-    }
+      // XP
+      try {
+        const r = await axios.get(`${API}/ayarlar/xp_tablosu`);
+        const d = r.data?.degerler || r.data;
+        setXpTablosu(d && typeof d === 'object' && Object.keys(d).length > 0 ? d : { okuma_gorevi: 10, anlama_testi: 15, kelime_gorevi: 8, gunluk_streak: 5, kitap_bitirme: 30, yazili_ozet: 20, egzersiz: 5, gelisim_tamamla: 5, gorev_tamamla: 10 });
+      } catch(e) { setXpTablosu({ okuma_gorevi: 10, anlama_testi: 15, kelime_gorevi: 8, gunluk_streak: 5, kitap_bitirme: 30, yazili_ozet: 20, egzersiz: 5, gelisim_tamamla: 5, gorev_tamamla: 10 }); }
+      // Lig
+      try {
+        const r = await axios.get(`${API}/ayarlar/lig_esikleri`);
+        const d = r.data?.degerler || r.data;
+        setLigEsikleri(d && typeof d === 'object' && Object.keys(d).length > 0 ? d : { bronz: 0, gumus: 200, altin: 500, elmas: 1000 });
+      } catch(e) { setLigEsikleri({ bronz: 0, gumus: 200, altin: 500, elmas: 1000 }); }
+      // Rozetler — önce ayarlar, sonra rozetler/tanim fallback
+      let ogretmenLoaded = false, ogrenciLoaded = false;
+      try {
+        const r = await axios.get(`${API}/ayarlar/ogretmen_rozetleri`);
+        const d = r.data?.degerler || r.data;
+        if (Array.isArray(d) && d.length > 0) { setOgretmenRozetler(d); ogretmenLoaded = true; }
+      } catch(e) {}
+      try {
+        const r = await axios.get(`${API}/ayarlar/ogrenci_rozetleri`);
+        const d = r.data?.degerler || r.data;
+        if (Array.isArray(d) && d.length > 0) { setOgrenciRozetler(d); ogrenciLoaded = true; }
+      } catch(e) {}
+      // Fallback: rozetler/tanim
+      if (!ogretmenLoaded || !ogrenciLoaded) {
+        try {
+          const r = await axios.get(`${API}/rozetler/tanim`);
+          if (!ogretmenLoaded && Array.isArray(r.data?.ogretmen)) setOgretmenRozetler(r.data.ogretmen);
+          if (!ogrenciLoaded && Array.isArray(r.data?.ogrenci)) setOgrenciRozetler(r.data.ogrenci);
+        } catch(e) {}
+      }
+      // Anket soruları
+      try {
+        const r = await axios.get(`${API}/ayarlar/anket_sorulari`);
+        const d = r.data?.degerler || r.data;
+        if (Array.isArray(d) && d.length > 0) { setAnketSorulari(d); }
+        else { const r2 = await axios.get(`${API}/anketler/sorular`); setAnketSorulari(Array.isArray(r2.data) ? r2.data : []); }
+      } catch(e) {
+        try { const r2 = await axios.get(`${API}/anketler/sorular`); setAnketSorulari(Array.isArray(r2.data) ? r2.data : []); } catch(e2) {}
+      }
     };
     fetchAyarlar();
   }, []);
