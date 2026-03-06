@@ -689,7 +689,29 @@ async def create_default_admin():
                         "tarih": (simdi - timedelta(days=random.randint(1, 20))).isoformat(),
                     })
 
-            logging.info(f"✅ Demo rozet + anket verileri oluşturuldu!")
+            # Demo bildirimler
+            demo_bildirimler = [
+                (ogrenci_uid, "gorev_atandi", "Ayşe Öğretmen size yeni görev atadı: Küçük Prens Bölüm 5-6", 3),
+                (ogrenci_uid, "streak_tebrik", "🎉 7 gün üst üste okudun! Harika gidiyorsun!", 1),
+                (ogrenci_uid, "rozet_kazandi", "🏅 Yeni rozet: Kararlı Okuyucu! 7 gün streak başarısı.", 2),
+                (ogretmen_uid, "risk_yuksek", "🚨 Mehmet Kaya son 7 gündür hiç okuma yapmadı!", 1),
+                (ogretmen_uid, "gorev_tamamlandi", "Ali Yılmaz 'Doğa belgeseli izle' görevini tamamladı.", 3),
+            ]
+            if demo_veli_user:
+                demo_bildirimler.append((demo_veli_user["id"], "rapor_tamamlandi", "Ali Yılmaz için yeni giriş analizi raporu hazır.", 2))
+                demo_bildirimler.append((demo_veli_user["id"], "streak_kirildi", "Ali dün okuma yapmadı. Streak kırılma riski!", 0))
+                demo_bildirimler.append((demo_veli_user["id"], "anket_hatirlatma", "Öğretmeninizi değerlendirmek ister misiniz? ⭐", 5))
+
+            for alici, tur, icerik, gun_once in demo_bildirimler:
+                await db.bildirimler.insert_one({
+                    "id": str(uuid.uuid4()), "alici_id": alici, "tur": tur,
+                    "baslik": BILDIRIM_TURLERI.get(tur, {}).get("baslik", "Bildirim"),
+                    "icerik": icerik, "oncelik": BILDIRIM_TURLERI.get(tur, {}).get("oncelik", "normal"),
+                    "ilgili_id": None, "okundu": gun_once > 2,
+                    "tarih": (simdi - timedelta(hours=gun_once * 24 + random.randint(1, 12))).isoformat(),
+                })
+
+            logging.info(f"✅ Demo rozet + anket + bildirim verileri oluşturuldu!")
             logging.info(f"   🏅 Öğretmen: {len(ogretmen_rozetler)} rozet")
             logging.info(f"   🏅 Öğrenci: {len(ogrenci_rozetler)} rozet")
             logging.info(f"   ⭐ Veli anketleri: 8 adet")
@@ -1808,6 +1830,9 @@ async def olustur_rapor(data: RaporOlusturCreate, current_user=Depends(get_curre
     }
     await db.diagnostic_raporlar.insert_one(rapor_data)
     rapor_data.pop("_id", None)
+    # Veliye bildirim gönder
+    try: await bildirim_rapor_tamamlandi(rapor_data.get("ogrenci_id"), rapor_data.get("baslik", "Giriş Analizi Raporu"))
+    except: pass
     return rapor_data
 
 @api_router.get("/diagnostic/rapor/ogrenci/{ogrenci_id}")
@@ -3677,6 +3702,220 @@ _original_kur_atla = None  # placeholder
 
 
 # ─────────────────────────────────────────────
+# BİLDİRİM SİSTEMİ
+# ─────────────────────────────────────────────
+
+BILDIRIM_TURLERI = {
+    "rapor_tamamlandi": {"baslik": "📋 Rapor Hazır", "oncelik": "yuksek"},
+    "gorev_atandi": {"baslik": "📌 Yeni Görev", "oncelik": "normal"},
+    "gorev_tamamlandi": {"baslik": "✅ Görev Tamamlandı", "oncelik": "normal"},
+    "gorev_hatirlatma": {"baslik": "⏰ Görev Hatırlatma", "oncelik": "normal"},
+    "streak_kirildi": {"baslik": "🔥 Streak Uyarısı", "oncelik": "yuksek"},
+    "streak_tebrik": {"baslik": "🎉 Streak Tebrik", "oncelik": "normal"},
+    "kur_atladi": {"baslik": "🎓 Kur Atlama", "oncelik": "yuksek"},
+    "mesaj_geldi": {"baslik": "✉️ Yeni Mesaj", "oncelik": "normal"},
+    "rozet_kazandi": {"baslik": "🏅 Yeni Rozet", "oncelik": "normal"},
+    "risk_yuksek": {"baslik": "🚨 Yüksek Risk", "oncelik": "yuksek"},
+    "anket_hatirlatma": {"baslik": "⭐ Değerlendirme", "oncelik": "normal"},
+    "lig_yukseldi": {"baslik": "🏆 Lig Yükselme", "oncelik": "normal"},
+    "haftalik_ozet": {"baslik": "📊 Haftalık Özet", "oncelik": "normal"},
+}
+
+
+async def bildirim_olustur(alici_id, tur, icerik, ilgili_id=None):
+    """Bildirim oluştur ve kaydet"""
+    tur_bilgi = BILDIRIM_TURLERI.get(tur, {"baslik": "Bildirim", "oncelik": "normal"})
+    doc = {
+        "id": str(uuid.uuid4()),
+        "alici_id": alici_id,
+        "tur": tur,
+        "baslik": tur_bilgi["baslik"],
+        "icerik": icerik,
+        "oncelik": tur_bilgi["oncelik"],
+        "ilgili_id": ilgili_id,
+        "okundu": False,
+        "tarih": datetime.utcnow().isoformat(),
+    }
+    await db.bildirimler.insert_one(doc)
+    return doc
+
+
+# Bildirimleri getir
+@api_router.get("/bildirimler")
+async def get_bildirimler(current_user=Depends(get_current_user)):
+    user_id = current_user["id"]
+    bildirimler = await db.bildirimler.find({"alici_id": user_id}).sort("tarih", -1).to_list(length=50)
+    for b in bildirimler:
+        b.pop("_id", None)
+    return bildirimler
+
+
+# Okunmamış bildirim sayısı
+@api_router.get("/bildirimler/okunmamis")
+async def get_okunmamis_bildirim(current_user=Depends(get_current_user)):
+    sayi = await db.bildirimler.count_documents({"alici_id": current_user["id"], "okundu": False})
+    return {"sayi": sayi}
+
+
+# Bildirim okundu işaretle
+@api_router.put("/bildirimler/{bildirim_id}/okundu")
+async def bildirim_okundu(bildirim_id: str, current_user=Depends(get_current_user)):
+    await db.bildirimler.update_one({"id": bildirim_id}, {"$set": {"okundu": True}})
+    return {"ok": True}
+
+
+# Tüm bildirimleri okundu yap
+@api_router.put("/bildirimler/tumunu-oku")
+async def tumunu_oku(current_user=Depends(get_current_user)):
+    await db.bildirimler.update_many({"alici_id": current_user["id"], "okundu": False}, {"$set": {"okundu": True}})
+    return {"ok": True}
+
+
+# Bildirim sil
+@api_router.delete("/bildirimler/{bildirim_id}")
+async def bildirim_sil(bildirim_id: str, current_user=Depends(get_current_user)):
+    await db.bildirimler.delete_one({"id": bildirim_id, "alici_id": current_user["id"]})
+    return {"ok": True}
+
+
+# ── OTOMATİK BİLDİRİM TETİKLEYİCİLERİ ──
+
+# Görev atandığında bildirim (gorevler endpoint'ine hook)
+async def bildirim_gorev_atandi(hedef_id, baslik, atayan_ad):
+    # Hedef kullanıcının user id'sini bul
+    user = await db.users.find_one({"$or": [{"id": hedef_id}, {"linked_id": hedef_id}]})
+    if user:
+        await bildirim_olustur(user["id"], "gorev_atandi", f"{atayan_ad} size yeni görev atadı: {baslik}", hedef_id)
+
+
+# Rapor tamamlandığında veliye bildirim
+async def bildirim_rapor_tamamlandi(ogrenci_id, rapor_baslik):
+    student = await db.students.find_one({"id": ogrenci_id})
+    if student:
+        # Velinin user'ını bul
+        veli = await db.users.find_one({"role": "parent", "$or": [
+            {"linked_id": ogrenci_id},
+            {"telefon": student.get("veli_telefon", "")}
+        ]})
+        if veli:
+            await bildirim_olustur(veli["id"], "rapor_tamamlandi",
+                f"{student.get('ad', '')} {student.get('soyad', '')} için yeni rapor hazır: {rapor_baslik}", ogrenci_id)
+
+
+# Streak uyarısı (günlük kontrol)
+async def bildirim_streak_kontrol():
+    """Tüm öğrencilerin streak'ini kontrol et, gerekirse bildirim gönder"""
+    from datetime import timedelta
+    simdi = datetime.utcnow()
+    dun = (simdi - timedelta(days=1)).strftime("%Y-%m-%d")
+    evvelsi = (simdi - timedelta(days=2)).strftime("%Y-%m-%d")
+
+    students = await db.students.find({"arsivli": {"$ne": True}}).to_list(length=None)
+    for s in students:
+        logs = await db.reading_logs.find({"ogrenci_id": s["id"]}).to_list(length=None)
+        tarihler = set(l.get("tarih", "")[:10] for l in logs)
+
+        # Dün okumadı ama önceki gün okumuştu → streak kırılma riski
+        if evvelsi in tarihler and dun not in tarihler:
+            user = await db.users.find_one({"linked_id": s["id"], "role": "student"})
+            if user:
+                # Bugün zaten bildirim gönderildi mi?
+                mevcut = await db.bildirimler.find_one({
+                    "alici_id": user["id"], "tur": "streak_kirildi",
+                    "tarih": {"$gte": simdi.strftime("%Y-%m-%d")}
+                })
+                if not mevcut:
+                    await bildirim_olustur(user["id"], "streak_kirildi",
+                        "Dün okuma yapmadın! Streak'ini korumak için bugün oku 📖")
+
+            # Veliye de bildir
+            veli = await db.users.find_one({"role": "parent", "$or": [
+                {"linked_id": s["id"]}, {"telefon": s.get("veli_telefon", "")}
+            ]})
+            if veli:
+                mevcut_v = await db.bildirimler.find_one({
+                    "alici_id": veli["id"], "tur": "streak_kirildi",
+                    "tarih": {"$gte": simdi.strftime("%Y-%m-%d")}
+                })
+                if not mevcut_v:
+                    await bildirim_olustur(veli["id"], "streak_kirildi",
+                        f"{s.get('ad', '')} dün okuma yapmadı. Streak kırılma riski!")
+
+        # 7 gün streak → tebrik
+        streak = 0
+        for i in range(30):
+            gun = (simdi - timedelta(days=i)).strftime("%Y-%m-%d")
+            if gun in tarihler:
+                streak += 1
+            elif i > 0:
+                break
+        if streak == 7:
+            user = await db.users.find_one({"linked_id": s["id"], "role": "student"})
+            if user:
+                mevcut = await db.bildirimler.find_one({
+                    "alici_id": user["id"], "tur": "streak_tebrik",
+                    "icerik": {"$regex": "7 gün"}
+                })
+                if not mevcut:
+                    await bildirim_olustur(user["id"], "streak_tebrik",
+                        "🎉 7 gün üst üste okudun! Harika gidiyorsun!")
+
+
+# Görev hatırlatma (son 1 gün kala)
+async def bildirim_gorev_hatirlatma():
+    from datetime import timedelta
+    simdi = datetime.utcnow()
+    yarin = (simdi + timedelta(days=1)).strftime("%Y-%m-%d")
+
+    gorevler = await db.gorevler.find({"durum": "bekliyor", "son_tarih": yarin}).to_list(length=None)
+    for g in gorevler:
+        user = await db.users.find_one({"$or": [{"id": g["hedef_id"]}, {"linked_id": g["hedef_id"]}]})
+        if user:
+            mevcut = await db.bildirimler.find_one({
+                "alici_id": user["id"], "tur": "gorev_hatirlatma", "ilgili_id": g["id"]
+            })
+            if not mevcut:
+                await bildirim_olustur(user["id"], "gorev_hatirlatma",
+                    f"Yarın son gün: {g['baslik']}", g["id"])
+
+
+# Risk yüksekse öğretmene bildir
+async def bildirim_risk_kontrol():
+    students = await db.students.find({"arsivli": {"$ne": True}}).to_list(length=None)
+    from datetime import timedelta
+    simdi = datetime.utcnow()
+
+    for s in students:
+        logs = await db.reading_logs.find({"ogrenci_id": s["id"]}).to_list(length=None)
+        yedi_gun = simdi - timedelta(days=7)
+        son_7 = [l for l in logs if l.get("tarih", "") >= yedi_gun.isoformat()]
+        aktif_7 = len(set(l.get("tarih", "")[:10] for l in son_7))
+
+        if aktif_7 == 0 and len(logs) > 0:  # Daha önce aktifti ama son 7 gün hiç okumadı
+            ogretmen_user = await db.users.find_one({"linked_id": s.get("ogretmen_id"), "role": "teacher"})
+            if ogretmen_user:
+                mevcut = await db.bildirimler.find_one({
+                    "alici_id": ogretmen_user["id"], "tur": "risk_yuksek",
+                    "ilgili_id": s["id"],
+                    "tarih": {"$gte": (simdi - timedelta(days=7)).isoformat()}
+                })
+                if not mevcut:
+                    await bildirim_olustur(ogretmen_user["id"], "risk_yuksek",
+                        f"🚨 {s.get('ad', '')} {s.get('soyad', '')} son 7 gündür hiç okuma yapmadı!", s["id"])
+
+
+# Manuel bildirim kontrol endpoint'i (admin veya cron job çağırabilir)
+@api_router.post("/bildirimler/kontrol")
+async def bildirim_kontrol_endpoint(current_user=Depends(get_current_user)):
+    if current_user.get("role") not in ["admin", "coordinator"]:
+        raise HTTPException(status_code=403, detail="Yetkisiz")
+    await bildirim_streak_kontrol()
+    await bildirim_gorev_hatirlatma()
+    await bildirim_risk_kontrol()
+    return {"ok": True, "mesaj": "Bildirim kontrolü tamamlandı"}
+
+
+# ─────────────────────────────────────────────
 # MESAJLAŞMA SİSTEMİ
 # ─────────────────────────────────────────────
 
@@ -3725,6 +3964,9 @@ async def create_mesaj(mesaj: MesajCreate, current_user=Depends(get_current_user
     )
     data = model.dict()
     await db.mesajlar.insert_one(data)
+    # Bildirim gönder
+    try: await bildirim_olustur(data.get("alici_id"), "mesaj_geldi", f"{data.get('gonderen_ad', '')} size mesaj gönderdi: {data.get('konu', '')}")
+    except: pass
     return data
 
 
@@ -3827,6 +4069,9 @@ async def create_gorev(gorev: GorevCreate, current_user=Depends(get_current_user
     )
     data = model.dict()
     await db.gorevler.insert_one(data)
+    # Bildirim gönder
+    try: await bildirim_gorev_atandi(data.get("hedef_id"), data.get("baslik", ""), data.get("atayan_ad", ""))
+    except: pass
     return data
 
 
