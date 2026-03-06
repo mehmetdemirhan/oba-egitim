@@ -359,12 +359,10 @@ function AppContent() {
             <TabsTrigger value="dashboard" className={tabClass}><BarChart3 className="h-4 w-4 mr-2" />Dashboard</TabsTrigger>
             <TabsTrigger value="teachers" className={tabClass}><UserCheck className="h-4 w-4 mr-2" />Öğretmenler</TabsTrigger>
             <TabsTrigger value="students" className={tabClass}><Users className="h-4 w-4 mr-2" />Öğrenciler</TabsTrigger>
-            <TabsTrigger value="courses" className={tabClass}><BookOpen className="h-4 w-4 mr-2" />Kurslar</TabsTrigger>
             {user.role !== "coordinator" && <TabsTrigger value="payments" className={tabClass}><CreditCard className="h-4 w-4 mr-2" />Muhasebe</TabsTrigger>}
             {user.role === "admin" && <TabsTrigger value="users" className={tabClass}><Shield className="h-4 w-4 mr-2" />Kullanıcılar</TabsTrigger>}
             <TabsTrigger value="gelisim" className={tabClass}><Trophy className="h-4 w-4 mr-2" />Gelişim</TabsTrigger>
             <TabsTrigger value="giris-analizi" className={tabClass}><Stethoscope className="h-4 w-4 mr-2" />Giriş Analizi</TabsTrigger>
-            <TabsTrigger value="gorevler" className={tabClass}><CheckCircle className="h-4 w-4 mr-2" />Görevler</TabsTrigger>
             <TabsTrigger value="mesajlar" className={tabClass}><Mail className="h-4 w-4 mr-2" />Mesajlar</TabsTrigger>
             {user.role === "admin" && <TabsTrigger value="ayarlar" className={tabClass}><Star className="h-4 w-4 mr-2" />Ayarlar</TabsTrigger>}
           </TabsList>
@@ -1141,7 +1139,7 @@ function AppContent() {
 
           {/* Gelisim Alani */}
           <TabsContent value="gelisim">
-            <GelisimAlani user={user} />
+            <GelisimAlani user={user} students={students} teachers={teachers} courses={courses} onTabChange={setActiveTab} />
           </TabsContent>
 
           {/* Görev Yönetimi */}
@@ -5349,7 +5347,7 @@ function GorevYonetimi({ user, students, teachers }) {
 }
 
 
-function GelisimAlani({ user }) {
+function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabChange }) {
   const { toast } = useToast();
   const [icerikler, setIcerikler] = useState([]);
   const [tamamlananlar, setTamamlananlar] = useState([]);
@@ -5677,10 +5675,17 @@ function GelisimAlani({ user }) {
       <div className="flex gap-2 mb-2">
         <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'icerikler' ? 'bg-orange-500 text-white shadow' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`} onClick={() => setGelisimSekme('icerikler')}>📚 İçerikler</button>
         <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'egzersizler' ? 'bg-blue-500 text-white shadow' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`} onClick={() => setGelisimSekme('egzersizler')}>👁️ Egzersizler</button>
+        <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'gorevler' ? 'bg-green-500 text-white shadow' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`} onClick={() => setGelisimSekme('gorevler')}>📌 Görevler</button>
+        <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'kurslar' ? 'bg-indigo-500 text-white shadow' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`} onClick={() => { if (onTabChange) onTabChange('courses'); }}>📖 Kurslar</button>
         {user.role === 'admin' && (
           <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'puan-ayar' ? 'bg-purple-500 text-white shadow' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`} onClick={() => setGelisimSekme('puan-ayar')}>⚙️ Egzersiz Puanları</button>
         )}
       </div>
+
+      {/* Görevler alt sekmesi */}
+      {gelisimSekme === 'gorevler' && (
+        <GorevYonetimi user={user} students={students} teachers={teachers} />
+      )}
 
       {gelisimSekme === 'egzersizler' && (
         <EgzersizlerModul user={user} egzersizPuanlari={egzersizPuanlari} onTamamla={async (egzersizId) => {
