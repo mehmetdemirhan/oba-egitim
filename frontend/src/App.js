@@ -3669,6 +3669,11 @@ function OgretmenPaneli({ user, logout }) {
   const [rozetDetayAcik, setRozetDetayAcik] = useState(false);
   const [seciliRozet, setSeciliRozet] = useState(null);
   const [anketDetayAcik, setAnketDetayAcik] = useState(false);
+  const [seciliKategori, setSeciliKategori] = useState(null);
+  // Hedef sistemi
+  const [hedefler, setHedefler] = useState([]);
+  const [hedefEkleAcik, setHedefEkleAcik] = useState(false);
+  const [hedefForm, setHedefForm] = useState({ kod: "", hedef_deger: 0, son_tarih: "" });
   // Mesaj
   const [mesajAlici, setMesajAlici] = useState("");
   const [mesajForm, setMesajForm] = useState({ konu: "", icerik: "" });
@@ -3695,6 +3700,7 @@ function OgretmenPaneli({ user, logout }) {
     try { const r = await axios.get(`${API}/rozetler/${user.id}`); setRozetlerim(Array.isArray(r.data) ? r.data : []); } catch(e) {}
     try { const r = await axios.get(`${API}/rozetler/tanim`); setRozetTanimlari(r.data?.ogretmen || []); } catch(e) {}
     try { const r = await axios.get(`${API}/anketler/ogretmen/${ogretmenId}/ozet`); setAnketOzet(r.data); } catch(e) {}
+    try { const r = await axios.get(`${API}/hedefler`); setHedefler(Array.isArray(r.data) ? r.data : []); } catch(e) {}
   }, [ogretmenId]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
@@ -3985,6 +3991,92 @@ function OgretmenPaneli({ user, logout }) {
             </Card>
           )}
 
+          {/* Hedeflerim — kompakt ilerleme kartı */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm border">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🎯</span>
+                <span className="font-bold text-sm text-gray-900">Hedeflerim</span>
+                {hedefler.length > 0 && <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{hedefler.filter(h => h.tamamlandi).length}/{hedefler.length} tamamlandı</span>}
+              </div>
+              <button onClick={() => setHedefEkleAcik(!hedefEkleAcik)} className="text-xs text-blue-600 hover:underline">{hedefEkleAcik ? "Kapat" : "+ Hedef Ekle"}</button>
+            </div>
+
+            {/* Hedef ekleme formu */}
+            {hedefEkleAcik && (() => {
+              const sablonlar = [
+                {kod:"ogrenci_sayisi", baslik:"Öğrenci Sayısı", ikon:"👥", birim:"öğrenci", ornek:15},
+                {kod:"kur_atlama", baslik:"Kur Atlama", ikon:"🎓", birim:"kur atlama", ornek:10},
+                {kod:"icerik_uretme", baslik:"İçerik Üretme", ikon:"📚", birim:"içerik", ornek:5},
+                {kod:"gorev_atama", baslik:"Görev Tamamlatma", ikon:"📌", birim:"görev", ornek:20},
+                {kod:"streak_ortalama", baslik:"Streak Ortalaması", ikon:"🔥", birim:"gün", ornek:7},
+                {kod:"veli_puan", baslik:"Veli Puanı", ikon:"⭐", birim:"puan", ornek:4.5},
+                {kod:"rozet_sayisi", baslik:"Rozet Kazanma", ikon:"🏅", birim:"rozet", ornek:15},
+                {kod:"risk_azaltma", baslik:"Düşük Riskli Öğrenci", ikon:"🛡️", birim:"öğrenci", ornek:10},
+              ];
+              const seciliSablon = sablonlar.find(s => s.kod === hedefForm.kod);
+              return (
+                <div className="bg-blue-50 rounded-xl p-3 mb-3 border border-blue-100 space-y-2">
+                  <Label className="text-xs font-medium">Hedef Türü</Label>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {sablonlar.map(s => (
+                      <button key={s.kod} type="button" onClick={() => setHedefForm({...hedefForm, kod: s.kod, hedef_deger: s.ornek})}
+                        className={`p-2 rounded-lg text-center transition-all border ${hedefForm.kod === s.kod ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}>
+                        <div className="text-lg">{s.ikon}</div>
+                        <div className="text-[9px] leading-tight">{s.baslik}</div>
+                      </button>
+                    ))}
+                  </div>
+                  {seciliSablon && (<>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div><Label className="text-[10px]">Hedef Değer</Label><Input type="number" step="0.1" value={hedefForm.hedef_deger} onChange={e => setHedefForm({...hedefForm, hedef_deger: parseFloat(e.target.value) || 0})} className="h-8 text-sm" /></div>
+                      <div><Label className="text-[10px]">Son Tarih (opsiyonel)</Label><Input type="date" value={hedefForm.son_tarih} onChange={e => setHedefForm({...hedefForm, son_tarih: e.target.value})} className="h-8 text-sm" /></div>
+                    </div>
+                    <Button size="sm" className="w-full bg-blue-600 text-white text-xs" onClick={async () => {
+                      try {
+                        await axios.post(`${API}/hedefler`, { kod: seciliSablon.kod, baslik: seciliSablon.baslik, ikon: seciliSablon.ikon, hedef_deger: hedefForm.hedef_deger, birim: seciliSablon.birim, son_tarih: hedefForm.son_tarih });
+                        toast({ title: `🎯 Hedef eklendi: ${seciliSablon.baslik}` });
+                        setHedefEkleAcik(false); setHedefForm({ kod: "", hedef_deger: 0, son_tarih: "" });
+                        const r = await axios.get(`${API}/hedefler`); setHedefler(Array.isArray(r.data) ? r.data : []);
+                      } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
+                    }}>🎯 Hedef Belirle</Button>
+                  </>)}
+                </div>
+              );
+            })()}
+
+            {/* Hedef listesi */}
+            {hedefler.length > 0 ? (
+              <div className="space-y-2">
+                {hedefler.map(h => (
+                  <div key={h.id} className={`rounded-xl p-3 border transition-all ${h.tamamlandi ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-100'}`}>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{h.tamamlandi ? "✅" : h.ikon}</span>
+                        <div>
+                          <span className="text-xs font-medium text-gray-800">{h.baslik}</span>
+                          {h.son_tarih && <span className="text-[9px] text-gray-400 ml-1">({h.son_tarih})</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-bold ${h.tamamlandi ? 'text-green-600' : h.ilerleme >= 75 ? 'text-blue-600' : 'text-gray-600'}`}>{h.mevcut_deger}/{h.hedef_deger}</span>
+                        <button onClick={async () => { try { await axios.delete(`${API}/hedefler/${h.id}`); const r = await axios.get(`${API}/hedefler`); setHedefler(Array.isArray(r.data) ? r.data : []); } catch(e) {} }} className="text-gray-300 hover:text-red-400 text-xs">✕</button>
+                      </div>
+                    </div>
+                    <div className="bg-white rounded-full h-1.5 overflow-hidden">
+                      <div className={`h-1.5 rounded-full transition-all ${h.tamamlandi ? 'bg-green-500' : h.ilerleme >= 75 ? 'bg-blue-500' : h.ilerleme >= 50 ? 'bg-yellow-500' : 'bg-gray-300'}`} style={{width:`${h.ilerleme}%`}} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : !hedefEkleAcik && (
+              <div className="text-center py-3">
+                <p className="text-xs text-gray-400">Henüz hedef belirlemediniz</p>
+                <button onClick={() => setHedefEkleAcik(true)} className="text-xs text-blue-600 mt-1 hover:underline">İlk hedefinizi belirleyin →</button>
+              </div>
+            )}
+          </div>
+
           {/* Rozetlerim — kompakt, son kazanılanlar + tıkla-aç */}
           {rozetTanimlari.length > 0 && (() => {
             const kazanilanlar = rozetTanimlari.filter(r => rozetlerim.some(k => k.rozet_kodu === r.kod));
@@ -4091,21 +4183,122 @@ function OgretmenPaneli({ user, logout }) {
                 </div>
                 <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${anketDetayAcik ? 'rotate-180' : ''}`} />
               </div>
-              {/* Detay — kategori grafikleri */}
-              {anketDetayAcik && (
-                <div className="mt-3 pt-3 border-t border-gray-100 space-y-3">
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="text-center"><div className="text-2xl font-bold text-purple-600">⭐ {anketOzet.ortalama}</div><div className="text-[10px] text-gray-500">/ 5 ortalama</div></div>
-                    <div className="text-center"><div className="text-2xl font-bold text-green-600">%{anketOzet.tavsiye_oran}</div><div className="text-[10px] text-gray-500">tavsiye oranı</div></div>
-                    <div className="text-center"><div className="text-2xl font-bold text-blue-600">{anketOzet.anket_sayisi}</div><div className="text-[10px] text-gray-500">anket</div></div>
+              {/* Detay — kategori grafikleri + ipuçları */}
+              {anketDetayAcik && (() => {
+                const ipuclari = {
+                  iletisim: {
+                    baslik: "💬 İletişim",
+                    puan: anketOzet.kategoriler?.iletisim,
+                    ipuclari: [
+                      "Öğrenciyle bire bir kısa görüşmeler yapın — 2 dakika bile fark yaratır",
+                      "Velilere haftalık kısa mesaj gönderin: 'Bu hafta Ali şunu başardı...'",
+                      "Olumlu geri bildirimle başlayın, gelişim alanlarını sonra nazikçe ekleyin",
+                      "Öğrencinin adını kullanarak kişisel hitap edin",
+                    ]
+                  },
+                  duzen: {
+                    baslik: "📋 Düzen",
+                    puan: anketOzet.kategoriler?.duzen,
+                    ipuclari: [
+                      "Her hafta aynı gün görev atayın — düzenlilik güven oluşturur",
+                      "Görevlere net son tarih koyun ve hatırlatma gönderin",
+                      "Haftalık rutininizi velilerle paylaşın — ne zaman ne yapılacak belli olsun",
+                      "Okuma takvimi oluşturup öğrenci ve veliye gönderin",
+                    ]
+                  },
+                  etki: {
+                    baslik: "📈 Etki",
+                    puan: anketOzet.kategoriler?.etki,
+                    ipuclari: [
+                      "Kur atlama raporlarını velilerle paylaşın — somut ilerleme göstersin",
+                      "Okuma süresi grafiğini veliye gösterin: 'İlk ay 5 dk, şimdi 15 dk!'",
+                      "Öğrencinin streak geçmişini vurgulayın — tutarlılık velileri etkiler",
+                      "Dönem başı vs dönem sonu karşılaştırma yapın",
+                    ]
+                  },
+                  geri_bildirim: {
+                    baslik: "📝 Geri Bildirim",
+                    puan: anketOzet.kategoriler?.geri_bildirim,
+                    ipuclari: [
+                      "Test sonuçlarından sonra kısa bir yorum yazın: 'Anlama becerisi gelişiyor'",
+                      "Ayda en az 1 kez detaylı geri bildirim mesajı gönderin",
+                      "Güçlü yönleri + gelişim alanlarını dengeli verin",
+                      "Mesaj sistemini aktif kullanın — veliler yanıt bekliyor",
+                    ]
+                  },
+                  motivasyon: {
+                    baslik: "🔥 Motivasyon",
+                    puan: anketOzet.kategoriler?.motivasyon,
+                    ipuclari: [
+                      "Streak tebrik mesajları gönderin: '7 gün! Harika gidiyorsun!'",
+                      "Rozet kazanıldığında veliye de bilgi verin",
+                      "Kitap bitirme kutlaması yapın — küçük başarılar önemli",
+                      "Öğrencinin ilgi alanına uygun kitap önerileri sunun",
+                    ]
+                  },
+                  icerik: {
+                    baslik: "📚 İçerik Çeşitliliği",
+                    puan: anketOzet.kategoriler?.icerik,
+                    ipuclari: [
+                      "Farklı türlerde görevler atayın: kitap, film, makale karışık",
+                      "Gelişim alanına yeni içerikler ekleyin — çeşitlilik öğrenciyi canlı tutar",
+                      "Egzersizleri deneyin ve öğrencilere önerin",
+                      "Yaş grubuna uygun güncel kitaplar havuza ekleyin",
+                    ]
+                  },
+                  genel: {
+                    baslik: "⭐ Genel Memnuniyet",
+                    puan: anketOzet.kategoriler?.genel,
+                    ipuclari: [
+                      "Tüm kategorilerde tutarlı olun — zayıf alan genel puanı düşürür",
+                      "En düşük puanlı kategoriye öncelik verin",
+                      "Velilerle dönem başı beklenti görüşmesi yapın",
+                      "Küçük ama düzenli iyileştirmeler büyük fark yaratır",
+                    ]
+                  }
+                };
+                const katRenk = (v) => v >= 4.5 ? "bg-green-500" : v >= 4.0 ? "bg-purple-500" : v >= 3.5 ? "bg-yellow-500" : "bg-red-500";
+
+                return (
+                  <div className="mt-3 pt-3 border-t border-gray-100 space-y-3">
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="text-center"><div className="text-2xl font-bold text-purple-600">⭐ {anketOzet.ortalama}</div><div className="text-[10px] text-gray-500">/ 5 ortalama</div></div>
+                      <div className="text-center"><div className="text-2xl font-bold text-green-600">%{anketOzet.tavsiye_oran}</div><div className="text-[10px] text-gray-500">tavsiye oranı</div></div>
+                      <div className="text-center"><div className="text-2xl font-bold text-blue-600">{anketOzet.anket_sayisi}</div><div className="text-[10px] text-gray-500">anket</div></div>
+                    </div>
+                    {Object.keys(anketOzet.kategoriler || {}).length > 0 && (
+                      <div className="space-y-1">
+                        <p className="text-[10px] text-gray-400 mb-1">Kategoriye tıklayarak ipuçları görün →</p>
+                        {Object.entries(anketOzet.kategoriler).map(([k, v]) => (
+                          <div key={k}>
+                            <div className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 rounded-lg px-1 py-0.5 transition-all" onClick={() => setSeciliKategori(seciliKategori === k ? null : k)}>
+                              <span className={`text-[10px] w-16 text-right ${seciliKategori === k ? 'font-bold text-purple-700' : 'text-gray-500'}`}>{({"iletisim":"İletişim","duzen":"Düzen","etki":"Etki","geri_bildirim":"Geri Bild.","motivasyon":"Motivasyon","icerik":"İçerik","genel":"Genel"})[k] || k}</span>
+                              <div className="flex-1 bg-gray-100 rounded-full h-1.5"><div className={`h-1.5 rounded-full transition-all ${katRenk(v)}`} style={{width:`${v/5*100}%`}} /></div>
+                              <span className={`text-[10px] font-medium w-8 ${v >= 4.5 ? 'text-green-600' : v >= 4.0 ? 'text-purple-600' : v >= 3.5 ? 'text-yellow-600' : 'text-red-600'}`}>{v}</span>
+                              <ChevronDown className={`h-3 w-3 text-gray-300 transition-transform ${seciliKategori === k ? 'rotate-180' : ''}`} />
+                            </div>
+                            {seciliKategori === k && ipuclari[k] && (
+                              <div className="ml-1 mt-1 mb-2 bg-gradient-to-r from-purple-50 to-white rounded-xl p-3 border border-purple-100">
+                                <div className="text-xs font-bold text-purple-700 mb-1.5">{ipuclari[k].baslik} — Puanınızı artırmak için:</div>
+                                <div className="space-y-1.5">
+                                  {ipuclari[k].ipuclari.map((tip, i) => (
+                                    <div key={i} className="flex items-start gap-2">
+                                      <span className="text-purple-400 text-xs mt-0.5">💡</span>
+                                      <span className="text-xs text-gray-600">{tip}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                                {v < 4.5 && <div className="mt-2 text-[10px] text-purple-500 italic">Şu anki puan: {v} → Hedefiniz: 4.5+ ile bu alanda mükemmel seviyeye ulaşın</div>}
+                                {v >= 4.5 && <div className="mt-2 text-[10px] text-green-600 italic">🎉 Bu kategoride harika gidiyorsunuz! Tutarlılığı koruyun.</div>}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  {Object.keys(anketOzet.kategoriler || {}).length > 0 && (
-                    <div className="space-y-1">{Object.entries(anketOzet.kategoriler).map(([k, v]) => (
-                      <div key={k} className="flex items-center gap-2"><span className="text-[10px] text-gray-500 w-16 text-right">{({"iletisim":"İletişim","duzen":"Düzen","etki":"Etki","geri_bildirim":"Geri Bild.","motivasyon":"Motivasyon","icerik":"İçerik","genel":"Genel"})[k] || k}</span><div className="flex-1 bg-gray-100 rounded-full h-1.5"><div className="h-1.5 bg-purple-500 rounded-full" style={{width:`${v/5*100}%`}} /></div><span className="text-[10px] font-medium text-gray-600">{v}</span></div>
-                    ))}</div>
-                  )}
-                </div>
-              )}
+                );
+              })()}
             </div>
           )}
 
