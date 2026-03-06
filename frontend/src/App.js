@@ -3667,6 +3667,7 @@ function OgretmenPaneli({ user, logout }) {
   const [rozetTanimlari, setRozetTanimlari] = useState([]);
   const [anketOzet, setAnketOzet] = useState(null);
   const [rozetDetayAcik, setRozetDetayAcik] = useState(false);
+  const [seciliRozet, setSeciliRozet] = useState(null);
   const [anketDetayAcik, setAnketDetayAcik] = useState(false);
   // Mesaj
   const [mesajAlici, setMesajAlici] = useState("");
@@ -3824,6 +3825,36 @@ function OgretmenPaneli({ user, logout }) {
 
         {/* ═══ DASHBOARD ═══ */}
         {aktifSekme === "dashboard" && (<>
+          {/* Motivasyon cümlesi — her girişte değişir */}
+          {(() => {
+            const motivasyonlar = [
+              { emoji: "🌟", cumle: "Bugün bir öğrencinizin gözlerindeki ışığı parlatabiirsiniz. Her kur atlama, bir hayatı değiştiren adımdır.", renk: "from-amber-50 to-orange-50 border-amber-200" },
+              { emoji: "🚀", cumle: "Öğrencilerinizin potansiyeli sınırsız — sizin rehberliğiniz onları bir adım öteye taşıyor.", renk: "from-blue-50 to-indigo-50 border-blue-200" },
+              { emoji: "📚", cumle: "Her okunan sayfa bir tohum, her kur atlama bir çiçek. Bahçenizi büyütmeye devam edin!", renk: "from-green-50 to-emerald-50 border-green-200" },
+              { emoji: "💪", cumle: "Riskli öğrenci yoktur, henüz keşfedilmemiş potansiyel vardır. Bugün kiminle başlayacaksınız?", renk: "from-purple-50 to-pink-50 border-purple-200" },
+              { emoji: "🎯", cumle: "Küçük adımlar büyük dönüşümler yaratır. Bugün bir görev atayarak fark yaratın!", renk: "from-teal-50 to-cyan-50 border-teal-200" },
+              { emoji: "🔥", cumle: "Streak'ler sadece öğrenciler için değil — sizin de tutarlılığınız onlara ilham veriyor.", renk: "from-red-50 to-orange-50 border-red-200" },
+              { emoji: "🌱", cumle: "Sabır ve kararlılıkla ektiğiniz her tohum, zamanı geldiğinde meyve verecek.", renk: "from-lime-50 to-green-50 border-lime-200" },
+              { emoji: "🏅", cumle: "Her rozet kazandığınızda, öğrencilerinize 'sürekli gelişim' modelini gösteriyorsunuz.", renk: "from-yellow-50 to-amber-50 border-yellow-200" },
+              { emoji: "💡", cumle: "Bir çocuğa okumayı sevdirmek, ona ömür boyu sürecek bir süper güç vermektir.", renk: "from-indigo-50 to-blue-50 border-indigo-200" },
+              { emoji: "🌈", cumle: "Bugün sınıfınızdaki en sessiz öğrenciye bir kitap önerin — belki de en çok ona ihtiyacı var.", renk: "from-pink-50 to-rose-50 border-pink-200" },
+              { emoji: "🎓", cumle: "Kur atlatan her öğrenci, sizin eğitimci kimliğinizin en güçlü kanıtıdır.", renk: "from-violet-50 to-purple-50 border-violet-200" },
+              { emoji: "📖", cumle: "Okuma alışkanlığı bir günde değil, sizin gibi kararlı eğitimcilerin rehberliğinde oluşur.", renk: "from-sky-50 to-blue-50 border-sky-200" },
+              { emoji: "⭐", cumle: "Veliler size güveniyor, öğrenciler size bakıyor. Bu güvenin hakkını her gün veriyorsunuz.", renk: "from-amber-50 to-yellow-50 border-amber-200" },
+              { emoji: "🧭", cumle: "Her analiz raporu bir pusula, her görev bir yol haritası. Öğrencilerinizi hedefe taşıyın!", renk: "from-emerald-50 to-teal-50 border-emerald-200" },
+            ];
+            const gunIndex = Math.floor(Date.now() / (1000 * 60 * 60)) % motivasyonlar.length;
+            const m = motivasyonlar[gunIndex];
+            return (
+              <div className={`bg-gradient-to-r ${m.renk} rounded-2xl p-4 border`}>
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl">{m.emoji}</span>
+                  <p className="text-sm text-gray-700 italic leading-relaxed">{m.cumle}</p>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Özet kartlar */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-4 text-white">
@@ -3975,19 +4006,75 @@ function OgretmenPaneli({ user, logout }) {
                   ))}{kazanilanlar.length > 5 && <span className="text-xs text-gray-400 self-center">+{kazanilanlar.length - 5}</span>}</div>
                 )}
                 {/* Detay — tüm rozetler */}
-                {rozetDetayAcik && (
-                  <div className="grid grid-cols-5 sm:grid-cols-7 gap-1.5 mt-3 pt-3 border-t border-gray-100">
-                    {rozetTanimlari.map(r => {
-                      const kazandi = rozetlerim.some(k => k.rozet_kodu === r.kod);
-                      return (
-                        <div key={r.kod} className={`text-center p-1.5 rounded-lg transition-all ${kazandi ? 'bg-orange-50 border border-orange-200' : 'opacity-25'}`} title={r.ad}>
-                          <div className="text-lg">{kazandi ? r.ikon : "🔒"}</div>
-                          <div className="text-[8px] text-gray-500 truncate">{r.ad}</div>
+                {rozetDetayAcik && (() => {
+                  const rozetKriterleri = {
+                    "icerik_ilk": "Gelişim alanına ilk içeriğinizi (hizmetiçi, film, kitap veya makale) ekleyin.",
+                    "icerik_5": "Toplam 5 içerik ekleyin ve yayına alınsın.",
+                    "icerik_20": "20 farklı içerik ekleyip yayına alarak kütüphaneyi zenginleştirin.",
+                    "icerik_50": "50 içerikle platformun en değerli bilgi kaynağı olun.",
+                    "oy_ilk": "Gelişim alanındaki herhangi bir içeriği oylayın.",
+                    "oy_20": "20 farklı içeriği inceleyip oylayarak kalite kontrolüne katkı sağlayın.",
+                    "oy_50": "50 içerik oylamasına katılarak baş editör seviyesine ulaşın.",
+                    "gorev_ilk": "Öğrencilerinize ilk görevi atayın.",
+                    "gorev_20": "20 görev atayın ve en az 10 tanesi öğrenciler tarafından tamamlansın.",
+                    "ilham_veren": "Öğrencilerinizin ortalama okuma streak'i 7+ gün olsun.",
+                    "yildiz_egitimci": "Öğrencilerinizin ortalama streak'i 10+ güne ulaşsın.",
+                    "kur_ilk": "İlk öğrenciniz kur atlasın — öğretmen onayıyla.",
+                    "kur_20": "Toplam 20 kur atlama gerçekleştirin.",
+                    "kur_30": "30 kur atlama ile seviye atlatan eğitimci olun.",
+                    "kur_50": "50 kur atlama — süper eğitimci statüsü!",
+                    "kur_100": "100 kur atlama ile dönüşüm lideri olun.",
+                    "veli_ilk": "İlk veli anketinde ortalama 4+ puan alın.",
+                    "veli_20": "20 veli anketinde ortalama 4.5+ puan alın.",
+                    "veli_30": "30 veli anketinde ort. 4.5+ ve %90 tavsiye oranı yakalayın.",
+                    "veli_100": "100 veli anketinde ort. 4.8+ ve %95 tavsiye — efsane öğretmen!",
+                    "gelisim_ilk": "İlk gelişim içeriğini tamamlayın (test çözün veya tamamla deyin).",
+                    "gelisim_10": "10 gelişim içeriği tamamlayarak sürekli öğrenen olun.",
+                    "gelisim_uzman": "30 içerik + %90 test başarısıyla uzman öğretmen seviyesine ulaşın.",
+                    "mesaj_ilk": "Öğrencinize veya veliye ilk mesajınızı gönderin.",
+                    "kopru_kurucu": "Hem öğrenciye hem veliye mesaj göndererek köprü kurun.",
+                    "egz_ilk": "İlk egzersizi tamamlayın — göz jimnastiği ile başlayabilirsiniz.",
+                    "egz_tamset": "14 egzersiz türünün tamamını en az birer kez deneyin.",
+                  };
+                  const seviyeRenk = { bronz: "bg-amber-100 text-amber-700 border-amber-300", gumus: "bg-gray-100 text-gray-700 border-gray-300", altin: "bg-yellow-100 text-yellow-700 border-yellow-300", platin: "bg-cyan-100 text-cyan-700 border-cyan-300", elmas: "bg-purple-100 text-purple-700 border-purple-300" };
+                  return (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <div className="grid grid-cols-5 sm:grid-cols-7 gap-1.5">
+                        {rozetTanimlari.map(r => {
+                          const kazandi = rozetlerim.some(k => k.rozet_kodu === r.kod);
+                          return (
+                            <div key={r.kod} onClick={(e) => { e.stopPropagation(); setSeciliRozet(seciliRozet?.kod === r.kod ? null : {...r, kazandi, kriter: rozetKriterleri[r.kod] || ""}); }}
+                              className={`text-center p-1.5 rounded-lg cursor-pointer transition-all hover:scale-105 ${kazandi ? 'bg-orange-50 border border-orange-200' : 'opacity-25 hover:opacity-50'} ${seciliRozet?.kod === r.kod ? 'ring-2 ring-blue-400 scale-105' : ''}`}>
+                              <div className="text-lg">{kazandi ? r.ikon : "🔒"}</div>
+                              <div className="text-[8px] text-gray-500 truncate">{r.ad}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {/* Rozet detay popup */}
+                      {seciliRozet && (
+                        <div className="mt-3 bg-gradient-to-r from-gray-50 to-white rounded-xl p-4 border border-gray-200 shadow-sm">
+                          <div className="flex items-start gap-3">
+                            <div className="text-3xl">{seciliRozet.kazandi ? seciliRozet.ikon : "🔒"}</div>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-sm">{seciliRozet.ad}</span>
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${seviyeRenk[seciliRozet.seviye] || "bg-gray-100"}`}>{seciliRozet.seviye}</span>
+                                <span className="text-xs text-orange-600 font-medium">+{seciliRozet.puan} puan</span>
+                              </div>
+                              <p className="text-xs text-gray-600 mt-1">{seciliRozet.kriter}</p>
+                              <div className="mt-2">{seciliRozet.kazandi
+                                ? <span className="text-xs text-green-600 font-medium bg-green-50 px-2 py-1 rounded-full">✅ Kazanıldı!</span>
+                                : <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">🔒 Henüz kazanılmadı — yukarıdaki kriteri tamamlayın</span>
+                              }</div>
+                            </div>
+                            <button onClick={(e) => { e.stopPropagation(); setSeciliRozet(null); }} className="text-gray-400 hover:text-gray-600 text-sm">✕</button>
+                          </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             );
           })()}
