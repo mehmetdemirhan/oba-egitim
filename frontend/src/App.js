@@ -4303,16 +4303,15 @@ function OgrenciPaneli({ user, logout }) {
 
         {/* ═══ ANA SAYFA ═══ */}
         {aktifSekme === "ana" && (<>
-          {/* XP + Lig Durumu */}
+          {/* Lig Durumu (XP yalnızca sıralama ekranında görünür) */}
           {xpDurum && (
             <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl p-4 text-white">
               <div className="flex items-center justify-between mb-2">
                 <div className="text-lg font-bold">{xpDurum.lig_label}</div>
-                <div className="text-sm opacity-80">{xpDurum.toplam_xp} XP</div>
               </div>
               {xpDurum.sonraki_lig && (<>
                 <div className="bg-white/20 rounded-full h-2.5 overflow-hidden"><div className="h-full bg-white rounded-full transition-all" style={{ width: `${Math.min(100, ((xpDurum.toplam_xp - (LIG_ESIKLERI_FE[xpDurum.lig] || 0)) / Math.max(1, xpDurum.sonraki_esik - (LIG_ESIKLERI_FE[xpDurum.lig] || 0))) * 100)}%` }} /></div>
-                <p className="text-xs opacity-70 mt-1">{xpDurum.kalan_xp} XP daha → {({"gumus":"🥈 Gümüş","altin":"🥇 Altın","elmas":"💎 Elmas"})[xpDurum.sonraki_lig]}</p>
+                <p className="text-xs opacity-70 mt-1">Sonraki lig: {({"gumus":"🥈 Gümüş","altin":"🥇 Altın","elmas":"💎 Elmas"})[xpDurum.sonraki_lig]}</p>
               </>)}
               {!xpDurum.sonraki_lig && <p className="text-xs opacity-80 mt-1">En yüksek lige ulaştın! 🎉</p>}
             </div>
@@ -4354,7 +4353,7 @@ function OgrenciPaneli({ user, logout }) {
             {(ligSiralama || siralama) && (<div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-2xl p-4 border border-yellow-100 cursor-pointer" onClick={() => setAktifSekme("siralama")}>
               <div className="text-xs font-medium text-yellow-800">🏆 Sıralaman</div>
               <div className="text-3xl font-bold text-orange-600 mt-1">{ligSiralama?.benim_siram || siralama?.benim_siram || "—"}.</div>
-              <div className="text-[10px] text-gray-500">{xpDurum ? `${xpDurum.toplam_xp} XP` : `${ligSiralama?.toplam || siralama?.toplam_ogrenci || 0} öğrenci`}</div>
+              <div className="text-[10px] text-gray-500">{ligSiralama?.toplam || siralama?.toplam_ogrenci || 0} öğrenci</div>
             </div>)}
             {profil?.ogretmen_bilgi && (<div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-4 border border-blue-100 cursor-pointer" onClick={() => setAktifSekme("mesajlar")}>
               <div className="text-xs font-medium text-blue-800">👩‍🏫 Öğretmenin</div>
@@ -5430,6 +5429,10 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
   const [redSebep, setRedSebep] = useState("");
   const [acikDetayId, setAcikDetayId] = useState(null);
   const [redDialogIcerik, setRedDialogIcerik] = useState(null);
+  // Bölüm bazlı soru yönetimi
+  const [soruYonetimiIcerik, setSoruYonetimiIcerik] = useState(null);
+  const [kitapSorulari, setKitapSorulari] = useState([]);
+  const [soruForm, setSoruForm] = useState({ bolum: 1, soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0 });
   const [adminForm, setAdminForm] = useState({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [], makale_link: "", makale_dosya_turu: "link", kitap_yazar: "", kitap_isbn: "", kitap_yayinevi: "", kitap_sayfa: "", kitap_yas_grubu: "", kitap_link: "", kitap_kapak: "" });
   const [kitapYukleniyor, setKitapYukleniyor] = useState(false);
   const [yeniSoru, setYeniSoru] = useState({ soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0 });
@@ -5540,6 +5543,99 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
   };
 
   // ── TEST GÖRÜNÜMÜ ──
+  // ── BÖLÜM BAZLI SORU YÖNETİMİ ──
+  if (gorunum === "soru-yonetimi" && soruYonetimiIcerik) {
+    const bolumSayisi = soruYonetimiIcerik.kitap_bolum_sayisi || 10;
+    const bolumler = Array.from({ length: bolumSayisi }, (_, i) => i + 1);
+
+    const soruEkle = async (e) => {
+      e.preventDefault();
+      if (soruForm.secenekler.some(s => !s.trim())) { toast({ title: "Tüm şıkları doldurun", variant: "destructive" }); return; }
+      try {
+        await axios.post(`${API}/kitaplar/${soruYonetimiIcerik.id}/sorular`, soruForm);
+        toast({ title: "✅ Soru eklendi!" });
+        setSoruForm({ bolum: soruForm.bolum, soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0 });
+        const r = await axios.get(`${API}/kitaplar/${soruYonetimiIcerik.id}/sorular`);
+        setKitapSorulari(Array.isArray(r.data) ? r.data : []);
+      } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
+    };
+
+    const soruSil = async (id) => {
+      try { await axios.delete(`${API}/kitaplar/sorular/${id}`);
+        const r = await axios.get(`${API}/kitaplar/${soruYonetimiIcerik.id}/sorular`);
+        setKitapSorulari(Array.isArray(r.data) ? r.data : []); toast({ title: "Silindi" });
+      } catch(e) {}
+    };
+
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={() => { setGorunum("liste"); setSoruYonetimiIcerik(null); }}>← Geri</Button>
+          <div><h2 className="text-lg font-bold">📝 {soruYonetimiIcerik.baslik}</h2>
+            <p className="text-xs text-gray-500">{soruYonetimiIcerik.kitap_yazar} • {bolumSayisi} bölüm • {kitapSorulari.length} soru</p></div>
+        </div>
+
+        {/* Soru ekleme formu */}
+        <Card className="border-0 shadow-sm border-l-4 border-l-teal-500">
+          <CardHeader className="pb-2"><CardTitle className="text-sm">📝 Yeni Soru Ekle</CardTitle></CardHeader>
+          <CardContent>
+            <form onSubmit={soruEkle} className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label className="text-xs">Bölüm</Label>
+                  <Select value={String(soruForm.bolum)} onValueChange={v => setSoruForm({...soruForm, bolum: parseInt(v)})}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{bolumler.map(b => <SelectItem key={b} value={String(b)}>Bölüm {b}</SelectItem>)}</SelectContent>
+                  </Select></div>
+                <div><Label className="text-xs">Doğru Cevap</Label>
+                  <Select value={String(soruForm.dogru_cevap)} onValueChange={v => setSoruForm({...soruForm, dogru_cevap: parseInt(v)})}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{["A","B","C","D"].map((s,i) => <SelectItem key={i} value={String(i)}>{s}</SelectItem>)}</SelectContent>
+                  </Select></div>
+              </div>
+              <div><Label className="text-xs">Soru</Label><Input value={soruForm.soru} onChange={e => setSoruForm({...soruForm, soru: e.target.value})} required placeholder="Soru metni..." /></div>
+              <div className="grid grid-cols-2 gap-2">
+                {["A","B","C","D"].map((s,i) => (
+                  <div key={i}><Label className="text-xs">{s})</Label>
+                    <Input value={soruForm.secenekler[i]} onChange={e => { const n = [...soruForm.secenekler]; n[i] = e.target.value; setSoruForm({...soruForm, secenekler: n}); }}
+                      required placeholder={`${s} şıkkı`} className={soruForm.dogru_cevap === i ? "border-green-500 bg-green-50" : ""} /></div>
+                ))}
+              </div>
+              <Button type="submit" className="w-full bg-teal-600 text-white">Soru Ekle</Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* Mevcut sorular bölüm bazlı */}
+        {bolumler.map(b => {
+          const bolumSorulari = kitapSorulari.filter(s => s.bolum === b);
+          if (bolumSorulari.length === 0) return null;
+          return (<div key={b}>
+            <h3 className="font-medium text-sm text-gray-700 mt-3 mb-2">Bölüm {b} ({bolumSorulari.length} soru)</h3>
+            {bolumSorulari.map((s, i) => (
+              <div key={s.id} className="bg-white rounded-xl p-3 shadow-sm border mb-2">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="font-medium text-sm">{i+1}. {s.soru}</div>
+                    <div className="grid grid-cols-2 gap-1 mt-1 ml-3">
+                      {(s.secenekler || []).map((sec, j) => (
+                        <div key={j} className={`text-xs px-2 py-0.5 rounded ${j === s.dogru_cevap ? 'bg-green-100 text-green-700 font-bold' : 'text-gray-500'}`}>
+                          {["A","B","C","D"][j]}) {sec}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <Button variant="destructive" size="sm" className="text-xs h-6" onClick={() => soruSil(s.id)}>Sil</Button>
+                </div>
+              </div>
+            ))}
+          </div>);
+        })}
+
+        {kitapSorulari.length === 0 && <div className="text-center py-8 text-gray-400">Henüz soru eklenmedi. Yukarıdaki formdan soru ekleyin.</div>}
+      </div>
+    );
+  }
+
   if (gorunum === "test" && aktifIcerik) {
     return (
       <div className="max-w-2xl mx-auto space-y-6">
@@ -5946,7 +6042,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                           </div>
                         </div>
                         {!tamamlandi && (
-                          <div className="flex gap-2 mt-4">
+                          <div className="flex gap-2 mt-4 flex-wrap">
                             {icerik.sorular?.length > 0 && (
                               <Button size="sm" onClick={() => { setAktifIcerik(icerik); setGorunum("test"); setTestCevaplari([]); }}
                                 className="bg-gradient-to-r from-orange-500 to-red-500 text-white">
@@ -5957,6 +6053,14 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                               ✓ Tamamlandı (+1 puan)
                             </Button>
                           </div>
+                        )}
+                        {/* Kitap türü ise bölüm bazlı soru yönetimi */}
+                        {icerik.tur === "kitap" && (user.role === "admin" || user.role === "coordinator" || user.role === "teacher") && (
+                          <Button size="sm" variant="outline" className="mt-2 text-teal-600 border-teal-300 hover:bg-teal-50" onClick={async () => {
+                            setSoruYonetimiIcerik(icerik);
+                            try { const r = await axios.get(`${API}/kitaplar/${icerik.id}/sorular`); setKitapSorulari(Array.isArray(r.data) ? r.data : []); } catch(e) { setKitapSorulari([]); }
+                            setGorunum("soru-yonetimi");
+                          }}>📝 Bölüm Soruları ({icerik._soru_sayisi || "Ekle"})</Button>
                         )}
                       </CardContent>
                     </Card>
