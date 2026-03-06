@@ -200,39 +200,36 @@ function AppContent() {
     try { const r = await axios.get(`${API}/courses`); setCourses(Array.isArray(r.data) ? r.data : []); } catch(e) {}
     try { const r = await axios.get(`${API}/payments`); setPayments(Array.isArray(r.data) ? r.data : []); } catch(e) {}
     try { const r = await axios.get(`${API}/risk-skor/toplu`); setOgrenciRiskler(Array.isArray(r.data) ? r.data : []); } catch(e) { setOgrenciRiskler([]); }
-    // Rozet + anket istatistikleri
-    try {
-      const [rozetR, tanimR, teachersR] = await Promise.all([
-        axios.get(`${API}/rozetler/tanim`),
-        axios.get(`${API}/teachers`),
-        Promise.resolve(null),
-      ]);
-      const ogretmenTanim = rozetR.data?.ogretmen || [];
-      const ogrenciTanim = rozetR.data?.ogrenci || [];
-      const tTeachers = Array.isArray(teachersR?.data) ? teachersR.data : [];
-      // Her öğretmenin rozet + anket özetini çek
-      const usersR = await axios.get(`${API}/auth/users`);
-      const allUsers = Array.isArray(usersR.data) ? usersR.data : [];
-      const ogretmenUsers = allUsers.filter(u => u.role === "teacher");
-      const anketOzetleri = [];
-      for (const ou of ogretmenUsers.slice(0, 10)) {
-        try {
-          const [rozR, ankR] = await Promise.all([
-            axios.get(`${API}/rozetler/${ou.id}`),
-            axios.get(`${API}/anketler/ogretmen/${ou.linked_id || ou.id}/ozet`),
-          ]);
-          anketOzetleri.push({
-            id: ou.id, ad: ou.ad, soyad: ou.soyad,
-            rozet_sayisi: Array.isArray(rozR.data) ? rozR.data.length : 0,
-            rozet_toplam: ogretmenTanim.length,
-            anket: ankR.data || {},
-          });
-        } catch(e) {}
-      }
-      setAdminRozetOzet({ ogretmen_tanim: ogretmenTanim.length, ogrenci_tanim: ogrenciTanim.length });
-      setAdminAnketOzet(anketOzetleri);
-    } catch(e) {}
   }, []);
+
+  // Admin rozet + anket özeti — ayrı useEffect (fetchAll'dan bağımsız)
+  useEffect(() => {
+    if (!user || (user.role !== "admin" && user.role !== "coordinator")) return;
+    const fetchRozetAnket = async () => {
+      try {
+        const [rozetR, usersR] = await Promise.all([
+          axios.get(`${API}/rozetler/tanim`),
+          axios.get(`${API}/auth/users`),
+        ]);
+        const ogretmenTanim = rozetR.data?.ogretmen || [];
+        const allUsers = Array.isArray(usersR.data) ? usersR.data : [];
+        const ogretmenUsers = allUsers.filter(u => u.role === "teacher").slice(0, 10);
+        const anketOzetleri = [];
+        for (const ou of ogretmenUsers) {
+          try {
+            const [rozR, ankR] = await Promise.all([
+              axios.get(`${API}/rozetler/${ou.id}`),
+              axios.get(`${API}/anketler/ogretmen/${ou.linked_id || ou.id}/ozet`),
+            ]);
+            anketOzetleri.push({ id: ou.id, ad: ou.ad, soyad: ou.soyad, rozet_sayisi: Array.isArray(rozR.data) ? rozR.data.length : 0, rozet_toplam: ogretmenTanim.length, anket: ankR.data || {} });
+          } catch(e) {}
+        }
+        setAdminRozetOzet({ ogretmen_tanim: ogretmenTanim.length, ogrenci_tanim: (rozetR.data?.ogrenci || []).length });
+        setAdminAnketOzet(anketOzetleri);
+      } catch(e) {}
+    };
+    fetchRozetAnket();
+  }, [user]);
 
   useEffect(() => {
     if (user) fetchAll();
@@ -4889,56 +4886,33 @@ function VeliPaneli({ user, logout }) {
 function SistemAyarlari({ user }) {
   const { toast } = useToast();
   const [ayarSekme, setAyarSekme] = useState("xp");
-  const [xpTablosu, setXpTablosu] = useState({});
-  const [ligEsikleri, setLigEsikleri] = useState({});
+  const [xpTablosu, setXpTablosu] = useState({ okuma_gorevi: 10, anlama_testi: 15, kelime_gorevi: 8, gunluk_streak: 5, kitap_bitirme: 30, yazili_ozet: 20, egzersiz: 5, gelisim_tamamla: 5, gorev_tamamla: 10 });
+  const [ligEsikleri, setLigEsikleri] = useState({ bronz: 0, gumus: 200, altin: 500, elmas: 1000 });
   const [ogretmenRozetler, setOgretmenRozetler] = useState([]);
   const [ogrenciRozetler, setOgrenciRozetler] = useState([]);
   const [anketSorulari, setAnketSorulari] = useState([]);
   const [kayitEdiliyor, setKayitEdiliyor] = useState(false);
+  const [yuklendi, setYuklendi] = useState(false);
 
   useEffect(() => {
     const fetchAyarlar = async () => {
-      // XP
+      // XP + Lig ayarları
+      try { const r = await axios.get(`${API}/ayarlar/xp_tablosu`); if (r.data?.degerler && Object.keys(r.data.degerler).length > 0) setXpTablosu(r.data.degerler); } catch(e) {}
+      try { const r = await axios.get(`${API}/ayarlar/lig_esikleri`); if (r.data?.degerler && Object.keys(r.data.degerler).length > 0) setLigEsikleri(r.data.degerler); } catch(e) {}
+
+      // Rozetler + Anket — doğrudan rozetler/tanim ve anketler/sorular kullan (auth gerektirmiyor, her zaman çalışır)
       try {
-        const r = await axios.get(`${API}/ayarlar/xp_tablosu`);
-        const d = r.data?.degerler || r.data;
-        setXpTablosu(d && typeof d === 'object' && Object.keys(d).length > 0 ? d : { okuma_gorevi: 10, anlama_testi: 15, kelime_gorevi: 8, gunluk_streak: 5, kitap_bitirme: 30, yazili_ozet: 20, egzersiz: 5, gelisim_tamamla: 5, gorev_tamamla: 10 });
-      } catch(e) { setXpTablosu({ okuma_gorevi: 10, anlama_testi: 15, kelime_gorevi: 8, gunluk_streak: 5, kitap_bitirme: 30, yazili_ozet: 20, egzersiz: 5, gelisim_tamamla: 5, gorev_tamamla: 10 }); }
-      // Lig
-      try {
-        const r = await axios.get(`${API}/ayarlar/lig_esikleri`);
-        const d = r.data?.degerler || r.data;
-        setLigEsikleri(d && typeof d === 'object' && Object.keys(d).length > 0 ? d : { bronz: 0, gumus: 200, altin: 500, elmas: 1000 });
-      } catch(e) { setLigEsikleri({ bronz: 0, gumus: 200, altin: 500, elmas: 1000 }); }
-      // Rozetler — önce ayarlar, sonra rozetler/tanim fallback
-      let ogretmenLoaded = false, ogrenciLoaded = false;
-      try {
-        const r = await axios.get(`${API}/ayarlar/ogretmen_rozetleri`);
-        const d = r.data?.degerler || r.data;
-        if (Array.isArray(d) && d.length > 0) { setOgretmenRozetler(d); ogretmenLoaded = true; }
+        const r = await axios.get(`${API}/rozetler/tanim`);
+        if (Array.isArray(r.data?.ogretmen) && r.data.ogretmen.length > 0) setOgretmenRozetler(r.data.ogretmen);
+        if (Array.isArray(r.data?.ogrenci) && r.data.ogrenci.length > 0) setOgrenciRozetler(r.data.ogrenci);
       } catch(e) {}
+
       try {
-        const r = await axios.get(`${API}/ayarlar/ogrenci_rozetleri`);
-        const d = r.data?.degerler || r.data;
-        if (Array.isArray(d) && d.length > 0) { setOgrenciRozetler(d); ogrenciLoaded = true; }
+        const r = await axios.get(`${API}/anketler/sorular`);
+        if (Array.isArray(r.data) && r.data.length > 0) setAnketSorulari(r.data);
       } catch(e) {}
-      // Fallback: rozetler/tanim
-      if (!ogretmenLoaded || !ogrenciLoaded) {
-        try {
-          const r = await axios.get(`${API}/rozetler/tanim`);
-          if (!ogretmenLoaded && Array.isArray(r.data?.ogretmen)) setOgretmenRozetler(r.data.ogretmen);
-          if (!ogrenciLoaded && Array.isArray(r.data?.ogrenci)) setOgrenciRozetler(r.data.ogrenci);
-        } catch(e) {}
-      }
-      // Anket soruları
-      try {
-        const r = await axios.get(`${API}/ayarlar/anket_sorulari`);
-        const d = r.data?.degerler || r.data;
-        if (Array.isArray(d) && d.length > 0) { setAnketSorulari(d); }
-        else { const r2 = await axios.get(`${API}/anketler/sorular`); setAnketSorulari(Array.isArray(r2.data) ? r2.data : []); }
-      } catch(e) {
-        try { const r2 = await axios.get(`${API}/anketler/sorular`); setAnketSorulari(Array.isArray(r2.data) ? r2.data : []); } catch(e2) {}
-      }
+
+      setYuklendi(true);
     };
     fetchAyarlar();
   }, []);
