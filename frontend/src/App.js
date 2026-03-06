@@ -3666,6 +3666,8 @@ function OgretmenPaneli({ user, logout }) {
   const [rozetlerim, setRozetlerim] = useState([]);
   const [rozetTanimlari, setRozetTanimlari] = useState([]);
   const [anketOzet, setAnketOzet] = useState(null);
+  const [rozetDetayAcik, setRozetDetayAcik] = useState(false);
+  const [anketDetayAcik, setAnketDetayAcik] = useState(false);
   // Mesaj
   const [mesajAlici, setMesajAlici] = useState("");
   const [mesajForm, setMesajForm] = useState({ konu: "", icerik: "" });
@@ -3952,46 +3954,72 @@ function OgretmenPaneli({ user, logout }) {
             </Card>
           )}
 
-          {/* Rozetlerim */}
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="pb-2"><CardTitle className="text-base flex items-center justify-between">🏅 Rozetlerim <span className="text-sm font-normal text-gray-500">{rozetlerim.length} / {rozetTanimlari.length}</span></CardTitle></CardHeader>
-            <CardContent>
-              {rozetTanimlari.length > 0 ? (
-                <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-                  {rozetTanimlari.map(r => {
-                    const kazandi = rozetlerim.some(k => k.rozet_kodu === r.kod);
-                    return (
-                      <div key={r.kod} className={`text-center p-2 rounded-xl border transition-all ${kazandi ? 'bg-white border-orange-200 shadow-sm' : 'bg-gray-50 border-gray-100 opacity-40'}`} title={`${r.ad}: ${kazandi ? 'Kazanıldı!' : 'Kilitli'}`}>
-                        <div className="text-2xl">{kazandi ? r.ikon : "🔒"}</div>
-                        <div className="text-[9px] text-gray-600 mt-1 truncate">{r.ad}</div>
-                      </div>
-                    );
-                  })}
+          {/* Rozetlerim — kompakt, son kazanılanlar + tıkla-aç */}
+          {rozetTanimlari.length > 0 && (() => {
+            const kazanilanlar = rozetTanimlari.filter(r => rozetlerim.some(k => k.rozet_kodu === r.kod));
+            const sonKazanilanlar = kazanilanlar.slice(0, 5);
+            return (
+              <div className="bg-white rounded-2xl p-4 shadow-sm border">
+                <div className="flex items-center justify-between cursor-pointer" onClick={() => setRozetDetayAcik(!rozetDetayAcik)}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🏅</span>
+                    <span className="font-bold text-sm text-gray-900">Rozetlerim</span>
+                    <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{kazanilanlar.length}/{rozetTanimlari.length}</span>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${rozetDetayAcik ? 'rotate-180' : ''}`} />
                 </div>
-              ) : (<p className="text-sm text-gray-400 text-center py-4">Yükleniyor...</p>)}
-            </CardContent>
-          </Card>
-
-          {/* Veli Değerlendirme Özeti */}
-          {anketOzet && anketOzet.anket_sayisi > 0 && (
-            <Card className="border-0 shadow-sm border-l-4 border-l-purple-500">
-              <CardHeader className="pb-2"><CardTitle className="text-base">💜 Veli Değerlendirmesi</CardTitle></CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-3 gap-3 mb-3">
-                  <div className="text-center"><div className="text-3xl font-bold text-purple-600">⭐ {anketOzet.ortalama}</div><div className="text-[10px] text-gray-500">/ 5 ortalama</div></div>
-                  <div className="text-center"><div className="text-3xl font-bold text-green-600">%{anketOzet.tavsiye_oran}</div><div className="text-[10px] text-gray-500">tavsiye oranı</div></div>
-                  <div className="text-center"><div className="text-3xl font-bold text-blue-600">{anketOzet.anket_sayisi}</div><div className="text-[10px] text-gray-500">anket</div></div>
-                </div>
-                {Object.keys(anketOzet.kategoriler || {}).length > 0 && (
-                  <div className="space-y-1.5">{Object.entries(anketOzet.kategoriler).map(([k, v]) => (
-                    <div key={k} className="flex items-center gap-2"><span className="text-[10px] text-gray-500 w-20 text-right">{({"iletisim":"İletişim","duzen":"Düzen","etki":"Etki","geri_bildirim":"Geri Bild.","motivasyon":"Motivasyon","icerik":"İçerik","genel":"Genel"})[k] || k}</span><div className="flex-1 bg-gray-100 rounded-full h-2"><div className="h-2 bg-purple-500 rounded-full" style={{width:`${v/5*100}%`}} /></div><span className="text-xs font-medium text-gray-700 w-8">{v}</span></div>
-                  ))}</div>
+                {/* Mini önizleme — son 5 rozet */}
+                {!rozetDetayAcik && kazanilanlar.length > 0 && (
+                  <div className="flex gap-1.5 mt-2">{sonKazanilanlar.map(r => (
+                    <span key={r.kod} className="text-xl" title={r.ad}>{r.ikon}</span>
+                  ))}{kazanilanlar.length > 5 && <span className="text-xs text-gray-400 self-center">+{kazanilanlar.length - 5}</span>}</div>
                 )}
-              </CardContent>
-            </Card>
-          )}
-          {anketOzet && anketOzet.anket_sayisi === 0 && (
-            <div className="bg-purple-50 rounded-2xl p-4 border border-purple-100 text-center"><div className="text-2xl mb-1">💜</div><div className="text-sm text-purple-700">Henüz veli değerlendirmesi yok</div><div className="text-xs text-gray-500 mt-1">Veliler panellerinden anket doldurabilir</div></div>
+                {/* Detay — tüm rozetler */}
+                {rozetDetayAcik && (
+                  <div className="grid grid-cols-5 sm:grid-cols-7 gap-1.5 mt-3 pt-3 border-t border-gray-100">
+                    {rozetTanimlari.map(r => {
+                      const kazandi = rozetlerim.some(k => k.rozet_kodu === r.kod);
+                      return (
+                        <div key={r.kod} className={`text-center p-1.5 rounded-lg transition-all ${kazandi ? 'bg-orange-50 border border-orange-200' : 'opacity-25'}`} title={r.ad}>
+                          <div className="text-lg">{kazandi ? r.ikon : "🔒"}</div>
+                          <div className="text-[8px] text-gray-500 truncate">{r.ad}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* Veli Değerlendirmesi — kompakt, tıkla-aç */}
+          {anketOzet && anketOzet.anket_sayisi > 0 && (
+            <div className="bg-white rounded-2xl p-4 shadow-sm border">
+              <div className="flex items-center justify-between cursor-pointer" onClick={() => setAnketDetayAcik(!anketDetayAcik)}>
+                <div className="flex items-center gap-3">
+                  <span className="text-lg">💜</span>
+                  <span className="font-bold text-sm text-gray-900">Veli Değerlendirmesi</span>
+                  <span className="text-lg font-bold text-purple-600">⭐ {anketOzet.ortalama}</span>
+                  <span className="text-xs text-green-600 font-medium">%{anketOzet.tavsiye_oran}</span>
+                </div>
+                <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${anketDetayAcik ? 'rotate-180' : ''}`} />
+              </div>
+              {/* Detay — kategori grafikleri */}
+              {anketDetayAcik && (
+                <div className="mt-3 pt-3 border-t border-gray-100 space-y-3">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="text-center"><div className="text-2xl font-bold text-purple-600">⭐ {anketOzet.ortalama}</div><div className="text-[10px] text-gray-500">/ 5 ortalama</div></div>
+                    <div className="text-center"><div className="text-2xl font-bold text-green-600">%{anketOzet.tavsiye_oran}</div><div className="text-[10px] text-gray-500">tavsiye oranı</div></div>
+                    <div className="text-center"><div className="text-2xl font-bold text-blue-600">{anketOzet.anket_sayisi}</div><div className="text-[10px] text-gray-500">anket</div></div>
+                  </div>
+                  {Object.keys(anketOzet.kategoriler || {}).length > 0 && (
+                    <div className="space-y-1">{Object.entries(anketOzet.kategoriler).map(([k, v]) => (
+                      <div key={k} className="flex items-center gap-2"><span className="text-[10px] text-gray-500 w-16 text-right">{({"iletisim":"İletişim","duzen":"Düzen","etki":"Etki","geri_bildirim":"Geri Bild.","motivasyon":"Motivasyon","icerik":"İçerik","genel":"Genel"})[k] || k}</span><div className="flex-1 bg-gray-100 rounded-full h-1.5"><div className="h-1.5 bg-purple-500 rounded-full" style={{width:`${v/5*100}%`}} /></div><span className="text-[10px] font-medium text-gray-600">{v}</span></div>
+                    ))}</div>
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           {/* Hızlı eylemler */}
