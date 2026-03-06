@@ -3916,6 +3916,190 @@ async def bildirim_kontrol_endpoint(current_user=Depends(get_current_user)):
 
 
 # ─────────────────────────────────────────────
+# KİTAP + BÖLÜM BAZLI SORU HAVUZU (Master Bölüm 8)
+# ─────────────────────────────────────────────
+
+# Kitap ekle
+@api_router.post("/kitaplar")
+async def create_kitap(payload: dict, current_user=Depends(get_current_user)):
+    kitap = {
+        "id": str(uuid.uuid4()),
+        "baslik": payload.get("baslik", ""),
+        "yazar": payload.get("yazar", ""),
+        "yas_grubu": payload.get("yas_grubu", ""),
+        "zorluk": payload.get("zorluk", "orta"),
+        "bolum_sayisi": payload.get("bolum_sayisi", 1),
+        "kapak_url": payload.get("kapak_url", ""),
+        "ekleyen_id": current_user["id"],
+        "ekleyen_ad": f"{current_user.get('ad', '')} {current_user.get('soyad', '')}".strip(),
+        "durum": "beklemede",  # beklemede → oylama → yayinda
+        "oylar": {},
+        "olusturma_tarihi": datetime.utcnow().isoformat(),
+    }
+    await db.kitap_havuzu.insert_one(kitap)
+    # Katkı puanı
+    await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": 15}})
+    kitap.pop("_id", None)
+    return kitap
+
+
+# Kitapları listele
+@api_router.get("/kitaplar")
+async def get_kitaplar(current_user=Depends(get_current_user)):
+    kitaplar = await db.kitap_havuzu.find().sort("olusturma_tarihi", -1).to_list(length=None)
+    for k in kitaplar:
+        k.pop("_id", None)
+    return kitaplar
+
+
+# Kitap admin kararı (onay/oylama/red)
+@api_router.post("/kitaplar/{kitap_id}/admin-karar")
+async def kitap_admin_karar(kitap_id: str, payload: dict, current_user=Depends(get_current_user)):
+    if current_user.get("role") not in ["admin", "coordinator"]:
+        raise HTTPException(status_code=403, detail="Yetkisiz")
+    onay = payload.get("onay", False)
+    direkt = payload.get("direkt", False)
+    if not onay:
+        await db.kitap_havuzu.update_one({"id": kitap_id}, {"$set": {"durum": "reddedildi"}})
+        return {"ok": True, "durum": "reddedildi"}
+    if direkt:
+        await db.kitap_havuzu.update_one({"id": kitap_id}, {"$set": {"durum": "yayinda"}})
+        return {"ok": True, "durum": "yayinda"}
+    await db.kitap_havuzu.update_one({"id": kitap_id}, {"$set": {"durum": "oylama"}})
+    return {"ok": True, "durum": "oylama"}
+
+
+# Kitap oylama
+@api_router.post("/kitaplar/{kitap_id}/oyla")
+async def kitap_oyla(kitap_id: str, payload: dict, current_user=Depends(get_current_user)):
+    onay = payload.get("onay", True)
+    sebep = payload.get("sebep", "")
+    oy_data = {"onay": onay, "sebep": sebep, "tarih": datetime.utcnow().isoformat()}
+    await db.kitap_havuzu.update_one({"id": kitap_id}, {"$set": {f"oylar.{current_user['id']}": oy_data}})
+    # Katkı puanı
+    await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": 3}})
+    # Otomatik yayına alma kontrolü
+    kitap = await db.kitap_havuzu.find_one({"id": kitap_id})
+    if kitap:
+        oylar = kitap.get("oylar", {})
+        toplam = len(oylar)
+        onaylar = sum(1 for o in oylar.values() if o.get("onay"))
+        redler = sum(1 for o in oylar.values() if not o.get("onay"))
+        if toplam >= 3 and onaylar / toplam >= 0.6:
+            await db.kitap_havuzu.update_one({"id": kitap_id}, {"$set": {"durum": "yayinda"}})
+        if redler > 0:
+            await db.kitap_havuzu.update_one({"id": kitap_id}, {"$set": {"durum": "askida"}})
+    return {"ok": True}
+
+
+# Bölüm bazlı soru ekle
+@api_router.post("/kitaplar/{kitap_id}/sorular")
+async def create_soru(kitap_id: str, payload: dict, current_user=Depends(get_current_user)):
+    soru = {
+        "id": str(uuid.uuid4()),
+        "kitap_id": kitap_id,
+        "bolum": payload.get("bolum", 1),
+        "soru": payload.get("soru", ""),
+        "secenekler": payload.get("secenekler", []),
+        "dogru_cevap": payload.get("dogru_cevap", 0),
+        "ekleyen_id": current_user["id"],
+        "ekleyen_ad": f"{current_user.get('ad', '')} {current_user.get('soyad', '')}".strip(),
+        "kullanim_sayisi": 0,
+        "olusturma_tarihi": datetime.utcnow().isoformat(),
+    }
+    await db.kitap_sorulari.insert_one(soru)
+    soru.pop("_id", None)
+    return soru
+
+
+# Kitabın sorularını getir
+@api_router.get("/kitaplar/{kitap_id}/sorular")
+async def get_kitap_sorulari(kitap_id: str, bolum: int = None, current_user=Depends(get_current_user)):
+    filtre = {"kitap_id": kitap_id}
+    if bolum:
+        filtre["bolum"] = bolum
+    sorular = await db.kitap_sorulari.find(filtre).to_list(length=None)
+    for s in sorular:
+        s.pop("_id", None)
+    return sorular
+
+
+# Soru sil
+@api_router.delete("/kitaplar/sorular/{soru_id}")
+async def delete_soru(soru_id: str, current_user=Depends(get_current_user)):
+    await db.kitap_sorulari.delete_one({"id": soru_id})
+    return {"ok": True}
+
+
+# Öğrenci için bölüm bazlı test çek (okuma sonrası)
+@api_router.get("/kitaplar/test/{kitap_id}/{bolum}")
+async def get_bolum_testi(kitap_id: str, bolum: int, current_user=Depends(get_current_user)):
+    sorular = await db.kitap_sorulari.find({"kitap_id": kitap_id, "bolum": bolum}).to_list(length=None)
+    for s in sorular:
+        s.pop("_id", None)
+        # Kullanım sayısını artır
+        await db.kitap_sorulari.update_one({"id": s["id"]}, {"$inc": {"kullanim_sayisi": 1}})
+    return sorular
+
+
+# Bölüm testi tamamla (öğrenci cevapladığında)
+@api_router.post("/kitaplar/test/tamamla")
+async def bolum_testi_tamamla(payload: dict, current_user=Depends(get_current_user)):
+    kitap_id = payload.get("kitap_id", "")
+    bolum = payload.get("bolum", 1)
+    cevaplar = payload.get("cevaplar", [])  # [{soru_id, secilen_cevap}]
+
+    sorular = await db.kitap_sorulari.find({"kitap_id": kitap_id, "bolum": bolum}).to_list(length=None)
+    soru_dict = {s["id"]: s for s in sorular}
+
+    dogru = 0
+    toplam = len(cevaplar)
+    for c in cevaplar:
+        soru = soru_dict.get(c.get("soru_id"))
+        if soru and c.get("secilen_cevap") == soru.get("dogru_cevap"):
+            dogru += 1
+
+    yuzde = round((dogru / max(toplam, 1)) * 100)
+
+    # Test sonucu kaydet
+    sonuc = {
+        "id": str(uuid.uuid4()),
+        "ogrenci_id": current_user.get("linked_id") or current_user["id"],
+        "kitap_id": kitap_id,
+        "bolum": bolum,
+        "dogru": dogru,
+        "toplam": toplam,
+        "yuzde": yuzde,
+        "cevaplar": cevaplar,
+        "tarih": datetime.utcnow().isoformat(),
+    }
+    await db.kitap_test_sonuclari.insert_one(sonuc)
+
+    # XP kazan
+    xp_tablosu = await get_xp_tablosu()
+    xp = xp_tablosu.get("anlama_testi", 15)
+    ogrenci_id = current_user.get("linked_id") or current_user["id"]
+    await db.xp_logs.insert_one({"id": str(uuid.uuid4()), "ogrenci_id": ogrenci_id, "eylem": "anlama_testi", "xp": xp, "tarih": datetime.utcnow().isoformat()})
+    await db.students.update_one({"id": ogrenci_id}, {"$inc": {"toplam_xp": xp}})
+
+    sonuc.pop("_id", None)
+    return {"sonuc": sonuc, "xp_kazanilan": xp}
+
+
+# Yayındaki kitapları listele (öğrenci/öğretmen)
+@api_router.get("/kitaplar/havuz")
+async def get_kitap_havuzu(current_user=Depends(get_current_user)):
+    kitaplar = await db.kitap_havuzu.find({"durum": "yayinda"}).to_list(length=None)
+    sonuc = []
+    for k in kitaplar:
+        k.pop("_id", None)
+        soru_sayisi = await db.kitap_sorulari.count_documents({"kitap_id": k["id"]})
+        k["soru_sayisi"] = soru_sayisi
+        sonuc.append(k)
+    return sonuc
+
+
+# ─────────────────────────────────────────────
 # MESAJLAŞMA SİSTEMİ
 # ─────────────────────────────────────────────
 
