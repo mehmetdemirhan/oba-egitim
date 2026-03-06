@@ -5435,7 +5435,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
   const [soruForm, setSoruForm] = useState({ bolum: 1, soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0, taksonomi: "kavrama" });
   const [adminForm, setAdminForm] = useState({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [], makale_link: "", makale_dosya_turu: "link", kitap_yazar: "", kitap_isbn: "", kitap_yayinevi: "", kitap_sayfa: "", kitap_yas_grubu: "", kitap_link: "", kitap_kapak: "" });
   const [kitapYukleniyor, setKitapYukleniyor] = useState(false);
-  const [yeniSoru, setYeniSoru] = useState({ soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0 });
+  const [yeniSoru, setYeniSoru] = useState({ soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0, taksonomi: "kavrama" });
   const [gelisimSekme, setGelisimSekme] = useState("icerikler");
   const [egzersizPuanlari, setEgzersizPuanlari] = useState({});
 
@@ -5504,7 +5504,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
       toast({ title: "Uyarı", description: "Soru ve tüm seçenekler dolu olmalı", variant: "destructive" }); return;
     }
     setAdminForm({ ...adminForm, sorular: [...adminForm.sorular, { ...yeniSoru, id: Date.now().toString() }] });
-    setYeniSoru({ soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0 });
+    setYeniSoru({ soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0, taksonomi: "kavrama" });
   };
 
   const kitapBilgiCek = async (deger, tip) => {
@@ -5840,15 +5840,59 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
               {/* Soru Ekleme */}
               <div className="border-2 border-dashed border-gray-200 rounded-xl p-4 space-y-4">
                 <h4 className="font-semibold text-gray-700">Test Soruları ({adminForm.sorular.length} soru eklendi)</h4>
-                {adminForm.sorular.map((s, i) => (
-                  <div key={i} className="bg-green-50 p-3 rounded-lg text-sm flex items-start justify-between">
-                    <span><strong>{i+1}.</strong> {s.soru}</span>
-                    <button type="button" onClick={() => setAdminForm({...adminForm, sorular: adminForm.sorular.filter((_,idx)=>idx!==i)})}
-                      className="text-red-500 ml-2 text-xs">✕</button>
-                  </div>
-                ))}
+                {adminForm.sorular.map((s, i) => {
+                  const taksLabel = {"bilgi":"1️⃣ Bilgi","kavrama":"2️⃣ Kavrama","uygulama":"3️⃣ Uygulama","analiz":"4️⃣ Analiz","sentez":"5️⃣ Sentez","degerlendirme":"6️⃣ Yaratma"};
+                  const taksRenk = {"bilgi":"bg-blue-100 text-blue-700","kavrama":"bg-green-100 text-green-700","uygulama":"bg-yellow-100 text-yellow-700","analiz":"bg-orange-100 text-orange-700","sentez":"bg-red-100 text-red-700","degerlendirme":"bg-purple-100 text-purple-700"};
+                  return (
+                    <div key={i} className="bg-green-50 p-3 rounded-lg text-sm flex items-start justify-between">
+                      <div><strong>{i+1}.</strong> {s.soru} {s.taksonomi && <span className={`text-[10px] ml-1 px-1.5 py-0.5 rounded-full ${taksRenk[s.taksonomi] || "bg-gray-100"}`}>{taksLabel[s.taksonomi] || ""}</span>}</div>
+                      <button type="button" onClick={() => setAdminForm({...adminForm, sorular: adminForm.sorular.filter((_,idx)=>idx!==i)})}
+                        className="text-red-500 ml-2 text-xs">✕</button>
+                    </div>
+                  );
+                })}
                 <div className="space-y-3 border-t pt-4">
-                  <Input placeholder="Soru metni" value={yeniSoru.soru} onChange={e => setYeniSoru({...yeniSoru, soru: e.target.value})} />
+                  {/* Bloom Taksonomisi Seçici */}
+                  <div>
+                    <Label className="text-xs font-medium text-gray-600">Bloom Taksonomisi Basamağı</Label>
+                    <div className="grid grid-cols-3 gap-1.5 mt-1">
+                      {[
+                        {k:"bilgi", l:"1️⃣ Bilgi", r:"bg-blue-500"},
+                        {k:"kavrama", l:"2️⃣ Kavrama", r:"bg-green-500"},
+                        {k:"uygulama", l:"3️⃣ Uygulama", r:"bg-yellow-500"},
+                        {k:"analiz", l:"4️⃣ Analiz", r:"bg-orange-500"},
+                        {k:"sentez", l:"5️⃣ Sentez", r:"bg-red-500"},
+                        {k:"degerlendirme", l:"6️⃣ Yaratma", r:"bg-purple-500"},
+                      ].map(t => (
+                        <button key={t.k} type="button" onClick={() => setYeniSoru({...yeniSoru, taksonomi: t.k})}
+                          className={`px-2 py-1.5 rounded-lg text-xs font-medium border transition-all ${yeniSoru.taksonomi === t.k ? `${t.r} text-white border-transparent shadow` : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}>{t.l}</button>
+                      ))}
+                    </div>
+                  </div>
+                  {/* Bloom ipucu */}
+                  <div className={`rounded-lg p-2.5 text-xs border ${
+                    yeniSoru.taksonomi === "bilgi" ? "bg-blue-50 border-blue-200" :
+                    yeniSoru.taksonomi === "kavrama" ? "bg-green-50 border-green-200" :
+                    yeniSoru.taksonomi === "uygulama" ? "bg-yellow-50 border-yellow-200" :
+                    yeniSoru.taksonomi === "analiz" ? "bg-orange-50 border-orange-200" :
+                    yeniSoru.taksonomi === "sentez" ? "bg-red-50 border-red-200" :
+                    "bg-purple-50 border-purple-200"
+                  }`}>
+                    {yeniSoru.taksonomi === "bilgi" && (<><strong className="text-blue-700">Hatırlama:</strong> Metinde doğrudan geçen bilgiyi sorun. <span className="italic text-gray-500">Kim? Ne zaman? Nerede? Hangisi metinde geçmiştir?</span></>)}
+                    {yeniSoru.taksonomi === "kavrama" && (<><strong className="text-green-700">Anlama:</strong> Kendi cümleleriyle ifade etsin. <span className="italic text-gray-500">Ne anlatılmak istenmiştir? Ana fikir nedir? Özetleyiniz.</span></>)}
+                    {yeniSoru.taksonomi === "uygulama" && (<><strong className="text-yellow-700">Uygulama:</strong> Farklı bir durumda kullanmasını isteyin. <span className="italic text-gray-500">Sen olsaydın? Bu bilgiyi nerede kullanabilirsin?</span></>)}
+                    {yeniSoru.taksonomi === "analiz" && (<><strong className="text-orange-700">Analiz:</strong> Neden-sonuç, karşılaştırma sorun. <span className="italic text-gray-500">Neden böyle davrandı? Aradaki fark nedir? Sebebi ne?</span></>)}
+                    {yeniSoru.taksonomi === "sentez" && (<><strong className="text-red-700">Değerlendirme:</strong> Yargılama ve görüş bildirme. <span className="italic text-gray-500">Katılıyor musun? Doğru mu yanlış mı? En önemli mesaj ne?</span></>)}
+                    {yeniSoru.taksonomi === "degerlendirme" && (<><strong className="text-purple-700">Yaratma:</strong> Yeni bir şey üretme, tasarlama. <span className="italic text-gray-500">Farklı bir son yaz. Başlık öner. Devamını tahmin et.</span></>)}
+                  </div>
+                  <Input placeholder={
+                    yeniSoru.taksonomi === "bilgi" ? "Metinde ... kim / ne zaman / nerede?" :
+                    yeniSoru.taksonomi === "kavrama" ? "Bu bölümde anlatılmak istenen nedir?" :
+                    yeniSoru.taksonomi === "uygulama" ? "Sen olsaydın bu durumda ne yapardın?" :
+                    yeniSoru.taksonomi === "analiz" ? "Karakterin böyle davranmasının sebebi nedir?" :
+                    yeniSoru.taksonomi === "sentez" ? "Bu karara katılıyor musun? Neden?" :
+                    "Hikayeye farklı bir son yaz"
+                  } value={yeniSoru.soru} onChange={e => setYeniSoru({...yeniSoru, soru: e.target.value})} />
                   {yeniSoru.secenekler.map((s, i) => (
                     <div key={i} className="flex items-center gap-2">
                       <span className="text-sm font-bold w-5">{['A','B','C','D'][i]}</span>
