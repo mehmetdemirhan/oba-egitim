@@ -3524,6 +3524,10 @@ function OgretmenPaneli({ user, logout }) {
   const [gorevForm, setGorevForm] = useState({ baslik: "", aciklama: "", tur: "ozel", son_tarih: "", film_link: "", makale_link: "", kitap_yazar: "" });
   const [gorevHedefler, setGorevHedefler] = useState([]);
   const [gorevAtaGoster, setGorevAtaGoster] = useState(false);
+  // Rozet + Anket
+  const [rozetlerim, setRozetlerim] = useState([]);
+  const [rozetTanimlari, setRozetTanimlari] = useState([]);
+  const [anketOzet, setAnketOzet] = useState(null);
   // Mesaj
   const [mesajAlici, setMesajAlici] = useState("");
   const [mesajForm, setMesajForm] = useState({ konu: "", icerik: "" });
@@ -3546,6 +3550,10 @@ function OgretmenPaneli({ user, logout }) {
     try { const r = await axios.get(`${API}/mesajlar`); setMesajlar(Array.isArray(r.data) ? r.data : []); } catch(e) { setMesajlar([]); }
     try { const r = await axios.get(`${API}/mesajlar/okunmamis-sayisi`); setOkunmamisSayisi(r.data?.sayi || 0); } catch(e) {}
     try { const r = await axios.get(`${API}/auth/users`); setKullanicilar(Array.isArray(r.data) ? r.data : []); } catch(e) { setKullanicilar([]); }
+    try { await axios.post(`${API}/rozetler/kontrol`); } catch(e) {}
+    try { const r = await axios.get(`${API}/rozetler/${user.id}`); setRozetlerim(Array.isArray(r.data) ? r.data : []); } catch(e) {}
+    try { const r = await axios.get(`${API}/rozetler/tanim`); setRozetTanimlari(r.data?.ogretmen || []); } catch(e) {}
+    try { const r = await axios.get(`${API}/anketler/ogretmen/${ogretmenId}/ozet`); setAnketOzet(r.data); } catch(e) {}
   }, [ogretmenId]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
@@ -3803,6 +3811,48 @@ function OgretmenPaneli({ user, logout }) {
             </Card>
           )}
 
+          {/* Rozetlerim */}
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="pb-2"><CardTitle className="text-base flex items-center justify-between">🏅 Rozetlerim <span className="text-sm font-normal text-gray-500">{rozetlerim.length} / {rozetTanimlari.length}</span></CardTitle></CardHeader>
+            <CardContent>
+              {rozetTanimlari.length > 0 ? (
+                <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                  {rozetTanimlari.map(r => {
+                    const kazandi = rozetlerim.some(k => k.rozet_kodu === r.kod);
+                    return (
+                      <div key={r.kod} className={`text-center p-2 rounded-xl border transition-all ${kazandi ? 'bg-white border-orange-200 shadow-sm' : 'bg-gray-50 border-gray-100 opacity-40'}`} title={`${r.ad}: ${kazandi ? 'Kazanıldı!' : 'Kilitli'}`}>
+                        <div className="text-2xl">{kazandi ? r.ikon : "🔒"}</div>
+                        <div className="text-[9px] text-gray-600 mt-1 truncate">{r.ad}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (<p className="text-sm text-gray-400 text-center py-4">Yükleniyor...</p>)}
+            </CardContent>
+          </Card>
+
+          {/* Veli Değerlendirme Özeti */}
+          {anketOzet && anketOzet.anket_sayisi > 0 && (
+            <Card className="border-0 shadow-sm border-l-4 border-l-purple-500">
+              <CardHeader className="pb-2"><CardTitle className="text-base">💜 Veli Değerlendirmesi</CardTitle></CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-3 mb-3">
+                  <div className="text-center"><div className="text-3xl font-bold text-purple-600">⭐ {anketOzet.ortalama}</div><div className="text-[10px] text-gray-500">/ 5 ortalama</div></div>
+                  <div className="text-center"><div className="text-3xl font-bold text-green-600">%{anketOzet.tavsiye_oran}</div><div className="text-[10px] text-gray-500">tavsiye oranı</div></div>
+                  <div className="text-center"><div className="text-3xl font-bold text-blue-600">{anketOzet.anket_sayisi}</div><div className="text-[10px] text-gray-500">anket</div></div>
+                </div>
+                {Object.keys(anketOzet.kategoriler || {}).length > 0 && (
+                  <div className="space-y-1.5">{Object.entries(anketOzet.kategoriler).map(([k, v]) => (
+                    <div key={k} className="flex items-center gap-2"><span className="text-[10px] text-gray-500 w-20 text-right">{({"iletisim":"İletişim","duzen":"Düzen","etki":"Etki","geri_bildirim":"Geri Bild.","motivasyon":"Motivasyon","icerik":"İçerik","genel":"Genel"})[k] || k}</span><div className="flex-1 bg-gray-100 rounded-full h-2"><div className="h-2 bg-purple-500 rounded-full" style={{width:`${v/5*100}%`}} /></div><span className="text-xs font-medium text-gray-700 w-8">{v}</span></div>
+                  ))}</div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+          {anketOzet && anketOzet.anket_sayisi === 0 && (
+            <div className="bg-purple-50 rounded-2xl p-4 border border-purple-100 text-center"><div className="text-2xl mb-1">💜</div><div className="text-sm text-purple-700">Henüz veli değerlendirmesi yok</div><div className="text-xs text-gray-500 mt-1">Veliler panellerinden anket doldurabilir</div></div>
+          )}
+
           {/* Hızlı eylemler */}
           <div className="grid grid-cols-2 gap-3">
             <button onClick={() => setAktifSekme("ogrencilerim")} className="bg-white rounded-2xl p-4 shadow-sm border text-left hover:shadow-md transition-all">
@@ -3940,6 +3990,8 @@ function OgrenciPaneli({ user, logout }) {
   const [egzersizPuanlari, setEgzersizPuanlari] = useState({});
   const [gelisimIcerikleri, setGelisimIcerikleri] = useState([]);
   const [gelisimTamamlananlar, setGelisimTamamlananlar] = useState([]);
+  const [ogrenciRozetler, setOgrenciRozetler] = useState([]);
+  const [ogrenciRozetTanim, setOgrenciRozetTanim] = useState([]);
 
   const ogrenciId = user.linked_id || user.id;
 
@@ -3956,6 +4008,9 @@ function OgrenciPaneli({ user, logout }) {
     try { const r = await axios.get(`${API}/egzersiz/puanlar`); setEgzersizPuanlari(r.data || {}); } catch(e) {}
     try { const r = await axios.get(`${API}/gelisim/icerik`); const d = Array.isArray(r.data) ? r.data : []; setGelisimIcerikleri(d.filter(i => i.durum === "yayinda" && (i.hedef_kitle === "hepsi" || i.hedef_kitle === "ogrenci"))); } catch(e) { setGelisimIcerikleri([]); }
     try { const r = await axios.get(`${API}/gelisim/tamamlama/${user.id}`); setGelisimTamamlananlar(Array.isArray(r.data) ? r.data : []); } catch(e) { setGelisimTamamlananlar([]); }
+    try { await axios.post(`${API}/rozetler/kontrol`); } catch(e) {}
+    try { const r = await axios.get(`${API}/rozetler/${user.id}`); setOgrenciRozetler(Array.isArray(r.data) ? r.data : []); } catch(e) {}
+    try { const r = await axios.get(`${API}/rozetler/tanim`); setOgrenciRozetTanim(r.data?.ogrenci || []); } catch(e) {}
   }, [ogrenciId, user.id]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
@@ -4165,6 +4220,19 @@ function OgrenciPaneli({ user, logout }) {
               <div className="text-[10px] text-blue-600 mt-1">✉️ Mesaj gönder</div>
             </div>)}
           </div>
+
+          {/* Rozetlerim */}
+          {ogrenciRozetTanim.length > 0 && (
+            <div className="bg-white rounded-2xl p-4 shadow-sm border">
+              <div className="flex items-center justify-between mb-3"><h3 className="font-bold text-sm text-gray-900">🏅 Rozetlerim</h3><span className="text-xs text-gray-500">{ogrenciRozetler.length} / {ogrenciRozetTanim.length}</span></div>
+              <div className="grid grid-cols-5 gap-2">
+                {ogrenciRozetTanim.slice(0, 15).map(r => {
+                  const kazandi = ogrenciRozetler.some(k => k.rozet_kodu === r.kod);
+                  return (<div key={r.kod} className={`text-center p-1.5 rounded-xl border ${kazandi ? 'bg-white border-orange-200 shadow-sm' : 'bg-gray-50 border-gray-100 opacity-30'}`} title={r.ad}><div className="text-xl">{kazandi ? r.ikon : "🔒"}</div><div className="text-[8px] text-gray-500 mt-0.5 truncate">{r.ad}</div></div>);
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Son 3 okuma */}
           {okumaKayitlari.length > 0 && (<div className="bg-white rounded-2xl p-4 shadow-sm border">
@@ -4466,6 +4534,13 @@ function VeliPaneli({ user, logout }) {
   const [mesajGonderiliyor, setMesajGonderiliyor] = useState(false);
   const [okunmamisSayisi, setOkunmamisSayisi] = useState(0);
   const [mesajGorunum, setMesajGorunum] = useState("gelen");
+  // Anket
+  const [anketSorulari, setAnketSorulari] = useState([]);
+  const [anketYanitlar, setAnketYanitlar] = useState({});
+  const [anketTavsiye, setAnketTavsiye] = useState(null);
+  const [anketNot, setAnketNot] = useState("");
+  const [anketGonderiliyor, setAnketGonderiliyor] = useState(false);
+  const [veliAnketleri, setVeliAnketleri] = useState([]);
 
   // Velinin çocuklarını bul (linked_id ile eşleşen öğrenciler)
   useEffect(() => {
@@ -4501,6 +4576,8 @@ function VeliPaneli({ user, logout }) {
   useEffect(() => {
     axios.get(`${API}/mesajlar`).then(r => setMesajlar(Array.isArray(r.data) ? r.data : [])).catch(() => { setMesajlar([]); });
     axios.get(`${API}/mesajlar/okunmamis-sayisi`).then(r => setOkunmamisSayisi(r.data?.sayi || 0)).catch(() => {});
+    axios.get(`${API}/anketler/sorular`).then(r => setAnketSorulari(Array.isArray(r.data) ? r.data : [])).catch(() => {});
+    axios.get(`${API}/anketler/veli/${user.id}`).then(r => setVeliAnketleri(Array.isArray(r.data) ? r.data : [])).catch(() => {});
     axios.get(`${API}/auth/users`).then(r => { const d = Array.isArray(r.data) ? r.data : []; setKullanicilar(d.filter(u => u.role === "teacher" || u.role === "admin" || u.role === "coordinator")); }).catch(() => {});
   }, []);
 
@@ -4526,6 +4603,7 @@ function VeliPaneli({ user, logout }) {
     { id: "ozet", label: "Özet", icon: "📊" },
     { id: "okumalar", label: "Okumalar", icon: "📖" },
     { id: "gorevler", label: "Görevler", icon: "📌" },
+    { id: "anket", label: "Değerlendir", icon: "⭐" },
     { id: "mesajlar", label: "Mesajlar", icon: "✉️", badge: okunmamisSayisi || null },
   ];
 
@@ -4606,6 +4684,77 @@ function VeliPaneli({ user, logout }) {
           </div>)}
 
           {/* MESAJLAR */}
+          {/* ANKET */}
+          {aktifSekme === "anket" && (<div className="space-y-4">
+            <h2 className="text-xl font-bold">⭐ Öğretmen Değerlendirmesi</h2>
+            {seciliCocuk ? (<>
+              {(() => {
+                const ogretmenId = seciliCocuk.ogretmen_id;
+                const donem = new Date().getFullYear() + "-D" + String(new Date().getMonth() + 1).padStart(2, '0');
+                const zatenDoldurdu = veliAnketleri.some(a => a.ogretmen_id === ogretmenId && a.donem === donem);
+
+                if (zatenDoldurdu) return (
+                  <div className="bg-green-50 rounded-2xl p-6 border border-green-200 text-center">
+                    <div className="text-4xl mb-2">✅</div><h3 className="font-bold text-green-800">Bu dönem için değerlendirmenizi yaptınız</h3>
+                    <p className="text-sm text-green-600 mt-1">Teşekkür ederiz! Sonraki dönemde tekrar doldurabilirsiniz.</p>
+                  </div>
+                );
+
+                const anketGonder = async () => {
+                  const puanSorular = anketSorulari.filter(s => s.tip === "puan");
+                  const bos = puanSorular.filter(s => !anketYanitlar[s.no]);
+                  if (bos.length > 0) { toast({ title: "Lütfen tüm soruları puanlayın", variant: "destructive" }); return; }
+                  if (anketTavsiye === null) { toast({ title: "Tavsiye sorusunu cevaplayın", variant: "destructive" }); return; }
+                  setAnketGonderiliyor(true);
+                  try {
+                    const yanitlar = Object.entries(anketYanitlar).map(([no, puan]) => {
+                      const s = anketSorulari.find(q => q.no === parseInt(no));
+                      return { soru_no: parseInt(no), puan, kategori: s?.kategori || "" };
+                    });
+                    await axios.post(`${API}/anketler`, { ogretmen_id: ogretmenId, ogrenci_id: seciliCocuk.id, yanitlar, tavsiye: anketTavsiye, not_text: anketNot, donem });
+                    toast({ title: "⭐ Değerlendirmeniz kaydedildi! Teşekkürler." });
+                    setAnketYanitlar({}); setAnketTavsiye(null); setAnketNot("");
+                    axios.get(`${API}/anketler/veli/${user.id}`).then(r => setVeliAnketleri(Array.isArray(r.data) ? r.data : []));
+                  } catch(e) { toast({ title: e.response?.data?.detail || "Hata", variant: "destructive" }); }
+                  setAnketGonderiliyor(false);
+                };
+
+                return (
+                  <Card className="border-0 shadow-sm"><CardContent className="p-5 space-y-5">
+                    <p className="text-sm text-gray-600">{seciliCocuk.ad} {seciliCocuk.soyad}'ın öğretmenini değerlendirin. Yanıtlarınız anonim olarak iletilir.</p>
+                    {anketSorulari.filter(s => s.tip === "puan").map(s => (
+                      <div key={s.no}>
+                        <Label className="text-sm font-medium">{s.no}. {s.soru}</Label>
+                        <div className="flex gap-1 mt-2">{[1,2,3,4,5].map(p => (
+                          <button key={p} onClick={() => setAnketYanitlar({...anketYanitlar, [s.no]: p})}
+                            className={`w-10 h-10 rounded-xl text-lg transition-all ${(anketYanitlar[s.no] || 0) >= p ? 'bg-yellow-400 shadow-sm scale-110' : 'bg-gray-100 hover:bg-gray-200'}`}>⭐</button>
+                        ))}</div>
+                      </div>
+                    ))}
+                    <div>
+                      <Label className="text-sm font-medium">8. Bu öğretmeni başka velilere tavsiye eder misiniz?</Label>
+                      <div className="flex gap-3 mt-2">
+                        <button onClick={() => setAnketTavsiye(true)} className={`flex-1 py-3 rounded-xl text-sm font-medium border transition-all ${anketTavsiye === true ? 'bg-green-500 text-white border-green-500' : 'bg-white text-gray-600 border-gray-200'}`}>👍 Evet</button>
+                        <button onClick={() => setAnketTavsiye(false)} className={`flex-1 py-3 rounded-xl text-sm font-medium border transition-all ${anketTavsiye === false ? 'bg-red-500 text-white border-red-500' : 'bg-white text-gray-600 border-gray-200'}`}>👎 Hayır</button>
+                      </div>
+                    </div>
+                    <div><Label className="text-sm">9. Eklemek istediğiniz not (opsiyonel)</Label><textarea value={anketNot} onChange={e => setAnketNot(e.target.value)} className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[60px] mt-1" placeholder="Düşünceleriniz..." /></div>
+                    <Button onClick={anketGonder} disabled={anketGonderiliyor} className="w-full bg-purple-600 text-white py-3">{anketGonderiliyor ? "Gönderiliyor..." : "⭐ Değerlendirmeyi Gönder"}</Button>
+                  </CardContent></Card>
+                );
+              })()}
+            </>) : (<div className="text-center py-12 text-gray-500">Çocuk seçilmedi</div>)}
+
+            {/* Önceki anketler */}
+            {veliAnketleri.length > 0 && (<div><h3 className="text-sm font-medium text-gray-500 mt-4">Önceki Değerlendirmelerim</h3>
+              {veliAnketleri.map(a => {
+                const puanlar = (a.yanitlar || []).filter(y => y.puan).map(y => y.puan);
+                const ort = puanlar.length > 0 ? (puanlar.reduce((t,p) => t+p, 0) / puanlar.length).toFixed(1) : "—";
+                return (<div key={a.id} className="bg-white rounded-xl p-3 border mt-2 flex items-center justify-between"><div><div className="text-sm font-medium">⭐ {ort} / 5</div><div className="text-xs text-gray-400">{a.donem} • {a.tavsiye ? "👍 Tavsiye" : "👎"}</div></div><div className="text-xs text-gray-400">{new Date(a.tarih).toLocaleDateString('tr-TR')}</div></div>);
+              })}
+            </div>)}
+          </div>)}
+
           {aktifSekme === "mesajlar" && (<div className="space-y-4">
             <h2 className="text-xl font-bold">✉️ Mesajlar</h2>
             <div className="flex gap-2">
