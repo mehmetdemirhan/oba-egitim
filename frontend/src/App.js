@@ -3890,7 +3890,54 @@ function OgretmenPaneli({ user, logout }) {
                 </>)}
 
                 {analiz && typeof analiz === 'string' && (<div className="bg-white rounded-xl p-4 border shadow-sm"><div className="text-xs text-gray-600 whitespace-pre-wrap">{analiz}</div></div>)}
-              </div>);
+              </div>);\n            })()}
+
+            {/* 🎤 Speech AI — Sesli Okuma Analizi */}
+            {(() => {
+              const [speechOgrData, setSpeechOgrData] = React.useState(null);
+              const [speechOgrYukleniyor, setSpeechOgrYukleniyor] = React.useState(false);
+              const yukleSpeeech = async () => {
+                setSpeechOgrYukleniyor(true);
+                try {
+                  const [statR, gecmisR] = await Promise.all([
+                    axios.get(`${API}/ai/speech/istatistik/${seciliOgrenci.id}`),
+                    axios.get(`${API}/ai/speech/gecmis/${seciliOgrenci.id}`),
+                  ]);
+                  setSpeechOgrData({ istatistik: statR.data, gecmis: gecmisR.data });
+                } catch(e) {}
+                setSpeechOgrYukleniyor(false);
+              };
+              const s = speechOgrData?.istatistik;
+              const g = speechOgrData?.gecmis || [];
+              const renk = (v) => v >= 80 ? "text-green-600" : v >= 60 ? "text-yellow-600" : "text-red-500";
+              return (
+                <div className="bg-white rounded-2xl p-4 shadow-sm border">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2"><span className="text-lg">🎤</span><span className="font-bold text-sm">Sesli Okuma Analizi</span></div>
+                    {!speechOgrData && <button onClick={yukleSpeeech} disabled={speechOgrYukleniyor} className="text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full hover:bg-purple-200">
+                      {speechOgrYukleniyor ? "⏳" : "Yükle →"}
+                    </button>}
+                  </div>
+                  {s && s.toplam > 0 ? (<>
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                      <div className="text-center bg-purple-50 rounded-xl p-2"><div className={`text-xl font-bold ${renk(s.ort_skor)}`}>{s.ort_skor}</div><div className="text-[10px] text-gray-500">Ort. Skor</div></div>
+                      <div className="text-center bg-blue-50 rounded-xl p-2"><div className="text-xl font-bold text-blue-600">{s.ort_wpm}</div><div className="text-[10px] text-gray-500">k/dk</div></div>
+                      <div className="text-center bg-green-50 rounded-xl p-2"><div className="text-xl font-bold text-green-600">{s.toplam}</div><div className="text-[10px] text-gray-500">Okuma</div></div>
+                    </div>
+                    {s.en_iyi && <div className="text-xs bg-yellow-50 border border-yellow-100 rounded-lg p-2 mb-2">🏆 En iyi: <strong>{s.en_iyi.metin}</strong> — {s.en_iyi.skor}/100 • {s.en_iyi.wpm} k/dk</div>}
+                    {g.slice(0,3).map((k,i) => (
+                      <div key={i} className="flex items-center justify-between py-1.5 border-b last:border-0">
+                        <div><div className="text-xs font-medium">{k.metin_baslik}</div><div className="text-[10px] text-gray-400">{k.tarih?.slice(0,10)} • {k.sure_sn}sn</div></div>
+                        <div className="text-right"><div className={`text-sm font-bold ${renk(k.analiz?.genel_skor||0)}`}>{k.analiz?.genel_skor||0}/100</div><div className="text-[10px] text-gray-400">{k.analiz?.wpm||0} k/dk</div></div>
+                      </div>
+                    ))}
+                  </>) : s && s.toplam === 0 ? (
+                    <div className="text-xs text-gray-400 text-center py-3">Bu öğrenci henüz sesli okuma yapmamış</div>
+                  ) : !speechOgrData ? (
+                    <div className="text-xs text-gray-400 text-center py-3">Sesli okuma verilerini görmek için Yükle'ye bas</div>
+                  ) : null}
+                </div>
+              );
             })()}
 
             {/* Haftalık */}
@@ -4543,6 +4590,18 @@ function OgrenciPaneli({ user, logout }) {
   const [okumaSuresi, setOkumaSuresi] = useState(0);
   const [okumaDuraklatildi, setOkumaDuraklatildi] = useState(false);
   const okumaInterval = useRef(null);
+  // Speech AI state'leri
+  const [speechMod, setSpeechMod] = useState(false);
+  const [speechMetinler, setSpeechMetinler] = useState([]);
+  const [seciliSpeechMetin, setSeciliSpeechMetin] = useState(null);
+  const [speechKayit, setSpeechKayit] = useState(false); // kayıt aktif mi
+  const [speechSure, setSpeechSure] = useState(0);
+  const speechSureRef = useRef(null);
+  const [speechSonuc, setSpeechSonuc] = useState(null);
+  const [speechYukleniyor, setSpeechYukleniyor] = useState(false);
+  const [speechGecmis, setSpeechGecmis] = useState([]);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
   const [agaclar, setAgaclar] = useState([]);
   const [neOkudunForm, setNeOkudunForm] = useState({ kitap_adi: "", bolum: "", baslangic_sayfa: "", bitis_sayfa: "", not_text: "" });
   const [mesajlar, setMesajlar] = useState([]);
@@ -4581,6 +4640,15 @@ function OgrenciPaneli({ user, logout }) {
   useEffect(() => { const f = async () => { try { const r = await axios.get(`${API}/ai/kocluk/${user.id}/motivasyon`); setAiMotMesaj(r.data.mesaj || ""); } catch(e) {} }; f(); }, [user.id]);
   // Kelime Evrimi verilerini yükle
   useEffect(() => { const f = async () => { try { const r = await axios.get(`${API}/ai/kelime-evrimi/${user.id}`); setKelimeData(r.data); } catch(e) {} }; f(); }, [user.id]);
+  // Speech AI: metinler ve geçmiş
+  useEffect(() => {
+    const f = async () => {
+      const sinif = linkedStudent?.sinif || user?.sinif || 3;
+      try { const r = await axios.get(`${API}/ai/speech/metinler?sinif=${sinif}`); setSpeechMetinler(r.data.metinler || []); } catch(e) {}
+      try { const r = await axios.get(`${API}/ai/speech/gecmis/${ogrenciId}`); setSpeechGecmis(r.data || []); } catch(e) {}
+    };
+    f();
+  }, [ogrenciId, user?.sinif]);
   // Okuma sayacı
   useEffect(() => {
     if (okumaBasladi && !okumaDuraklatildi) {
@@ -4604,6 +4672,56 @@ function OgrenciPaneli({ user, logout }) {
   const [socraticSoru, setSocraticSoru] = useState(null);
   const [socraticCevap, setSocraticCevap] = useState("");
   const [socraticSonuc, setSocraticSonuc] = useState(null);
+
+  // ── SPEECH AI Fonksiyonları ──
+  const speechBaslat = async (metin) => {
+    setSeciliSpeechMetin(metin);
+    setSpeechSonuc(null);
+    setSpeechSure(0);
+    audioChunksRef.current = [];
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      mediaRecorderRef.current = mr;
+      mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      mr.start(250);
+      setSpeechKayit(true);
+      speechSureRef.current = setInterval(() => setSpeechSure(s => s + 1), 1000);
+    } catch(e) {
+      toast({ title: "Mikrofon erişimi gerekli. Lütfen izin ver.", variant: "destructive" });
+    }
+  };
+
+  const speechBitir = async () => {
+    if (!mediaRecorderRef.current) return;
+    clearInterval(speechSureRef.current);
+    setSpeechKayit(false);
+    setSpeechYukleniyor(true);
+
+    await new Promise(resolve => {
+      mediaRecorderRef.current.onstop = resolve;
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream?.getTracks().forEach(t => t.stop());
+    });
+
+    try {
+      const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+      const fd = new FormData();
+      fd.append("ses_dosyasi", blob, "ses.webm");
+      fd.append("metin_id", seciliSpeechMetin?.id || "");
+      fd.append("ogrenci_id", linkedStudent?.id || user?.id || "");
+      fd.append("sure_sn", speechSure.toString());
+      fd.append("sinif", (linkedStudent?.sinif || user?.sinif || 3).toString());
+      const r = await axios.post(`${API}/ai/speech/analiz`, fd, { headers: { "Content-Type": "multipart/form-data" }, timeout: 60000 });
+      setSpeechSonuc(r.data);
+      toast({ title: `🎤 Analiz tamam! ${r.data.genel_skor}/100 puan • +${r.data.xp_kazanildi} XP` });
+      // Geçmişi yenile
+      try { const gr = await axios.get(`${API}/ai/speech/gecmis/${linkedStudent?.id || user?.id}`); setSpeechGecmis(gr.data); } catch(e) {}
+    } catch(e) {
+      toast({ title: "Analiz hatası. Lütfen tekrar dene.", variant: "destructive" });
+    }
+    setSpeechYukleniyor(false);
+  };
 
   const okumaKaydet = async (e) => {
     e.preventDefault();
@@ -4655,6 +4773,172 @@ function OgrenciPaneli({ user, logout }) {
   const seviyeEmoji = seviye <= 2 ? "🌱" : seviye <= 5 ? "🌿" : seviye <= 10 ? "🌳" : seviye <= 20 ? "🏆" : "👑";
 
   // ── OKUMA RİTÜELİ ──
+  // ── SPEECH AI EKRANI ──
+  if (aktifEkran === "speech") {
+    const skorRenk = (s) => s >= 80 ? "text-green-600" : s >= 60 ? "text-yellow-600" : "text-red-500";
+    const skorBg = (s) => s >= 80 ? "bg-green-50 border-green-200" : s >= 60 ? "bg-yellow-50 border-yellow-200" : "bg-red-50 border-red-200";
+
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-purple-50 to-indigo-100 p-4">
+        <div className="max-w-md mx-auto space-y-4">
+          {/* Header */}
+          <div className="flex items-center gap-3">
+            <button onClick={() => { setAktifEkran(null); setSpeechSonuc(null); setSpeechKayit(false); clearInterval(speechSureRef.current); if(mediaRecorderRef.current?.state === "recording") { mediaRecorderRef.current.stop(); mediaRecorderRef.current.stream?.getTracks().forEach(t=>t.stop()); } }} className="text-purple-600 text-sm">← Geri</button>
+            <h2 className="text-lg font-bold text-purple-900">🎤 Sesli Okuma Analizi</h2>
+          </div>
+
+          {/* Sonuç ekranı */}
+          {speechSonuc && (
+            <div className="space-y-3">
+              <div className={`rounded-2xl border p-4 text-center ${skorBg(speechSonuc.genel_skor)}`}>
+                <div className="text-5xl font-bold mb-1 text-purple-700">{speechSonuc.genel_skor}<span className="text-lg">/100</span></div>
+                <div className="text-sm font-medium text-gray-600 capitalize">{speechSonuc.seviye}</div>
+                <div className="text-xs text-green-600 font-bold mt-1">+{speechSonuc.xp_kazanildi} XP kazandın! 🎉</div>
+              </div>
+
+              {/* 4 metrik */}
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { label: "Telaffuz", val: speechSonuc.telaffuz_skoru, icon: "🗣️" },
+                  { label: "Akıcılık", val: speechSonuc.akicilik_skoru, icon: "🌊" },
+                  { label: "Tonlama", val: speechSonuc.tonlama_skoru, icon: "🎵" },
+                  { label: "Vurgu", val: speechSonuc.vurgu_skoru, icon: "💥" },
+                ].map(m => (
+                  <div key={m.label} className="bg-white rounded-xl p-3 border text-center">
+                    <div className="text-xl">{m.icon}</div>
+                    <div className={`text-xl font-bold ${skorRenk(m.val)}`}>{m.val}</div>
+                    <div className="text-xs text-gray-500">{m.label}</div>
+                    <div className="mt-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className={`h-1.5 rounded-full ${m.val>=80?"bg-green-500":m.val>=60?"bg-yellow-400":"bg-red-400"}`} style={{width:`${m.val}%`}} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* WPM */}
+              <div className="bg-white rounded-xl border p-3 flex justify-between items-center">
+                <div>
+                  <div className="text-xs text-gray-500">Okuma Hızın</div>
+                  <div className={`text-2xl font-bold ${skorRenk(speechSonuc.akicilik_skoru)}`}>{speechSonuc.wpm} <span className="text-sm font-normal text-gray-400">kelime/dk</span></div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-gray-500">Sınıf Normu</div>
+                  <div className="text-lg font-bold text-gray-400">{speechSonuc.norm_wpm} <span className="text-xs font-normal">kelime/dk</span></div>
+                </div>
+              </div>
+
+              {/* Öğrenciye mesaj */}
+              {speechSonuc.ogrenci_mesaj && (
+                <div className="bg-gradient-to-r from-purple-100 to-indigo-100 rounded-xl p-3 border border-purple-200">
+                  <div className="text-xs font-medium text-purple-700 mb-1">🤖 AI Koçun Diyor:</div>
+                  <p className="text-sm text-gray-700">{speechSonuc.ogrenci_mesaj}</p>
+                </div>
+              )}
+
+              {/* Güçlü yönler & gelişim */}
+              {(speechSonuc.guclu_yonler?.length > 0 || speechSonuc.gelisim_alanlari?.length > 0) && (
+                <div className="grid grid-cols-2 gap-2">
+                  {speechSonuc.guclu_yonler?.length > 0 && (
+                    <div className="bg-green-50 rounded-xl p-3 border border-green-100">
+                      <div className="text-xs font-bold text-green-700 mb-1">✅ Güçlü</div>
+                      {speechSonuc.guclu_yonler.map((g,i) => <div key={i} className="text-xs text-green-600">• {g}</div>)}
+                    </div>
+                  )}
+                  {speechSonuc.gelisim_alanlari?.length > 0 && (
+                    <div className="bg-orange-50 rounded-xl p-3 border border-orange-100">
+                      <div className="text-xs font-bold text-orange-700 mb-1">📈 Gelişim</div>
+                      {speechSonuc.gelisim_alanlari.map((g,i) => <div key={i} className="text-xs text-orange-600">• {g}</div>)}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <button onClick={() => { setSpeechSonuc(null); setSeciliSpeechMetin(null); setSpeechSure(0); }} className="w-full py-3 rounded-xl bg-purple-600 text-white font-medium text-sm">🔄 Tekrar Oku</button>
+            </div>
+          )}
+
+          {/* Kayıt yapılıyor */}
+          {!speechSonuc && speechKayit && seciliSpeechMetin && (
+            <div className="space-y-4">
+              <div className="bg-red-50 border-2 border-red-300 rounded-2xl p-4 text-center">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+                  <span className="text-red-600 font-bold text-sm">KAYIT YAPILIYOR</span>
+                </div>
+                <div className="text-4xl font-mono font-bold text-red-700">
+                  {Math.floor(speechSure/60).toString().padStart(2,'0')}:{(speechSure%60).toString().padStart(2,'0')}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border-2 border-purple-200 p-4">
+                <div className="text-xs font-bold text-purple-700 mb-2">📖 Okunan Metin:</div>
+                <p className="text-sm text-gray-800 leading-relaxed font-medium">{seciliSpeechMetin.metin}</p>
+              </div>
+
+              <button onClick={speechBitir} disabled={speechYukleniyor || speechSure < 3}
+                className="w-full py-4 rounded-2xl bg-gradient-to-r from-red-500 to-pink-600 text-white font-bold text-lg disabled:opacity-50">
+                {speechYukleniyor ? "⏳ Analiz ediliyor..." : "⏹️ Bitir & Analiz Et"}
+              </button>
+              {speechSure < 3 && <p className="text-xs text-center text-gray-400">En az 3 saniye kayıt gerekiyor</p>}
+            </div>
+          )}
+
+          {/* Yükleniyor */}
+          {speechYukleniyor && !speechKayit && (
+            <div className="bg-white rounded-2xl border p-8 text-center">
+              <div className="text-4xl mb-3 animate-bounce">🤖</div>
+              <div className="text-sm font-medium text-gray-600">AI sesin analiz ediyor...</div>
+              <div className="mt-3 flex justify-center gap-1">
+                {[0,1,2].map(i => <div key={i} className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{animationDelay:`${i*0.15}s`}} />)}
+              </div>
+            </div>
+          )}
+
+          {/* Metin seçimi */}
+          {!speechSonuc && !speechKayit && !speechYukleniyor && (
+            <div className="space-y-3">
+              <p className="text-sm text-gray-600 text-center">Bir metin seç ve yüksek sesle oku 📖</p>
+              {speechMetinler.length === 0 && (
+                <div className="text-center text-gray-400 text-sm py-4">Metin yükleniyor...</div>
+              )}
+              {speechMetinler.map(m => (
+                <div key={m.id} className="bg-white rounded-2xl border-2 border-purple-100 hover:border-purple-300 p-4 cursor-pointer transition-all" onClick={() => speechBaslat(m)}>
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="font-semibold text-gray-800 text-sm">{m.baslik}</div>
+                    <div className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">{m.kelime_sayisi} kelime</div>
+                  </div>
+                  <p className="text-xs text-gray-500 line-clamp-2">{m.metin}</p>
+                  <button className="mt-3 w-full py-2 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-600 text-white text-sm font-medium">🎤 Bu Metni Oku</button>
+                </div>
+              ))}
+
+              {/* Geçmiş */}
+              {speechGecmis.length > 0 && (
+                <div className="mt-4">
+                  <div className="text-xs font-bold text-gray-500 mb-2">📊 Son Okumalar</div>
+                  <div className="space-y-2">
+                    {speechGecmis.slice(0,3).map((k,i) => (
+                      <div key={i} className="bg-white rounded-xl border p-3 flex justify-between items-center">
+                        <div>
+                          <div className="text-xs font-medium text-gray-700">{k.metin_baslik}</div>
+                          <div className="text-xs text-gray-400">{k.tarih?.slice(0,10)}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className={`text-lg font-bold ${skorRenk(k.analiz?.genel_skor||0)}`}>{k.analiz?.genel_skor||0}</div>
+                          <div className="text-xs text-gray-400">{k.analiz?.wpm||0} k/dk</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   if (aktifEkran === "okuma") {
     return (
       <div className="min-h-screen bg-gradient-to-b from-green-50 to-emerald-100 flex flex-col items-center justify-center p-4">
@@ -4816,10 +5100,15 @@ function OgrenciPaneli({ user, logout }) {
           {/* Haftalık hedef */}
           {istatistik && (<div className="bg-white rounded-2xl p-4 shadow-sm border"><div className="flex items-center justify-between mb-2"><div className="text-sm font-medium text-gray-700">Haftalık Hedef</div><span className="text-sm font-bold text-gray-700">{istatistik.aktif_gunler_7}/4 gün</span></div><div className="flex gap-1">{[0,1,2,3].map(i => (<div key={i} className={`flex-1 h-3 rounded-full ${i < istatistik.aktif_gunler_7 ? 'bg-gradient-to-r from-orange-400 to-red-500' : 'bg-gray-100'}`} />))}</div><p className="text-xs text-gray-400 mt-2">Haftada en az 4 gün okuma 📖</p></div>)}
 
-          {/* Okumaya Başla */}
-          <button onClick={okumaBaslat} className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-2xl p-5 shadow-lg hover:shadow-xl transition-all active:scale-[0.98]">
-            <div className="text-3xl mb-1">🌳</div><div className="text-lg font-bold">Okumaya Başla</div><div className="text-xs opacity-80">Konsantrasyon Ormanını büyüt</div>
-          </button>
+          {/* Okumaya Başla + Sesli Okuma */}
+          <div className="grid grid-cols-2 gap-3">
+            <button onClick={okumaBaslat} className="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all active:scale-[0.98]">
+              <div className="text-2xl mb-1">🌳</div><div className="text-sm font-bold">Sessiz Oku</div><div className="text-[10px] opacity-80">Ormanını büyüt</div>
+            </button>
+            <button onClick={() => setAktifEkran("speech")} className="bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all active:scale-[0.98]">
+              <div className="text-2xl mb-1">🎤</div><div className="text-sm font-bold">Sesli Oku</div><div className="text-[10px] opacity-80">AI analiz eder</div>
+            </button>
+          </div>
 
           {/* Bekleyen görevler kısa */}
           {bekleyenGorevler.length > 0 && (<div className="bg-white rounded-2xl p-4 shadow-sm border">
