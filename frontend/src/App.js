@@ -6240,12 +6240,139 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
         <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'egzersizler' ? 'bg-blue-500 text-white shadow' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`} onClick={() => setGelisimSekme('egzersizler')}>👁️ Egzersizler</button>
         <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'gorevler' ? 'bg-green-500 text-white shadow' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`} onClick={() => setGelisimSekme('gorevler')}>📌 Görevler</button>
         <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'kurslar' ? 'bg-indigo-500 text-white shadow' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`} onClick={() => { if (onTabChange) onTabChange('courses'); }}>📖 Kurslar</button>
+        <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'ai-bilgi' ? 'bg-cyan-500 text-white shadow' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`} onClick={() => setGelisimSekme('ai-bilgi')}>🧠 AI Eğit</button>
         {user.role === 'admin' && (
           <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'puan-ayar' ? 'bg-purple-500 text-white shadow' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`} onClick={() => setGelisimSekme('puan-ayar')}>⚙️ Egzersiz Puanları</button>
         )}
       </div>
 
       {/* Görevler alt sekmesi */}
+      {/* AI Bilgi Tabanı — PDF/Word yükleme */}
+      {gelisimSekme === 'ai-bilgi' && (() => {
+        const [aiYuklemeler, setAiYuklemeler] = React.useState([]);
+        const [aiStat, setAiStat] = React.useState(null);
+        const [aiPuanlar, setAiPuanlar] = React.useState({ toplam: 0, detay: [] });
+        const [yukleForm, setYukleForm] = React.useState({ sinif: "3", tur: "ders_kitabi", kitap_adi: "", yazar: "", temalar: "" });
+        const [yukleniyor, setYukleniyor] = React.useState(false);
+        const dosyaRef = React.useRef(null);
+
+        React.useEffect(() => {
+          const fetch = async () => {
+            try { const r = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setAiYuklemeler(Array.isArray(r.data) ? r.data : []); } catch(e) {}
+            try { const r = await axios.get(`${API}/ai/bilgi-tabani/istatistik`); setAiStat(r.data); } catch(e) {}
+            try { const r = await axios.get(`${API}/ai/bilgi-tabani/puanlarim`); setAiPuanlar(r.data); } catch(e) {}
+          };
+          fetch();
+        }, []);
+
+        const dosyaYukle = async () => {
+          const file = dosyaRef.current?.files?.[0];
+          if (!file) { toast({ title: "Dosya seçin", variant: "destructive" }); return; }
+          const ext = file.name.split('.').pop().toLowerCase();
+          if (!['pdf', 'docx', 'doc'].includes(ext)) { toast({ title: "Sadece PDF, DOCX veya DOC yüklenebilir", variant: "destructive" }); return; }
+          setYukleniyor(true);
+          try {
+            const fd = new FormData();
+            fd.append("dosya", file);
+            fd.append("sinif", yukleForm.sinif);
+            fd.append("tur", yukleForm.tur);
+            fd.append("kitap_adi", yukleForm.kitap_adi || file.name);
+            fd.append("yazar", yukleForm.yazar);
+            fd.append("temalar", yukleForm.temalar);
+            const r = await axios.post(`${API}/ai/bilgi-tabani/yukle`, fd, { headers: { "Content-Type": "multipart/form-data" } });
+            toast({ title: `🧠 ${r.data.mesaj}` });
+            dosyaRef.current.value = "";
+            setYukleForm({ sinif: "3", tur: "ders_kitabi", kitap_adi: "", yazar: "", temalar: "" });
+            const r2 = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setAiYuklemeler(Array.isArray(r2.data) ? r2.data : []);
+            const r3 = await axios.get(`${API}/ai/bilgi-tabani/puanlarim`); setAiPuanlar(r3.data);
+          } catch(e) { toast({ title: e.response?.data?.detail || "Yükleme hatası", variant: "destructive" }); }
+          setYukleniyor(false);
+        };
+
+        return (<div className="space-y-4">
+          {/* Puan özeti */}
+          <div className="bg-gradient-to-r from-cyan-500 to-blue-600 rounded-2xl p-4 text-white">
+            <div className="flex items-center justify-between">
+              <div><div className="text-sm opacity-80">🧠 AI Eğitim Puanım</div><div className="text-3xl font-bold">{aiPuanlar.toplam}</div></div>
+              <div className="text-right"><div className="text-sm opacity-80">Yüklemelerim</div><div className="text-2xl font-bold">{aiYuklemeler.length}</div></div>
+            </div>
+          </div>
+
+          {/* İstatistikler */}
+          {aiStat && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div className="bg-white rounded-xl p-3 border text-center"><div className="text-xl font-bold text-cyan-600">{aiStat.toplam_yukleme}</div><div className="text-[10px] text-gray-500">Toplam Yükleme</div></div>
+              <div className="bg-white rounded-xl p-3 border text-center"><div className="text-xl font-bold text-green-600">{aiStat.toplam_kelime}</div><div className="text-[10px] text-gray-500">Toplam Kelime</div></div>
+              <div className="bg-white rounded-xl p-3 border text-center"><div className="text-xl font-bold text-purple-600">{aiStat.toplam_ai_soru}</div><div className="text-[10px] text-gray-500">AI Sorusu</div></div>
+              <div className="bg-white rounded-xl p-3 border text-center"><div className="text-xl font-bold text-orange-600">{aiStat.bekleyen_onay}</div><div className="text-[10px] text-gray-500">Onay Bekleyen</div></div>
+            </div>
+          )}
+
+          {/* Top katkıcılar */}
+          {aiStat?.top_contributors?.length > 0 && (
+            <div className="bg-white rounded-xl p-3 border"><div className="text-xs font-bold text-gray-700 mb-2">🏆 En Çok Katkı Yapanlar</div>
+              <div className="space-y-1">{aiStat.top_contributors.slice(0, 5).map((c, i) => (
+                <div key={i} className="flex items-center justify-between text-xs"><span className="text-gray-600">{["🥇","🥈","🥉","4.","5."][i]} {c.ad}</span><span className="font-bold text-cyan-600">{c.puan} puan ({c.yukleme} dosya)</span></div>
+              ))}</div>
+            </div>
+          )}
+
+          {/* Yükleme formu */}
+          <Card className="border-0 shadow-sm border-l-4 border-l-cyan-500">
+            <CardHeader className="pb-2"><CardTitle className="text-sm">📤 AI'a Kitap / Doküman Öğret</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <div className="bg-cyan-50 rounded-lg p-3 border border-cyan-100">
+                <p className="text-xs text-cyan-700">📚 PDF veya Word (.docx/.doc) formatında ders kitabı, öykü kitabı, masal kitabı yükleyin. AI içeriği analiz ederek kelime haritası, okuma parçaları ve Bloom taksonomili sorular üretecek.</p>
+                <p className="text-xs text-cyan-600 mt-1 font-medium">Her yükleme = +20 puan | Onay bonusu = +10 puan | Zengin içerik bonusu = +5 puan</p>
+              </div>
+              <input ref={dosyaRef} type="file" accept=".pdf,.docx,.doc" className="block w-full text-sm text-gray-500 file:mr-2 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-cyan-100 file:text-cyan-700 hover:file:bg-cyan-200" />
+              <div className="grid grid-cols-2 gap-2">
+                <div><Label className="text-xs">Sınıf Seviyesi *</Label>
+                  <Select value={yukleForm.sinif} onValueChange={v => setYukleForm({...yukleForm, sinif: v})}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{[1,2,3,4,5,6,7,8].map(s => <SelectItem key={s} value={String(s)}>{s}. Sınıf</SelectItem>)}</SelectContent>
+                  </Select></div>
+                <div><Label className="text-xs">Kitap Türü *</Label>
+                  <Select value={yukleForm.tur} onValueChange={v => setYukleForm({...yukleForm, tur: v})}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ders_kitabi">📘 MEB Ders Kitabı</SelectItem>
+                      <SelectItem value="oyku">📖 Öykü Kitabı</SelectItem>
+                      <SelectItem value="masal">🧚 Masal Kitabı</SelectItem>
+                      <SelectItem value="roman">📕 Roman</SelectItem>
+                      <SelectItem value="ansiklopedi">📚 Ansiklopedi</SelectItem>
+                      <SelectItem value="diger">📄 Diğer</SelectItem>
+                    </SelectContent></Select></div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div><Label className="text-xs">Kitap Adı</Label><Input value={yukleForm.kitap_adi} onChange={e => setYukleForm({...yukleForm, kitap_adi: e.target.value})} placeholder="Otomatik alınır" /></div>
+                <div><Label className="text-xs">Yazar</Label><Input value={yukleForm.yazar} onChange={e => setYukleForm({...yukleForm, yazar: e.target.value})} placeholder="Yazar adı" /></div>
+              </div>
+              <Button onClick={dosyaYukle} disabled={yukleniyor} className="w-full bg-cyan-600 text-white">{yukleniyor ? "⏳ Yükleniyor..." : "🧠 Yükle ve AI'a Öğret (+20 puan)"}</Button>
+            </CardContent>
+          </Card>
+
+          {/* Yükleme geçmişi */}
+          {aiYuklemeler.length > 0 && (<div>
+            <h3 className="font-medium text-sm text-gray-700 mb-2">📋 Yükleme Geçmişi</h3>
+            <div className="space-y-2">{aiYuklemeler.map(y => (
+              <div key={y.id} className={`bg-white rounded-xl p-3 border shadow-sm ${!y.onayli ? 'border-l-4 border-l-yellow-400' : ''}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{y.dosya_format === '.pdf' ? '📕' : '📘'}</span>
+                    <div><div className="text-sm font-medium">{y.kitap_adi}</div><div className="text-[10px] text-gray-500">{y.sinif}. Sınıf • {y.tur} • {y.dosya_format} • {(y.dosya_boyut / 1024 / 1024).toFixed(1)} MB</div></div>
+                  </div>
+                  <div className="text-right">
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${y.durum === 'tamamlandi' ? 'bg-green-100 text-green-700' : y.durum === 'hata' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{y.durum === 'tamamlandi' ? '✅ Tamamlandı' : y.durum === 'hata' ? '❌ Hata' : '⏳ Bekliyor'}</span>
+                    {!y.onayli && <div className="text-[9px] text-yellow-600 mt-0.5">Onay bekliyor</div>}
+                  </div>
+                </div>
+              </div>
+            ))}</div>
+          </div>)}
+        </div>);
+      })()}
+
       {gelisimSekme === 'gorevler' && (
         <GorevYonetimi user={user} students={students} teachers={teachers} />
       )}
