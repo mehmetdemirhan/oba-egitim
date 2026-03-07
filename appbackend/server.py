@@ -1202,7 +1202,57 @@ async def create_default_admin():
                     })
             logging.info("  ✅ Socratic Reading demo logları oluşturuldu")
 
-        logging.info("✅ AI demo verileri oluşturuldu: DNA, koçluk, kelimeler, parçalar, sorular, tekrar, socratic")
+        # ── Dalga 3 Demo: Speech AI logları ──
+        speech_var = await db.speech_logs.find_one({})
+        if not speech_var:
+            demo_speech = [
+                {"metin_id": "s3_1", "baslik": "Ormanda Bir Gün", "metin": SPEECH_OKUMA_METİNLERİ[3][0]["metin"], "gun_once": 6, "sure": 38, "wpm": 52, "skor": 72, "telaffuz": 75, "akicilik": 68},
+                {"metin_id": "s3_2", "baslik": "Dürüstlük", "metin": SPEECH_OKUMA_METİNLERİ[3][1]["metin"], "gun_once": 5, "sure": 35, "wpm": 58, "skor": 76, "telaffuz": 78, "akicilik": 73},
+                {"metin_id": "s3_1", "baslik": "Ormanda Bir Gün", "metin": SPEECH_OKUMA_METİNLERİ[3][0]["metin"], "gun_once": 4, "sure": 33, "wpm": 63, "skor": 80, "telaffuz": 82, "akicilik": 78},
+                {"metin_id": "s3_2", "baslik": "Dürüstlük", "metin": SPEECH_OKUMA_METİNLERİ[3][1]["metin"], "gun_once": 3, "sure": 30, "wpm": 68, "skor": 84, "telaffuz": 85, "akicilik": 83},
+                {"metin_id": "s3_1", "baslik": "Ormanda Bir Gün", "metin": SPEECH_OKUMA_METİNLERİ[3][0]["metin"], "gun_once": 1, "sure": 28, "wpm": 74, "skor": 88, "telaffuz": 89, "akicilik": 87},
+            ]
+            for ogr in demo_ogrenciler[:2]:
+                sinif_int = 3
+                try:
+                    sinif_int = int(ogr.get("sinif", 3))
+                except:
+                    pass
+                for s in demo_speech:
+                    genel = s["skor"]
+                    seviye = "çok iyi" if genel >= 85 else "iyi" if genel >= 70 else "orta"
+                    await db.speech_logs.insert_one({
+                        "id": str(uuid.uuid4()),
+                        "ogrenci_id": ogr["id"],
+                        "metin_id": s["metin_id"],
+                        "metin_baslik": s["baslik"],
+                        "metin": s["metin"],
+                        "sinif": sinif_int,
+                        "sure_sn": s["sure"],
+                        "analiz": {
+                            "transkript": s["metin"],
+                            "telaffuz_skoru": s["telaffuz"],
+                            "akicilik_skoru": s["akicilik"],
+                            "wpm": s["wpm"],
+                            "norm_wpm": 95,
+                            "duraklama_sayisi": random.randint(1, 4),
+                            "tonlama_skoru": s["telaffuz"] + 2,
+                            "vurgu_skoru": s["akicilik"] + 3,
+                            "genel_skor": genel,
+                            "seviye": seviye,
+                            "guclu_yonler": ["Telaffuz başarılı", "Ritim tutarlı"] if genel >= 75 else ["Kelime tanıma gelişiyor"],
+                            "gelisim_alanlari": ["Hız artırılabilir"] if s["wpm"] < 80 else [],
+                            "ogretmen_notu": f"Öğrenci {s['wpm']} kelime/dk okuyor. {'Sınıf normuna yaklaşıyor.' if s['wpm'] > 60 else 'Tekrarlı okuma önerilir.'}",
+                            "ogrenci_mesaj": "Harika ilerliyorsun! 🌟" if genel >= 80 else "Her gün biraz daha iyileşiyorsun! 💪",
+                            "telaffuz_hatalar": [],
+                            "mock": True,
+                            "whisper_kullanildi": False,
+                        },
+                        "tarih": (simdi - timedelta(days=s["gun_once"])).isoformat(),
+                    })
+            logging.info("  ✅ Speech AI demo logları oluşturuldu")
+
+        logging.info("✅ AI demo verileri oluşturuldu: DNA, koçluk, kelimeler, parçalar, sorular, tekrar, socratic, speech")
     else:
         logging.info("ℹ️ AI demo verileri zaten mevcut")
 
@@ -6607,6 +6657,265 @@ async def get_gorev_istatistik(current_user=Depends(get_current_user)):
                 "tamamlandi": len([g for g in l if g.get("durum") == "tamamlandi"]),
                 "suresi_doldu": len([g for g in l if g.get("durum") == "suresi_doldu"])}
     return {"ogretmen": h(og), "ogrenci": h(os)}
+
+
+# ─────────────────────────────────────────────
+# DALGA 3: SPEECH AI — SESLİ OKUMA ANALİZİ
+# ─────────────────────────────────────────────
+
+SPEECH_OKUMA_METİNLERİ = {
+    1: [
+        {"id": "s1_1", "baslik": "Küçük Kedi", "metin": "Küçük kedi bahçede oynadı. Güneş parlıyordu. Kedi mutluydu.", "kelime_sayisi": 10, "sinif": 1},
+        {"id": "s1_2", "baslik": "Renkli Balonlar", "metin": "Ali kırmızı balon aldı. Ayşe sarı balon aldı. İkisi de çok sevindi.", "kelime_sayisi": 12, "sinif": 1},
+    ],
+    2: [
+        {"id": "s2_1", "baslik": "Yağmur", "metin": "Sabah kalktığımda pencereden baktım. Dışarıda yağmur yağıyordu. Annem şemsiyemi hazırladı ve okula gittim.", "kelime_sayisi": 20, "sinif": 2},
+        {"id": "s2_2", "baslik": "Kitap Kurdu", "metin": "Her gün en az bir kitap okuyorum. Kitaplar bana yeni dünyalar açıyor. En sevdiğim yer kütüphane.", "kelime_sayisi": 18, "sinif": 2},
+    ],
+    3: [
+        {"id": "s3_1", "baslik": "Ormanda Bir Gün", "metin": "Ormanın içinde yürürken ağaçların arasından süzülen güneş ışığını seyrettim. Kuşlar şakıyor, yapraklar hışırdıyordu. Bu sessizlik içinde kendimi huzurlu hissettim.", "kelime_sayisi": 30, "sinif": 3},
+        {"id": "s3_2", "baslik": "Dürüstlük", "metin": "Pazarda yürürken yerde bir cüzdan buldum. İçinde para ve kimlik vardı. Hemen karakola götürdüm. Görevli bana teşekkür etti ve sahibini bulacaklarını söyledi.", "kelime_sayisi": 32, "sinif": 3},
+    ],
+    4: [
+        {"id": "s4_1", "baslik": "Göç Eden Kuşlar", "metin": "Her sonbahar leylekler uzun bir yolculuğa çıkar. Binlerce kilometre uçarak sıcak ülkelere göç ederler. Pusula gibi çalışan içgüdüleri sayesinde yollarını şaşırmazlar. Bu muhteşem yolculuk nesiller boyunca sürmektedir.", "kelime_sayisi": 38, "sinif": 4},
+    ],
+    5: [
+        {"id": "s5_1", "baslik": "Anadolu Medeniyetleri", "metin": "Anadolu, tarihin en eski medeniyetlerine ev sahipliği yapmıştır. Hitit, Frigya, Lidya ve daha pek çok uygarlık bu topraklarda yaşamış, eserler bırakmıştır. Bu zengin miras günümüze kadar ulaşmıştır.", "kelime_sayisi": 35, "sinif": 5},
+    ],
+}
+
+def _speech_mock_analiz(transkript: str, beklenen_metin: str, sure_sn: float, sinif: int) -> dict:
+    """Whisper API yokken mock ses analizi üret."""
+    import difflib
+    # Kelime doğruluğu (basit diff)
+    b_kelimeler = beklenen_metin.lower().split()
+    t_kelimeler = transkript.lower().split() if transkript else b_kelimeler
+    eslesme = difflib.SequenceMatcher(None, b_kelimeler, t_kelimeler).ratio()
+    telaffuz_skoru = round(eslesme * 100)
+
+    # WPM hesapla
+    sure_dk = max(sure_sn / 60, 0.1)
+    wpm = round(len(b_kelimeler) / sure_dk)
+
+    # Norm WPM sınıfa göre
+    norm = {1: 50, 2: 75, 3: 95, 4: 115, 5: 130, 6: 145, 7: 155, 8: 165}.get(sinif, 95)
+    akicilik_skoru = min(100, round(wpm / norm * 100))
+
+    # Duraksama simülasyonu
+    duraklama_sayisi = max(0, len(b_kelimeler) // 8 - 1)
+
+    seviye = "çok iyi" if telaffuz_skoru >= 85 else "iyi" if telaffuz_skoru >= 70 else "orta" if telaffuz_skoru >= 55 else "geliştirilmeli"
+
+    return {
+        "transkript": transkript or beklenen_metin,
+        "telaffuz_skoru": telaffuz_skoru,
+        "akicilik_skoru": akicilik_skoru,
+        "wpm": wpm,
+        "norm_wpm": norm,
+        "duraklama_sayisi": duraklama_sayisi,
+        "tonlama_skoru": min(100, telaffuz_skoru + 5),
+        "vurgu_skoru": min(100, akicilik_skoru + 3),
+        "genel_skor": round((telaffuz_skoru + akicilik_skoru) / 2),
+        "seviye": seviye,
+        "guclu_yonler": ["Kelime tanıma iyi"] if telaffuz_skoru >= 70 else [],
+        "gelisim_alanlari": ["Akıcılığı artır"] if akicilik_skoru < 70 else [],
+        "mock": True,
+    }
+
+
+@api_router.get("/ai/speech/metinler")
+async def speech_okuma_metinleri(sinif: int = 3, current_user=Depends(get_current_user)):
+    """Sınıfa göre sesli okuma metinleri getir."""
+    metinler = SPEECH_OKUMA_METİNLERİ.get(sinif, SPEECH_OKUMA_METİNLERİ.get(3, []))
+    if not metinler:
+        # En yakın sınıfı bul
+        for s in range(sinif, 0, -1):
+            if s in SPEECH_OKUMA_METİNLERİ:
+                metinler = SPEECH_OKUMA_METİNLERİ[s]
+                break
+    return {"metinler": metinler, "sinif": sinif}
+
+
+@api_router.post("/ai/speech/analiz")
+async def speech_analiz(
+    ses_dosyasi: UploadFile = File(None),
+    metin_id: str = Form(""),
+    ogrenci_id: str = Form(""),
+    sure_sn: float = Form(30.0),
+    sinif: int = Form(3),
+    current_user=Depends(get_current_user)
+):
+    """Sesli okuma kaydını analiz et: WPM + telaffuz + tonlama + duraklama."""
+    # Hedef metni bul
+    beklenen_metin = ""
+    metin_baslik = ""
+    for s_list in SPEECH_OKUMA_METİNLERİ.values():
+        for m in s_list:
+            if m["id"] == metin_id:
+                beklenen_metin = m["metin"]
+                metin_baslik = m["baslik"]
+                sinif = m.get("sinif", sinif)
+                break
+
+    transkript = ""
+    whisper_kullanildi = False
+
+    # Whisper API — varsa kullan
+    OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+    if ses_dosyasi and OPENAI_API_KEY:
+        try:
+            ses_bytes = await ses_dosyasi.read()
+            async with httpx.AsyncClient(timeout=60.0) as c:
+                resp = await c.post(
+                    "https://api.openai.com/v1/audio/transcriptions",
+                    headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
+                    files={"file": (ses_dosyasi.filename or "ses.webm", ses_bytes, "audio/webm")},
+                    data={"model": "whisper-1", "language": "tr"},
+                )
+                if resp.status_code == 200:
+                    transkript = resp.json().get("text", "")
+                    whisper_kullanildi = True
+        except Exception as e:
+            logging.warning(f"Whisper API hatası: {e}")
+
+    # Analiz
+    analiz = _speech_mock_analiz(transkript, beklenen_metin, sure_sn, sinif)
+    analiz["whisper_kullanildi"] = whisper_kullanildi
+
+    # Claude ile derin analiz (API key varsa)
+    if ANTHROPIC_API_KEY and beklenen_metin and transkript:
+        ai_prompt = f"""Öğrenci okuma analizi (Sınıf: {sinif}):
+
+Beklenen metin: {beklenen_metin}
+Öğrenci okuması (transkript): {transkript}
+Süre: {sure_sn:.0f} saniye
+WPM: {analiz['wpm']}
+
+Analiz et ve şu JSON'u döndür:
+{{
+  "guclu_yonler": ["...", "..."],
+  "gelisim_alanlari": ["...", "..."],
+  "ogretmen_notu": "Öğretmene 1-2 cümle öneri",
+  "ogrenci_mesaj": "Öğrenciye motive edici 1 cümle (sen diliyle)",
+  "telaffuz_hatalar": ["yanlış okunan kelime varsa listele"],
+  "tonlama_degerlendirme": "iyi/orta/geliştirilmeli"
+}}
+
+SADECE JSON döndür."""
+        ai_result = await call_claude(
+            "Sen ilkokul Türkçe okuma uzmanısın. Çocukların okuma becerilerini değerlendirirsin.",
+            ai_prompt, model="haiku", max_tokens=500
+        )
+        if ai_result.get("parsed"):
+            p = ai_result["parsed"]
+            analiz["guclu_yonler"] = p.get("guclu_yonler", analiz["guclu_yonler"])
+            analiz["gelisim_alanlari"] = p.get("gelisim_alanlari", analiz["gelisim_alanlari"])
+            analiz["ogretmen_notu"] = p.get("ogretmen_notu", "")
+            analiz["ogrenci_mesaj"] = p.get("ogrenci_mesaj", "")
+            analiz["telaffuz_hatalar"] = p.get("telaffuz_hatalar", [])
+            analiz["tonlama_degerlendirme"] = p.get("tonlama_degerlendirme", "")
+            analiz["mock"] = False
+
+    # Varsayılan mesajlar (AI yoksa)
+    if "ogretmen_notu" not in analiz:
+        analiz["ogretmen_notu"] = f"Öğrenci {analiz['wpm']} kelime/dk hızında okudu. " + (
+            "Akıcılığını artırmak için tekrarlı okuma egzersizleri önerilebilir." if analiz["akicilik_skoru"] < 70
+            else "Okuma hızı sınıf normuna uygun."
+        )
+    if "ogrenci_mesaj" not in analiz:
+        mesajlar = {
+            "çok iyi": "Harika okudun! Sen gerçek bir okuma şampiyonusun! 🏆",
+            "iyi": "Çok güzel okudun! Her gün biraz daha iyileşiyorsun! ⭐",
+            "orta": "İyi bir başlangıç! Pratik yaptıkça daha da güzelleşecek! 💪",
+            "geliştirilmeli": "Okumaya devam et, her gün daha iyisi olacaksın! 🌱",
+        }
+        analiz["ogrenci_mesaj"] = mesajlar.get(analiz["seviye"], "Harika iş çıkardın!")
+
+    # Veritabanına kaydet
+    gercek_ogrenci_id = ogrenci_id or current_user.get("linked_id") or current_user.get("id")
+    kayit_id = str(uuid.uuid4())
+    await db.speech_logs.insert_one({
+        "id": kayit_id,
+        "ogrenci_id": gercek_ogrenci_id,
+        "metin_id": metin_id,
+        "metin_baslik": metin_baslik,
+        "metin": beklenen_metin,
+        "sinif": sinif,
+        "sure_sn": sure_sn,
+        "analiz": analiz,
+        "tarih": datetime.utcnow().isoformat(),
+    })
+
+    # XP ver
+    xp = 15 if analiz["genel_skor"] >= 80 else 10 if analiz["genel_skor"] >= 60 else 5
+    ogrenci = await db.students.find_one({"id": gercek_ogrenci_id})
+    if not ogrenci:
+        ogrenci = await db.users.find_one({"id": gercek_ogrenci_id})
+    if ogrenci:
+        await db.students.update_one({"id": gercek_ogrenci_id}, {"$inc": {"toplam_xp": xp}})
+        await db.xp_logs.insert_one({
+            "id": str(uuid.uuid4()), "ogrenci_id": gercek_ogrenci_id,
+            "eylem": "sesli_okuma", "xp": xp,
+            "aciklama": f"Sesli okuma: {metin_baslik} — {analiz['genel_skor']}/100",
+            "tarih": datetime.utcnow().isoformat(),
+        })
+
+    return {**analiz, "id": kayit_id, "xp_kazanildi": xp}
+
+
+@api_router.get("/ai/speech/gecmis/{ogrenci_id}")
+async def speech_gecmis(ogrenci_id: str, current_user=Depends(get_current_user)):
+    """Öğrencinin sesli okuma geçmişi."""
+    kayitlar = await db.speech_logs.find(
+        {"ogrenci_id": ogrenci_id}
+    ).sort("tarih", -1).to_list(length=50)
+    for k in kayitlar:
+        k.pop("_id", None)
+    return kayitlar
+
+
+@api_router.get("/ai/speech/istatistik/{ogrenci_id}")
+async def speech_istatistik(ogrenci_id: str, current_user=Depends(get_current_user)):
+    """Öğrencinin sesli okuma gelişim istatistikleri."""
+    kayitlar = await db.speech_logs.find(
+        {"ogrenci_id": ogrenci_id}
+    ).sort("tarih", 1).to_list(length=None)
+    for k in kayitlar:
+        k.pop("_id", None)
+
+    if not kayitlar:
+        return {"toplam": 0, "ort_wpm": 0, "ort_skor": 0, "gelisim": [], "en_iyi": None}
+
+    wpm_list = [k["analiz"].get("wpm", 0) for k in kayitlar]
+    skor_list = [k["analiz"].get("genel_skor", 0) for k in kayitlar]
+
+    # Son 10 kayıt grafik için
+    gelisim = [
+        {
+            "tarih": k["tarih"][:10],
+            "wpm": k["analiz"].get("wpm", 0),
+            "skor": k["analiz"].get("genel_skor", 0),
+            "metin": k.get("metin_baslik", ""),
+        }
+        for k in kayitlar[-10:]
+    ]
+
+    en_iyi = max(kayitlar, key=lambda k: k["analiz"].get("genel_skor", 0))
+
+    return {
+        "toplam": len(kayitlar),
+        "ort_wpm": round(sum(wpm_list) / len(wpm_list)),
+        "ort_skor": round(sum(skor_list) / len(skor_list)),
+        "son_wpm": wpm_list[-1] if wpm_list else 0,
+        "son_skor": skor_list[-1] if skor_list else 0,
+        "gelisim": gelisim,
+        "en_iyi": {
+            "metin": en_iyi.get("metin_baslik", ""),
+            "skor": en_iyi["analiz"].get("genel_skor", 0),
+            "wpm": en_iyi["analiz"].get("wpm", 0),
+            "tarih": en_iyi["tarih"][:10],
+        },
+    }
 
 
 # ─────────────────────────────────────────────
