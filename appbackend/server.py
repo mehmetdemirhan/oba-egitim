@@ -47,9 +47,49 @@ AI_CACHE_HOURS = int(os.environ.get("AI_CACHE_HOURS", "24"))
 AI_MAX_DAILY_REQUESTS = int(os.environ.get("AI_MAX_DAILY_REQUESTS", "200"))
 
 
+def _mock_bilgi_tabani_response(user_message: str) -> dict:
+    """API key yokken bilgi tabanı için mock veri üret."""
+    import re as _re
+    sinif_match = _re.search(r"Sınıf: (\d+)", user_message)
+    sinif = int(sinif_match.group(1)) if sinif_match else 3
+    kitap_match = _re.search(r"Kitap: (.+?)\n", user_message)
+    kitap = kitap_match.group(1).strip() if kitap_match else "Kitap"
+    bolum_match = _re.search(r"Bölüm (\d+)", user_message)
+    bolum = int(bolum_match.group(1)) if bolum_match else 1
+    metin_match = _re.search(r"METİN:\n(.{0,200})", user_message, _re.DOTALL)
+    metin_kesit = metin_match.group(1).strip() if metin_match else ""
+    kelimeler_demo = [
+        {"kelime": "macera", "anlam": "Heyecan verici ve tehlikeli olay", "ornek_cumle": "Çocuklar ormanda büyük bir macera yaşadı.", "zorluk": sinif},
+        {"kelime": "keşif", "anlam": "Bilinmeyeni ilk kez bulma", "ornek_cumle": "Bilim insanı önemli bir keşif yaptı.", "zorluk": sinif},
+        {"kelime": "merak", "anlam": "Bir şeyi öğrenmek isteme", "ornek_cumle": "Meraklı çocuk her şeyi sorar.", "zorluk": max(1, sinif-1)},
+        {"kelime": "cesaret", "anlam": "Korkmadan hareket edebilme", "ornek_cumle": "Cesur kahraman engeli aştı.", "zorluk": sinif},
+        {"kelime": "azim", "anlam": "Bir işi bitirme kararlılığı", "ornek_cumle": "Azimle çalışan başarıya ulaştı.", "zorluk": sinif+1},
+    ]
+    parsed = {
+        "hedef_kelimeler": kelimeler_demo,
+        "okuma_parcasi": {
+            "baslik": f"{kitap} — Bölüm {bolum}",
+            "ozet": f"Bu bölümde {kitap} kitabından seçilmiş bir metin yer almaktadır. Öğrenciler metni okuyarak yeni kelimeler öğrenir.",
+            "tema": "Genel",
+            "kelime_sayisi": len(metin_kesit.split()) if metin_kesit else 50,
+        },
+        "sorular": [
+            {"soru": "Metinde geçen en önemli olay nedir?", "secenekler": ["A seçeneği", "B seçeneği", "C seçeneği", "D seçeneği"], "dogru_cevap": 0, "taksonomi": "bilgi"},
+            {"soru": "Bu metinden ne anladınız?", "secenekler": ["Ana fikri bulduk", "Sadece okudum", "Hiç anlamadım", "Çok zordu"], "dogru_cevap": 0, "taksonomi": "kavrama"},
+            {"soru": "Metindeki karakterin davranışını nasıl değerlendirirsiniz?", "secenekler": ["Doğru davrandı", "Yanlış davrandı", "Kararsızım", "Önemli değil"], "dogru_cevap": 0, "taksonomi": "degerlendirme"},
+        ],
+    }
+    import json as _json
+    text = _json.dumps(parsed, ensure_ascii=False)
+    return {"text": text, "parsed": parsed, "tokens": 0, "maliyet": 0, "error": None, "mock": True}
+
+
 async def call_claude(system_prompt: str, user_message: str, model: str = "sonnet", max_tokens: int = 2000) -> dict:
     """Claude API çağrısı — tüm AI modülleri bu fonksiyonu kullanır."""
     if not ANTHROPIC_API_KEY:
+        # Bilgi tabanı işleme için mock data, diğerleri için hata
+        if "hedef_kelimeler" in user_message or "METİN:" in user_message:
+            return _mock_bilgi_tabani_response(user_message)
         return {"error": "ANTHROPIC_API_KEY tanımlı değil", "text": ""}
 
     # Günlük istek limiti kontrolü
@@ -61,7 +101,7 @@ async def call_claude(system_prompt: str, user_message: str, model: str = "sonne
     model_id = AI_HAIKU_MODEL if model == "haiku" else AI_DEFAULT_MODEL
 
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client_http:
+        async with httpx.AsyncClient(timeout=90.0) as client_http:
             response = await client_http.post(
                 "https://api.anthropic.com/v1/messages",
                 headers={
@@ -5392,6 +5432,7 @@ Kurallar:
         "okuma_parcasi": len(tum_parcalar),
         "uretilen_soru": len(tum_sorular),
         "bonus_puan": bonus,
+        "mock": not bool(ANTHROPIC_API_KEY),
         "kelimeler": tum_kelimeler,
         "parcalar": tum_parcalar,
         "sorular": tum_sorular,
