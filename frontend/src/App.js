@@ -4528,6 +4528,7 @@ function OgrenciPaneli({ user, logout }) {
   const [gelisimAltSekme, setGelisimAltSekme] = useState("icerikler"); // icerikler, egzersizler, okumalarim
   const [aktifEkran, setAktifEkran] = useState(null);
   const [okumaBasladi, setOkumaBasladi] = useState(false);
+  const [aiMotMesaj, setAiMotMesaj] = useState("");
   const [okumaSuresi, setOkumaSuresi] = useState(0);
   const [okumaDuraklatildi, setOkumaDuraklatildi] = useState(false);
   const okumaInterval = useRef(null);
@@ -4565,6 +4566,8 @@ function OgrenciPaneli({ user, logout }) {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
+  // AI motivasyon mesajı
+  useEffect(() => { const f = async () => { try { const r = await axios.get(`${API}/ai/kocluk/${user.id}/motivasyon`); setAiMotMesaj(r.data.mesaj || ""); } catch(e) {} }; f(); }, [user.id]);
   // Okuma sayacı
   useEffect(() => {
     if (okumaBasladi && !okumaDuraklatildi) {
@@ -4742,6 +4745,16 @@ function OgrenciPaneli({ user, logout }) {
             <div className="bg-white rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-pink-600">{okunanSayfa}</div><div className="text-[10px] text-gray-500">📄 Sayfa</div></div>
             <div className="bg-white rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-teal-600">{tamamlananGorevSayisi + tamamlananGelisim}</div><div className="text-[10px] text-gray-500">✅ Tamamlanan</div></div>
           </div>
+
+          {/* 🤖 AI Günlük Motivasyon Mesajı */}
+          {aiMotMesaj && (
+              <div className="bg-gradient-to-r from-cyan-50 to-blue-50 rounded-2xl p-4 border border-cyan-200 relative">
+                <div className="flex items-start gap-3">
+                  <div className="text-2xl">🤖</div>
+                  <div className="flex-1"><div className="text-xs font-medium text-cyan-700 mb-1">AI Koçun Diyor ki:</div><p className="text-sm text-gray-700">{aiMotMesaj}</p></div>
+                </div>
+              </div>
+          )}
 
           {/* Haftalık hedef */}
           {istatistik && (<div className="bg-white rounded-2xl p-4 shadow-sm border"><div className="flex items-center justify-between mb-2"><div className="text-sm font-medium text-gray-700">Haftalık Hedef</div><span className="text-sm font-bold text-gray-700">{istatistik.aktif_gunler_7}/4 gün</span></div><div className="flex gap-1">{[0,1,2,3].map(i => (<div key={i} className={`flex-1 h-3 rounded-full ${i < istatistik.aktif_gunler_7 ? 'bg-gradient-to-r from-orange-400 to-red-500' : 'bg-gray-100'}`} />))}</div><p className="text-xs text-gray-400 mt-2">Haftada en az 4 gün okuma 📖</p></div>)}
@@ -5216,6 +5229,21 @@ function VeliPaneli({ user, logout }) {
             </div>)}
             {istatistik && (<div className="bg-white rounded-2xl p-4 shadow-sm border"><div className="text-sm font-medium text-gray-700 mb-2">Bu Hafta</div><div className="flex items-center gap-2"><div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden"><div className="h-full bg-gradient-to-r from-purple-400 to-pink-500 rounded-full" style={{ width: `${Math.min(100,(istatistik.aktif_gunler_7/4)*100)}%` }} /></div><span className="text-sm font-bold">{istatistik.aktif_gunler_7}/4 gün</span></div></div>)}
             {istatistik && (<div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-4 text-center border"><div className="text-3xl font-bold text-purple-600">{istatistik.toplam_dakika}</div><div className="text-sm text-gray-500">toplam dakika okuma</div></div>)}
+
+            {/* 🤖 AI Gelişim Raporu */}
+            {istatistik && (
+              <div className="bg-gradient-to-r from-cyan-50 to-blue-50 rounded-2xl p-4 border border-cyan-200">
+                <div className="flex items-center gap-2 mb-3"><span className="text-lg">🤖</span><span className="font-bold text-sm text-cyan-800">AI Gelişim Raporu</span></div>
+                <div className="space-y-2 text-xs text-gray-600">
+                  <div className="flex items-center justify-between"><span>📚 Bu ay okunan kitap</span><span className="font-bold text-blue-600">{istatistik.toplam_kitap || 0}</span></div>
+                  <div className="flex items-center justify-between"><span>🔥 Mevcut streak</span><span className="font-bold text-orange-600">{istatistik.streak || 0} gün</span></div>
+                  <div className="flex items-center justify-between"><span>⏱ Günlük ortalama</span><span className="font-bold text-green-600">{Math.round((istatistik.toplam_dakika || 0) / Math.max(istatistik.aktif_gunler_7 || 1, 1))} dk</span></div>
+                  {istatistik.streak >= 5 && <div className="bg-green-100 rounded-lg p-2 text-green-700 text-center">🎉 Harika! Çocuğunuz {istatistik.streak} gündür düzenli okuyor</div>}
+                  {istatistik.streak < 2 && <div className="bg-yellow-100 rounded-lg p-2 text-yellow-700 text-center">💡 Birlikte 10 dakika okuma, alışkanlık oluşturur</div>}
+                  {istatistik.streak >= 2 && istatistik.streak < 5 && <div className="bg-blue-100 rounded-lg p-2 text-blue-700 text-center">👏 İyi gidiyor! Streak'i sürdürmek için bugün de okuyalım</div>}
+                </div>
+              </div>
+            )}
             {bekleyenGorevler.length > 0 && (<div className="bg-yellow-50 rounded-2xl p-4 border border-yellow-100"><div className="font-medium text-sm text-yellow-800">📌 {bekleyenGorevler.length} bekleyen görev var</div><div className="mt-2 space-y-1">{bekleyenGorevler.slice(0,3).map(g => (<div key={g.id} className="text-xs text-gray-600">• {g.baslik}{g.son_tarih && ` (Son: ${new Date(g.son_tarih).toLocaleDateString('tr-TR')})`}</div>))}</div></div>)}
           </>)}
 
