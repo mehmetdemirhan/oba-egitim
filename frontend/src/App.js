@@ -3658,6 +3658,11 @@ function OgretmenPaneli({ user, logout }) {
   const [kullanicilar, setKullanicilar] = useState([]);
   const [seciliOgrenci, setSeciliOgrenci] = useState(null);
   const [ogrenciDetay, setOgrenciDetay] = useState(null);
+  // AI Koçluk state'leri
+  const [aiRapor, setAiRapor] = useState(null);
+  const [aiYukleniyor, setAiYukleniyor] = useState(false);
+  const [aiDna, setAiDna] = useState(null);
+  const [aiAcikKart, setAiAcikKart] = useState(null);
   // Görev atama
   const [gorevForm, setGorevForm] = useState({ baslik: "", aciklama: "", tur: "ozel", son_tarih: "", film_link: "", makale_link: "", kitap_yazar: "" });
   const [gorevHedefler, setGorevHedefler] = useState([]);
@@ -3708,6 +3713,7 @@ function OgretmenPaneli({ user, logout }) {
   // Öğrenci detayını çek
   const ogrenciDetayCek = async (ogrenci) => {
     setSeciliOgrenci(ogrenci);
+    setAiRapor(null); setAiDna(null); setAiAcikKart(null); // AI state reset
     try {
       const [logR, statR, riskR, xpR, gorevR] = await Promise.all([
         axios.get(`${API}/reading-logs/${ogrenci.id}`),
@@ -3789,11 +3795,6 @@ function OgretmenPaneli({ user, logout }) {
 
             {/* 🤖 AI Koçluk Butonu + Sonuçlar */}
             {(() => {
-              const [aiRapor, setAiRapor] = React.useState(null);
-              const [aiYukleniyor, setAiYukleniyor] = React.useState(false);
-              const [aiDna, setAiDna] = React.useState(null);
-              const [aiAcikKart, setAiAcikKart] = React.useState(null);
-
               const aiKoclukAl = async () => {
                 setAiYukleniyor(true);
                 try {
@@ -5841,6 +5842,13 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
   const [soruYonetimiIcerik, setSoruYonetimiIcerik] = useState(null);
   const [kitapSorulari, setKitapSorulari] = useState([]);
   const [soruForm, setSoruForm] = useState({ bolum: 1, soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0, taksonomi: "kavrama" });
+  // AI Bilgi Tabanı state'leri
+  const [aiYuklemeler, setAiYuklemeler] = useState([]);
+  const [aiStat, setAiStat] = useState(null);
+  const [aiPuanlar, setAiPuanlar] = useState({ toplam: 0, detay: [] });
+  const [yukleForm, setYukleForm] = useState({ sinif: "3", tur: "ders_kitabi", kitap_adi: "", yazar: "", temalar: "" });
+  const [aiBilgiYukleniyor, setAiBilgiYukleniyor] = useState(false);
+  const dosyaRef = React.useRef(null);
   const [adminForm, setAdminForm] = useState({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [], makale_link: "", makale_dosya_turu: "link", kitap_yazar: "", kitap_isbn: "", kitap_yayinevi: "", kitap_sayfa: "", kitap_yas_grubu: "", kitap_link: "", kitap_kapak: "" });
   const [kitapYukleniyor, setKitapYukleniyor] = useState(false);
   const [yeniSoru, setYeniSoru] = useState({ soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0, taksonomi: "kavrama" });
@@ -5855,6 +5863,8 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
   }, [user.id]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+  // AI Bilgi Tabanı verilerini yükle
+  useEffect(() => { const f = async () => { try { const r = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setAiYuklemeler(Array.isArray(r.data)?r.data:[]); } catch(e) {} try { const r = await axios.get(`${API}/ai/bilgi-tabani/istatistik`); setAiStat(r.data); } catch(e) {} try { const r = await axios.get(`${API}/ai/bilgi-tabani/puanlarim`); setAiPuanlar(r.data); } catch(e) {} }; f(); }, [user]);
 
   const turIcon = (tur) => ({ hizmetici: <GraduationCap className="h-5 w-5"/>, film: <Film className="h-5 w-5"/>, kitap: <BookMarked className="h-5 w-5"/>, makale: <FileText className="h-5 w-5"/> }[tur] || <BookOpen className="h-5 w-5"/>);
   const turLabel = (tur) => ({ hizmetici: "Hizmetiçi Eğitim", film: "Film", kitap: "Kitap", makale: "Makale" }[tur] || tur);
@@ -6364,28 +6374,13 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
       {/* Görevler alt sekmesi */}
       {/* AI Bilgi Tabanı — PDF/Word yükleme */}
       {gelisimSekme === 'ai-bilgi' && (() => {
-        const [aiYuklemeler, setAiYuklemeler] = React.useState([]);
-        const [aiStat, setAiStat] = React.useState(null);
-        const [aiPuanlar, setAiPuanlar] = React.useState({ toplam: 0, detay: [] });
-        const [yukleForm, setYukleForm] = React.useState({ sinif: "3", tur: "ders_kitabi", kitap_adi: "", yazar: "", temalar: "" });
-        const [yukleniyor, setYukleniyor] = React.useState(false);
-        const dosyaRef = React.useRef(null);
-
-        React.useEffect(() => {
-          const fetch = async () => {
-            try { const r = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setAiYuklemeler(Array.isArray(r.data) ? r.data : []); } catch(e) {}
-            try { const r = await axios.get(`${API}/ai/bilgi-tabani/istatistik`); setAiStat(r.data); } catch(e) {}
-            try { const r = await axios.get(`${API}/ai/bilgi-tabani/puanlarim`); setAiPuanlar(r.data); } catch(e) {}
-          };
-          fetch();
-        }, []);
 
         const dosyaYukle = async () => {
           const file = dosyaRef.current?.files?.[0];
           if (!file) { toast({ title: "Dosya seçin", variant: "destructive" }); return; }
           const ext = file.name.split('.').pop().toLowerCase();
           if (!['pdf', 'docx', 'doc'].includes(ext)) { toast({ title: "Sadece PDF, DOCX veya DOC yüklenebilir", variant: "destructive" }); return; }
-          setYukleniyor(true);
+          setAiBilgiYukleniyor(true);
           try {
             const fd = new FormData();
             fd.append("dosya", file);
@@ -6401,7 +6396,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
             const r2 = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setAiYuklemeler(Array.isArray(r2.data) ? r2.data : []);
             const r3 = await axios.get(`${API}/ai/bilgi-tabani/puanlarim`); setAiPuanlar(r3.data);
           } catch(e) { toast({ title: e.response?.data?.detail || "Yükleme hatası", variant: "destructive" }); }
-          setYukleniyor(false);
+          setAiBilgiYukleniyor(false);
         };
 
         return (<div className="space-y-4">
@@ -6463,7 +6458,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                 <div><Label className="text-xs">Kitap Adı</Label><Input value={yukleForm.kitap_adi} onChange={e => setYukleForm({...yukleForm, kitap_adi: e.target.value})} placeholder="Otomatik alınır" /></div>
                 <div><Label className="text-xs">Yazar</Label><Input value={yukleForm.yazar} onChange={e => setYukleForm({...yukleForm, yazar: e.target.value})} placeholder="Yazar adı" /></div>
               </div>
-              <Button onClick={dosyaYukle} disabled={yukleniyor} className="w-full bg-cyan-600 text-white">{yukleniyor ? "⏳ Yükleniyor..." : "🧠 Yükle ve AI'a Öğret (+20 puan)"}</Button>
+              <Button onClick={dosyaYukle} disabled={aiBilgiYukleniyor} className="w-full bg-cyan-600 text-white">{aiBilgiYukleniyor ? "⏳ Yükleniyor..." : "🧠 Yükle ve AI'a Öğret (+20 puan)"}</Button>
             </CardContent>
           </Card>
 
