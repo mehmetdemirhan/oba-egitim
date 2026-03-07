@@ -3893,7 +3893,8 @@ function OgretmenPaneli({ user, logout }) {
                 </>)}
 
                 {analiz && typeof analiz === 'string' && (<div className="bg-white rounded-xl p-4 border shadow-sm"><div className="text-xs text-gray-600 whitespace-pre-wrap">{analiz}</div></div>)}
-              </div>);\n            })()}
+              </div>);
+            })()}
 
             {/* 🎤 Speech AI — Sesli Okuma Analizi */}
             {(() => {
