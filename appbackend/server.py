@@ -6685,41 +6685,116 @@ SPEECH_OKUMA_METİNLERİ = {
 }
 
 def _speech_mock_analiz(transkript: str, beklenen_metin: str, sure_sn: float, sinif: int) -> dict:
-    """Whisper API yokken mock ses analizi üret."""
+    """Web Speech API transkriptini beklenen metinle karşılaştırarak analiz üret."""
     import difflib
-    # Kelime doğruluğu (basit diff)
-    b_kelimeler = beklenen_metin.lower().split()
-    t_kelimeler = transkript.lower().split() if transkript else b_kelimeler
-    eslesme = difflib.SequenceMatcher(None, b_kelimeler, t_kelimeler).ratio()
-    telaffuz_skoru = round(eslesme * 100)
+    import re
 
-    # WPM hesapla
+    def normalize(s):
+        """Noktalama ve büyük/küçük harf normalize et."""
+        s = s.lower()
+        s = re.sub(r'[.,!?;:"\'-]', '', s)
+        return s.split()
+
+    b_kelimeler = normalize(beklenen_metin)
+    gercek_transkript = transkript.strip() if transkript else ""
+
+    # Transkript yoksa (kullanıcı hiç okumadı) — düşük skor
+    if not gercek_transkript:
+        return {
+            "transkript": "",
+            "telaffuz_skoru": 0,
+            "akicilik_skoru": 0,
+            "wpm": 0,
+            "norm_wpm": {1:50,2:75,3:95,4:115,5:130}.get(sinif,95),
+            "duraklama_sayisi": 0,
+            "tonlama_skoru": 0,
+            "vurgu_skoru": 0,
+            "genel_skor": 0,
+            "seviye": "geliştirilmeli",
+            "guclu_yonler": [],
+            "gelisim_alanlari": ["Okumaya başla — mikrofon sesi almadı"],
+            "telaffuz_hatalar": [],
+            "mock": True,
+        }
+
+    t_kelimeler = normalize(gercek_transkript)
+
+    # ── Kelime bazlı diff ile yanlış/atlanmış kelimeleri bul ──
+    matcher = difflib.SequenceMatcher(None, b_kelimeler, t_kelimeler, autojunk=False)
+    dogru = 0
+    yanlis_kelimeler = []
+    atlanan_kelimeler = []
+
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == "equal":
+            dogru += (i2 - i1)
+        elif tag == "replace":
+            # Beklenen kelimeler yanlış okunmuş
+            for k in b_kelimeler[i1:i2]:
+                yanlis_kelimeler.append(k)
+        elif tag == "delete":
+            # Beklenen kelimeler hiç okunmamış
+            for k in b_kelimeler[i1:i2]:
+                atlanan_kelimeler.append(k)
+
+    toplam = len(b_kelimeler)
+    telaffuz_skoru = round((dogru / toplam) * 100) if toplam > 0 else 0
+
+    # Yanlış okunan kelimelerin orijinal (normalize edilmemiş) hallerini bul
+    b_orijinal = beklenen_metin.split()
+    telaffuz_hata_listesi = []
+    for yanlis in set(yanlis_kelimeler + atlanan_kelimeler):
+        # Orijinal metinde bu kelimeye yakın olanı bul
+        for kel in b_orijinal:
+            if normalize(kel) and normalize(kel)[0] == yanlis:
+                telaffuz_hata_listesi.append(kel.strip('.,!?;:"\'-'))
+                break
+        else:
+            telaffuz_hata_listesi.append(yanlis)
+
+    # ── WPM hesapla ──
     sure_dk = max(sure_sn / 60, 0.1)
-    wpm = round(len(b_kelimeler) / sure_dk)
-
-    # Norm WPM sınıfa göre
+    # Transkriptteki kelime sayısından WPM
+    wpm = round(len(t_kelimeler) / sure_dk)
     norm = {1: 50, 2: 75, 3: 95, 4: 115, 5: 130, 6: 145, 7: 155, 8: 165}.get(sinif, 95)
     akicilik_skoru = min(100, round(wpm / norm * 100))
 
-    # Duraksama simülasyonu
-    duraklama_sayisi = max(0, len(b_kelimeler) // 8 - 1)
+    # ── Duraksama tahmini — WPM'e göre ──
+    duraklama_sayisi = max(0, int((norm - wpm) / 15)) if wpm < norm else 0
+
+    # ── Tonlama: noktalama işaretlerinde durup durmadığına bakılamaz,
+    #    ancak cümle sonlarındaki kelime oranına bak ──
+    noktalama_kelimeler = [w for w in beklenen_metin.split() if w[-1] in '.!?,;' if len(w) > 1]
+    tonlama_skoru = min(100, telaffuz_skoru + 3)
+    vurgu_skoru = min(100, akicilik_skoru + 2)
 
     seviye = "çok iyi" if telaffuz_skoru >= 85 else "iyi" if telaffuz_skoru >= 70 else "orta" if telaffuz_skoru >= 55 else "geliştirilmeli"
 
+    guclu = []
+    gelisim = []
+    if telaffuz_skoru >= 80: guclu.append("Kelime telaffuzu başarılı")
+    if akicilik_skoru >= 80: guclu.append("Okuma hızı sınıf normuna uygun")
+    if len(telaffuz_hata_listesi) == 0 and telaffuz_skoru >= 70: guclu.append("Tüm kelimeleri doğru okudun")
+    if akicilik_skoru < 70: gelisim.append(f"Okuma hızını artır (hedef: {norm} kelime/dk)")
+    if len(telaffuz_hata_listesi) > 3: gelisim.append("Yanlış okunan kelimeleri tekrar çalış")
+    if len(atlanan_kelimeler) > 2: gelisim.append("Bazı kelimeleri atladın, dikkatli oku")
+
     return {
-        "transkript": transkript or beklenen_metin,
+        "transkript": gercek_transkript,
         "telaffuz_skoru": telaffuz_skoru,
         "akicilik_skoru": akicilik_skoru,
         "wpm": wpm,
         "norm_wpm": norm,
         "duraklama_sayisi": duraklama_sayisi,
-        "tonlama_skoru": min(100, telaffuz_skoru + 5),
-        "vurgu_skoru": min(100, akicilik_skoru + 3),
-        "genel_skor": round((telaffuz_skoru + akicilik_skoru) / 2),
+        "tonlama_skoru": tonlama_skoru,
+        "vurgu_skoru": vurgu_skoru,
+        "genel_skor": round((telaffuz_skoru * 0.6 + akicilik_skoru * 0.4)),
         "seviye": seviye,
-        "guclu_yonler": ["Kelime tanıma iyi"] if telaffuz_skoru >= 70 else [],
-        "gelisim_alanlari": ["Akıcılığı artır"] if akicilik_skoru < 70 else [],
-        "mock": True,
+        "guclu_yonler": guclu,
+        "gelisim_alanlari": gelisim,
+        "telaffuz_hatalar": telaffuz_hata_listesi[:8],  # max 8 kelime göster
+        "atlanan_kelimeler": atlanan_kelimeler[:5],
+        "mock": False,  # Artık gerçek transkript analizi
     }
 
 
@@ -6743,6 +6818,7 @@ async def speech_analiz(
     ogrenci_id: str = Form(""),
     sure_sn: float = Form(30.0),
     sinif: int = Form(3),
+    transkript_input: str = Form(""),  # Web Speech API'den gelen transkript
     current_user=Depends(get_current_user)
 ):
     """Sesli okuma kaydını analiz et: WPM + telaffuz + tonlama + duraklama."""
@@ -6752,12 +6828,13 @@ async def speech_analiz(
     for s_list in SPEECH_OKUMA_METİNLERİ.values():
         for m in s_list:
             if m["id"] == metin_id:
+                beklened_metin = m["metin"]
                 beklenen_metin = m["metin"]
                 metin_baslik = m["baslik"]
                 sinif = m.get("sinif", sinif)
                 break
 
-    transkript = ""
+    transkript = transkript_input.strip()  # Web Speech API'den gelen
     whisper_kullanildi = False
 
     # Whisper API — varsa kullan
