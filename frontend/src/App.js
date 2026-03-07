@@ -4529,6 +4529,11 @@ function OgrenciPaneli({ user, logout }) {
   const [aktifEkran, setAktifEkran] = useState(null);
   const [okumaBasladi, setOkumaBasladi] = useState(false);
   const [aiMotMesaj, setAiMotMesaj] = useState("");
+  // Kelime Evrimi state'leri
+  const [kelimeData, setKelimeData] = useState(null);
+  const [aktifKelime, setAktifKelime] = useState(null);
+  const [cevapGosterim, setCevapGosterim] = useState(false);
+  const [oyunData, setOyunData] = useState(null);
   const [okumaSuresi, setOkumaSuresi] = useState(0);
   const [okumaDuraklatildi, setOkumaDuraklatildi] = useState(false);
   const okumaInterval = useRef(null);
@@ -4568,6 +4573,8 @@ function OgrenciPaneli({ user, logout }) {
 
   // AI motivasyon mesajı
   useEffect(() => { const f = async () => { try { const r = await axios.get(`${API}/ai/kocluk/${user.id}/motivasyon`); setAiMotMesaj(r.data.mesaj || ""); } catch(e) {} }; f(); }, [user.id]);
+  // Kelime Evrimi verilerini yükle
+  useEffect(() => { const f = async () => { try { const r = await axios.get(`${API}/ai/kelime-evrimi/${user.id}`); setKelimeData(r.data); } catch(e) {} }; f(); }, [user.id]);
   // Okuma sayacı
   useEffect(() => {
     if (okumaBasladi && !okumaDuraklatildi) {
@@ -4587,14 +4594,24 @@ function OgrenciPaneli({ user, logout }) {
   const okumaBaslat = () => { setOkumaBasladi(true); setOkumaDuraklatildi(false); setOkumaSuresi(0); setAgaclar([]); setAktifEkran("okuma"); };
   const okumaBitir = () => { clearInterval(okumaInterval.current); setOkumaBasladi(false); setNeOkudunForm({ kitap_adi:"", bolum:"", baslangic_sayfa:"", bitis_sayfa:"", not_text:"" }); setAktifEkran("ne-okudun"); };
 
+  // Socratic Reading state
+  const [socraticSoru, setSocraticSoru] = useState(null);
+  const [socraticCevap, setSocraticCevap] = useState("");
+  const [socraticSonuc, setSocraticSonuc] = useState(null);
+
   const okumaKaydet = async (e) => {
     e.preventDefault();
     const dk = Math.max(1, Math.round(okumaSuresi / 60));
     try {
       await axios.post(`${API}/reading-logs`, { ...neOkudunForm, baslangic_sayfa: neOkudunForm.baslangic_sayfa ? parseInt(neOkudunForm.baslangic_sayfa) : null, bitis_sayfa: neOkudunForm.bitis_sayfa ? parseInt(neOkudunForm.bitis_sayfa) : null, sure_dakika: dk });
-      toast({ title: `🌳 ${dk} dakika okuma kaydedildi!` }); setOkumaSuresi(0); setAgaclar([]); setAktifEkran(null);
+      toast({ title: `🌳 ${dk} dakika okuma kaydedildi!` }); setOkumaSuresi(0); setAgaclar([]);
       // Otomatik XP kazan
       try { await axios.post(`${API}/xp/kazan`, { eylem: "okuma_gorevi" }); } catch(e) {}
+      // Socratic soru al
+      try {
+        const sr = await axios.post(`${API}/ai/socratic-soru`, { kitap_adi: neOkudunForm.kitap_adi, bolum: neOkudunForm.bolum, sure_dk: dk, sinif: user.sinif || 3 });
+        setSocraticSoru(sr.data); setSocraticCevap(""); setSocraticSonuc(null);
+      } catch(e) { setAktifEkran(null); }
       fetchAll();
     } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
   };
@@ -4665,8 +4682,42 @@ function OgrenciPaneli({ user, logout }) {
             <div className="grid grid-cols-2 gap-3"><div><Label>Başlangıç Sayfa</Label><Input type="number" value={neOkudunForm.baslangic_sayfa} onChange={e => setNeOkudunForm({...neOkudunForm, baslangic_sayfa: e.target.value})} /></div><div><Label>Bitiş Sayfa</Label><Input type="number" value={neOkudunForm.bitis_sayfa} onChange={e => setNeOkudunForm({...neOkudunForm, bitis_sayfa: e.target.value})} /></div></div>
             <div><Label>Not</Label><Input value={neOkudunForm.not_text} onChange={e => setNeOkudunForm({...neOkudunForm, not_text: e.target.value})} placeholder="Kısa not..." /></div>
             <Button type="submit" className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 rounded-xl">Kaydet 📝</Button>
-            <Button type="button" variant="outline" className="w-full" onClick={() => { setOkumaSuresi(0); setAktifEkran(null); }}>Atla</Button>
-          </form></CardContent></Card></div>
+            <Button type="button" variant="outline" className="w-full" onClick={() => { setOkumaSuresi(0); setAktifEkran(null); setSocraticSoru(null); }}>Atla</Button>
+          </form></CardContent></Card>
+
+          {/* Socratic Reading Popup */}
+          {socraticSoru && (
+            <Card className="border-2 border-cyan-300 shadow-lg">
+              <CardHeader className="bg-gradient-to-r from-cyan-50 to-blue-50 pb-2">
+                <CardTitle className="text-base flex items-center gap-2">🤖 Okuma Koçun Soruyor</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-3 space-y-3">
+                <p className="text-sm font-medium text-gray-800">{socraticSoru.soru}</p>
+                {socraticSoru.ipucu && <p className="text-xs text-cyan-600 italic">💡 İpucu: {socraticSoru.ipucu}</p>}
+                {!socraticSonuc ? (<>
+                  <textarea value={socraticCevap} onChange={e => setSocraticCevap(e.target.value)} className="w-full border rounded-lg p-2 text-sm min-h-[60px]" placeholder="Düşünceni yaz..." />
+                  <div className="flex gap-2">
+                    <Button className="flex-1 bg-cyan-600 text-white text-sm" onClick={async () => {
+                      try {
+                        const r = await axios.post(`${API}/ai/socratic-cevap`, { soru: socraticSoru.soru, cevap: socraticCevap });
+                        setSocraticSonuc(r.data);
+                      } catch(e) { setSocraticSonuc({ puan: 3, geri_bildirim: "Teşekkürler! 👏", xp: 5 }); }
+                    }}>Gönder 🚀</Button>
+                    <Button variant="outline" className="text-sm" onClick={() => { setSocraticSoru(null); setAktifEkran(null); }}>Atla</Button>
+                  </div>
+                </>) : (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      {[1,2,3,4,5].map(s => <span key={s} className={`text-lg ${s <= socraticSonuc.puan ? '⭐' : '☆'}`}>{s <= socraticSonuc.puan ? '⭐' : '☆'}</span>)}
+                      <span className="text-xs text-green-600 font-bold">+{socraticSonuc.xp} XP</span>
+                    </div>
+                    <p className="text-sm text-gray-700 bg-cyan-50 p-2 rounded-lg">{socraticSonuc.geri_bildirim}</p>
+                    <Button className="w-full bg-green-600 text-white text-sm" onClick={() => { setSocraticSoru(null); setSocraticSonuc(null); setAktifEkran(null); }}>Tamam ✅</Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}</div>
       </div>
     );
   }
@@ -4817,7 +4868,7 @@ function OgrenciPaneli({ user, logout }) {
           <h2 className="text-lg font-bold">🎯 Gelişim</h2>
           {/* Alt sekmeler */}
           <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
-            {[{id:"icerikler",l:"📚 İçerikler"},{id:"egzersizler",l:"👁️ Egzersizler"},{id:"okumalarim",l:"📖 Okumalarım"}].map(s => (
+            {[{id:"icerikler",l:"📚 İçerikler"},{id:"egzersizler",l:"👁️ Egzersizler"},{id:"okumalarim",l:"📖 Okumalarım"},{id:"kelime_evrimi",l:"🧠 Kelimelerim"}].map(s => (
               <button key={s.id} onClick={() => setGelisimAltSekme(s.id)}
                 className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${gelisimAltSekme === s.id ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}>{s.l}</button>
             ))}
@@ -4849,6 +4900,69 @@ function OgrenciPaneli({ user, logout }) {
               okumaKayitlari.map(k => (<Card key={k.id} className="border-0 shadow-sm"><CardContent className="p-3 flex items-center justify-between"><div><div className="font-medium text-sm">{k.kitap_adi || "—"}</div><div className="text-xs text-gray-400">{k.bolum && `${k.bolum} • `}⏱ {k.sure_dakika} dk {k.baslangic_sayfa && k.bitis_sayfa && `• s.${k.baslangic_sayfa}-${k.bitis_sayfa}`}</div>{k.not_text && <p className="text-[10px] text-blue-600 mt-0.5">💬 {k.not_text}</p>}</div><div className="text-[10px] text-gray-400">{new Date(k.tarih).toLocaleDateString('tr-TR')}</div></CardContent></Card>))
             )}
           </>)}
+
+          {/* ── Kelime Evrimi (Spaced Repetition) ── */}
+          {gelisimAltSekme === "kelime_evrimi" && (() => {
+            return (<div className="space-y-3">
+              {kelimeData && (
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="bg-cyan-50 rounded-xl p-3 text-center border border-cyan-200"><div className="text-2xl font-bold text-cyan-600">{kelimeData.bugun_tekrar}</div><div className="text-[9px] text-cyan-700">📝 Bugün Tekrar</div></div>
+                  <div className="bg-green-50 rounded-xl p-3 text-center border border-green-200"><div className="text-2xl font-bold text-green-600">{kelimeData.ogrenilmis}</div><div className="text-[9px] text-green-700">✅ Öğrenilmiş</div></div>
+                  <div className="bg-purple-50 rounded-xl p-3 text-center border border-purple-200"><div className="text-2xl font-bold text-purple-600">{kelimeData.toplam}</div><div className="text-[9px] text-purple-700">📚 Toplam</div></div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-2">
+                {[["eslestirme","🎲 Eşleştirme"],["bosluk_doldurma","⬜ Boşluk Doldur"],["cumle_kurma","📝 Cümle Kur"],["kelime_avi","🔍 Kelime Avı"]].map(([t,l]) => (
+                  <button key={t} onClick={async () => {
+                    try { const r = await axios.post(`${API}/ai/mini-oyun`, { tur: t, sinif: user.sinif || 3 }); setOyunData(r.data.oyun); } catch(e) {}
+                  }} className="bg-white rounded-xl p-3 border shadow-sm text-center hover:bg-gray-50 transition-all">
+                    <div className="text-lg">{l.split(" ")[0]}</div><div className="text-[10px] text-gray-600">{l.split(" ").slice(1).join(" ")}</div>
+                  </button>
+                ))}
+              </div>
+
+              {oyunData && (
+                <div className="bg-white rounded-xl p-4 border-2 border-cyan-300 shadow-md">
+                  <div className="flex items-center justify-between mb-3"><h3 className="font-bold text-sm">{oyunData.baslik}</h3><button onClick={() => setOyunData(null)} className="text-xs text-gray-400">✕</button></div>
+                  <p className="text-xs text-gray-600 mb-3">{oyunData.aciklama}</p>
+                  {oyunData.tur === "eslestirme" && oyunData.kelimeler && (<div className="space-y-1.5">{oyunData.kelimeler.map((k, i) => (<div key={i} className="flex items-center gap-2 bg-gray-50 rounded-lg p-2"><span className="bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded text-xs font-bold min-w-[80px] text-center">{k}</span><span className="text-xs">↔</span><span className="text-xs text-gray-600">{oyunData.anlamlar?.[i] || ""}</span></div>))}</div>)}
+                  {oyunData.tur === "bosluk_doldurma" && oyunData.sorular && (<div className="space-y-2">{oyunData.sorular.map((s, i) => (<div key={i} className="bg-gray-50 rounded-lg p-2"><p className="text-xs mb-1">{s.cumle_bos}</p><div className="flex gap-1 flex-wrap">{(s.secenekler||[]).map((sec, j) => (<button key={j} className="text-[10px] px-2 py-1 rounded bg-white border hover:bg-cyan-50">{sec}</button>))}</div></div>))}</div>)}
+                  {oyunData.tur === "kelime_avi" && oyunData.kelimeler && (<div><p className="text-xs text-gray-500 mb-1">Bul: {oyunData.kelimeler.join(", ")}</p></div>)}
+                  {oyunData.tur === "cumle_kurma" && oyunData.sorular && (<div className="space-y-2">{oyunData.sorular.map((s, i) => (<div key={i} className="bg-gray-50 rounded-lg p-2"><p className="text-[10px] text-gray-400 mb-1">Hedef: {s.hedef_kelime}</p><div className="flex gap-1 flex-wrap">{(s.karisik||[]).map((k, j) => (<span key={j} className="text-[10px] bg-white border px-2 py-0.5 rounded">{k}</span>))}</div></div>))}</div>)}
+                  <Button className="w-full mt-3 bg-green-600 text-white text-sm" onClick={async () => { try { const r = await axios.post(`${API}/ai/mini-oyun/tamamla`, { tur: oyunData.tur, dogru: 5, toplam: 6 }); toast({ title: `🎮 ${r.data.mesaj} +${r.data.xp} XP` }); setOyunData(null); } catch(e) {} }}>Oyunu Tamamla ✅</Button>
+                </div>
+              )}
+
+              {kelimeData?.bekleyenler?.length > 0 && !oyunData && (<>
+                <h3 className="font-bold text-sm text-gray-700">📝 Bugün Tekrar Edilecek Kelimeler</h3>
+                {!aktifKelime ? (
+                  <button onClick={() => { setAktifKelime(kelimeData.bekleyenler[0]); setCevapGosterim(false); }} className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl p-4 shadow-md">
+                    <div className="text-lg font-bold">🧠 Tekrara Başla</div><div className="text-xs opacity-80">{kelimeData.bekleyenler.length} kelime bekliyor</div>
+                  </button>
+                ) : (
+                  <div className="bg-white rounded-xl p-4 border-2 border-cyan-300 shadow-md text-center space-y-3">
+                    <div className="text-xs text-gray-400">Kutu {aktifKelime.kutu}/5 • Tekrar #{(aktifKelime.tekrar_sayisi||0)+1}</div>
+                    <div className="text-2xl font-bold text-cyan-700">{aktifKelime.kelime}</div>
+                    {!cevapGosterim ? (
+                      <Button onClick={() => setCevapGosterim(true)} className="bg-yellow-500 text-white">Anlamını Göster 👀</Button>
+                    ) : (<>
+                      <div className="bg-cyan-50 rounded-lg p-3"><p className="text-sm font-medium">{aktifKelime.anlam}</p>{aktifKelime.ornek_cumle && <p className="text-xs text-gray-500 mt-1 italic">"{aktifKelime.ornek_cumle}"</p>}</div>
+                      <div className="flex gap-2">
+                        <Button className="flex-1 bg-red-500 text-white text-sm" onClick={async () => { try { await axios.post(`${API}/ai/kelime-evrimi/cevapla`, { kelime_id: aktifKelime.id, dogru: false }); } catch(e) {} const kalan = kelimeData.bekleyenler.filter(k => k.id !== aktifKelime.id); setKelimeData({...kelimeData, bekleyenler: kalan}); setAktifKelime(kalan[0] || null); setCevapGosterim(false); if (!kalan[0]) toast({ title: "🎉 Tamamlandı!" }); }}>❌ Bilmiyordum</Button>
+                        <Button className="flex-1 bg-green-500 text-white text-sm" onClick={async () => { try { await axios.post(`${API}/ai/kelime-evrimi/cevapla`, { kelime_id: aktifKelime.id, dogru: true }); } catch(e) {} const kalan = kelimeData.bekleyenler.filter(k => k.id !== aktifKelime.id); setKelimeData({...kelimeData, bekleyenler: kalan}); setAktifKelime(kalan[0] || null); setCevapGosterim(false); if (!kalan[0]) toast({ title: "🎉 Tamamlandı!" }); }}>✅ Biliyordum</Button>
+                      </div>
+                    </>)}
+                  </div>
+                )}
+              </>)}
+
+              {kelimeData?.bekleyenler?.length === 0 && !oyunData && (
+                <div className="text-center py-8 text-gray-500"><div className="text-3xl mb-2">🎉</div><p className="text-sm">Bugün tekrar edilecek kelime yok!</p><p className="text-xs text-gray-400 mt-1">Yeni kelimeler okudukça eklenecek</p></div>
+              )}
+            </div>);
+          })()}
+
         </div>)}
 
         {/* ═══ SIRALAMA (XP Lig Bazlı) ═══ */}
