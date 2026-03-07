@@ -6032,6 +6032,19 @@ function AiMerkezi({ user }) {
     <div className="space-y-6">
       <h2 className="text-2xl font-bold flex items-center gap-2">🧠 AI Merkezi</h2>
 
+      {/* Demo Veri Yükle butonu */}
+      {user.role === "admin" && (
+        <button onClick={async () => {
+          try {
+            const r = await axios.post(`${API}/ai/demo-yukle`);
+            toast({ title: `🎉 ${r.data.mesaj} — DNA: ${r.data.sonuc?.dna}, Koçluk: ${r.data.sonuc?.kocluk}, Kelime: ${r.data.sonuc?.kelime_tekrar}, Soru: ${r.data.sonuc?.soru}` });
+            window.location.reload();
+          } catch(e) { toast({ title: e.response?.data?.detail || "Hata", variant: "destructive" }); }
+        }} className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-xl text-sm font-medium shadow hover:shadow-lg transition-all">
+          🚀 Demo Verileri Yükle / Yenile
+        </button>
+      )}
+
       {/* Sekme butonları */}
       <div className="flex gap-1 flex-wrap">
         {[["genel","📊 Genel"],["dna","🧬 DNA Profilleri"],["kocluk","🤖 Koçluk"],["kelimeler","📚 Kelime Haritası"],["yuklemeler","📁 Yüklemeler"],["socratic","💬 Socratic"],["maliyet","💰 Maliyet"]].map(([k,l]) => (
