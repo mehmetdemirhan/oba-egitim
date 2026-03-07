@@ -6375,12 +6375,56 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
       {/* AI Bilgi Tabanı — PDF/Word yükleme */}
       {gelisimSekme === 'ai-bilgi' && (() => {
 
+        const [aiIlerleme, setAiIlerleme] = React.useState(0);
+        const [aiIslemDurum, setAiIslemDurum] = React.useState("");
+        const [aiSonuc, setAiSonuc] = React.useState(null);
+        const [aiSonucSekme, setAiSonucSekme] = React.useState("kelimeler");
+
         const dosyaYukle = async () => {
+          const urlMod = yukleForm._mod === "url";
+
+          if (urlMod) {
+            // ── URL MODU ──
+            const url = (yukleForm._url || "").trim();
+            if (!url) { toast({ title: "Link yapıştırın", variant: "destructive" }); return; }
+            if (!url.startsWith("http")) { toast({ title: "Geçerli bir link girin (http:// veya https://)", variant: "destructive" }); return; }
+            setAiBilgiYukleniyor(true); setAiIlerleme(5); setAiIslemDurum("🔗 Dosya linkten indiriliyor..."); setAiSonuc(null);
+            try {
+              const r = await axios.post(`${API}/ai/bilgi-tabani/yukle-url`, { url, sinif: parseInt(yukleForm.sinif), tur: yukleForm.tur, kitap_adi: yukleForm.kitap_adi, yazar: yukleForm.yazar });
+              toast({ title: `🧠 ${r.data.mesaj}` });
+              setAiIlerleme(25); setAiIslemDurum("📖 Metin çıkarılıyor...");
+              const yukId = r.data.yukleme?.id;
+              if (yukId) {
+                const ilerlemeTakip = setInterval(async () => {
+                  try {
+                    const ir = await axios.get(`${API}/ai/bilgi-tabani/ilerleme/${yukId}`);
+                    setAiIlerleme(ir.data.ilerleme || 25);
+                    const d = ir.data.durum;
+                    setAiIslemDurum(d === "metin_cikariliyor" ? "📖 Metin çıkarılıyor..." : d === "ai_analiz" ? "🧠 AI analiz ediyor..." : d === "tamamlandi" ? "✅ Tamamlandı!" : d === "hata" ? "❌ Hata" : "⏳ İşleniyor...");
+                    if (d === "tamamlandi" || d === "hata") clearInterval(ilerlemeTakip);
+                  } catch(e) {}
+                }, 2000);
+                const isleR = await axios.post(`${API}/ai/bilgi-tabani/isle/${yukId}`);
+                clearInterval(ilerlemeTakip);
+                setAiIlerleme(100); setAiIslemDurum("✅ Tamamlandı!");
+                setAiSonuc(isleR.data);
+                toast({ title: `🎉 AI öğrendi! ${isleR.data.cikarilan_kelime || 0} kelime, ${isleR.data.okuma_parcasi || 0} parça, ${isleR.data.uretilen_soru || 0} soru` });
+              }
+              setYukleForm({ sinif: "3", tur: "ders_kitabi", kitap_adi: "", yazar: "", temalar: "", _mod: "url", _url: "" });
+              try { const r2 = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setAiYuklemeler(Array.isArray(r2.data) ? r2.data : []); } catch(e) {}
+              try { const r3 = await axios.get(`${API}/ai/bilgi-tabani/puanlarim`); setAiPuanlar(r3.data); } catch(e) {}
+              try { const r4 = await axios.get(`${API}/ai/bilgi-tabani/istatistik`); setAiStat(r4.data); } catch(e) {}
+            } catch(e) { toast({ title: e.response?.data?.detail || "Link yükleme hatası", variant: "destructive" }); setAiIslemDurum(""); }
+            setAiBilgiYukleniyor(false);
+            return;
+          }
+
+          // ── DOSYA MODU ──
           const file = dosyaRef.current?.files?.[0];
           if (!file) { toast({ title: "Dosya seçin", variant: "destructive" }); return; }
           const ext = file.name.split('.').pop().toLowerCase();
           if (!['pdf', 'docx', 'doc'].includes(ext)) { toast({ title: "Sadece PDF, DOCX veya DOC yüklenebilir", variant: "destructive" }); return; }
-          setAiBilgiYukleniyor(true);
+          setAiBilgiYukleniyor(true); setAiIlerleme(5); setAiIslemDurum("📤 Dosya yükleniyor..."); setAiSonuc(null);
           try {
             const fd = new FormData();
             fd.append("dosya", file);
@@ -6388,15 +6432,46 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
             fd.append("tur", yukleForm.tur);
             fd.append("kitap_adi", yukleForm.kitap_adi || file.name);
             fd.append("yazar", yukleForm.yazar);
-            fd.append("temalar", yukleForm.temalar);
-            const r = await axios.post(`${API}/ai/bilgi-tabani/yukle`, fd, { headers: { "Content-Type": "multipart/form-data" } });
+            fd.append("temalar", yukleForm.temalar || "");
+            const r = await axios.post(`${API}/ai/bilgi-tabani/yukle`, fd, {
+              headers: { "Content-Type": "multipart/form-data" },
+              onUploadProgress: (p) => { if (p.total) setAiIlerleme(Math.round(p.loaded / p.total * 20)); }
+            });
             toast({ title: `🧠 ${r.data.mesaj}` });
+            const yukId = r.data.yukleme?.id;
+            if (yukId) {
+              setAiIlerleme(25); setAiIslemDurum("📖 Metin çıkarılıyor...");
+              const ilerlemeTakip = setInterval(async () => {
+                try {
+                  const ir = await axios.get(`${API}/ai/bilgi-tabani/ilerleme/${yukId}`);
+                  setAiIlerleme(ir.data.ilerleme || 25);
+                  const d = ir.data.durum;
+                  setAiIslemDurum(d === "metin_cikariliyor" ? "📖 Metin çıkarılıyor..." : d === "ai_analiz" ? "🧠 AI analiz ediyor..." : d === "tamamlandi" ? "✅ Tamamlandı!" : d === "hata" ? "❌ Hata" : "⏳ İşleniyor...");
+                  if (d === "tamamlandi" || d === "hata") clearInterval(ilerlemeTakip);
+                } catch(e) {}
+              }, 2000);
+              const isleR = await axios.post(`${API}/ai/bilgi-tabani/isle/${yukId}`);
+              clearInterval(ilerlemeTakip);
+              setAiIlerleme(100); setAiIslemDurum("✅ Tamamlandı!");
+              setAiSonuc(isleR.data);
+              toast({ title: `🎉 AI öğrendi! ${isleR.data.cikarilan_kelime || 0} kelime, ${isleR.data.okuma_parcasi || 0} parça, ${isleR.data.uretilen_soru || 0} soru` });
+            }
             dosyaRef.current.value = "";
-            setYukleForm({ sinif: "3", tur: "ders_kitabi", kitap_adi: "", yazar: "", temalar: "" });
-            const r2 = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setAiYuklemeler(Array.isArray(r2.data) ? r2.data : []);
-            const r3 = await axios.get(`${API}/ai/bilgi-tabani/puanlarim`); setAiPuanlar(r3.data);
-          } catch(e) { toast({ title: e.response?.data?.detail || "Yükleme hatası", variant: "destructive" }); }
+            setYukleForm({ sinif: "3", tur: "ders_kitabi", kitap_adi: "", yazar: "", temalar: "", _mod: "dosya" });
+            try { const r2 = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setAiYuklemeler(Array.isArray(r2.data) ? r2.data : []); } catch(e) {}
+            try { const r3 = await axios.get(`${API}/ai/bilgi-tabani/puanlarim`); setAiPuanlar(r3.data); } catch(e) {}
+            try { const r4 = await axios.get(`${API}/ai/bilgi-tabani/istatistik`); setAiStat(r4.data); } catch(e) {}
+          } catch(e) { toast({ title: e.response?.data?.detail || "Yükleme hatası", variant: "destructive" }); setAiIslemDurum(""); }
           setAiBilgiYukleniyor(false);
+        };
+
+        // Geçmiş yüklemenin sonuçlarını görüntüle
+        const sonucGoruntule = async (yukId) => {
+          try {
+            const r = await axios.get(`${API}/ai/bilgi-tabani/sonuc/${yukId}`);
+            setAiSonuc({ kelimeler: r.data.kelimeler, parcalar: r.data.parcalar, sorular: r.data.sorular, ...r.data.yukleme?.sonuc });
+            setAiSonucSekme("kelimeler");
+          } catch(e) { toast({ title: "Sonuç yüklenemedi", variant: "destructive" }); }
         };
 
         return (<div className="space-y-4">
@@ -6432,10 +6507,27 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
             <CardHeader className="pb-2"><CardTitle className="text-sm">📤 AI'a Kitap / Doküman Öğret</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               <div className="bg-cyan-50 rounded-lg p-3 border border-cyan-100">
-                <p className="text-xs text-cyan-700">📚 PDF veya Word (.docx/.doc) formatında ders kitabı, öykü kitabı, masal kitabı yükleyin. AI içeriği analiz ederek kelime haritası, okuma parçaları ve Bloom taksonomili sorular üretecek.</p>
+                <p className="text-xs text-cyan-700">📚 PDF veya Word dosyası yükleyin ya da direkt link yapıştırın. AI içeriği analiz ederek kelime haritası, okuma parçaları ve Bloom taksonomili sorular üretecek.</p>
                 <p className="text-xs text-cyan-600 mt-1 font-medium">Her yükleme = +20 puan | Onay bonusu = +10 puan | Zengin içerik bonusu = +5 puan</p>
               </div>
-              <input ref={dosyaRef} type="file" accept=".pdf,.docx,.doc" className="block w-full text-sm text-gray-500 file:mr-2 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-cyan-100 file:text-cyan-700 hover:file:bg-cyan-200" />
+
+              {/* Dosya / URL seçimi */}
+              <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
+                <button onClick={() => setYukleForm({...yukleForm, _mod: "dosya"})} className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${(!yukleForm._mod || yukleForm._mod === "dosya") ? 'bg-white shadow text-cyan-700' : 'text-gray-500'}`}>📁 Dosya Yükle</button>
+                <button onClick={() => setYukleForm({...yukleForm, _mod: "url"})} className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${yukleForm._mod === "url" ? 'bg-white shadow text-cyan-700' : 'text-gray-500'}`}>🔗 Link Yapıştır</button>
+              </div>
+
+              {(!yukleForm._mod || yukleForm._mod === "dosya") && (
+                <input ref={dosyaRef} type="file" accept=".pdf,.docx,.doc" className="block w-full text-sm text-gray-500 file:mr-2 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-cyan-100 file:text-cyan-700 hover:file:bg-cyan-200" />
+              )}
+
+              {yukleForm._mod === "url" && (
+                <div className="space-y-2">
+                  <Input value={yukleForm._url || ""} onChange={e => setYukleForm({...yukleForm, _url: e.target.value})} placeholder="https://tymm.meb.gov.tr/upload/kitap/turkce_1_1.pdf" className="text-xs" />
+                  <p className="text-[10px] text-gray-400">PDF veya Word dosyasının direkt linkini yapıştırın. MEB, EBA veya herhangi bir kaynaktan olabilir.</p>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-2">
                 <div><Label className="text-xs">Sınıf Seviyesi *</Label>
                   <Select value={yukleForm.sinif} onValueChange={v => setYukleForm({...yukleForm, sinif: v})}>
@@ -6459,6 +6551,91 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                 <div><Label className="text-xs">Yazar</Label><Input value={yukleForm.yazar} onChange={e => setYukleForm({...yukleForm, yazar: e.target.value})} placeholder="Yazar adı" /></div>
               </div>
               <Button onClick={dosyaYukle} disabled={aiBilgiYukleniyor} className="w-full bg-cyan-600 text-white">{aiBilgiYukleniyor ? "⏳ Yükleniyor..." : "🧠 Yükle ve AI'a Öğret (+20 puan)"}</Button>
+
+              {/* İlerleme Çubuğu */}
+              {aiBilgiYukleniyor && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs"><span className="text-cyan-700 font-medium">{aiIslemDurum}</span><span className="text-gray-500">{aiIlerleme}%</span></div>
+                  <div className="bg-gray-200 rounded-full h-3 overflow-hidden"><div className="h-3 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full transition-all duration-500" style={{width:`${aiIlerleme}%`}} /></div>
+                  <div className="flex justify-between text-[9px] text-gray-400"><span>📤 Yükleme</span><span>📖 Parse</span><span>🧠 AI Analiz</span><span>💾 Kayıt</span><span>✅</span></div>
+                </div>
+              )}
+
+              {/* AI Sonuç Ekranı */}
+              {aiSonuc && (aiSonuc.kelimeler?.length > 0 || aiSonuc.parcalar?.length > 0 || aiSonuc.sorular?.length > 0) && (
+                <div className="border-t-2 border-cyan-200 pt-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-bold text-sm text-cyan-800">🎉 AI Öğrenme Sonuçları</h3>
+                    <button onClick={() => setAiSonuc(null)} className="text-xs text-gray-400 hover:text-red-400">✕ Kapat</button>
+                  </div>
+
+                  {/* Özet kartları */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="bg-green-50 rounded-xl p-3 text-center border border-green-200"><div className="text-2xl font-bold text-green-600">{aiSonuc.kelimeler?.length || aiSonuc.cikarilan_kelime || 0}</div><div className="text-[9px] text-green-700">📚 Kelime Çıkarıldı</div></div>
+                    <div className="bg-blue-50 rounded-xl p-3 text-center border border-blue-200"><div className="text-2xl font-bold text-blue-600">{aiSonuc.parcalar?.length || aiSonuc.okuma_parcasi || 0}</div><div className="text-[9px] text-blue-700">📖 Okuma Parçası</div></div>
+                    <div className="bg-purple-50 rounded-xl p-3 text-center border border-purple-200"><div className="text-2xl font-bold text-purple-600">{aiSonuc.sorular?.length || aiSonuc.uretilen_soru || 0}</div><div className="text-[9px] text-purple-700">📝 Soru Üretildi</div></div>
+                  </div>
+
+                  {/* Sekme butonları */}
+                  <div className="flex gap-1">
+                    {[["kelimeler","📚 Kelimeler"],["parcalar","📖 Parçalar"],["sorular","📝 Sorular"]].map(([k,l]) => (
+                      <button key={k} onClick={() => setAiSonucSekme(k)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${aiSonucSekme === k ? 'bg-cyan-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{l}</button>
+                    ))}
+                  </div>
+
+                  {/* Kelimeler listesi */}
+                  {aiSonucSekme === "kelimeler" && aiSonuc.kelimeler?.length > 0 && (
+                    <div className="space-y-1.5 max-h-80 overflow-y-auto">{aiSonuc.kelimeler.map((k, i) => (
+                      <div key={i} className="bg-white rounded-lg p-2.5 border shadow-sm">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-cyan-700">{k.kelime}</span>
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${k.zorluk <= 3 ? 'bg-green-100 text-green-700' : k.zorluk <= 6 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>zorluk: {k.zorluk}/10</span>
+                          </div>
+                          <span className="text-[9px] text-gray-400">Bölüm {k.bolum}</span>
+                        </div>
+                        <div className="text-xs text-gray-600 mt-1">{k.anlam}</div>
+                        {k.ornek_cumle && <div className="text-[10px] text-gray-400 mt-0.5 italic">"{k.ornek_cumle}"</div>}
+                      </div>
+                    ))}</div>
+                  )}
+
+                  {/* Okuma parçaları */}
+                  {aiSonucSekme === "parcalar" && aiSonuc.parcalar?.length > 0 && (
+                    <div className="space-y-2 max-h-80 overflow-y-auto">{aiSonuc.parcalar.map((p, i) => (
+                      <div key={i} className="bg-white rounded-lg p-3 border shadow-sm">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm font-bold text-blue-700">📖 {p.baslik || `Bölüm ${p.bolum}`}</span>
+                          {p.tema && <span className="text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">{p.tema}</span>}
+                        </div>
+                        <p className="text-xs text-gray-600">{p.ozet}</p>
+                        {p.metin_kesit && <details className="mt-1"><summary className="text-[10px] text-cyan-600 cursor-pointer">Metin kesiti göster</summary><p className="text-[10px] text-gray-400 mt-1 whitespace-pre-wrap bg-gray-50 p-2 rounded">{p.metin_kesit}</p></details>}
+                      </div>
+                    ))}</div>
+                  )}
+
+                  {/* Sorular */}
+                  {aiSonucSekme === "sorular" && aiSonuc.sorular?.length > 0 && (
+                    <div className="space-y-2 max-h-80 overflow-y-auto">{aiSonuc.sorular.map((s, i) => {
+                      const taksRenk = {"bilgi":"bg-blue-100 text-blue-700","kavrama":"bg-green-100 text-green-700","uygulama":"bg-yellow-100 text-yellow-700","analiz":"bg-orange-100 text-orange-700","sentez":"bg-red-100 text-red-700","degerlendirme":"bg-purple-100 text-purple-700"};
+                      return (
+                        <div key={i} className="bg-white rounded-lg p-3 border shadow-sm">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-medium">{i+1}. {s.soru}</span>
+                          </div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${taksRenk[s.taksonomi] || 'bg-gray-100'}`}>{s.taksonomi}</span>
+                            <span className="text-[9px] text-gray-400">Bölüm {s.bolum}</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-1">{(s.secenekler || []).map((sec, j) => (
+                            <div key={j} className={`text-[10px] px-2 py-0.5 rounded ${j === s.dogru_cevap ? 'bg-green-100 text-green-700 font-bold' : 'text-gray-500'}`}>{["A","B","C","D"][j]}) {sec}</div>
+                          ))}</div>
+                        </div>
+                      );
+                    })}</div>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -6488,6 +6665,8 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                     </div>)}
                     <div className="text-right">
                       <span className={`text-[10px] px-2 py-0.5 rounded-full ${y.durum === 'tamamlandi' ? 'bg-green-100 text-green-700' : y.durum === 'hata' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{y.durum === 'tamamlandi' ? '✅ Tamamlandı' : y.durum === 'hata' ? '❌ Hata' : '⏳ Bekliyor'}</span>
+                    {y.durum === 'tamamlandi' && <button onClick={() => sonucGoruntule(y.id)} className="text-[9px] text-cyan-600 hover:underline mt-0.5">Sonuçları Gör →</button>}
+                    {y.durum === 'yuklendi' && <button onClick={async () => { try { toast({ title: "🧠 AI işleme başlatılıyor..." }); await axios.post(`${API}/ai/bilgi-tabani/isle/${y.id}`); toast({ title: "✅ İşleme tamamlandı!" }); const r2 = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setAiYuklemeler(Array.isArray(r2.data)?r2.data:[]); } catch(e) { toast({ title: "İşleme hatası", variant: "destructive" }); } }} className="text-[9px] text-orange-600 hover:underline mt-0.5">AI ile İşle →</button>}
                       {!y.onayli && <div className="text-[9px] text-yellow-600 mt-0.5">Onay bekliyor</div>}
                     </div>
                   </div>
