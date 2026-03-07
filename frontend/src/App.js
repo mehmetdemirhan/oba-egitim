@@ -6001,18 +6001,22 @@ function AiMerkezi({ user }) {
       try { const r = await axios.get(`${API}/ai/sorular`); setSorular(Array.isArray(r.data) ? r.data : []); } catch(e) {}
       try { const r = await axios.get(`${API}/ai/socratic-log`); setSocraticListesi(Array.isArray(r.data) ? r.data : []); } catch(e) {}
 
-      // DNA listesi — her öğrenci için
+      // DNA listesi — her öğrenci için (koçluktan bağımsız)
       try {
         const students = await axios.get(`${API}/students`);
         const slist = Array.isArray(students.data) ? students.data : [];
         const dnaArr = [];
         const kocArr = [];
-        for (const s of slist.slice(0, 30)) {
+        // DNA: paralel çek, hızlı
+        await Promise.allSettled(slist.slice(0, 30).map(async (s) => {
           try { const dr = await axios.get(`${API}/ai/dna/${s.id}`); dnaArr.push({...dr.data, ad: s.ad, soyad: s.soyad}); } catch(e) {}
+        }));
+        setDnaListesi([...dnaArr]);
+        // Koçluk: API key gerektirir, ayrı try-catch
+        await Promise.allSettled(slist.slice(0, 10).map(async (s) => {
           try { const kr = await axios.post(`${API}/ai/kocluk/${s.id}`); kocArr.push({...kr.data, ad: s.ad, soyad: s.soyad}); } catch(e) {}
-        }
-        setDnaListesi(dnaArr);
-        setKoclukListesi(kocArr);
+        }));
+        setKoclukListesi([...kocArr]);
       } catch(e) {}
     };
     f();
@@ -6047,7 +6051,7 @@ function AiMerkezi({ user }) {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="bg-gradient-to-br from-cyan-500 to-blue-600 rounded-2xl p-4 text-white"><div className="text-3xl font-bold">{istatistik?.toplam_yukleme || yuklemeler.length}</div><div className="text-xs opacity-80">📁 Toplam Yükleme</div></div>
           <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl p-4 text-white"><div className="text-3xl font-bold">{istatistik?.toplam_kelime || 0}</div><div className="text-xs opacity-80">📚 Toplam Kelime</div></div>
-          <div className="bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl p-4 text-white"><div className="text-3xl font-bold">{istatistik?.toplam_soru || 0}</div><div className="text-xs opacity-80">📝 AI Sorusu</div></div>
+          <div className="bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl p-4 text-white"><div className="text-3xl font-bold">{istatistik?.toplam_ai_soru ?? sorular.length ?? 0}</div><div className="text-xs opacity-80">📝 AI Sorusu</div></div>
           <div className="bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl p-4 text-white"><div className="text-3xl font-bold">{dnaListesi.length}</div><div className="text-xs opacity-80">🧬 DNA Profili</div></div>
         </div>
         {maliyet && (
