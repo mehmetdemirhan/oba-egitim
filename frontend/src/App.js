@@ -5849,6 +5849,11 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
   const [yukleForm, setYukleForm] = useState({ sinif: "3", tur: "ders_kitabi", kitap_adi: "", yazar: "", temalar: "" });
   const [aiBilgiYukleniyor, setAiBilgiYukleniyor] = useState(false);
   const dosyaRef = React.useRef(null);
+  // AI işleme state'leri
+  const [aiIlerleme, setAiIlerleme] = useState(0);
+  const [aiIslemDurum, setAiIslemDurum] = useState("");
+  const [aiSonuc, setAiSonuc] = useState(null);
+  const [aiSonucSekme, setAiSonucSekme] = useState("kelimeler");
   const [adminForm, setAdminForm] = useState({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [], makale_link: "", makale_dosya_turu: "link", kitap_yazar: "", kitap_isbn: "", kitap_yayinevi: "", kitap_sayfa: "", kitap_yas_grubu: "", kitap_link: "", kitap_kapak: "" });
   const [kitapYukleniyor, setKitapYukleniyor] = useState(false);
   const [yeniSoru, setYeniSoru] = useState({ soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0, taksonomi: "kavrama" });
@@ -6374,11 +6379,6 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
       {/* Görevler alt sekmesi */}
       {/* AI Bilgi Tabanı — PDF/Word yükleme */}
       {gelisimSekme === 'ai-bilgi' && (() => {
-
-        const [aiIlerleme, setAiIlerleme] = React.useState(0);
-        const [aiIslemDurum, setAiIslemDurum] = React.useState("");
-        const [aiSonuc, setAiSonuc] = React.useState(null);
-        const [aiSonucSekme, setAiSonucSekme] = React.useState("kelimeler");
 
         const dosyaYukle = async () => {
           const urlMod = yukleForm._mod === "url";
