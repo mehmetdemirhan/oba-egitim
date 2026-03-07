@@ -6808,6 +6808,13 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                   } catch(e) {}
                 }, 2000);
                 const isleR = await axios.post(`${API}/ai/bilgi-tabani/isle/${yukId}`, {}, { timeout: 300000 });
+                clearInterval(ilerlemeTakip);
+                setAiIlerleme(100); setAiIslemDurum("✅ Tamamlandı!");
+                setAiSonuc(isleR.data);
+                const mockUyariUrl = isleR.data.mock ? " (Demo mod — API key olmadan)" : "";
+                toast({ title: `🎉 AI öğrendi!${mockUyariUrl} ${isleR.data.cikarilan_kelime || 0} kelime, ${isleR.data.okuma_parcasi || 0} parça, ${isleR.data.uretilen_soru || 0} soru` });
+              }
+              setYukleForm({ sinif: "3", tur: "ders_kitabi", kitap_adi: "", yazar: "", temalar: "", _mod: "url", _url: "" });
               try { const r2 = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setAiYuklemeler(Array.isArray(r2.data) ? r2.data : []); } catch(e) {}
               try { const r3 = await axios.get(`${API}/ai/bilgi-tabani/puanlarim`); setAiPuanlar(r3.data); } catch(e) {}
               try { const r4 = await axios.get(`${API}/ai/bilgi-tabani/istatistik`); setAiStat(r4.data); } catch(e) {}
