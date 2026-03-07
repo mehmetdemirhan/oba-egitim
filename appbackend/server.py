@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Body
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Body, UploadFile, File, Form
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
@@ -1379,6 +1379,9 @@ VARSAYILAN_PUANLAR = {
     "metin_havuza_girme": 10,
     "icerik_ekleme": 5,
     "icerik_oylama": 2,
+    "ai_kitap_yukleme": 25,
+    "ai_ders_kitabi_yukleme": 40,
+    "ai_kitap_onaylandi": 15,
 }
 
 async def get_puan_ayarlari():
@@ -3150,6 +3153,11 @@ OGRETMEN_ROZETLERI_DEFAULT = [
     {"kod": "kopru_kurucu", "ad": "Köprü Kurucu", "ikon": "🌉", "kategori": "iletisim", "seviye": "altin", "puan": 15},
     {"kod": "egz_ilk", "ad": "İlk Egzersiz", "ikon": "👁️", "kategori": "egzersiz", "seviye": "bronz", "puan": 2},
     {"kod": "egz_tamset", "ad": "Tam Set", "ikon": "🎖️", "kategori": "egzersiz", "seviye": "altin", "puan": 20},
+    # AI Eğitim Katkısı
+    {"kod": "ai_ilk", "ad": "AI Eğitimcisi", "ikon": "🧠", "kategori": "ai_egitim", "seviye": "bronz", "puan": 5},
+    {"kod": "ai_5", "ad": "Veri Kaşifi", "ikon": "📊", "kategori": "ai_egitim", "seviye": "gumus", "puan": 15},
+    {"kod": "ai_20", "ad": "AI Ustası", "ikon": "🤖", "kategori": "ai_egitim", "seviye": "altin", "puan": 30},
+    {"kod": "ai_50", "ad": "Bilgi Mimarı", "ikon": "🏗️", "kategori": "ai_egitim", "seviye": "elmas", "puan": 75},
 ]
 
 OGRENCI_ROZETLERI_DEFAULT = [
@@ -3722,6 +3730,179 @@ async def veli_anketleri(veli_id: str, current_user=Depends(get_current_user)):
 
 # kur/atla endpoint'ini güncelle — kur_atlamalari collection'ına da kaydet
 _original_kur_atla = None  # placeholder
+
+
+# ─────────────────────────────────────────────
+# AI BİLGİ TABANI — PDF/DOCX Yükleme + AI Öğrenme + Puan Sistemi
+# ─────────────────────────────────────────────
+
+AI_EGITIM_PUANLARI = {
+    "pdf_yukle": 20,
+    "docx_yukle": 20,
+    "onaylandi": 10,       # admin onayı sonrası ek puan
+    "kelime_zengin": 5,    # 50+ kelime çıkarılan yükleme bonusu
+    "soru_zengin": 5,      # 20+ soru çıkarılan yükleme bonusu
+}
+
+DESTEKLENEN_FORMATLAR = [".pdf", ".docx", ".doc"]
+
+
+@api_router.post("/ai/bilgi-tabani/yukle")
+async def ai_bilgi_tabani_yukle(
+    dosya: UploadFile = File(...),
+    sinif: int = Form(...),
+    tur: str = Form("ders_kitabi"),
+    kitap_adi: str = Form(""),
+    yazar: str = Form(""),
+    temalar: str = Form(""),
+    current_user=Depends(get_current_user)
+):
+    import os
+    ext = os.path.splitext(dosya.filename)[1].lower()
+    if ext not in DESTEKLENEN_FORMATLAR:
+        raise HTTPException(status_code=400, detail=f"Desteklenmeyen format: {ext}. Desteklenen: {', '.join(DESTEKLENEN_FORMATLAR)}")
+
+    icerik = await dosya.read()
+    if len(icerik) > 50 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Dosya 50 MB'den büyük olamaz")
+
+    # Günlük limit kontrolü
+    bugun = datetime.utcnow().strftime("%Y-%m-%d")
+    bugun_yukleme = await db.ai_yuklemeler.count_documents({
+        "yukleyen_id": current_user["id"],
+        "tarih": {"$regex": f"^{bugun}"}
+    })
+    limit = 10 if current_user.get("role") in ["admin", "coordinator"] else 3
+    if bugun_yukleme >= limit:
+        raise HTTPException(status_code=429, detail=f"Günlük yükleme limitine ulaştınız ({limit})")
+
+    import base64
+    dosya_b64 = base64.b64encode(icerik).decode("utf-8")
+
+    yukleme = {
+        "id": str(uuid.uuid4()),
+        "dosya_adi": dosya.filename,
+        "dosya_boyut": len(icerik),
+        "dosya_format": ext,
+        "dosya_b64": dosya_b64,
+        "sinif": sinif,
+        "tur": tur,
+        "kitap_adi": kitap_adi or dosya.filename.replace(ext, ""),
+        "yazar": yazar,
+        "temalar": [t.strip() for t in temalar.split(",") if t.strip()] if temalar else [],
+        "yukleyen_id": current_user["id"],
+        "yukleyen_ad": f"{current_user.get('ad', '')} {current_user.get('soyad', '')}".strip(),
+        "yukleyen_rol": current_user.get("role", ""),
+        "durum": "yuklendi",  # yuklendi → isleniyor → tamamlandi / hata
+        "onayli": current_user.get("role") in ["admin", "coordinator"],
+        "sonuc": {},
+        "versiyon": 1,
+        "tarih": datetime.utcnow().isoformat(),
+    }
+    await db.ai_yuklemeler.insert_one(yukleme)
+
+    # Puan ver
+    puan = AI_EGITIM_PUANLARI.get(f"{ext.replace('.', '')}_yukle", 20)
+    await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": puan}})
+
+    # Puan log
+    await db.ai_egitim_puanlari.insert_one({
+        "id": str(uuid.uuid4()),
+        "kullanici_id": current_user["id"],
+        "eylem": "dosya_yukle",
+        "dosya_adi": dosya.filename,
+        "sinif": sinif,
+        "puan": puan,
+        "tarih": datetime.utcnow().isoformat(),
+    })
+
+    yukleme.pop("_id", None)
+    yukleme.pop("dosya_b64", None)
+    return {"yukleme": yukleme, "puan_kazanilan": puan, "mesaj": f"✅ +{puan} puan! Dosya yüklendi, işlenmeyi bekliyor."}
+
+
+@api_router.get("/ai/bilgi-tabani/gecmis")
+async def ai_bilgi_tabani_gecmis(current_user=Depends(get_current_user)):
+    filtre = {}
+    if current_user.get("role") not in ["admin", "coordinator"]:
+        filtre["yukleyen_id"] = current_user["id"]
+    items = await db.ai_yuklemeler.find(filtre, {"dosya_b64": 0}).sort("tarih", -1).to_list(length=200)
+    for i in items:
+        i.pop("_id", None)
+    return items
+
+
+@api_router.get("/ai/bilgi-tabani/istatistik")
+async def ai_bilgi_tabani_istatistik(current_user=Depends(get_current_user)):
+    toplam_yukleme = await db.ai_yuklemeler.count_documents({})
+    tamamlanan = await db.ai_yuklemeler.count_documents({"durum": "tamamlandi"})
+    bekleyen = await db.ai_yuklemeler.count_documents({"onayli": False})
+    toplam_kelime = await db.meb_kelime_haritasi.count_documents({})
+    toplam_soru = await db.kitap_sorulari.count_documents({"kaynak": "ai_egitim"})
+
+    sinif_dagilim = {}
+    for s in range(1, 9):
+        sinif_dagilim[str(s)] = {
+            "yukleme": await db.ai_yuklemeler.count_documents({"sinif": s}),
+            "kelime": await db.meb_kelime_haritasi.count_documents({"sinif": s}),
+        }
+
+    # En çok katkı yapan öğretmenler
+    pipeline = [
+        {"$group": {"_id": "$kullanici_id", "toplam_puan": {"$sum": "$puan"}, "yukleme_sayisi": {"$sum": 1}}},
+        {"$sort": {"toplam_puan": -1}},
+        {"$limit": 10}
+    ]
+    top_contributors = []
+    async for doc in db.ai_egitim_puanlari.aggregate(pipeline):
+        user = await db.users.find_one({"id": doc["_id"]})
+        if user:
+            top_contributors.append({
+                "ad": f"{user.get('ad', '')} {user.get('soyad', '')}".strip(),
+                "puan": doc["toplam_puan"],
+                "yukleme": doc["yukleme_sayisi"],
+            })
+
+    return {
+        "toplam_yukleme": toplam_yukleme,
+        "tamamlanan": tamamlanan,
+        "bekleyen_onay": bekleyen,
+        "toplam_kelime": toplam_kelime,
+        "toplam_ai_soru": toplam_soru,
+        "sinif_dagilim": sinif_dagilim,
+        "top_contributors": top_contributors,
+    }
+
+
+@api_router.put("/ai/bilgi-tabani/onayla/{yukleme_id}")
+async def ai_bilgi_tabani_onayla(yukleme_id: str, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+    yukleme = await db.ai_yuklemeler.find_one({"id": yukleme_id})
+    if not yukleme:
+        raise HTTPException(status_code=404, detail="Yükleme bulunamadı")
+    await db.ai_yuklemeler.update_one({"id": yukleme_id}, {"$set": {"onayli": True}})
+    # Onay bonusu
+    await db.users.update_one({"id": yukleme["yukleyen_id"]}, {"$inc": {"puan": AI_EGITIM_PUANLARI["onaylandi"]}})
+    await db.ai_egitim_puanlari.insert_one({
+        "id": str(uuid.uuid4()), "kullanici_id": yukleme["yukleyen_id"],
+        "eylem": "onay_bonusu", "puan": AI_EGITIM_PUANLARI["onaylandi"],
+        "tarih": datetime.utcnow().isoformat(),
+    })
+    return {"ok": True, "mesaj": "Onaylandı, yükleyene +10 bonus puan verildi"}
+
+
+@api_router.delete("/ai/bilgi-tabani/{yukleme_id}")
+async def ai_bilgi_tabani_sil(yukleme_id: str, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+    await db.ai_yuklemeler.delete_one({"id": yukleme_id})
+    return {"ok": True}
+
+
+@api_router.get("/ai/bilgi-tabani/puanlarim")
+async def ai_egitim_puanlarim(current_user=Depends(get_current_user)):
+    puanlar = await db.ai_egitim_puanlari.find({"kullanici_id": current_user["id"]}).sort("tarih", -1).to_list(length=100)
+    for p in puanlar:
+        p.pop("_id", None)
+    toplam = sum(p.get("puan", 0) for p in puanlar)
+    return {"toplam": toplam, "detay": puanlar}
 
 
 # ─────────────────────────────────────────────
