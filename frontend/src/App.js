@@ -366,6 +366,7 @@ function AppContent() {
             <TabsTrigger value="giris-analizi" className={tabClass}><Stethoscope className="h-4 w-4 mr-2" />Giriş Analizi</TabsTrigger>
             <TabsTrigger value="mesajlar" className={tabClass}><Mail className="h-4 w-4 mr-2" />Mesajlar</TabsTrigger>
             {user.role === "admin" && <TabsTrigger value="ayarlar" className={tabClass}><Star className="h-4 w-4 mr-2" />Ayarlar</TabsTrigger>}
+            <TabsTrigger value="ai-merkezi" className={tabClass}>🧠 AI Merkezi</TabsTrigger>
           </TabsList>
 
           {/* Dashboard */}
@@ -1159,6 +1160,11 @@ function AppContent() {
               <SistemAyarlari user={user} />
             </TabsContent>
           )}
+
+          {/* ═══ AI MERKEZİ ═══ */}
+          <TabsContent value="ai-merkezi">
+            <AiMerkezi user={user} />
+          </TabsContent>
 
         </Tabs>
 
@@ -5963,6 +5969,219 @@ function GorevYonetimi({ user, students, teachers }) {
             </div>
           </div></CardContent></Card>))}
       </div>)}
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════
+// AI MERKEZİ — Admin AI Dashboard
+// ═══════════════════════════════════════════
+function AiMerkezi({ user }) {
+  const { toast } = useToast();
+  const [aiSekme, setAiSekme] = useState("genel");
+  const [maliyet, setMaliyet] = useState(null);
+  const [yuklemeler, setYuklemeler] = useState([]);
+  const [kelimeler, setKelimeler] = useState([]);
+  const [parcalar, setParcalar] = useState([]);
+  const [sorular, setSorular] = useState([]);
+  const [dnaListesi, setDnaListesi] = useState([]);
+  const [koclukListesi, setKoclukListesi] = useState([]);
+  const [socraticListesi, setSocraticListesi] = useState([]);
+  const [kelimeTekrar, setKelimeTekrar] = useState([]);
+  const [istatistik, setIstatistik] = useState(null);
+
+  useEffect(() => {
+    const f = async () => {
+      try { const r = await axios.get(`${API}/ai/maliyet-ozet`); setMaliyet(r.data); } catch(e) {}
+      try { const r = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setYuklemeler(Array.isArray(r.data) ? r.data : []); } catch(e) {}
+      try { const r = await axios.get(`${API}/ai/bilgi-tabani/istatistik`); setIstatistik(r.data); } catch(e) {}
+
+      // DNA listesi
+      try {
+        const students = await axios.get(`${API}/students`);
+        const slist = Array.isArray(students.data) ? students.data : [];
+        const dnaArr = [];
+        for (const s of slist.slice(0, 20)) {
+          try { const dr = await axios.get(`${API}/ai/dna/${s.id}`); dnaArr.push({...dr.data, ad: s.ad, soyad: s.soyad}); } catch(e) {}
+        }
+        setDnaListesi(dnaArr);
+      } catch(e) {}
+
+      // Kelimeler
+      try {
+        const r = await axios.get(`${API}/ai/bilgi-tabani/istatistik`);
+        // kelime listesi ayrı endpoint yok, istatistikten çekiyoruz
+      } catch(e) {}
+
+      // Koçluk cache
+      try {
+        const students = await axios.get(`${API}/students`);
+        const slist = Array.isArray(students.data) ? students.data : [];
+        const kocArr = [];
+        for (const s of slist.slice(0, 10)) {
+          try { const kr = await axios.post(`${API}/ai/kocluk/${s.id}`); kocArr.push({...kr.data, ad: s.ad, soyad: s.soyad}); } catch(e) {}
+        }
+        setKoclukListesi(kocArr);
+      } catch(e) {}
+    };
+    f();
+  }, [user]);
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold flex items-center gap-2">🧠 AI Merkezi</h2>
+
+      {/* Sekme butonları */}
+      <div className="flex gap-1 flex-wrap">
+        {[["genel","📊 Genel"],["dna","🧬 DNA Profilleri"],["kocluk","🤖 Koçluk"],["kelimeler","📚 Kelime Haritası"],["yuklemeler","📁 Yüklemeler"],["socratic","💬 Socratic"],["maliyet","💰 Maliyet"]].map(([k,l]) => (
+          <button key={k} onClick={() => setAiSekme(k)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${aiSekme === k ? 'bg-cyan-600 text-white shadow' : 'bg-white text-gray-600 border hover:bg-gray-50'}`}>{l}</button>
+        ))}
+      </div>
+
+      {/* GENEL */}
+      {aiSekme === "genel" && (<>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="bg-gradient-to-br from-cyan-500 to-blue-600 rounded-2xl p-4 text-white"><div className="text-3xl font-bold">{istatistik?.toplam_yukleme || yuklemeler.length}</div><div className="text-xs opacity-80">📁 Toplam Yükleme</div></div>
+          <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl p-4 text-white"><div className="text-3xl font-bold">{istatistik?.toplam_kelime || 0}</div><div className="text-xs opacity-80">📚 Toplam Kelime</div></div>
+          <div className="bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl p-4 text-white"><div className="text-3xl font-bold">{istatistik?.toplam_soru || 0}</div><div className="text-xs opacity-80">📝 AI Sorusu</div></div>
+          <div className="bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl p-4 text-white"><div className="text-3xl font-bold">{dnaListesi.length}</div><div className="text-xs opacity-80">🧬 DNA Profili</div></div>
+        </div>
+        {maliyet && (
+          <div className="bg-white rounded-2xl p-4 border shadow-sm">
+            <h3 className="font-bold text-sm mb-3">💰 AI Maliyet Özeti</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div><div className="text-xs text-gray-500">Bugün</div><div className="text-lg font-bold text-cyan-600">{maliyet.gunluk?.istek || 0} istek</div><div className="text-sm text-gray-600">${maliyet.gunluk?.maliyet_usd?.toFixed(4) || "0.00"}</div></div>
+              <div><div className="text-xs text-gray-500">Bu Ay</div><div className="text-lg font-bold text-blue-600">{maliyet.aylik?.istek || 0} istek</div><div className="text-sm text-gray-600">${maliyet.aylik?.maliyet_usd?.toFixed(4) || "0.00"}</div></div>
+            </div>
+          </div>
+        )}
+        {/* Son yüklemeler */}
+        <div className="bg-white rounded-2xl p-4 border shadow-sm">
+          <h3 className="font-bold text-sm mb-3">📁 Son Yüklemeler</h3>
+          <div className="space-y-2">{yuklemeler.slice(0, 5).map(y => (
+            <div key={y.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+              <div><div className="text-sm font-medium">{y.dosya_format === ".pdf" ? "📕" : "📘"} {y.kitap_adi}</div><div className="text-[10px] text-gray-400">{y.yukleyen_ad} • {y.sinif}. sınıf • {new Date(y.tarih).toLocaleDateString('tr-TR')}</div></div>
+              <div className="text-right">
+                <span className={`text-[10px] px-2 py-0.5 rounded-full ${y.durum === 'tamamlandi' ? 'bg-green-100 text-green-700' : y.durum === 'hata' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{y.durum === 'tamamlandi' ? '✅' : y.durum === 'hata' ? '❌' : '⏳'} {y.durum}</span>
+                {y.sonuc?.cikarilan_kelime > 0 && <div className="text-[9px] text-gray-400 mt-0.5">{y.sonuc.cikarilan_kelime} kelime • {y.sonuc.uretilen_soru} soru</div>}
+              </div>
+            </div>
+          ))}</div>
+        </div>
+      </>)}
+
+      {/* DNA PROFİLLERİ */}
+      {aiSekme === "dna" && (<>
+        <h3 className="font-bold text-sm">🧬 Tüm Öğrenci DNA Profilleri ({dnaListesi.length})</h3>
+        <div className="space-y-3">{dnaListesi.map(d => {
+          const b = d.boyutlar || {};
+          const renk = (v) => v >= 70 ? "bg-green-500" : v >= 40 ? "bg-yellow-500" : "bg-red-500";
+          return (
+            <div key={d.ogrenci_id} className="bg-white rounded-2xl p-4 border shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2"><span className="font-bold text-sm">{d.ad} {d.soyad}</span><span className="text-xs bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded-full">{d.profil_label}</span></div>
+                <span className="text-xs text-gray-400">{d.sinif}. sınıf</span>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                {[["Kelime", b.kelime_gucu, "📚"],["Akıcılık", b.akicilik, "⚡"],["Anlama", b.anlama_derinligi, "🧠"],["Dikkat", b.dikkat_suresi, "🎯"],["Zorluk", b.zorluk_toleransi, "💪"],["Psikoloji", null, "🔮"]].map(([ad, val, ikon]) => (
+                  <div key={ad} className="flex items-center gap-1.5">
+                    <span className="text-xs">{ikon}</span>
+                    <span className="text-[10px] text-gray-500 w-14">{ad}</span>
+                    {val !== null ? (<><div className="flex-1 bg-gray-100 rounded-full h-2"><div className={`h-2 rounded-full ${renk(val)}`} style={{width:`${val}%`}} /></div><span className="text-[10px] font-bold w-6 text-right">{val}</span></>) : (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${b.okuma_psikolojisi === 'keşifçi' ? 'bg-green-100 text-green-700' : b.okuma_psikolojisi === 'kararsız' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>{b.okuma_psikolojisi || "—"}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}</div>
+        {dnaListesi.length === 0 && <div className="text-center py-8 text-gray-500">DNA profili henüz oluşturulmamış</div>}
+      </>)}
+
+      {/* KOÇLUK */}
+      {aiSekme === "kocluk" && (<>
+        <h3 className="font-bold text-sm">🤖 AI Koçluk Raporları ({koclukListesi.length})</h3>
+        <div className="space-y-3">{koclukListesi.map(k => {
+          const a = k.ai_analiz || {};
+          return (
+            <div key={k.ogrenci_id} className="bg-white rounded-2xl p-4 border shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-bold text-sm">{k.ad} {k.soyad}</span>
+                <span className="text-[10px] text-gray-400">{new Date(k.tarih).toLocaleDateString('tr-TR')}</span>
+              </div>
+              {a.durum_degerlendirmesi && (<div className="mb-2">
+                <div className="text-xs text-green-600 mb-1">✅ Güçlü: {(a.durum_degerlendirmesi.guclu_yonler || []).join(", ")}</div>
+                <div className="text-xs text-orange-600">📈 Gelişim: {(a.durum_degerlendirmesi.gelisim_alanlari || []).join(", ")}</div>
+              </div>)}
+              {a.risk_analizi && <div className={`text-xs px-2 py-1 rounded-lg mb-2 ${a.risk_analizi.seviye === 'yüksek' ? 'bg-red-50 text-red-700' : a.risk_analizi.seviye === 'orta' ? 'bg-yellow-50 text-yellow-700' : 'bg-green-50 text-green-700'}`}>🚨 Risk: {a.risk_analizi.seviye} — {a.risk_analizi.aciliyet}</div>}
+              {a.kitap_tavsiyeleri && <div className="text-xs text-gray-600">📚 Tavsiyeler: {a.kitap_tavsiyeleri.map(t => t.ad).join(", ")}</div>}
+              {a.motivasyon_mesaji && <div className="text-xs text-cyan-600 mt-1 italic">💬 {a.motivasyon_mesaji}</div>}
+            </div>
+          );
+        })}</div>
+        {koclukListesi.length === 0 && <div className="text-center py-8 text-gray-500">Koçluk raporu henüz oluşturulmamış</div>}
+      </>)}
+
+      {/* KELİME HARİTASI */}
+      {aiSekme === "kelimeler" && (<>
+        <h3 className="font-bold text-sm">📚 MEB Kelime Haritası</h3>
+        {istatistik?.sinif_dagilimi && (
+          <div className="grid grid-cols-4 gap-2">{Object.entries(istatistik.sinif_dagilimi).map(([s, c]) => (
+            <div key={s} className="bg-white rounded-xl p-3 border text-center"><div className="text-lg font-bold text-cyan-600">{c}</div><div className="text-[10px] text-gray-500">{s}. Sınıf</div></div>
+          ))}</div>
+        )}
+        {istatistik?.top_contributors && (
+          <div className="bg-white rounded-2xl p-4 border shadow-sm">
+            <h4 className="font-medium text-sm mb-2">🏆 En Çok Katkı Yapanlar</h4>
+            <div className="space-y-1">{istatistik.top_contributors.map((t, i) => (
+              <div key={i} className="flex items-center justify-between text-sm"><span>{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i+1}.`} {t.ad}</span><span className="text-xs text-gray-500">{t.yukleme} dosya • {t.puan} puan</span></div>
+            ))}</div>
+          </div>
+        )}
+      </>)}
+
+      {/* YÜKLEMELER */}
+      {aiSekme === "yuklemeler" && (<>
+        <h3 className="font-bold text-sm">📁 Tüm Yüklemeler ({yuklemeler.length})</h3>
+        <div className="space-y-2">{yuklemeler.map(y => (
+          <div key={y.id} className="bg-white rounded-xl p-3 border shadow-sm">
+            <div className="flex items-center justify-between">
+              <div><div className="text-sm font-medium">{y.dosya_format === ".pdf" ? "📕" : "📘"} {y.kitap_adi}</div><div className="text-[10px] text-gray-400">{y.yukleyen_ad} • {y.sinif}. sınıf • {y.tur} • {(y.dosya_boyut/1024/1024).toFixed(1)} MB</div></div>
+              <div className="flex items-center gap-2">
+                <span className={`text-[10px] px-2 py-0.5 rounded-full ${y.durum === 'tamamlandi' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{y.durum}</span>
+                {!y.onayli && y.durum !== 'hata' && <button onClick={async () => { try { await axios.put(`${API}/ai/bilgi-tabani/onayla/${y.id}`); toast({ title: "✅ Onaylandı!" }); const r = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setYuklemeler(Array.isArray(r.data)?r.data:[]); } catch(e) {} }} className="text-xs bg-green-600 text-white px-2 py-1 rounded">Onayla</button>}
+              </div>
+            </div>
+            {y.sonuc && y.sonuc.cikarilan_kelime > 0 && <div className="flex gap-3 mt-1 text-[10px] text-gray-500"><span>📚 {y.sonuc.cikarilan_kelime} kelime</span><span>📖 {y.sonuc.okuma_parcasi} parça</span><span>📝 {y.sonuc.uretilen_soru} soru</span></div>}
+          </div>
+        ))}</div>
+      </>)}
+
+      {/* SOCRATIC */}
+      {aiSekme === "socratic" && (<>
+        <h3 className="font-bold text-sm">💬 Socratic Reading Geçmişi</h3>
+        <p className="text-xs text-gray-500">Öğrencilerin okuma sonrası AI sorularına verdikleri cevaplar</p>
+        <div className="text-center py-8 text-gray-400">Veriler öğrenciler okuma kaydettikçe burada görünecek</div>
+      </>)}
+
+      {/* MALİYET */}
+      {aiSekme === "maliyet" && (<>
+        <h3 className="font-bold text-sm">💰 AI Maliyet Detayı</h3>
+        {maliyet ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white rounded-2xl p-4 border shadow-sm"><div className="text-xs text-gray-500 mb-1">📅 Bugünkü Harcama</div><div className="text-2xl font-bold text-cyan-600">${maliyet.gunluk?.maliyet_usd?.toFixed(4) || "0.00"}</div><div className="text-sm text-gray-600">{maliyet.gunluk?.istek || 0} API isteği</div></div>
+              <div className="bg-white rounded-2xl p-4 border shadow-sm"><div className="text-xs text-gray-500 mb-1">📆 Bu Ay</div><div className="text-2xl font-bold text-blue-600">${maliyet.aylik?.maliyet_usd?.toFixed(4) || "0.00"}</div><div className="text-sm text-gray-600">{maliyet.aylik?.istek || 0} API isteği</div></div>
+            </div>
+            <div className="bg-white rounded-2xl p-4 border shadow-sm">
+              <div className="text-xs text-gray-500 mb-2">Günlük Limit</div>
+              <div className="flex items-center gap-2"><div className="flex-1 bg-gray-100 rounded-full h-3"><div className="h-3 bg-cyan-500 rounded-full" style={{width:`${Math.min(100, (maliyet.gunluk?.istek||0)/maliyet.gunluk_limit*100)}%`}} /></div><span className="text-sm font-bold">{maliyet.gunluk?.istek || 0}/{maliyet.gunluk_limit}</span></div>
+            </div>
+          </div>
+        ) : <div className="text-center py-8 text-gray-400">Maliyet verisi yükleniyor...</div>}
+      </>)}
     </div>
   );
 }
