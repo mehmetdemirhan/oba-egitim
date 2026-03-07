@@ -4645,12 +4645,12 @@ function OgrenciPaneli({ user, logout }) {
   // Speech AI: metinler ve geçmiş
   useEffect(() => {
     const f = async () => {
-      const sinif = linkedStudent?.sinif || user?.sinif || 3;
+      const sinif = profil?.sinif || user?.sinif || 3;
       try { const r = await axios.get(`${API}/ai/speech/metinler?sinif=${sinif}`); setSpeechMetinler(r.data.metinler || []); } catch(e) {}
       try { const r = await axios.get(`${API}/ai/speech/gecmis/${ogrenciId}`); setSpeechGecmis(r.data || []); } catch(e) {}
     };
     f();
-  }, [ogrenciId, user?.sinif]);
+  }, [ogrenciId, profil?.sinif]);
   // Okuma sayacı
   useEffect(() => {
     if (okumaBasladi && !okumaDuraklatildi) {
@@ -4711,14 +4711,14 @@ function OgrenciPaneli({ user, logout }) {
       const fd = new FormData();
       fd.append("ses_dosyasi", blob, "ses.webm");
       fd.append("metin_id", seciliSpeechMetin?.id || "");
-      fd.append("ogrenci_id", linkedStudent?.id || user?.id || "");
+      fd.append("ogrenci_id", ogrenciId || "");
       fd.append("sure_sn", speechSure.toString());
-      fd.append("sinif", (linkedStudent?.sinif || user?.sinif || 3).toString());
+      fd.append("sinif", (profil?.sinif || user?.sinif || 3).toString());
       const r = await axios.post(`${API}/ai/speech/analiz`, fd, { headers: { "Content-Type": "multipart/form-data" }, timeout: 60000 });
       setSpeechSonuc(r.data);
       toast({ title: `🎤 Analiz tamam! ${r.data.genel_skor}/100 puan • +${r.data.xp_kazanildi} XP` });
       // Geçmişi yenile
-      try { const gr = await axios.get(`${API}/ai/speech/gecmis/${linkedStudent?.id || user?.id}`); setSpeechGecmis(gr.data); } catch(e) {}
+      try { const gr = await axios.get(`${API}/ai/speech/gecmis/${ogrenciId}`); setSpeechGecmis(gr.data); } catch(e) {}
     } catch(e) {
       toast({ title: "Analiz hatası. Lütfen tekrar dene.", variant: "destructive" });
     }
