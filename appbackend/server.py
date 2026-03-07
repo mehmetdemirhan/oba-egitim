@@ -4343,18 +4343,7 @@ async def ai_bilgi_tabani_yukle(
         raise HTTPException(status_code=400, detail=f"Desteklenmeyen format: {ext}. Desteklenen: {', '.join(DESTEKLENEN_FORMATLAR)}")
 
     icerik = await dosya.read()
-    if len(icerik) > 50 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="Dosya 50 MB'den büyük olamaz")
-
-    # Günlük limit kontrolü
-    bugun = datetime.utcnow().strftime("%Y-%m-%d")
-    bugun_yukleme = await db.ai_yuklemeler.count_documents({
-        "yukleyen_id": current_user["id"],
-        "tarih": {"$regex": f"^{bugun}"}
-    })
-    limit = 10 if current_user.get("role") in ["admin", "coordinator"] else 3
-    if bugun_yukleme >= limit:
-        raise HTTPException(status_code=429, detail=f"Günlük yükleme limitine ulaştınız ({limit})")
+    # Boyut ve günlük yükleme limiti kaldırıldı
 
     # ── DUPLICATE KONTROL ──
     import hashlib
@@ -4424,7 +4413,388 @@ async def ai_bilgi_tabani_yukle(
     return {"yukleme": yukleme, "puan_kazanilan": puan, "mesaj": mesaj}
 
 
-@api_router.get("/ai/bilgi-tabani/gecmis")
+@api_router.post("/ai/bilgi-tabani/yukle-url")
+async def ai_bilgi_tabani_yukle_url(payload: dict, current_user=Depends(get_current_user)):
+    """URL'den PDF/Word indir ve bilgi tabanına ekle."""
+    url = payload.get("url", "").strip()
+    sinif = payload.get("sinif", 3)
+    tur = payload.get("tur", "ders_kitabi")
+    kitap_adi = payload.get("kitap_adi", "")
+    yazar = payload.get("yazar", "")
+
+    if not url:
+        raise HTTPException(status_code=400, detail="URL boş olamaz")
+
+    # URL formatı kontrolü
+    if not url.startswith("http://") and not url.startswith("https://"):
+        raise HTTPException(status_code=400, detail="Geçerli bir URL girin (http:// veya https://)")
+
+    # Dosya uzantısı kontrolü
+    import os as os_mod
+    url_path = url.split("?")[0].split("#")[0]
+    ext = os_mod.path.splitext(url_path)[1].lower()
+    if ext not in [".pdf", ".docx", ".doc"]:
+        # Uzantı URL'de yoksa content-type'dan bakacağız
+        ext = ".pdf"  # varsayılan
+
+    # Günlük limit kontrolü
+    bugun = datetime.utcnow().strftime("%Y-%m-%d")
+    bugun_yukleme = await db.ai_yuklemeler.count_documents({
+        "yukleyen_id": current_user["id"],
+        "tarih": {"$regex": f"^{bugun}"}
+    })
+    limit = 10 if current_user.get("role") in ["admin", "coordinator"] else 3
+    if bugun_yukleme >= limit:
+        raise HTTPException(status_code=429, detail=f"Günlük yükleme limitine ulaştınız ({limit})")
+
+    # URL'den dosya indir
+    try:
+        async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client_http:
+            response = await client_http.get(url, headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            })
+            if response.status_code != 200:
+                raise HTTPException(status_code=400, detail=f"Dosya indirilemedi: HTTP {response.status_code}")
+
+            icerik = response.content
+            content_type = response.headers.get("content-type", "")
+
+            # Content-type'dan format belirle
+            if "pdf" in content_type:
+                ext = ".pdf"
+            elif "word" in content_type or "docx" in content_type:
+                ext = ".docx"
+            elif "msword" in content_type:
+                ext = ".doc"
+
+            if len(icerik) > 50 * 1024 * 1024:
+                raise HTTPException(status_code=400, detail="Dosya 50 MB'den büyük")
+            if len(icerik) < 1000:
+                raise HTTPException(status_code=400, detail="İndirilen dosya çok küçük veya boş. URL'yi kontrol edin.")
+
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=408, detail="Dosya indirme zaman aşımına uğradı (60sn). URL'yi kontrol edin.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Dosya indirme hatası: {str(e)[:200]}")
+
+    # Hash kontrolü
+    import hashlib
+    dosya_hash = hashlib.sha256(icerik).hexdigest()
+    mevcut = await db.ai_yuklemeler.find_one({"dosya_hash": dosya_hash})
+    if mevcut:
+        raise HTTPException(status_code=409, detail=f"Bu dosya daha önce yüklenmiş: '{mevcut.get('kitap_adi', '')}'")
+
+    # Dosya adını URL'den çıkar
+    dosya_adi = url.split("/")[-1].split("?")[0] or "indirilen_dosya" + ext
+    if not kitap_adi:
+        kitap_adi = dosya_adi.replace(ext, "").replace("_", " ").replace("-", " ").title()
+
+    import base64
+    dosya_b64 = base64.b64encode(icerik).decode("utf-8")
+
+    yukleme = {
+        "id": str(uuid.uuid4()),
+        "dosya_adi": dosya_adi,
+        "dosya_boyut": len(icerik),
+        "dosya_format": ext,
+        "dosya_hash": dosya_hash,
+        "dosya_b64": dosya_b64,
+        "kaynak_url": url,
+        "sinif": sinif,
+        "tur": tur,
+        "kitap_adi": kitap_adi,
+        "yazar": yazar,
+        "temalar": [],
+        "yukleyen_id": current_user["id"],
+        "yukleyen_ad": f"{current_user.get('ad', '')} {current_user.get('soyad', '')}".strip(),
+        "yukleyen_rol": current_user.get("role", ""),
+        "durum": "yuklendi",
+        "onayli": current_user.get("role") in ["admin", "coordinator"],
+        "guven_skoru": None,
+        "okuma_seviyesi": None,
+        "sonuc": {},
+        "versiyon": 1,
+        "tarih": datetime.utcnow().isoformat(),
+    }
+    await db.ai_yuklemeler.insert_one(yukleme)
+
+    # Puan ver
+    puan = AI_EGITIM_PUANLARI.get(f"{ext.replace('.', '')}_yukle", 20)
+    await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": puan}})
+    await db.ai_egitim_puanlari.insert_one({
+        "id": str(uuid.uuid4()),
+        "kullanici_id": current_user["id"],
+        "eylem": "url_yukle",
+        "dosya_adi": dosya_adi,
+        "sinif": sinif,
+        "puan": puan,
+        "tarih": datetime.utcnow().isoformat(),
+    })
+
+    yukleme.pop("_id", None)
+    yukleme.pop("dosya_b64", None)
+    return {
+        "yukleme": yukleme,
+        "puan_kazanilan": puan,
+        "mesaj": f"✅ +{puan} puan! '{kitap_adi}' URL'den indirildi ({len(icerik)//1024} KB).",
+        "boyut_kb": len(icerik) // 1024,
+    }
+
+
+@api_router.post("/ai/bilgi-tabani/isle/{yukleme_id}")
+async def ai_bilgi_tabani_isle(yukleme_id: str, current_user=Depends(get_current_user)):
+    """Yüklenen dosyayı AI ile işle: metin çıkar → kelimeler + okuma parçaları + sorular üret."""
+    yukleme = await db.ai_yuklemeler.find_one({"id": yukleme_id})
+    if not yukleme:
+        raise HTTPException(status_code=404, detail="Yükleme bulunamadı")
+    if not yukleme.get("dosya_b64"):
+        raise HTTPException(status_code=400, detail="Dosya verisi bulunamadı")
+
+    import base64
+    dosya_bytes = base64.b64decode(yukleme["dosya_b64"])
+    ext = yukleme.get("dosya_format", ".pdf")
+    sinif = yukleme.get("sinif", 3)
+    kitap_adi = yukleme.get("kitap_adi", "Bilinmeyen")
+
+    # ── AŞAMA 1: METİN ÇIKARMA ──
+    await db.ai_yuklemeler.update_one({"id": yukleme_id}, {"$set": {"durum": "metin_cikariliyor", "ilerleme": 10}})
+
+    ham_metin = ""
+    sayfa_sayisi = 0
+    try:
+        if ext == ".pdf":
+            import fitz  # PyMuPDF
+            doc = fitz.open(stream=dosya_bytes, filetype="pdf")
+            sayfa_sayisi = len(doc)
+            for page in doc:
+                ham_metin += page.get_text() + "\n"
+            doc.close()
+        elif ext in [".docx", ".doc"]:
+            try:
+                from docx import Document as DocxDocument
+                doc_file = io.BytesIO(dosya_bytes)
+                doc_obj = DocxDocument(doc_file)
+                for para in doc_obj.paragraphs:
+                    if para.text.strip():
+                        ham_metin += para.text + "\n"
+                sayfa_sayisi = max(1, len(ham_metin) // 2000)
+            except:
+                ham_metin = dosya_bytes.decode("utf-8", errors="ignore")
+                sayfa_sayisi = max(1, len(ham_metin) // 2000)
+    except Exception as e:
+        await db.ai_yuklemeler.update_one({"id": yukleme_id}, {"$set": {"durum": "hata", "sonuc": {"hata": f"Metin çıkarma hatası: {str(e)[:200]}"}}})
+        raise HTTPException(status_code=500, detail=f"Metin çıkarma hatası: {str(e)[:200]}")
+
+    if len(ham_metin.strip()) < 100:
+        await db.ai_yuklemeler.update_one({"id": yukleme_id}, {"$set": {"durum": "hata", "sonuc": {"hata": "Yeterli metin çıkarılamadı (min 100 karakter)"}}})
+        raise HTTPException(status_code=400, detail="Yeterli metin çıkarılamadı")
+
+    kelime_sayisi = len(ham_metin.split())
+    await db.ai_yuklemeler.update_one({"id": yukleme_id}, {"$set": {"durum": "ai_analiz", "ilerleme": 30, "sonuc": {"sayfa_sayisi": sayfa_sayisi, "kelime_sayisi": kelime_sayisi}}})
+
+    # ── AŞAMA 2: CHUNKING ──
+    chunk_boyut = {1:200, 2:300, 3:400, 4:500, 5:600, 6:700, 7:800, 8:900}.get(sinif, 500)
+    paragraflar = [p.strip() for p in ham_metin.split("\n") if len(p.strip()) > 30]
+    chunks = []
+    mevcut_chunk = ""
+    for p in paragraflar:
+        if len(mevcut_chunk.split()) + len(p.split()) > chunk_boyut:
+            if mevcut_chunk.strip():
+                chunks.append(mevcut_chunk.strip())
+            mevcut_chunk = p
+        else:
+            mevcut_chunk += "\n" + p
+    if mevcut_chunk.strip():
+        chunks.append(mevcut_chunk.strip())
+
+    if not chunks:
+        chunks = [ham_metin[:2000]]
+
+    # Max 10 chunk (maliyet kontrolü)
+    chunks = chunks[:10]
+
+    await db.ai_yuklemeler.update_one({"id": yukleme_id}, {"$set": {"ilerleme": 40, "sonuc.chunk_sayisi": len(chunks)}})
+
+    # ── AŞAMA 3: AI ANALİZİ (her chunk için) ──
+    tum_kelimeler = []
+    tum_parcalar = []
+    tum_sorular = []
+
+    for i, chunk in enumerate(chunks):
+        ilerleme = 40 + int((i / len(chunks)) * 40)
+        await db.ai_yuklemeler.update_one({"id": yukleme_id}, {"$set": {"ilerleme": ilerleme}})
+
+        ai_prompt = f"""Kitap: {kitap_adi}
+Sınıf: {sinif}. sınıf
+Bölüm {i+1}/{len(chunks)}
+
+METİN:
+{chunk[:2000]}
+
+Şu JSON'u üret:
+{{
+  "hedef_kelimeler": [
+    {{"kelime": "...", "anlam": "...", "ornek_cumle": "...", "zorluk": 1-10}}
+  ],
+  "okuma_parcasi": {{
+    "baslik": "Bu bölümün kısa başlığı",
+    "ozet": "2-3 cümle özet",
+    "tema": "MEB teması",
+    "kelime_sayisi": 0
+  }},
+  "sorular": [
+    {{"soru": "...", "secenekler": ["A","B","C","D"], "dogru_cevap": 0, "taksonomi": "bilgi"}}
+  ]
+}}
+
+Kurallar:
+- Hedef kelimeler: {sinif}. sınıf öğrencisinin ÖĞRENMESİ gereken 5-15 kelime
+- Her kelimeye çocuğun anlayacağı basit anlam ve örnek cümle yaz
+- Okuma parçası özeti çocuğun merak edeceği şekilde olsun
+- 3-5 soru üret (farklı Bloom basamaklarından)
+- SADECE JSON döndür"""
+
+        result = await call_claude(
+            "Sen MEB Türkçe müfredatını bilen bir dil eğitimcisisin. Çocuklara uygun kelime ve soru üretirsin.",
+            ai_prompt, model="sonnet", max_tokens=2000
+        )
+
+        if result.get("parsed"):
+            p = result["parsed"]
+            # Kelimeler
+            for k in p.get("hedef_kelimeler", []):
+                k["kaynak_kitap"] = kitap_adi
+                k["sinif"] = sinif
+                k["bolum"] = i + 1
+                tum_kelimeler.append(k)
+            # Okuma parçası
+            parca = p.get("okuma_parcasi", {})
+            if parca:
+                parca["kaynak_kitap"] = kitap_adi
+                parca["bolum"] = i + 1
+                parca["metin_kesit"] = chunk[:500]
+                tum_parcalar.append(parca)
+            # Sorular
+            for s in p.get("sorular", []):
+                s["kaynak_kitap"] = kitap_adi
+                s["sinif"] = sinif
+                s["bolum"] = i + 1
+                tum_sorular.append(s)
+
+    await db.ai_yuklemeler.update_one({"id": yukleme_id}, {"$set": {"ilerleme": 85}})
+
+    # ── AŞAMA 4: VERİTABANINA KAYDET ──
+    # Kelimeleri meb_kelime_haritasi'na ekle
+    eklenen_kelime = 0
+    for k in tum_kelimeler:
+        mevcut = await db.meb_kelime_haritasi.find_one({"kelime": k.get("kelime", "").lower(), "sinif": sinif})
+        if not mevcut:
+            await db.meb_kelime_haritasi.insert_one({
+                "id": str(uuid.uuid4()),
+                "sinif": sinif,
+                "kelime": k.get("kelime", "").lower(),
+                "anlam": k.get("anlam", ""),
+                "ornek_cumle": k.get("ornek_cumle", ""),
+                "zorluk": k.get("zorluk", 5),
+                "kaynak": kitap_adi,
+                "yukleyen_id": current_user["id"],
+                "tarih": datetime.utcnow().isoformat(),
+            })
+            eklenen_kelime += 1
+
+    # Okuma parçalarını kaydet
+    for p in tum_parcalar:
+        await db.ai_okuma_parcalari.insert_one({
+            "id": str(uuid.uuid4()),
+            "yukleme_id": yukleme_id,
+            "kitap_adi": kitap_adi,
+            "sinif": sinif,
+            "bolum": p.get("bolum", 0),
+            "baslik": p.get("baslik", ""),
+            "ozet": p.get("ozet", ""),
+            "tema": p.get("tema", ""),
+            "metin_kesit": p.get("metin_kesit", ""),
+            "kelime_sayisi": p.get("kelime_sayisi", 0),
+            "tarih": datetime.utcnow().isoformat(),
+        })
+
+    # Soruları kaydet
+    for s in tum_sorular:
+        await db.ai_uretilen_sorular.insert_one({
+            "id": str(uuid.uuid4()),
+            "yukleme_id": yukleme_id,
+            "kitap_adi": kitap_adi,
+            "sinif": sinif,
+            "bolum": s.get("bolum", 0),
+            "soru": s.get("soru", ""),
+            "secenekler": s.get("secenekler", []),
+            "dogru_cevap": s.get("dogru_cevap", 0),
+            "taksonomi": s.get("taksonomi", "kavrama"),
+            "tarih": datetime.utcnow().isoformat(),
+        })
+
+    # Bonus puanlar
+    bonus = 0
+    if eklenen_kelime >= 50:
+        bonus += 5
+        await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": 5}})
+    if len(tum_sorular) >= 20:
+        bonus += 5
+        await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": 5}})
+
+    # Sonucu güncelle
+    sonuc = {
+        "sayfa_sayisi": sayfa_sayisi,
+        "kelime_sayisi": kelime_sayisi,
+        "chunk_sayisi": len(chunks),
+        "cikarilan_kelime": len(tum_kelimeler),
+        "eklenen_kelime": eklenen_kelime,
+        "okuma_parcasi": len(tum_parcalar),
+        "uretilen_soru": len(tum_sorular),
+        "bonus_puan": bonus,
+        "kelimeler": tum_kelimeler,
+        "parcalar": tum_parcalar,
+        "sorular": tum_sorular,
+    }
+
+    await db.ai_yuklemeler.update_one({"id": yukleme_id}, {"$set": {
+        "durum": "tamamlandi",
+        "ilerleme": 100,
+        "sonuc": {k: v for k, v in sonuc.items() if k not in ["kelimeler", "parcalar", "sorular"]},
+    }})
+
+    return sonuc
+
+
+@api_router.get("/ai/bilgi-tabani/sonuc/{yukleme_id}")
+async def ai_bilgi_tabani_sonuc(yukleme_id: str, current_user=Depends(get_current_user)):
+    """Yükleme sonuçlarını getir: kelimeler, okuma parçaları, sorular."""
+    yukleme = await db.ai_yuklemeler.find_one({"id": yukleme_id}, {"dosya_b64": 0})
+    if not yukleme:
+        raise HTTPException(status_code=404, detail="Yükleme bulunamadı")
+    yukleme.pop("_id", None)
+
+    kelimeler = await db.meb_kelime_haritasi.find({"kaynak": yukleme.get("kitap_adi", "")}).to_list(length=None)
+    for k in kelimeler: k.pop("_id", None)
+
+    parcalar = await db.ai_okuma_parcalari.find({"yukleme_id": yukleme_id}).sort("bolum", 1).to_list(length=None)
+    for p in parcalar: p.pop("_id", None)
+
+    sorular = await db.ai_uretilen_sorular.find({"yukleme_id": yukleme_id}).sort("bolum", 1).to_list(length=None)
+    for s in sorular: s.pop("_id", None)
+
+    return {"yukleme": yukleme, "kelimeler": kelimeler, "parcalar": parcalar, "sorular": sorular}
+
+
+@api_router.get("/ai/bilgi-tabani/ilerleme/{yukleme_id}")
+async def ai_bilgi_tabani_ilerleme(yukleme_id: str, current_user=Depends(get_current_user)):
+    """Yükleme işleme ilerleme durumu."""
+    yukleme = await db.ai_yuklemeler.find_one({"id": yukleme_id}, {"dosya_b64": 0, "_id": 0})
+    if not yukleme:
+        return {"ilerleme": 0, "durum": "bulunamadi"}
+    return {"ilerleme": yukleme.get("ilerleme", 0), "durum": yukleme.get("durum", "yuklendi"), "sonuc": yukleme.get("sonuc", {})}
 async def ai_bilgi_tabani_gecmis(current_user=Depends(get_current_user)):
     filtre = {}
     if current_user.get("role") not in ["admin", "coordinator"]:
