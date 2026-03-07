@@ -4407,6 +4407,51 @@ SADECE JSON döndür:
     return {"hikaye": result.get("parsed") or result.get("text", ""), "token": result.get("tokens", 0), "maliyet": result.get("maliyet", 0)}
 
 
+@api_router.get("/ai/kelime-listesi")
+async def ai_kelime_listesi(sinif: int = 0, current_user=Depends(get_current_user)):
+    """Kelime haritasındaki tüm kelimeleri listeler."""
+    filtre = {}
+    if sinif > 0:
+        filtre["sinif"] = sinif
+    kelimeler = await db.meb_kelime_haritasi.find(filtre).sort("kelime", 1).to_list(length=500)
+    for k in kelimeler:
+        k.pop("_id", None)
+    return kelimeler
+
+
+@api_router.get("/ai/okuma-parcalari")
+async def ai_okuma_parcalari_listesi(current_user=Depends(get_current_user)):
+    """Tüm AI okuma parçalarını listeler."""
+    parcalar = await db.ai_okuma_parcalari.find({}).sort("tarih", -1).to_list(length=100)
+    for p in parcalar:
+        p.pop("_id", None)
+    return parcalar
+
+
+@api_router.get("/ai/sorular")
+async def ai_sorular_listesi(current_user=Depends(get_current_user)):
+    """Tüm AI üretilen soruları listeler."""
+    sorular = await db.ai_uretilen_sorular.find({}).sort("tarih", -1).to_list(length=200)
+    for s in sorular:
+        s.pop("_id", None)
+    return sorular
+
+
+@api_router.get("/ai/socratic-log")
+async def ai_socratic_log_listesi(current_user=Depends(get_current_user)):
+    """Socratic Reading loglarını listeler."""
+    loglar = await db.ai_socratic_log.find({}).sort("tarih", -1).to_list(length=100)
+    for l in loglar:
+        l.pop("_id", None)
+    # Öğrenci adlarını ekle
+    for l in loglar:
+        ogr = await db.users.find_one({"id": l.get("ogrenci_id", "")})
+        if not ogr:
+            ogr = await db.students.find_one({"id": l.get("ogrenci_id", "")})
+        l["ogrenci_ad"] = f"{ogr.get('ad', '')} {ogr.get('soyad', '')}" if ogr else "Bilinmiyor"
+    return loglar
+
+
 @api_router.get("/ai/maliyet-ozet")
 async def ai_maliyet_ozet(current_user=Depends(require_role(UserRole.ADMIN))):
     """Admin: AI maliyet özeti."""
@@ -4424,9 +4469,11 @@ async def ai_maliyet_ozet(current_user=Depends(require_role(UserRole.ADMIN))):
 
 
 @api_router.post("/ai/demo-yukle")
-async def ai_demo_yukle(current_user=Depends(require_role(UserRole.ADMIN))):
+async def ai_demo_yukle(current_user=Depends(get_current_user)):
     """Admin: Tüm AI demo verilerini oluştur/yenile."""
-    import random as rnd
+    if current_user.get("role") not in ["admin", "coordinator"]:
+        raise HTTPException(status_code=403, detail="Yetkiniz yok")
+
     simdi = datetime.utcnow()
 
     # Tüm öğrencileri bul
@@ -4466,7 +4513,7 @@ async def ai_demo_yukle(current_user=Depends(require_role(UserRole.ADMIN))):
         boyutlar = {}
         for k, v in p["b"].items():
             if isinstance(v, int):
-                boyutlar[k] = max(5, min(100, v + rnd.randint(-10, 10)))
+                boyutlar[k] = max(5, min(100, v + random.randint(-10, 10)))
             else:
                 boyutlar[k] = v
 
@@ -4483,10 +4530,10 @@ async def ai_demo_yukle(current_user=Depends(require_role(UserRole.ADMIN))):
             "dna": {"profil_tipi": p["tip"], "profil_label": p["label"], "boyutlar": boyutlar},
             "ai_analiz": {
                 "durum_degerlendirmesi": {
-                    "guclu_yonler": rnd.sample(["Anlama kapasitesi yüksek", "Düzenli okuyor", "Hayal gücü gelişmiş", "Meraklı", "Kelime hazinesi iyi", "Cesur kitap seçimleri", "Hızlı okuma", "Dikkatli dinleme"], 3),
-                    "gelisim_alanlari": rnd.sample(["Okuma hızı artırılmalı", "Anlama derinliği geliştirilmeli", "Kelime hazinesi genişletilmeli", "Dikkat süresi kısa", "Bloom üst basamakları zayıf", "Streak tutarsız"], 2),
+                    "guclu_yonler": random.sample(["Anlama kapasitesi yüksek", "Düzenli okuyor", "Hayal gücü gelişmiş", "Meraklı", "Kelime hazinesi iyi", "Cesur kitap seçimleri", "Hızlı okuma", "Dikkatli dinleme"], 3),
+                    "gelisim_alanlari": random.sample(["Okuma hızı artırılmalı", "Anlama derinliği geliştirilmeli", "Kelime hazinesi genişletilmeli", "Dikkat süresi kısa", "Bloom üst basamakları zayıf", "Streak tutarsız"], 2),
                 },
-                "risk_analizi": {"seviye": rnd.choice(["düşük", "orta", "yüksek"]), "faktorler": [rnd.choice(["Streak kırılma riski", "Kelime gücü düşük", "Dikkat süresi kısa", "Zor metinlerden kaçınma"])], "aciliyet": rnd.choice(["Takip yeterli", "Haftalık kontrol", "Acil müdahale"])},
+                "risk_analizi": {"seviye": random.choice(["düşük", "orta", "yüksek"]), "faktorler": [random.choice(["Streak kırılma riski", "Kelime gücü düşük", "Dikkat süresi kısa", "Zor metinlerden kaçınma"])], "aciliyet": random.choice(["Takip yeterli", "Haftalık kontrol", "Acil müdahale"])},
                 "mudahale_plani": {"hafta_1": "Günlük 10 dk sesli okuma", "hafta_2": "Tekrarlı okuma + kelime çalışması", "hafta_3": "Bloom soru çözme pratiği", "hafta_4": "Bağımsız okuma + özet yazma"},
                 "veliye_mesaj": f"Sayın Veli, {ad} okuma gelişiminde ilerleme kaydediyor. Evde günlük 10-15 dakika birlikte okuma yapmanız gelişimini hızlandıracaktır. Kitap önerilerimizi takip edebilirsiniz.",
                 "haftalik_gorevler": [
@@ -4496,21 +4543,21 @@ async def ai_demo_yukle(current_user=Depends(require_role(UserRole.ADMIN))):
                     {"gun": "Perşembe", "gorev": "Karakterin motivasyonunu analiz et", "bloom": "analiz"},
                     {"gun": "Cuma", "gorev": "Hikâyeye alternatif son yaz", "bloom": "yaratma"},
                 ],
-                "kitap_tavsiyeleri": rnd.sample([
+                "kitap_tavsiyeleri": random.sample([
                     {"ad": "Charlie'nin Çikolata Fabrikası", "yazar": "Roald Dahl", "neden": "Hayal gücü yüksek, kısa bölümler"},
                     {"ad": "Küçük Prens", "yazar": "Saint-Exupéry", "neden": "Felsefi derinlik, kısa paragraflar"},
                     {"ad": "Pollyanna", "yazar": "E.H. Porter", "neden": "Pozitif bakış, karakter gelişimi"},
                     {"ad": "Kaşağı", "yazar": "Ömer Seyfettin", "neden": "Kısa öykü, değer eğitimi"},
                     {"ad": "Martı", "yazar": "Richard Bach", "neden": "Cesaret ve azim teması"},
                 ], 3),
-                "motivasyon_mesaji": rnd.choice([
+                "motivasyon_mesaji": random.choice([
                     f"Harika gidiyorsun {ad}! Her gün biraz daha güçleniyorsun 🌟",
                     f"Süpersin {ad}! Okumaya devam et, başarı senin hakkın 💪",
                     f"Merhaba {ad}! Bugün yeni bir maceraya hazır mısın? 📚",
                     f"{ad}, senin gibisi az bulunur! Her kelime bir adım 🚀",
                 ]),
                 "kelime_mudahale": "Günlük 5 yeni kelime + görsel kartlarla çalışma. Spaced repetition tekrarı.",
-                "metin_recetesi": {"paragraf_uzunlugu": "Orta (80-120 kelime)", "soyutluk": rnd.choice(["Düşük", "Orta", "Yüksek"]), "aksiyon": rnd.choice(["Düşük", "Orta", "Yüksek"]), "hedef_kelime_orani": "%70 bilinen + %30 yeni"},
+                "metin_recetesi": {"paragraf_uzunlugu": "Orta (80-120 kelime)", "soyutluk": random.choice(["Düşük", "Orta", "Yüksek"]), "aksiyon": random.choice(["Düşük", "Orta", "Yüksek"]), "hedef_kelime_orani": "%70 bilinen + %30 yeni"},
             },
             "ai_ham_metin": "", "model": "demo", "token": 0, "maliyet": 0, "tarih": simdi.isoformat(),
         }}, upsert=True)
@@ -4528,12 +4575,12 @@ async def ai_demo_yukle(current_user=Depends(require_role(UserRole.ADMIN))):
             {"kelime": "dürüstlük", "anlam": "Doğruyu söyleme", "ornek_cumle": "Dürüstlük en değerli erdemdir."},
         ]
         for kt in demo_kelimeler_tekrar:
-            kutu = rnd.randint(1, 5)
+            kutu = random.randint(1, 5)
             gun_sonra = {1:0, 2:1, 3:5, 4:14, 5:30}[kutu]
             await db.kelime_tekrar.insert_one({
                 "id": str(uuid.uuid4()), "ogrenci_id": oid, "sinif": sinif, "kutu": kutu,
-                "tekrar_sayisi": rnd.randint(1, 8), "dogru_sayisi": rnd.randint(0, 6),
-                "son_gosterim": (simdi - timedelta(days=rnd.randint(1, 7))).isoformat(),
+                "tekrar_sayisi": random.randint(1, 8), "dogru_sayisi": random.randint(0, 6),
+                "son_gosterim": (simdi - timedelta(days=random.randint(1, 7))).isoformat(),
                 "sonraki_gosterim": (simdi + timedelta(days=gun_sonra)).isoformat() if gun_sonra > 0 else simdi.isoformat(),
                 "tarih": (simdi - timedelta(days=14)).isoformat(), **kt,
             })
@@ -4547,13 +4594,13 @@ async def ai_demo_yukle(current_user=Depends(require_role(UserRole.ADMIN))):
             "Bu hikâyenin sana öğrettiği bir şey var mı?",
             "Hikâyenin sonu farklı olabilir miydi?",
         ]
-        for j in range(rnd.randint(2, 4)):
+        for j in range(random.randint(2, 4)):
             await db.ai_socratic_log.insert_one({
                 "id": str(uuid.uuid4()), "ogrenci_id": oid,
-                "kitap_adi": rnd.choice(["Ormanın Sırrı", "Dürüst Çocuk", "Göçmen Kuşlar", "Takım Çalışması"]),
-                "bolum": f"Bölüm {rnd.randint(1,4)}", "soru": rnd.choice(socratic_sorular),
-                "bloom": rnd.choice(["kavrama", "analiz", "sentez", "degerlendirme"]),
-                "puan": rnd.randint(3, 5), "tarih": (simdi - timedelta(days=rnd.randint(0, 5))).isoformat(),
+                "kitap_adi": random.choice(["Ormanın Sırrı", "Dürüst Çocuk", "Göçmen Kuşlar", "Takım Çalışması"]),
+                "bolum": f"Bölüm {random.randint(1,4)}", "soru": random.choice(socratic_sorular),
+                "bloom": random.choice(["kavrama", "analiz", "sentez", "degerlendirme"]),
+                "puan": random.randint(3, 5), "tarih": (simdi - timedelta(days=random.randint(0, 5))).isoformat(),
             })
             sonuc["socratic"] += 1
 
@@ -4825,11 +4872,10 @@ async def ai_mini_oyun(payload: dict, current_user=Depends(get_current_user)):
 
     if oyun_turu == "eslestirme":
         # Kelime-anlam eşleştirme (Claude gerektirmez)
-        import random as rnd
         karisik_kelimeler = kelimeler[:8]
-        rnd.shuffle(karisik_kelimeler)
+        random.shuffle(karisik_kelimeler)
         karisik_anlamlar = [k.get("anlam", "") for k in karisik_kelimeler]
-        rnd.shuffle(karisik_anlamlar)
+        random.shuffle(karisik_anlamlar)
         return {"oyun": {
             "tur": "eslestirme",
             "baslik": "🎲 Kelime Eşleştirme",
@@ -4850,11 +4896,10 @@ async def ai_mini_oyun(payload: dict, current_user=Depends(get_current_user)):
                     sorular.append({"cumle_bos": bos, "dogru": k["kelime"], "secenekler": []})
         # Şıklar ekle
         tum_kelimeler = [k.get("kelime", "") for k in kelimeler]
-        import random as rnd
         for s in sorular:
             yanlis = [w for w in tum_kelimeler if w != s["dogru"]][:3]
             secenekler = [s["dogru"]] + yanlis
-            rnd.shuffle(secenekler)
+            random.shuffle(secenekler)
             s["secenekler"] = secenekler
         return {"oyun": {
             "tur": "bosluk_doldurma",
@@ -4882,9 +4927,8 @@ SADECE JSON: {{"grid": [["A","B",...], ...], "kelimeler": ["kelime1", ...], "yon
             cumle = k.get("ornek_cumle", "")
             if cumle:
                 kelime_listesi = cumle.split()
-                import random as rnd
                 karisik = kelime_listesi.copy()
-                rnd.shuffle(karisik)
+                random.shuffle(karisik)
                 sorular.append({"karisik": karisik, "dogru": kelime_listesi, "hedef_kelime": k.get("kelime", "")})
         return {"oyun": {
             "tur": "cumle_kurma",
