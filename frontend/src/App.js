@@ -4680,44 +4680,74 @@ function OgrenciPaneli({ user, logout }) {
     setSeciliSpeechMetin(metin);
     setSpeechSonuc(null);
     setSpeechSure(0);
-    audioChunksRef.current = [];
+    audioChunksRef.current = []; // transkript parçaları burada birikecek
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast({ title: "Tarayıcın sesli okumayı desteklemiyor. Chrome kullan.", variant: "destructive" });
+      return;
+    }
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream, { mimeType: "audio/webm" });
-      mediaRecorderRef.current = mr;
-      mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
-      mr.start(250);
+      // Mikrofon izni kontrol
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      const recognition = new SpeechRecognition();
+      recognition.lang = "tr-TR";
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+
+      mediaRecorderRef.current = recognition; // recognition'ı ref'e sakla (bitir için)
+
+      recognition.onresult = (event) => {
+        let tumTranskript = "";
+        for (let i = 0; i < event.results.length; i++) {
+          tumTranskript += event.results[i][0].transcript + " ";
+        }
+        audioChunksRef.current = [tumTranskript.trim()]; // son transkripti sakla
+      };
+
+      recognition.onerror = (e) => {
+        if (e.error !== "aborted") {
+          toast({ title: `Ses tanıma hatası: ${e.error}`, variant: "destructive" });
+        }
+      };
+
+      recognition.start();
       setSpeechKayit(true);
       speechSureRef.current = setInterval(() => setSpeechSure(s => s + 1), 1000);
+
     } catch(e) {
       toast({ title: "Mikrofon erişimi gerekli. Lütfen izin ver.", variant: "destructive" });
     }
   };
 
   const speechBitir = async () => {
-    if (!mediaRecorderRef.current) return;
     clearInterval(speechSureRef.current);
     setSpeechKayit(false);
     setSpeechYukleniyor(true);
 
-    await new Promise(resolve => {
-      mediaRecorderRef.current.onstop = resolve;
-      mediaRecorderRef.current.stop();
-      mediaRecorderRef.current.stream?.getTracks().forEach(t => t.stop());
-    });
+    // Recognition'ı durdur
+    if (mediaRecorderRef.current) {
+      try { mediaRecorderRef.current.stop(); } catch(e) {}
+    }
+
+    // Kısa bekleme — son sonuçların gelmesi için
+    await new Promise(r => setTimeout(r, 600));
+
+    const transkript = audioChunksRef.current[0] || "";
 
     try {
-      const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
       const fd = new FormData();
-      fd.append("ses_dosyasi", blob, "ses.webm");
+      fd.append("transkript", transkript);
       fd.append("metin_id", seciliSpeechMetin?.id || "");
       fd.append("ogrenci_id", ogrenciId || "");
       fd.append("sure_sn", speechSure.toString());
       fd.append("sinif", (profil?.sinif || user?.sinif || 3).toString());
-      const r = await axios.post(`${API}/ai/speech/analiz`, fd, { headers: { "Content-Type": "multipart/form-data" }, timeout: 60000 });
+      const r = await axios.post(`${API}/ai/speech/analiz`, fd, { timeout: 60000 });
       setSpeechSonuc(r.data);
       toast({ title: `🎤 Analiz tamam! ${r.data.genel_skor}/100 puan • +${r.data.xp_kazanildi} XP` });
-      // Geçmişi yenile
       try { const gr = await axios.get(`${API}/ai/speech/gecmis/${ogrenciId}`); setSpeechGecmis(gr.data); } catch(e) {}
     } catch(e) {
       toast({ title: "Analiz hatası. Lütfen tekrar dene.", variant: "destructive" });
@@ -4853,6 +4883,26 @@ function OgrenciPaneli({ user, logout }) {
                     </div>
                   )}
                 </div>
+              )}
+
+              {/* Yanlış / atlanan kelimeler */}
+              {speechSonuc.telaffuz_hatalar?.length > 0 && (
+                <div className="bg-red-50 rounded-xl p-3 border border-red-100">
+                  <div className="text-xs font-bold text-red-700 mb-2">❌ Yanlış / Farklı Okunan Kelimeler</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {speechSonuc.telaffuz_hatalar.map((k,i) => (
+                      <span key={i} className="bg-red-100 text-red-700 text-xs px-2 py-1 rounded-lg font-medium border border-red-200">{k}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Tarayıcının duyduğu (transkript) */}
+              {speechSonuc.transkript && (
+                <details className="bg-gray-50 rounded-xl border">
+                  <summary className="text-xs text-gray-500 px-3 py-2 cursor-pointer select-none">🎤 Tarayıcının duyduğu metin</summary>
+                  <div className="px-3 pb-3 text-xs text-gray-600 leading-relaxed italic">{speechSonuc.transkript}</div>
+                </details>
               )}
 
               <button onClick={() => { setSpeechSonuc(null); setSeciliSpeechMetin(null); setSpeechSure(0); }} className="w-full py-3 rounded-xl bg-purple-600 text-white font-medium text-sm">🔄 Tekrar Oku</button>
