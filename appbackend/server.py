@@ -1063,7 +1063,7 @@ async def create_default_admin():
                 "durum": "tamamlandi", "onayli": True, "ilerleme": 100,
                 "sonuc": {"sayfa_sayisi": 180, "kelime_sayisi": 45000, "chunk_sayisi": 8,
                           "cikarilan_kelime": 12, "eklenen_kelime": 12, "okuma_parcasi": 4, "uretilen_soru": 15, "bonus_puan": 10},
-                "guven_skoru": 92, "okuma_seviyesi": "3. Sınıf", "versiyon": 1, "tarih": (simdi - timedelta(days=3)).isoformat(),
+                "guven_skoru": {"toplam": 92, "seviye": "yuksek", "detay": {"icindekiler": 90, "dil_uygunlugu": 95, "bloom_dagilimi": 88}}, "okuma_seviyesi": "3. Sınıf", "versiyon": 1, "tarih": (simdi - timedelta(days=3)).isoformat(),
             })
 
             # Demo okuma parçaları
@@ -4641,7 +4641,7 @@ async def ai_demo_yukle(current_user=Depends(get_current_user)):
         "yukleyen_id": ogretmen_id, "yukleyen_ad": ogretmen_ad, "yukleyen_rol": "teacher",
         "durum": "tamamlandi", "onayli": True, "ilerleme": 100,
         "sonuc": {"sayfa_sayisi": 180, "kelime_sayisi": 45000, "chunk_sayisi": 8, "cikarilan_kelime": 12, "eklenen_kelime": 12, "okuma_parcasi": 4, "uretilen_soru": 10, "bonus_puan": 10},
-        "guven_skoru": 92, "okuma_seviyesi": "3. Sınıf", "versiyon": 1, "tarih": (simdi - timedelta(days=3)).isoformat(),
+        "guven_skoru": {"toplam": 92, "seviye": "yuksek", "detay": {"icindekiler": 90, "dil_uygunlugu": 95, "bloom_dagilimi": 88}}, "okuma_seviyesi": "3. Sınıf", "versiyon": 1, "tarih": (simdi - timedelta(days=3)).isoformat(),
     })
     sonuc["yukleme"] += 1
 
@@ -5572,13 +5572,24 @@ async def ai_bilgi_tabani_istatistik(current_user=Depends(get_current_user)):
 
     # Güven skoru istatistikleri
     guven_yuklemeler = await db.ai_yuklemeler.find({"guven_skoru": {"$ne": None}}, {"guven_skoru": 1}).to_list(length=None)
-    guven_skorlari = [y["guven_skoru"]["toplam"] for y in guven_yuklemeler if y.get("guven_skoru", {}).get("toplam")]
-    guven_ort = round(sum(guven_skorlari) / max(len(guven_skorlari), 1), 1) if guven_skorlari else 0
+    guven_skorlari = []
     guven_dagilim = {"yuksek": 0, "orta": 0, "dusuk": 0}
     for y in guven_yuklemeler:
-        sev = y.get("guven_skoru", {}).get("seviye", "")
-        if sev in guven_dagilim:
-            guven_dagilim[sev] += 1
+        gs = y.get("guven_skoru")
+        if gs is None:
+            continue
+        # Eski format: integer (92) → dict'e çevir
+        if isinstance(gs, (int, float)):
+            toplam = gs
+            seviye = "yuksek" if gs >= 80 else ("orta" if gs >= 60 else "dusuk")
+        else:
+            toplam = gs.get("toplam", 0)
+            seviye = gs.get("seviye", "")
+        if toplam:
+            guven_skorlari.append(toplam)
+        if seviye in guven_dagilim:
+            guven_dagilim[seviye] += 1
+    guven_ort = round(sum(guven_skorlari) / max(len(guven_skorlari), 1), 1) if guven_skorlari else 0
 
     # Duplicate önleme istatistikleri
     toplam_hash = await db.ai_yuklemeler.distinct("dosya_hash")
