@@ -3669,6 +3669,9 @@ function OgretmenPaneli({ user, logout }) {
   const [aiYukleniyor, setAiYukleniyor] = useState(false);
   const [aiDna, setAiDna] = useState(null);
   const [aiAcikKart, setAiAcikKart] = useState(null);
+  // Speech AI state'leri (öğretmen paneli)
+  const [speechOgrData, setSpeechOgrData] = useState(null);
+  const [speechOgrYukleniyor, setSpeechOgrYukleniyor] = useState(false);
   // Görev atama
   const [gorevForm, setGorevForm] = useState({ baslik: "", aciklama: "", tur: "ozel", son_tarih: "", film_link: "", makale_link: "", kitap_yazar: "" });
   const [gorevHedefler, setGorevHedefler] = useState([]);
@@ -3719,7 +3722,7 @@ function OgretmenPaneli({ user, logout }) {
   // Öğrenci detayını çek
   const ogrenciDetayCek = async (ogrenci) => {
     setSeciliOgrenci(ogrenci);
-    setAiRapor(null); setAiDna(null); setAiAcikKart(null); // AI state reset
+    setAiRapor(null); setAiDna(null); setAiAcikKart(null); setSpeechOgrData(null); setSpeechOgrYukleniyor(false); // AI state reset
     try {
       const [logR, statR, riskR, xpR, gorevR] = await Promise.all([
         axios.get(`${API}/reading-logs/${ogrenci.id}`),
@@ -3894,8 +3897,6 @@ function OgretmenPaneli({ user, logout }) {
 
             {/* 🎤 Speech AI — Sesli Okuma Analizi */}
             {(() => {
-              const [speechOgrData, setSpeechOgrData] = React.useState(null);
-              const [speechOgrYukleniyor, setSpeechOgrYukleniyor] = React.useState(false);
               const yukleSpeeech = async () => {
                 setSpeechOgrYukleniyor(true);
                 try {
