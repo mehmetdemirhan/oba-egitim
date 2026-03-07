@@ -4191,7 +4191,11 @@ async def get_okuma_dna(ogrenci_id: str, current_user=Depends(get_current_user))
 
     ok = v["okuma_ozet"]
     # 1. Kelime Gücü (0-100)
-    sinif = v["ogrenci"].get("sinif", 3)
+    sinif_raw = v["ogrenci"].get("sinif", 3)
+    try:
+        sinif = int(sinif_raw)
+    except (ValueError, TypeError):
+        sinif = 3
     hedef_kelime = {1:150, 2:300, 3:500, 4:700, 5:1000, 6:1300, 7:1600, 8:2000}.get(sinif, 500)
     bilinen = await db.kelime_bankasi.count_documents({"ogrenci_id": ogrenci_id, "ogrenildi": True}) if await db.kelime_bankasi.count_documents({}) > 0 else int(hedef_kelime * 0.5)
     kelime_gucu = min(100, round(bilinen / hedef_kelime * 100))
@@ -5545,7 +5549,7 @@ async def ai_bilgi_tabani_istatistik(current_user=Depends(get_current_user)):
     tamamlanan = await db.ai_yuklemeler.count_documents({"durum": "tamamlandi"})
     bekleyen = await db.ai_yuklemeler.count_documents({"onayli": False})
     toplam_kelime = await db.meb_kelime_haritasi.count_documents({})
-    toplam_soru = await db.kitap_sorulari.count_documents({"kaynak": "ai_egitim"})
+    toplam_soru = await db.ai_uretilen_sorular.count_documents({}) + await db.kitap_sorulari.count_documents({"kaynak": "ai_egitim"})
 
     sinif_dagilim = {}
     for s in range(1, 9):
