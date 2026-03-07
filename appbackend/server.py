@@ -1104,7 +1104,65 @@ async def create_default_admin():
                 "eylem": "dosya_yukle", "dosya_adi": "turkce_3_ders_kitabi.pdf", "sinif": 3, "puan": 30, "tarih": simdi.isoformat(),
             })
 
-        logging.info("✅ AI demo verileri oluşturuldu: DNA, koçluk, kelimeler, parçalar, sorular")
+        # ── Dalga 2 Demo: Kelime Evrimi (Spaced Repetition) ──
+        kelime_tekrar_var = await db.kelime_tekrar.find_one({})
+        if not kelime_tekrar_var:
+            for ogr in demo_ogrenciler[:3]:
+                oid = ogr["id"]
+                sinif = ogr.get("sinif", 3)
+                demo_tekrar_kelimeler = [
+                    {"kelime": "macera", "anlam": "Tehlikeli ve heyecan verici olay", "ornek_cumle": "Çocuklar ormanda büyük bir macera yaşadı.", "kutu": 3, "dogru": 4, "tekrar": 5, "gun_sonra": 7},
+                    {"kelime": "keşif", "anlam": "Bilinmeyen bir şeyi ilk kez bulma", "ornek_cumle": "Bilim insanı yeni bir keşif yaptı.", "kutu": 2, "dogru": 2, "tekrar": 3, "gun_sonra": 3},
+                    {"kelime": "pusula", "anlam": "Yön bulmaya yarayan araç", "ornek_cumle": "Kaşif pusulasıyla yolunu buldu.", "kutu": 1, "dogru": 0, "tekrar": 1, "gun_sonra": 0},
+                    {"kelime": "cesaret", "anlam": "Korkmadan hareket edebilme gücü", "ornek_cumle": "Küçük kız büyük cesaret gösterdi.", "kutu": 4, "dogru": 6, "tekrar": 7, "gun_sonra": 21},
+                    {"kelime": "merak", "anlam": "Bir şeyi bilmek isteme duygusu", "ornek_cumle": "Merak eden çocuk her şeyi sorar.", "kutu": 5, "dogru": 8, "tekrar": 8, "gun_sonra": 45},
+                    {"kelime": "sabır", "anlam": "Bekleyebilme ve dayanma gücü", "ornek_cumle": "Bahçıvan sabırla çiçeklerin büyümesini bekledi.", "kutu": 1, "dogru": 1, "tekrar": 3, "gun_sonra": 0},
+                    {"kelime": "göç", "anlam": "Bir yerden başka bir yere toplu taşınma", "ornek_cumle": "Kuşlar kışın sıcak ülkelere göç eder.", "kutu": 2, "dogru": 3, "tekrar": 4, "gun_sonra": 1},
+                    {"kelime": "dürüstlük", "anlam": "Doğruyu söyleme, hile yapmama", "ornek_cumle": "Dürüstlük en değerli erdemlerden biridir.", "kutu": 3, "dogru": 5, "tekrar": 6, "gun_sonra": 5},
+                ]
+                for kt in demo_tekrar_kelimeler:
+                    await db.kelime_tekrar.insert_one({
+                        "id": str(uuid.uuid4()),
+                        "ogrenci_id": oid,
+                        "kelime": kt["kelime"],
+                        "anlam": kt["anlam"],
+                        "ornek_cumle": kt["ornek_cumle"],
+                        "sinif": sinif,
+                        "kutu": kt["kutu"],
+                        "tekrar_sayisi": kt["tekrar"],
+                        "dogru_sayisi": kt["dogru"],
+                        "son_gosterim": (simdi - timedelta(days=max(1, kt["gun_sonra"]))).isoformat(),
+                        "sonraki_gosterim": (simdi + timedelta(days=kt["gun_sonra"])).isoformat() if kt["gun_sonra"] > 0 else simdi.isoformat(),
+                        "tarih": (simdi - timedelta(days=14)).isoformat(),
+                    })
+            logging.info("  ✅ Kelime Evrimi demo verileri oluşturuldu (8 kelime × 3 öğrenci)")
+
+        # ── Dalga 2 Demo: Socratic Reading logları ──
+        socratic_var = await db.ai_socratic_log.find_one({})
+        if not socratic_var:
+            demo_socratic = [
+                {"kitap": "Ormanın Sırrı", "soru": "Ali ormanda kaybolduğunda ne hissetti sence?", "bloom": "analiz", "gun_once": 2},
+                {"kitap": "Ormanın Sırrı", "soru": "Sen Ali'nin yerinde olsaydın ne yapardın?", "bloom": "degerlendirme", "gun_once": 2},
+                {"kitap": "Dürüst Çocuk", "soru": "Elif cüzdanı sahibine verdi. Bu doğru bir karar mıydı?", "bloom": "degerlendirme", "gun_once": 1},
+                {"kitap": "Göçmen Kuşlar", "soru": "Kuşlar nasıl yol buluyor olabilir?", "bloom": "analiz", "gun_once": 1},
+                {"kitap": "Takım Çalışması", "soru": "Tek başına mı yoksa takımla mı çalışmak daha iyi? Neden?", "bloom": "sentez", "gun_once": 0},
+            ]
+            for ogr in demo_ogrenciler[:2]:
+                for s in demo_socratic:
+                    await db.ai_socratic_log.insert_one({
+                        "id": str(uuid.uuid4()),
+                        "ogrenci_id": ogr["id"],
+                        "kitap_adi": s["kitap"],
+                        "bolum": "Bölüm 1",
+                        "soru": s["soru"],
+                        "bloom": s["bloom"],
+                        "cevap": "Demo cevap — öğrenci düşüncesini yazdı.",
+                        "puan": random.randint(3, 5),
+                        "tarih": (simdi - timedelta(days=s["gun_once"])).isoformat(),
+                    })
+            logging.info("  ✅ Socratic Reading demo logları oluşturuldu")
+
+        logging.info("✅ AI demo verileri oluşturuldu: DNA, koçluk, kelimeler, parçalar, sorular, tekrar, socratic")
     else:
         logging.info("ℹ️ AI demo verileri zaten mevcut")
 
@@ -4363,6 +4421,297 @@ async def ai_maliyet_ozet(current_user=Depends(require_role(UserRole.ADMIN))):
         "aylik": {"istek": len(aylik), "maliyet_usd": round(sum(r.get("maliyet_usd", 0) for r in aylik), 4)},
         "gunluk_limit": AI_MAX_DAILY_REQUESTS,
     }
+
+
+# ─────────────────────────────────────────────
+# DALGA 2: SOCRATİC READİNG + KELİME EVRİMİ + MİNİ OYUN
+# ─────────────────────────────────────────────
+
+@api_router.post("/ai/socratic-soru")
+async def ai_socratic_soru(payload: dict, current_user=Depends(get_current_user)):
+    """Okuma kaydı sonrası Sokratik soru üretir."""
+    kitap_adi = payload.get("kitap_adi", "")
+    bolum = payload.get("bolum", "")
+    sure_dk = payload.get("sure_dk", 10)
+    sinif = payload.get("sinif", 3)
+
+    prompt = f"""Kitap: {kitap_adi or 'bilinmiyor'}
+Bölüm: {bolum or 'bilinmiyor'}
+Sınıf: {sinif}
+Okuma süresi: {sure_dk} dk
+
+Bu öğrenci az önce okuma yaptı. Okuduğu hakkında düşünmesini sağlayacak 1 Sokratik soru sor.
+Soru kısa, merak uyandırıcı ve Türkçe olsun. Çocuğa uygun dil kullan.
+SADECE JSON döndür: {{"soru": "...", "ipucu": "...", "bloom": "kavrama|analiz|sentez|degerlendirme"}}"""
+
+    result = await call_claude(
+        "Sen çocuklara Sokratik sorular soran sevecen bir okuma koçusun. Düşünmeye teşvik edersin.",
+        prompt, model="haiku", max_tokens=200
+    )
+
+    if result.get("parsed"):
+        soru_data = result["parsed"]
+    else:
+        soru_data = {"soru": f"Az önce okuduğun bölümde en çok ne dikkatini çekti?", "ipucu": "Karakterlerin davranışlarını düşün", "bloom": "kavrama"}
+
+    # Log
+    await db.ai_socratic_log.insert_one({
+        "id": str(uuid.uuid4()),
+        "ogrenci_id": current_user["id"],
+        "kitap_adi": kitap_adi,
+        "bolum": bolum,
+        "soru": soru_data.get("soru", ""),
+        "bloom": soru_data.get("bloom", "kavrama"),
+        "tarih": datetime.utcnow().isoformat(),
+    })
+
+    return soru_data
+
+
+@api_router.post("/ai/socratic-cevap")
+async def ai_socratic_cevap(payload: dict, current_user=Depends(get_current_user)):
+    """Öğrencinin Sokratik soruya verdiği cevabı değerlendirir."""
+    soru = payload.get("soru", "")
+    cevap = payload.get("cevap", "")
+
+    if len(cevap) < 5:
+        return {"puan": 1, "geri_bildirim": "Biraz daha düşünüp detaylı cevap vermeyi dener misin? 🤔", "xp": 2}
+
+    prompt = f"""Soru: {soru}
+Öğrenci cevabı: {cevap}
+
+Bu cevabı 1-5 arası puanla. Kısa, pozitif geri bildirim ver. Türkçe. Çocuğa uygun.
+SADECE JSON: {{"puan": 1-5, "geri_bildirim": "..."}}"""
+
+    result = await call_claude("Sen yapıcı geri bildirim veren bir okuma koçusun.", prompt, model="haiku", max_tokens=150)
+
+    if result.get("parsed"):
+        r = result["parsed"]
+        puan = min(5, max(1, r.get("puan", 3)))
+        geri = r.get("geri_bildirim", "Güzel düşünmüşsün! 👏")
+    else:
+        puan = 3
+        geri = "Düşüncelerini paylaştığın için teşekkürler! 👏"
+
+    xp = {1: 2, 2: 3, 3: 5, 4: 7, 5: 10}.get(puan, 5)
+
+    # XP ver
+    try:
+        await db.users.update_one({"id": current_user["id"]}, {"$inc": {"toplam_xp": xp}})
+    except:
+        pass
+
+    return {"puan": puan, "geri_bildirim": geri, "xp": xp}
+
+
+# ── KELİME EVRİMİ (SPACED REPETITION) ──
+
+@api_router.get("/ai/kelime-evrimi/{ogrenci_id}")
+async def kelime_evrimi_listesi(ogrenci_id: str, current_user=Depends(get_current_user)):
+    """Öğrencinin kelime tekrar programı — bugün tekrar edilmesi gerekenler."""
+    simdi = datetime.utcnow()
+    # Bugün veya geçmiş tarihli tekrar bekleyenler
+    bekleyenler = await db.kelime_tekrar.find({
+        "ogrenci_id": ogrenci_id,
+        "sonraki_gosterim": {"$lte": simdi.isoformat()}
+    }).sort("sonraki_gosterim", 1).to_list(length=20)
+
+    for k in bekleyenler:
+        k.pop("_id", None)
+
+    # İstatistik
+    toplam = await db.kelime_tekrar.count_documents({"ogrenci_id": ogrenci_id})
+    ogrenilmis = await db.kelime_tekrar.count_documents({"ogrenci_id": ogrenci_id, "kutu": {"$gte": 4}})
+
+    return {"bekleyenler": bekleyenler, "toplam": toplam, "ogrenilmis": ogrenilmis, "bugun_tekrar": len(bekleyenler)}
+
+
+@api_router.post("/ai/kelime-evrimi/cevapla")
+async def kelime_evrimi_cevapla(payload: dict, current_user=Depends(get_current_user)):
+    """Kelime tekrarına doğru/yanlış cevap — Leitner Box algoritması."""
+    kelime_id = payload.get("kelime_id", "")
+    dogru = payload.get("dogru", False)
+    ogrenci_id = current_user["id"]
+
+    kayit = await db.kelime_tekrar.find_one({"id": kelime_id, "ogrenci_id": ogrenci_id})
+    if not kayit:
+        raise HTTPException(status_code=404, detail="Kelime kaydı bulunamadı")
+
+    mevcut_kutu = kayit.get("kutu", 1)
+    simdi = datetime.utcnow()
+
+    # Yaş bazlı aralıklar
+    sinif = kayit.get("sinif", 3)
+    if sinif <= 2:  # 6-8 yaş
+        araliklar = {1: 1, 2: 2, 3: 5, 4: 12, 5: 30}
+    elif sinif <= 5:  # 9-11 yaş
+        araliklar = {1: 1, 2: 3, 3: 7, 4: 21, 5: 45}
+    else:  # 12+ yaş
+        araliklar = {1: 1, 2: 3, 3: 7, 4: 30, 5: 60}
+
+    if dogru:
+        yeni_kutu = min(5, mevcut_kutu + 1)
+        xp = 2
+    else:
+        yeni_kutu = 1  # Yanlış → ilk kutuya geri
+        xp = 1
+
+    sonraki_gun = araliklar.get(yeni_kutu, 7)
+    sonraki = (simdi + timedelta(days=sonraki_gun)).isoformat()
+
+    await db.kelime_tekrar.update_one({"id": kelime_id}, {"$set": {
+        "kutu": yeni_kutu,
+        "son_gosterim": simdi.isoformat(),
+        "sonraki_gosterim": sonraki,
+        "tekrar_sayisi": kayit.get("tekrar_sayisi", 0) + 1,
+        "dogru_sayisi": kayit.get("dogru_sayisi", 0) + (1 if dogru else 0),
+    }})
+
+    # XP
+    try:
+        await db.users.update_one({"id": ogrenci_id}, {"$inc": {"toplam_xp": xp}})
+    except:
+        pass
+
+    return {"dogru": dogru, "yeni_kutu": yeni_kutu, "sonraki_gun": sonraki_gun, "xp": xp}
+
+
+@api_router.post("/ai/kelime-evrimi/ekle")
+async def kelime_evrimi_ekle(payload: dict, current_user=Depends(get_current_user)):
+    """Öğrenciye kelime tekrar programına kelime ekler."""
+    ogrenci_id = payload.get("ogrenci_id", current_user["id"])
+    kelimeler = payload.get("kelimeler", [])  # [{"kelime": "...", "anlam": "...", "sinif": 3}]
+
+    eklenen = 0
+    for k in kelimeler[:20]:  # max 20 kelime bir seferde
+        mevcut = await db.kelime_tekrar.find_one({"ogrenci_id": ogrenci_id, "kelime": k.get("kelime", "").lower()})
+        if not mevcut:
+            await db.kelime_tekrar.insert_one({
+                "id": str(uuid.uuid4()),
+                "ogrenci_id": ogrenci_id,
+                "kelime": k.get("kelime", "").lower(),
+                "anlam": k.get("anlam", ""),
+                "ornek_cumle": k.get("ornek_cumle", ""),
+                "sinif": k.get("sinif", 3),
+                "kutu": 1,
+                "tekrar_sayisi": 0,
+                "dogru_sayisi": 0,
+                "son_gosterim": None,
+                "sonraki_gosterim": datetime.utcnow().isoformat(),
+                "tarih": datetime.utcnow().isoformat(),
+            })
+            eklenen += 1
+
+    return {"eklenen": eklenen, "toplam_gonderilen": len(kelimeler)}
+
+
+# ── MİNİ OYUN ÜRETİCİ ──
+
+@api_router.post("/ai/mini-oyun")
+async def ai_mini_oyun(payload: dict, current_user=Depends(get_current_user)):
+    """Kelimelerden mini oyun üretir (kelime avı, eşleştirme, boşluk doldurma)."""
+    oyun_turu = payload.get("tur", "eslestirme")  # eslestirme, kelime_avi, bosluk_doldurma, cumle_kurma
+    kelimeler = payload.get("kelimeler", [])  # [{"kelime": "...", "anlam": "..."}]
+    sinif = payload.get("sinif", 3)
+
+    if not kelimeler:
+        # Rastgele kelime al
+        rastgele = await db.meb_kelime_haritasi.find({"sinif": sinif}).to_list(length=10)
+        kelimeler = [{"kelime": k.get("kelime", ""), "anlam": k.get("anlam", ""), "ornek_cumle": k.get("ornek_cumle", "")} for k in rastgele]
+
+    if not kelimeler:
+        return {"oyun": None, "mesaj": "Kelime bulunamadı"}
+
+    if oyun_turu == "eslestirme":
+        # Kelime-anlam eşleştirme (Claude gerektirmez)
+        import random as rnd
+        karisik_kelimeler = kelimeler[:8]
+        rnd.shuffle(karisik_kelimeler)
+        karisik_anlamlar = [k.get("anlam", "") for k in karisik_kelimeler]
+        rnd.shuffle(karisik_anlamlar)
+        return {"oyun": {
+            "tur": "eslestirme",
+            "baslik": "🎲 Kelime Eşleştirme",
+            "aciklama": "Her kelimeyi doğru anlamıyla eşleştir!",
+            "kelimeler": [k.get("kelime", "") for k in karisik_kelimeler],
+            "anlamlar": [k.get("anlam", "") for k in karisik_kelimeler],  # doğru sıralama (frontend karıştıracak)
+            "xp": 5,
+        }}
+
+    elif oyun_turu == "bosluk_doldurma":
+        # Cümledeki kelimeyi bul
+        sorular = []
+        for k in kelimeler[:6]:
+            cumle = k.get("ornek_cumle", "")
+            if cumle and k.get("kelime", ""):
+                bos = cumle.replace(k["kelime"], "___").replace(k["kelime"].capitalize(), "___")
+                if "___" in bos:
+                    sorular.append({"cumle_bos": bos, "dogru": k["kelime"], "secenekler": []})
+        # Şıklar ekle
+        tum_kelimeler = [k.get("kelime", "") for k in kelimeler]
+        import random as rnd
+        for s in sorular:
+            yanlis = [w for w in tum_kelimeler if w != s["dogru"]][:3]
+            secenekler = [s["dogru"]] + yanlis
+            rnd.shuffle(secenekler)
+            s["secenekler"] = secenekler
+        return {"oyun": {
+            "tur": "bosluk_doldurma",
+            "baslik": "⬜ Boşluk Doldur",
+            "aciklama": "Cümledeki boşluğa uygun kelimeyi bul!",
+            "sorular": sorular,
+            "xp": 5,
+        }}
+
+    elif oyun_turu == "kelime_avi":
+        # Kelime avı grid üretimi (AI)
+        prompt = f"""Şu kelimelerden 8x8 harf gridi oluştur (kelime avı oyunu):
+Kelimeler: {', '.join([k.get('kelime','') for k in kelimeler[:6]])}
+SADECE JSON: {{"grid": [["A","B",...], ...], "kelimeler": ["kelime1", ...], "yonler": ["sağa","aşağı",...] }}"""
+
+        result = await call_claude("Sen kelime oyunu tasarımcısısın.", prompt, model="haiku", max_tokens=500)
+        if result.get("parsed"):
+            return {"oyun": {"tur": "kelime_avi", "baslik": "🔍 Kelime Avı", "aciklama": "Gizli kelimeleri bul!", **result["parsed"], "xp": 7}}
+        else:
+            return {"oyun": {"tur": "kelime_avi", "baslik": "🔍 Kelime Avı", "aciklama": "Kelimeleri bul!", "kelimeler": [k.get("kelime","") for k in kelimeler[:6]], "xp": 7}}
+
+    elif oyun_turu == "cumle_kurma":
+        sorular = []
+        for k in kelimeler[:5]:
+            cumle = k.get("ornek_cumle", "")
+            if cumle:
+                kelime_listesi = cumle.split()
+                import random as rnd
+                karisik = kelime_listesi.copy()
+                rnd.shuffle(karisik)
+                sorular.append({"karisik": karisik, "dogru": kelime_listesi, "hedef_kelime": k.get("kelime", "")})
+        return {"oyun": {
+            "tur": "cumle_kurma",
+            "baslik": "📝 Cümle Kurma",
+            "aciklama": "Karışık kelimeleri doğru sıraya diz!",
+            "sorular": sorular,
+            "xp": 5,
+        }}
+
+    return {"oyun": None, "mesaj": "Bilinmeyen oyun türü"}
+
+
+@api_router.post("/ai/mini-oyun/tamamla")
+async def ai_mini_oyun_tamamla(payload: dict, current_user=Depends(get_current_user)):
+    """Mini oyun tamamlama — XP ver."""
+    oyun_turu = payload.get("tur", "")
+    dogru_sayisi = payload.get("dogru", 0)
+    toplam = payload.get("toplam", 1)
+    basari = round(dogru_sayisi / max(toplam, 1) * 100)
+
+    xp = 3 if basari < 50 else 5 if basari < 80 else 7 if basari < 100 else 10
+
+    try:
+        await db.users.update_one({"id": current_user["id"]}, {"$inc": {"toplam_xp": xp}})
+    except:
+        pass
+
+    return {"xp": xp, "basari": basari, "mesaj": "Harika!" if basari >= 80 else "İyi gidiyor!" if basari >= 50 else "Tekrar deneyelim!"}
 
 
 # ─────────────────────────────────────────────
