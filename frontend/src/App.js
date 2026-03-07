@@ -3786,6 +3786,106 @@ function OgretmenPaneli({ user, logout }) {
             </div>
             {/* Risk faktörleri */}
             {d.risk?.faktorler?.length > 0 && (<div className="bg-red-50 rounded-xl p-3 border border-red-100"><div className="text-xs font-medium text-red-700 mb-1">⚠️ Risk Faktörleri:</div>{d.risk.faktorler.map((f,i) => <div key={i} className="text-xs text-red-600">• {f}</div>)}</div>)}
+
+            {/* 🤖 AI Koçluk Butonu + Sonuçlar */}
+            {(() => {
+              const [aiRapor, setAiRapor] = React.useState(null);
+              const [aiYukleniyor, setAiYukleniyor] = React.useState(false);
+              const [aiDna, setAiDna] = React.useState(null);
+              const [aiAcikKart, setAiAcikKart] = React.useState(null);
+
+              const aiKoclukAl = async () => {
+                setAiYukleniyor(true);
+                try {
+                  const [kocR, dnaR] = await Promise.all([
+                    axios.post(`${API}/ai/kocluk/${seciliOgrenci.id}`),
+                    axios.get(`${API}/ai/dna/${seciliOgrenci.id}`),
+                  ]);
+                  setAiRapor(kocR.data);
+                  setAiDna(dnaR.data);
+                } catch(e) { toast({ title: e.response?.data?.detail || "AI hatası. ANTHROPIC_API_KEY tanımlı mı?", variant: "destructive" }); }
+                setAiYukleniyor(false);
+              };
+
+              const analiz = aiRapor?.ai_analiz;
+              const dnaB = aiDna?.boyutlar || {};
+              const dnaRenk = (v) => v >= 70 ? "bg-green-500" : v >= 40 ? "bg-yellow-500" : "bg-red-500";
+
+              return (<div className="space-y-3">
+                {!aiRapor && (
+                  <button onClick={aiKoclukAl} disabled={aiYukleniyor}
+                    className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-2xl p-4 shadow-md hover:shadow-lg transition-all disabled:opacity-60">
+                    <div className="flex items-center justify-center gap-2">
+                      {aiYukleniyor ? (<><div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" /><span className="text-sm">AI analiz ediyor...</span></>) : (<><span className="text-xl">🤖</span><span className="font-bold">AI Koçluk Önerisi Al</span></>)}
+                    </div>
+                    {!aiYukleniyor && <div className="text-xs opacity-80 mt-1">7 boyutlu DNA profili + kişiselleştirilmiş müdahale planı</div>}
+                  </button>
+                )}
+
+                {aiDna && (<div className="bg-white rounded-2xl p-4 shadow-sm border">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2"><span className="text-lg">🧬</span><span className="font-bold text-sm">Okuma DNA'sı</span><span className="text-xs bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded-full">{aiDna.profil_label}</span></div>
+                    <button onClick={() => { setAiRapor(null); setAiDna(null); }} className="text-xs text-gray-400 hover:text-red-400">Yenile ↻</button>
+                  </div>
+                  <div className="space-y-1.5">
+                    {[
+                      ["Kelime Gücü", dnaB.kelime_gucu, "📚"],
+                      ["Akıcılık", dnaB.akicilik, "⚡"],
+                      ["Anlama Derinliği", dnaB.anlama_derinligi, "🧠"],
+                      ["Dikkat Süresi", dnaB.dikkat_suresi, "🎯"],
+                      ["Zorluk Toleransı", dnaB.zorluk_toleransi, "💪"],
+                    ].map(([ad, val, ikon]) => (
+                      <div key={ad} className="flex items-center gap-2">
+                        <span className="text-xs">{ikon}</span>
+                        <span className="text-[10px] text-gray-500 w-24">{ad}</span>
+                        <div className="flex-1 bg-gray-100 rounded-full h-2"><div className={`h-2 rounded-full transition-all ${dnaRenk(val)}`} style={{width:`${val}%`}} /></div>
+                        <span className="text-[10px] font-bold w-8 text-right">{val}</span>
+                      </div>
+                    ))}
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs">🔮</span><span className="text-[10px] text-gray-500 w-24">Psikoloji</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full ${dnaB.okuma_psikolojisi === 'keşifçi' ? 'bg-green-100 text-green-700' : dnaB.okuma_psikolojisi === 'kararsız' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>{dnaB.okuma_psikolojisi || "—"}</span>
+                    </div>
+                  </div>
+                </div>)}
+
+                {analiz && typeof analiz === 'object' && (<>
+                  {/* Accordion kartlar */}
+                  {[
+                    ["durum", "📊 Durum Değerlendirmesi", analiz.durum_degerlendirmesi],
+                    ["risk", "🚨 Risk Analizi + Müdahale", analiz.risk_analizi],
+                    ["plan", "📋 4 Haftalık Plan", analiz.mudahale_plani],
+                    ["mesaj", "✉️ Veliye Mesaj Taslağı", analiz.veliye_mesaj],
+                    ["gorev", "📌 Haftalık Görev Önerisi", analiz.haftalik_gorevler],
+                    ["kitap", "📚 Kitap Tavsiyeleri", analiz.kitap_tavsiyeleri],
+                    ["motivasyon", "💬 Motivasyon", analiz.motivasyon_mesaji],
+                    ["kelime", "📝 Kelime Planı", analiz.kelime_mudahale],
+                    ["recete", "🎯 Metin Reçetesi", analiz.metin_recetesi],
+                  ].filter(([,, v]) => v).map(([key, baslik, icerik]) => (
+                    <div key={key} className="bg-white rounded-xl border shadow-sm overflow-hidden">
+                      <button className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50" onClick={() => setAiAcikKart(aiAcikKart === key ? null : key)}>
+                        <span className="text-sm font-medium">{baslik}</span>
+                        <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${aiAcikKart === key ? 'rotate-180' : ''}`} />
+                      </button>
+                      {aiAcikKart === key && (<div className="px-4 pb-3 text-xs text-gray-600 border-t">
+                        {typeof icerik === 'string' ? (
+                          key === 'mesaj' ? (<div className="mt-2 space-y-2"><p className="whitespace-pre-wrap bg-blue-50 p-3 rounded-lg">{icerik}</p><Button size="sm" className="bg-blue-600 text-white text-xs" onClick={() => { setMesajForm({ konu: "Okuma gelişimi hakkında", icerik }); setMesajAlici(seciliOgrenci.veli_id || ""); setAktifSekme("mesajlar"); }}>✉️ Bu Mesajı Gönder</Button></div>)
+                          : <p className="mt-2 whitespace-pre-wrap">{icerik}</p>
+                        ) : Array.isArray(icerik) ? (
+                          <div className="mt-2 space-y-1">{icerik.map((item, i) => (<div key={i} className="bg-gray-50 p-2 rounded-lg">{typeof item === 'string' ? item : JSON.stringify(item, null, 0).replace(/[{}"]/g, '').replace(/,/g, ' • ')}</div>))}</div>
+                        ) : typeof icerik === 'object' ? (
+                          <div className="mt-2 space-y-1">{Object.entries(icerik).map(([k, v]) => (<div key={k} className="flex gap-2"><span className="font-medium text-gray-700 min-w-[80px]">{k}:</span><span>{typeof v === 'string' ? v : JSON.stringify(v)}</span></div>))}</div>
+                        ) : <p className="mt-2">{String(icerik)}</p>}
+                      </div>)}
+                    </div>
+                  ))}
+                  <div className="text-[9px] text-gray-300 text-center">AI analizi {new Date(aiRapor.tarih).toLocaleString('tr-TR')} • {aiRapor.token} token • ${aiRapor.maliyet?.toFixed(4)}</div>
+                </>)}
+
+                {analiz && typeof analiz === 'string' && (<div className="bg-white rounded-xl p-4 border shadow-sm"><div className="text-xs text-gray-600 whitespace-pre-wrap">{analiz}</div></div>)}
+              </div>);
+            })()}
+
             {/* Haftalık */}
             <div className="bg-white rounded-2xl p-4 shadow-sm border"><div className="flex items-center justify-between mb-2"><span className="text-sm font-medium">Haftalık Aktivite</span><span className="font-bold">{d.stat?.aktif_gunler_7 || 0}/4 gün</span></div><div className="flex gap-1">{[0,1,2,3].map(i => (<div key={i} className={`flex-1 h-3 rounded-full ${i < (d.stat?.aktif_gunler_7 || 0) ? 'bg-gradient-to-r from-orange-400 to-red-500' : 'bg-gray-100'}`} />))}</div></div>
             {/* Görevler */}
@@ -5945,7 +6045,22 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                       required placeholder={`${s} şıkkı`} className={soruForm.dogru_cevap === i ? "border-green-500 bg-green-50" : ""} /></div>
                 ))}
               </div>
-              <Button type="submit" className="w-full bg-teal-600 text-white">Soru Ekle</Button>
+              <div className="grid grid-cols-2 gap-2">
+                <Button type="submit" className="bg-teal-600 text-white">Soru Ekle</Button>
+                <Button type="button" className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white" onClick={async () => {
+                  if (!soruYonetimiIcerik?.baslik) { toast({ title: "Kitap seçili değil", variant: "destructive" }); return; }
+                  toast({ title: "🤖 AI soru üretiyor..." });
+                  try {
+                    const r = await axios.post(`${API}/ai/soru-uret`, { metin: `Kitap: ${soruYonetimiIcerik.baslik}. Bölüm ${soruForm.bolum}. Sınıf: ${soruYonetimiIcerik.kitap_yas_grubu || "3-4"}. Tema: ${soruYonetimiIcerik.baslik}`, sinif: parseInt(soruYonetimiIcerik.kitap_yas_grubu) || 4, soru_sayisi: 5 });
+                    const sorularAI = r.data?.sorular || [];
+                    for (const s of sorularAI) {
+                      await axios.post(`${API}/kitaplar/${soruYonetimiIcerik.id}/sorular`, { bolum: soruForm.bolum, soru: s.soru, secenekler: s.secenekler, dogru_cevap: s.dogru_cevap, taksonomi: s.taksonomi || "kavrama" });
+                    }
+                    toast({ title: `🤖 ${sorularAI.length} soru AI tarafından eklendi!` });
+                    const rr = await axios.get(`${API}/kitaplar/${soruYonetimiIcerik.id}/sorular`); setKitapSorulari(Array.isArray(rr.data) ? rr.data : []);
+                  } catch(e) { toast({ title: "AI soru üretilemedi", variant: "destructive" }); }
+                }}>🤖 AI ile Üret</Button>
+              </div>
             </form>
           </CardContent>
         </Card>
@@ -6304,7 +6419,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
               <div className="bg-white rounded-xl p-3 border text-center"><div className="text-xl font-bold text-cyan-600">{aiStat.toplam_yukleme}</div><div className="text-[10px] text-gray-500">Toplam Yükleme</div></div>
               <div className="bg-white rounded-xl p-3 border text-center"><div className="text-xl font-bold text-green-600">{aiStat.toplam_kelime}</div><div className="text-[10px] text-gray-500">Toplam Kelime</div></div>
               <div className="bg-white rounded-xl p-3 border text-center"><div className="text-xl font-bold text-purple-600">{aiStat.toplam_ai_soru}</div><div className="text-[10px] text-gray-500">AI Sorusu</div></div>
-              <div className="bg-white rounded-xl p-3 border text-center"><div className="text-xl font-bold text-orange-600">{aiStat.bekleyen_onay}</div><div className="text-[10px] text-gray-500">Onay Bekleyen</div></div>
+              <div className="bg-white rounded-xl p-3 border text-center"><div className={`text-xl font-bold ${(aiStat.guven_skoru?.ortalama || 0) >= 70 ? 'text-green-600' : (aiStat.guven_skoru?.ortalama || 0) >= 40 ? 'text-yellow-600' : 'text-red-500'}`}>{aiStat.guven_skoru?.ortalama || "—"}</div><div className="text-[10px] text-gray-500">Ort. Güven Skoru</div></div>
             </div>
           )}
 
@@ -6355,20 +6470,46 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
           {/* Yükleme geçmişi */}
           {aiYuklemeler.length > 0 && (<div>
             <h3 className="font-medium text-sm text-gray-700 mb-2">📋 Yükleme Geçmişi</h3>
-            <div className="space-y-2">{aiYuklemeler.map(y => (
+            <div className="space-y-2">{aiYuklemeler.map(y => {
+              const gs = y.guven_skoru;
+              const gsRenk = gs ? (gs.toplam >= 70 ? 'text-green-600 bg-green-50' : gs.toplam >= 40 ? 'text-yellow-600 bg-yellow-50' : 'text-red-600 bg-red-50') : '';
+              return (
               <div key={y.id} className={`bg-white rounded-xl p-3 border shadow-sm ${!y.onayli ? 'border-l-4 border-l-yellow-400' : ''}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-lg">{y.dosya_format === '.pdf' ? '📕' : '📘'}</span>
                     <div><div className="text-sm font-medium">{y.kitap_adi}</div><div className="text-[10px] text-gray-500">{y.sinif}. Sınıf • {y.tur} • {y.dosya_format} • {(y.dosya_boyut / 1024 / 1024).toFixed(1)} MB</div></div>
                   </div>
-                  <div className="text-right">
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${y.durum === 'tamamlandi' ? 'bg-green-100 text-green-700' : y.durum === 'hata' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{y.durum === 'tamamlandi' ? '✅ Tamamlandı' : y.durum === 'hata' ? '❌ Hata' : '⏳ Bekliyor'}</span>
-                    {!y.onayli && <div className="text-[9px] text-yellow-600 mt-0.5">Onay bekliyor</div>}
+                  <div className="flex items-center gap-2">
+                    {/* AI Güven Skoru */}
+                    {gs && (<div className={`text-center px-2 py-1 rounded-lg ${gsRenk}`}>
+                      <div className="text-sm font-bold">{gs.toplam}/100</div>
+                      <div className="text-[8px]">Güven Skoru</div>
+                    </div>)}
+                    {/* Okuma Seviyesi */}
+                    {y.okuma_seviyesi && (<div className="text-center px-2 py-1 rounded-lg bg-blue-50 text-blue-600">
+                      <div className="text-sm font-bold">{y.okuma_seviyesi.grade_level}. sınıf</div>
+                      <div className="text-[8px]">Seviye</div>
+                    </div>)}
+                    <div className="text-right">
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full ${y.durum === 'tamamlandi' ? 'bg-green-100 text-green-700' : y.durum === 'hata' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{y.durum === 'tamamlandi' ? '✅ Tamamlandı' : y.durum === 'hata' ? '❌ Hata' : '⏳ Bekliyor'}</span>
+                      {!y.onayli && <div className="text-[9px] text-yellow-600 mt-0.5">Onay bekliyor</div>}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}</div>
+                {/* Güven Skoru detay (varsa) */}
+                {gs && gs.detay && (
+                  <div className="mt-2 pt-2 border-t border-gray-100 grid grid-cols-4 gap-1">
+                    {Object.entries(gs.detay).map(([k, v]) => (
+                      <div key={k} className="text-center">
+                        <div className="bg-gray-100 rounded-full h-1 mb-0.5"><div className={`h-1 rounded-full ${v.skor >= v.max * 0.7 ? 'bg-green-500' : v.skor >= v.max * 0.4 ? 'bg-yellow-500' : 'bg-red-400'}`} style={{width: `${(v.skor / v.max) * 100}%`}} /></div>
+                        <div className="text-[8px] text-gray-500">{({"kelime_cesitliligi":"Kelime","soru_kalitesi":"Soru","zorluk_uyumu":"Zorluk","icerik_zenginligi":"İçerik"})[k]} {v.skor}/{v.max}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>);
+            })}</div>
           </div>)}
         </div>);
       })()}
