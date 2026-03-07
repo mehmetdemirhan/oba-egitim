@@ -5996,32 +5996,22 @@ function AiMerkezi({ user }) {
       try { const r = await axios.get(`${API}/ai/maliyet-ozet`); setMaliyet(r.data); } catch(e) {}
       try { const r = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setYuklemeler(Array.isArray(r.data) ? r.data : []); } catch(e) {}
       try { const r = await axios.get(`${API}/ai/bilgi-tabani/istatistik`); setIstatistik(r.data); } catch(e) {}
+      try { const r = await axios.get(`${API}/ai/kelime-listesi`); setKelimeler(Array.isArray(r.data) ? r.data : []); } catch(e) {}
+      try { const r = await axios.get(`${API}/ai/okuma-parcalari`); setParcalar(Array.isArray(r.data) ? r.data : []); } catch(e) {}
+      try { const r = await axios.get(`${API}/ai/sorular`); setSorular(Array.isArray(r.data) ? r.data : []); } catch(e) {}
+      try { const r = await axios.get(`${API}/ai/socratic-log`); setSocraticListesi(Array.isArray(r.data) ? r.data : []); } catch(e) {}
 
-      // DNA listesi
+      // DNA listesi — her öğrenci için
       try {
         const students = await axios.get(`${API}/students`);
         const slist = Array.isArray(students.data) ? students.data : [];
         const dnaArr = [];
-        for (const s of slist.slice(0, 20)) {
-          try { const dr = await axios.get(`${API}/ai/dna/${s.id}`); dnaArr.push({...dr.data, ad: s.ad, soyad: s.soyad}); } catch(e) {}
-        }
-        setDnaListesi(dnaArr);
-      } catch(e) {}
-
-      // Kelimeler
-      try {
-        const r = await axios.get(`${API}/ai/bilgi-tabani/istatistik`);
-        // kelime listesi ayrı endpoint yok, istatistikten çekiyoruz
-      } catch(e) {}
-
-      // Koçluk cache
-      try {
-        const students = await axios.get(`${API}/students`);
-        const slist = Array.isArray(students.data) ? students.data : [];
         const kocArr = [];
-        for (const s of slist.slice(0, 10)) {
+        for (const s of slist.slice(0, 30)) {
+          try { const dr = await axios.get(`${API}/ai/dna/${s.id}`); dnaArr.push({...dr.data, ad: s.ad, soyad: s.soyad}); } catch(e) {}
           try { const kr = await axios.post(`${API}/ai/kocluk/${s.id}`); kocArr.push({...kr.data, ad: s.ad, soyad: s.soyad}); } catch(e) {}
         }
+        setDnaListesi(dnaArr);
         setKoclukListesi(kocArr);
       } catch(e) {}
     };
@@ -6116,36 +6106,37 @@ function AiMerkezi({ user }) {
       {/* KOÇLUK */}
       {aiSekme === "kocluk" && (<>
         <h3 className="font-bold text-sm">🤖 AI Koçluk Raporları ({koclukListesi.length})</h3>
-        <div className="space-y-3">{koclukListesi.map(k => {
-          const a = k.ai_analiz || {};
-          return (
-            <div key={k.ogrenci_id} className="bg-white rounded-2xl p-4 border shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-bold text-sm">{k.ad} {k.soyad}</span>
-                <span className="text-[10px] text-gray-400">{new Date(k.tarih).toLocaleDateString('tr-TR')}</span>
+        {koclukListesi.length > 0 ? (
+          <div className="space-y-3">{koclukListesi.map(k => {
+            const a = k.ai_analiz || {};
+            return (
+              <div key={k.ogrenci_id} className="bg-white rounded-2xl p-4 border shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2"><span className="font-bold text-sm">{k.ad} {k.soyad}</span><span className="text-xs bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded-full">{k.dna?.profil_label || ""}</span></div>
+                  <span className="text-xs text-gray-400">{new Date(k.tarih).toLocaleDateString('tr-TR')}</span>
+                </div>
+                {a.durum_degerlendirmesi ? (<>
+                  <div className="text-xs text-green-600 mb-1">✅ {(a.durum_degerlendirmesi.guclu_yonler || []).join(" • ")}</div>
+                  <div className="text-xs text-orange-600 mb-1">📈 {(a.durum_degerlendirmesi.gelisim_alanlari || []).join(" • ")}</div>
+                  {a.risk_analizi && <div className={`text-xs px-2 py-1 rounded-lg mb-1 ${a.risk_analizi.seviye === 'yüksek' ? 'bg-red-50 text-red-700' : a.risk_analizi.seviye === 'orta' ? 'bg-yellow-50 text-yellow-700' : 'bg-green-50 text-green-700'}`}>🚨 {a.risk_analizi.seviye} — {a.risk_analizi.aciliyet}</div>}
+                  {a.kitap_tavsiyeleri && <div className="text-xs text-gray-600">📚 {a.kitap_tavsiyeleri.map(t => t.ad).join(", ")}</div>}
+                  {a.motivasyon_mesaji && <div className="text-xs text-cyan-600 mt-1 italic">💬 {a.motivasyon_mesaji}</div>}
+                </>) : <div className="text-xs text-gray-400">Rapor bekleniyor...</div>}
               </div>
-              {a.durum_degerlendirmesi && (<div className="mb-2">
-                <div className="text-xs text-green-600 mb-1">✅ Güçlü: {(a.durum_degerlendirmesi.guclu_yonler || []).join(", ")}</div>
-                <div className="text-xs text-orange-600">📈 Gelişim: {(a.durum_degerlendirmesi.gelisim_alanlari || []).join(", ")}</div>
-              </div>)}
-              {a.risk_analizi && <div className={`text-xs px-2 py-1 rounded-lg mb-2 ${a.risk_analizi.seviye === 'yüksek' ? 'bg-red-50 text-red-700' : a.risk_analizi.seviye === 'orta' ? 'bg-yellow-50 text-yellow-700' : 'bg-green-50 text-green-700'}`}>🚨 Risk: {a.risk_analizi.seviye} — {a.risk_analizi.aciliyet}</div>}
-              {a.kitap_tavsiyeleri && <div className="text-xs text-gray-600">📚 Tavsiyeler: {a.kitap_tavsiyeleri.map(t => t.ad).join(", ")}</div>}
-              {a.motivasyon_mesaji && <div className="text-xs text-cyan-600 mt-1 italic">💬 {a.motivasyon_mesaji}</div>}
-            </div>
-          );
-        })}</div>
-        {koclukListesi.length === 0 && <div className="text-center py-8 text-gray-500">Koçluk raporu henüz oluşturulmamış</div>}
+            );
+          })}</div>
+        ) : <div className="text-center py-8 text-gray-400">Koçluk raporu yok — önce "Demo Verileri Yükle"</div>}
       </>)}
 
       {/* KELİME HARİTASI */}
       {aiSekme === "kelimeler" && (<>
-        <h3 className="font-bold text-sm">📚 MEB Kelime Haritası</h3>
+        <h3 className="font-bold text-sm">📚 MEB Kelime Haritası ({kelimeler.length} kelime)</h3>
         {istatistik?.sinif_dagilimi && (
-          <div className="grid grid-cols-4 gap-2">{Object.entries(istatistik.sinif_dagilimi).map(([s, c]) => (
-            <div key={s} className="bg-white rounded-xl p-3 border text-center"><div className="text-lg font-bold text-cyan-600">{c}</div><div className="text-[10px] text-gray-500">{s}. Sınıf</div></div>
+          <div className="grid grid-cols-4 gap-2">{Object.entries(istatistik.sinif_dagilimi).filter(([,v]) => v.kelime > 0).map(([s, c]) => (
+            <div key={s} className="bg-white rounded-xl p-3 border text-center"><div className="text-lg font-bold text-cyan-600">{c.kelime}</div><div className="text-[10px] text-gray-500">{s}. Sınıf</div></div>
           ))}</div>
         )}
-        {istatistik?.top_contributors && (
+        {istatistik?.top_contributors?.length > 0 && (
           <div className="bg-white rounded-2xl p-4 border shadow-sm">
             <h4 className="font-medium text-sm mb-2">🏆 En Çok Katkı Yapanlar</h4>
             <div className="space-y-1">{istatistik.top_contributors.map((t, i) => (
@@ -6153,6 +6144,22 @@ function AiMerkezi({ user }) {
             ))}</div>
           </div>
         )}
+        {/* Kelime kartları */}
+        <div className="space-y-1.5">{kelimeler.map((k, i) => (
+          <div key={k.id || i} className="bg-white rounded-lg p-3 border shadow-sm flex items-center justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-cyan-700">{k.kelime}</span>
+                <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${k.zorluk <= 3 ? 'bg-green-100 text-green-700' : k.zorluk <= 6 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>{k.zorluk}/10</span>
+                <span className="text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">{k.sinif}. sınıf</span>
+              </div>
+              <div className="text-xs text-gray-600 mt-0.5">{k.anlam}</div>
+              {k.ornek_cumle && <div className="text-[10px] text-gray-400 italic">"{k.ornek_cumle}"</div>}
+            </div>
+            <div className="text-[9px] text-gray-400 ml-2">{k.kaynak}</div>
+          </div>
+        ))}</div>
+        {kelimeler.length === 0 && <div className="text-center py-8 text-gray-400">Henüz kelime yok. "Demo Verileri Yükle" butonuna tıklayın.</div>}
       </>)}
 
       {/* YÜKLEMELER */}
@@ -6174,9 +6181,27 @@ function AiMerkezi({ user }) {
 
       {/* SOCRATIC */}
       {aiSekme === "socratic" && (<>
-        <h3 className="font-bold text-sm">💬 Socratic Reading Geçmişi</h3>
-        <p className="text-xs text-gray-500">Öğrencilerin okuma sonrası AI sorularına verdikleri cevaplar</p>
-        <div className="text-center py-8 text-gray-400">Veriler öğrenciler okuma kaydettikçe burada görünecek</div>
+        <h3 className="font-bold text-sm">💬 Socratic Reading Geçmişi ({socraticListesi.length})</h3>
+        <div className="space-y-2">{socraticListesi.map((s, i) => {
+          const bloomRenk = {"bilgi":"bg-blue-100 text-blue-700","kavrama":"bg-green-100 text-green-700","analiz":"bg-orange-100 text-orange-700","sentez":"bg-red-100 text-red-700","degerlendirme":"bg-purple-100 text-purple-700"};
+          return (
+            <div key={s.id || i} className="bg-white rounded-xl p-3 border shadow-sm">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm font-medium">{s.ogrenci_ad}</span>
+                <div className="flex items-center gap-2">
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${bloomRenk[s.bloom] || 'bg-gray-100'}`}>{s.bloom}</span>
+                  {s.puan && <span className="text-xs text-yellow-600">{"⭐".repeat(s.puan)}</span>}
+                </div>
+              </div>
+              <p className="text-xs text-gray-700">❓ {s.soru}</p>
+              <div className="flex items-center justify-between mt-1">
+                <span className="text-[10px] text-gray-400">📖 {s.kitap_adi} • {s.bolum}</span>
+                <span className="text-[10px] text-gray-400">{new Date(s.tarih).toLocaleDateString('tr-TR')}</span>
+              </div>
+            </div>
+          );
+        })}</div>
+        {socraticListesi.length === 0 && <div className="text-center py-8 text-gray-400">Henüz Socratic log yok. "Demo Verileri Yükle" butonuna tıklayın.</div>}
       </>)}
 
       {/* MALİYET */}
