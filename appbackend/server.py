@@ -4423,6 +4423,207 @@ async def ai_maliyet_ozet(current_user=Depends(require_role(UserRole.ADMIN))):
     }
 
 
+@api_router.post("/ai/demo-yukle")
+async def ai_demo_yukle(current_user=Depends(require_role(UserRole.ADMIN))):
+    """Admin: Tüm AI demo verilerini oluştur/yenile."""
+    import random as rnd
+    simdi = datetime.utcnow()
+
+    # Tüm öğrencileri bul
+    tum_ogrenciler = await db.students.find({}).to_list(length=50)
+    if not tum_ogrenciler:
+        tum_ogrenciler = await db.users.find({"role": "student"}).to_list(length=50)
+    if not tum_ogrenciler:
+        raise HTTPException(status_code=404, detail="Hiç öğrenci bulunamadı")
+
+    ogretmen = await db.users.find_one({"role": "teacher"})
+    ogretmen_id = ogretmen["id"] if ogretmen else current_user["id"]
+    ogretmen_ad = f"{ogretmen.get('ad','')} {ogretmen.get('soyad','')}".strip() if ogretmen else "Admin"
+
+    sonuc = {"dna": 0, "kocluk": 0, "kelime": 0, "kelime_tekrar": 0, "yukleme": 0, "parca": 0, "soru": 0, "socratic": 0}
+
+    # Eski demo verileri temizle
+    await db.okuma_dna.delete_many({})
+    await db.ai_kocluk_cache.delete_many({"model": "demo"})
+    await db.kelime_tekrar.delete_many({})
+    await db.ai_socratic_log.delete_many({})
+
+    profil_havuzu = [
+        {"tip": "hayalci_okuyucu", "label": "🌈 Hayalci Okuyucu", "b": {"kelime_gucu": 72, "akicilik": 45, "anlama_derinligi": 80, "dikkat_suresi": 55, "zorluk_toleransi": 60, "kelime_tekrar_ihtiyaci": 35, "okuma_psikolojisi": "keşifçi"}},
+        {"tip": "hızlı_okuyucu", "label": "⚡ Hızlı Okuyucu", "b": {"kelime_gucu": 58, "akicilik": 78, "anlama_derinligi": 42, "dikkat_suresi": 70, "zorluk_toleransi": 45, "kelime_tekrar_ihtiyaci": 50, "okuma_psikolojisi": "güvenli"}},
+        {"tip": "başlangıç_okuyucu", "label": "🌱 Başlangıç Okuyucu", "b": {"kelime_gucu": 35, "akicilik": 30, "anlama_derinligi": 55, "dikkat_suresi": 25, "zorluk_toleransi": 30, "kelime_tekrar_ihtiyaci": 75, "okuma_psikolojisi": "kararsız"}},
+        {"tip": "dengeli_okuyucu", "label": "⚖️ Dengeli Okuyucu", "b": {"kelime_gucu": 65, "akicilik": 62, "anlama_derinligi": 68, "dikkat_suresi": 60, "zorluk_toleransi": 55, "kelime_tekrar_ihtiyaci": 40, "okuma_psikolojisi": "güvenli"}},
+        {"tip": "analitik_okuyucu", "label": "🔍 Analitik Okuyucu", "b": {"kelime_gucu": 80, "akicilik": 50, "anlama_derinligi": 85, "dikkat_suresi": 75, "zorluk_toleransi": 70, "kelime_tekrar_ihtiyaci": 25, "okuma_psikolojisi": "keşifçi"}},
+    ]
+
+    for i, ogr in enumerate(tum_ogrenciler):
+        oid = ogr["id"]
+        ad = ogr.get("ad", f"Öğrenci{i}")
+        sinif = ogr.get("sinif", 3)
+        p = profil_havuzu[i % len(profil_havuzu)]
+
+        # Hafif randomize
+        boyutlar = {}
+        for k, v in p["b"].items():
+            if isinstance(v, int):
+                boyutlar[k] = max(5, min(100, v + rnd.randint(-10, 10)))
+            else:
+                boyutlar[k] = v
+
+        # DNA
+        await db.okuma_dna.update_one({"ogrenci_id": oid}, {"$set": {
+            "ogrenci_id": oid, "boyutlar": boyutlar, "profil_tipi": p["tip"],
+            "profil_label": p["label"], "sinif": sinif, "son_guncelleme": simdi.isoformat(),
+        }}, upsert=True)
+        sonuc["dna"] += 1
+
+        # Koçluk cache
+        await db.ai_kocluk_cache.update_one({"ogrenci_id": oid}, {"$set": {
+            "id": str(uuid.uuid4()), "ogrenci_id": oid,
+            "dna": {"profil_tipi": p["tip"], "profil_label": p["label"], "boyutlar": boyutlar},
+            "ai_analiz": {
+                "durum_degerlendirmesi": {
+                    "guclu_yonler": rnd.sample(["Anlama kapasitesi yüksek", "Düzenli okuyor", "Hayal gücü gelişmiş", "Meraklı", "Kelime hazinesi iyi", "Cesur kitap seçimleri", "Hızlı okuma", "Dikkatli dinleme"], 3),
+                    "gelisim_alanlari": rnd.sample(["Okuma hızı artırılmalı", "Anlama derinliği geliştirilmeli", "Kelime hazinesi genişletilmeli", "Dikkat süresi kısa", "Bloom üst basamakları zayıf", "Streak tutarsız"], 2),
+                },
+                "risk_analizi": {"seviye": rnd.choice(["düşük", "orta", "yüksek"]), "faktorler": [rnd.choice(["Streak kırılma riski", "Kelime gücü düşük", "Dikkat süresi kısa", "Zor metinlerden kaçınma"])], "aciliyet": rnd.choice(["Takip yeterli", "Haftalık kontrol", "Acil müdahale"])},
+                "mudahale_plani": {"hafta_1": "Günlük 10 dk sesli okuma", "hafta_2": "Tekrarlı okuma + kelime çalışması", "hafta_3": "Bloom soru çözme pratiği", "hafta_4": "Bağımsız okuma + özet yazma"},
+                "veliye_mesaj": f"Sayın Veli, {ad} okuma gelişiminde ilerleme kaydediyor. Evde günlük 10-15 dakika birlikte okuma yapmanız gelişimini hızlandıracaktır. Kitap önerilerimizi takip edebilirsiniz.",
+                "haftalik_gorevler": [
+                    {"gun": "Pazartesi", "gorev": "Sevdiği kitaptan 2 sayfa sesli oku", "bloom": "uygulama"},
+                    {"gun": "Salı", "gorev": "5 yeni kelime öğren ve cümle kur", "bloom": "uygulama"},
+                    {"gun": "Çarşamba", "gorev": "Okuduğu bölümün özetini yaz", "bloom": "sentez"},
+                    {"gun": "Perşembe", "gorev": "Karakterin motivasyonunu analiz et", "bloom": "analiz"},
+                    {"gun": "Cuma", "gorev": "Hikâyeye alternatif son yaz", "bloom": "yaratma"},
+                ],
+                "kitap_tavsiyeleri": rnd.sample([
+                    {"ad": "Charlie'nin Çikolata Fabrikası", "yazar": "Roald Dahl", "neden": "Hayal gücü yüksek, kısa bölümler"},
+                    {"ad": "Küçük Prens", "yazar": "Saint-Exupéry", "neden": "Felsefi derinlik, kısa paragraflar"},
+                    {"ad": "Pollyanna", "yazar": "E.H. Porter", "neden": "Pozitif bakış, karakter gelişimi"},
+                    {"ad": "Kaşağı", "yazar": "Ömer Seyfettin", "neden": "Kısa öykü, değer eğitimi"},
+                    {"ad": "Martı", "yazar": "Richard Bach", "neden": "Cesaret ve azim teması"},
+                ], 3),
+                "motivasyon_mesaji": rnd.choice([
+                    f"Harika gidiyorsun {ad}! Her gün biraz daha güçleniyorsun 🌟",
+                    f"Süpersin {ad}! Okumaya devam et, başarı senin hakkın 💪",
+                    f"Merhaba {ad}! Bugün yeni bir maceraya hazır mısın? 📚",
+                    f"{ad}, senin gibisi az bulunur! Her kelime bir adım 🚀",
+                ]),
+                "kelime_mudahale": "Günlük 5 yeni kelime + görsel kartlarla çalışma. Spaced repetition tekrarı.",
+                "metin_recetesi": {"paragraf_uzunlugu": "Orta (80-120 kelime)", "soyutluk": rnd.choice(["Düşük", "Orta", "Yüksek"]), "aksiyon": rnd.choice(["Düşük", "Orta", "Yüksek"]), "hedef_kelime_orani": "%70 bilinen + %30 yeni"},
+            },
+            "ai_ham_metin": "", "model": "demo", "token": 0, "maliyet": 0, "tarih": simdi.isoformat(),
+        }}, upsert=True)
+        sonuc["kocluk"] += 1
+
+        # Kelime tekrar (Spaced Repetition)
+        demo_kelimeler_tekrar = [
+            {"kelime": "macera", "anlam": "Tehlikeli ve heyecan verici olay", "ornek_cumle": "Çocuklar ormanda büyük bir macera yaşadı."},
+            {"kelime": "keşif", "anlam": "Bilinmeyen bir şeyi ilk kez bulma", "ornek_cumle": "Bilim insanı yeni bir keşif yaptı."},
+            {"kelime": "pusula", "anlam": "Yön bulmaya yarayan araç", "ornek_cumle": "Kaşif pusulasıyla yolunu buldu."},
+            {"kelime": "cesaret", "anlam": "Korkmadan hareket edebilme gücü", "ornek_cumle": "Küçük kız büyük cesaret gösterdi."},
+            {"kelime": "merak", "anlam": "Bir şeyi bilmek isteme duygusu", "ornek_cumle": "Merak eden çocuk her şeyi sorar."},
+            {"kelime": "sabır", "anlam": "Bekleyebilme gücü", "ornek_cumle": "Bahçıvan sabırla bekledi."},
+            {"kelime": "göç", "anlam": "Toplu taşınma", "ornek_cumle": "Kuşlar sıcak ülkelere göç eder."},
+            {"kelime": "dürüstlük", "anlam": "Doğruyu söyleme", "ornek_cumle": "Dürüstlük en değerli erdemdir."},
+        ]
+        for kt in demo_kelimeler_tekrar:
+            kutu = rnd.randint(1, 5)
+            gun_sonra = {1:0, 2:1, 3:5, 4:14, 5:30}[kutu]
+            await db.kelime_tekrar.insert_one({
+                "id": str(uuid.uuid4()), "ogrenci_id": oid, "sinif": sinif, "kutu": kutu,
+                "tekrar_sayisi": rnd.randint(1, 8), "dogru_sayisi": rnd.randint(0, 6),
+                "son_gosterim": (simdi - timedelta(days=rnd.randint(1, 7))).isoformat(),
+                "sonraki_gosterim": (simdi + timedelta(days=gun_sonra)).isoformat() if gun_sonra > 0 else simdi.isoformat(),
+                "tarih": (simdi - timedelta(days=14)).isoformat(), **kt,
+            })
+            sonuc["kelime_tekrar"] += 1
+
+        # Socratic log
+        socratic_sorular = [
+            "Bu bölümde en çok ne dikkatini çekti?",
+            "Karakter neden böyle davrandı sence?",
+            "Sen olsaydın ne yapardın?",
+            "Bu hikâyenin sana öğrettiği bir şey var mı?",
+            "Hikâyenin sonu farklı olabilir miydi?",
+        ]
+        for j in range(rnd.randint(2, 4)):
+            await db.ai_socratic_log.insert_one({
+                "id": str(uuid.uuid4()), "ogrenci_id": oid,
+                "kitap_adi": rnd.choice(["Ormanın Sırrı", "Dürüst Çocuk", "Göçmen Kuşlar", "Takım Çalışması"]),
+                "bolum": f"Bölüm {rnd.randint(1,4)}", "soru": rnd.choice(socratic_sorular),
+                "bloom": rnd.choice(["kavrama", "analiz", "sentez", "degerlendirme"]),
+                "puan": rnd.randint(3, 5), "tarih": (simdi - timedelta(days=rnd.randint(0, 5))).isoformat(),
+            })
+            sonuc["socratic"] += 1
+
+    # Kelimeler (meb_kelime_haritasi)
+    demo_kelimeler = [
+        {"kelime": "macera", "anlam": "Tehlikeli ve heyecan verici olay", "ornek_cumle": "Çocuklar ormanda büyük bir macera yaşadı.", "zorluk": 4, "sinif": 3},
+        {"kelime": "keşif", "anlam": "Bilinmeyen bir şeyi ilk kez bulma", "ornek_cumle": "Bilim insanı yeni bir keşif yaptı.", "zorluk": 5, "sinif": 3},
+        {"kelime": "pusula", "anlam": "Yön bulmaya yarayan araç", "ornek_cumle": "Kaşif pusulasıyla yolunu buldu.", "zorluk": 6, "sinif": 3},
+        {"kelime": "cesaret", "anlam": "Korkmadan hareket edebilme gücü", "ornek_cumle": "Küçük kız büyük cesaret gösterdi.", "zorluk": 4, "sinif": 3},
+        {"kelime": "merak", "anlam": "Bir şeyi bilmek isteme duygusu", "ornek_cumle": "Merak eden çocuk her şeyi sorar.", "zorluk": 3, "sinif": 3},
+        {"kelime": "sabır", "anlam": "Bekleyebilme ve dayanma gücü", "ornek_cumle": "Bahçıvan sabırla çiçeklerin büyümesini bekledi.", "zorluk": 4, "sinif": 3},
+        {"kelime": "hayal gücü", "anlam": "Zihinde yeni şeyler oluşturabilme", "ornek_cumle": "Hayal gücü güçlü olan çocuklar iyi yazar.", "zorluk": 5, "sinif": 3},
+        {"kelime": "fedakarlık", "anlam": "Başkaları için vazgeçme", "ornek_cumle": "Anneler büyük fedakarlıklar yapar.", "zorluk": 7, "sinif": 4},
+        {"kelime": "dürüstlük", "anlam": "Doğruyu söyleme", "ornek_cumle": "Dürüstlük en değerli erdemdir.", "zorluk": 5, "sinif": 4},
+        {"kelime": "azim", "anlam": "Kararlılıkla sürdürme", "ornek_cumle": "Azimli öğrenci başarıya ulaştı.", "zorluk": 6, "sinif": 4},
+        {"kelime": "empati", "anlam": "Başkalarının duygularını anlama", "ornek_cumle": "Empati kurabilen iyi arkadaş olur.", "zorluk": 7, "sinif": 5},
+        {"kelime": "göç", "anlam": "Toplu taşınma", "ornek_cumle": "Kuşlar sıcak ülkelere göç eder.", "zorluk": 4, "sinif": 3},
+    ]
+    await db.meb_kelime_haritasi.delete_many({"kaynak": {"$regex": "Demo"}})
+    for k in demo_kelimeler:
+        await db.meb_kelime_haritasi.update_one({"kelime": k["kelime"]}, {"$set": {
+            "id": str(uuid.uuid4()), "kaynak": "Demo - MEB Türkçe",
+            "yukleyen_id": ogretmen_id, "tarih": simdi.isoformat(), **k,
+        }}, upsert=True)
+        sonuc["kelime"] += 1
+
+    # Demo yükleme
+    await db.ai_yuklemeler.delete_many({"kitap_adi": {"$regex": "Demo"}})
+    await db.ai_okuma_parcalari.delete_many({"kitap_adi": {"$regex": "Demo"}})
+    await db.ai_uretilen_sorular.delete_many({"kitap_adi": {"$regex": "Demo"}})
+
+    demo_yuk_id = str(uuid.uuid4())
+    await db.ai_yuklemeler.insert_one({
+        "id": demo_yuk_id, "dosya_adi": "turkce_3_ders_kitabi.pdf", "dosya_boyut": 4500000,
+        "dosya_format": ".pdf", "dosya_hash": f"demo_{uuid.uuid4().hex[:8]}", "dosya_b64": "",
+        "sinif": 3, "tur": "ders_kitabi", "kitap_adi": "Türkçe 3 Ders Kitabı (Demo)",
+        "yazar": "MEB", "temalar": ["Erdemler", "Doğa ve Evren", "Çocuk Dünyası"],
+        "yukleyen_id": ogretmen_id, "yukleyen_ad": ogretmen_ad, "yukleyen_rol": "teacher",
+        "durum": "tamamlandi", "onayli": True, "ilerleme": 100,
+        "sonuc": {"sayfa_sayisi": 180, "kelime_sayisi": 45000, "chunk_sayisi": 8, "cikarilan_kelime": 12, "eklenen_kelime": 12, "okuma_parcasi": 4, "uretilen_soru": 10, "bonus_puan": 10},
+        "guven_skoru": 92, "okuma_seviyesi": "3. Sınıf", "versiyon": 1, "tarih": (simdi - timedelta(days=3)).isoformat(),
+    })
+    sonuc["yukleme"] += 1
+
+    demo_parcalar = [
+        {"baslik": "Ormanın Sırrı", "ozet": "Küçük Ali ormanda kaybolur, konuşan hayvanlarla arkadaş olur.", "tema": "Doğa ve Evren", "metin_kesit": "Ağaçların arasından süzülen güneş ışığı ormanın derinliklerini aydınlatıyordu. Küçük Ali ilk kez bu kadar içerilere gelmişti..."},
+        {"baslik": "Dürüst Çocuk", "ozet": "Pazarda para bulan Elif'in dürüstlük hikâyesi.", "tema": "Erdemler", "metin_kesit": "Elif pazarda yerde parlayan bir şey gördü. Eğilip baktığında bunun bir cüzdan olduğunu anladı. 'Bunu sahibine vermem lazım' dedi..."},
+        {"baslik": "Göçmen Kuşlar", "ozet": "Leyleklerin göç yolculuğu ve yol bulma yetenekleri.", "tema": "Doğa ve Evren", "metin_kesit": "Her sonbaharda leylekler uzun bir yolculuğa çıkar. Binlerce kilometre uçarak sıcak ülkelere göç ederler..."},
+        {"baslik": "Takım Çalışması", "ozet": "Sınıftaki öğrencilerin birlikte proje hazırlama hikâyesi.", "tema": "Çocuk Dünyası", "metin_kesit": "Öğretmen sınıfa bir proje verdi: 'Hayalinizdeki şehri tasarlayın.' Herkes tek başına yapmak istedi ama çok zordu..."},
+    ]
+    for j, p in enumerate(demo_parcalar):
+        await db.ai_okuma_parcalari.insert_one({"id": str(uuid.uuid4()), "yukleme_id": demo_yuk_id, "kitap_adi": "Türkçe 3 Ders Kitabı (Demo)", "sinif": 3, "bolum": j+1, **p, "kelime_sayisi": len(p["metin_kesit"].split()), "tarih": simdi.isoformat()})
+        sonuc["parca"] += 1
+
+    demo_sorular = [
+        {"soru": "Ali ormanda kime rastladı?", "secenekler": ["Sincap", "Ayı", "Balık", "Kuş"], "dogru_cevap": 0, "taksonomi": "bilgi", "bolum": 1},
+        {"soru": "Hayvanlar Ali'ye nasıl yardım etti?", "secenekler": ["Yemek verdiler", "Yol gösterdiler", "Şarkı söylediler", "Uyuttular"], "dogru_cevap": 1, "taksonomi": "kavrama", "bolum": 1},
+        {"soru": "Elif cüzdanı neden sahibine verdi?", "secenekler": ["Korktu", "Dürüsttü", "Paraya ihtiyacı yoktu", "Annesi gördü"], "dogru_cevap": 1, "taksonomi": "analiz", "bolum": 2},
+        {"soru": "Sen Elif'in yerinde olsan ne yapardın?", "secenekler": ["Sahibine verirdim", "Saklardım", "Polise götürürdüm", "Bilmiyorum"], "dogru_cevap": 0, "taksonomi": "degerlendirme", "bolum": 2},
+        {"soru": "Leylekler neden göç eder?", "secenekler": ["Sıcak ülke", "Arkadaş bulma", "Yeni yuva", "Uçma öğrenme"], "dogru_cevap": 0, "taksonomi": "bilgi", "bolum": 3},
+        {"soru": "Kuşların yol bulma yeteneğine ne denir?", "secenekler": ["GPS", "İçgüdü", "Harita", "Rüzgar"], "dogru_cevap": 1, "taksonomi": "kavrama", "bolum": 3},
+        {"soru": "Takım çalışması neden önemlidir?", "secenekler": ["Hızlı biter", "Herkes öğrenir", "Eğlenceli", "Hepsi"], "dogru_cevap": 3, "taksonomi": "sentez", "bolum": 4},
+    ]
+    for s in demo_sorular:
+        await db.ai_uretilen_sorular.insert_one({"id": str(uuid.uuid4()), "yukleme_id": demo_yuk_id, "kitap_adi": "Türkçe 3 Ders Kitabı (Demo)", "sinif": 3, **s, "tarih": simdi.isoformat()})
+        sonuc["soru"] += 1
+
+    return {"mesaj": "✅ AI demo verileri oluşturuldu!", "sonuc": sonuc}
+
+
 # ─────────────────────────────────────────────
 # DALGA 2: SOCRATİC READİNG + KELİME EVRİMİ + MİNİ OYUN
 # ─────────────────────────────────────────────
