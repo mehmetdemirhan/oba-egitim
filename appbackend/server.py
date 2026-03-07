@@ -17,6 +17,7 @@ from datetime import datetime, timezone, timedelta
 from enum import Enum
 from passlib.context import CryptContext
 from jose import JWTError, jwt
+import httpx
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -34,6 +35,208 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get('ACCESS_TOKEN_EXPIRE_MINUTES', 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
+
+# ─────────────────────────────────────────────
+# CLAUDE AI YARDIMCI FONKSİYONLAR
+# ─────────────────────────────────────────────
+
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+AI_DEFAULT_MODEL = os.environ.get("AI_DEFAULT_MODEL", "claude-sonnet-4-20250514")
+AI_HAIKU_MODEL = "claude-haiku-4-5-20251001"
+AI_CACHE_HOURS = int(os.environ.get("AI_CACHE_HOURS", "24"))
+AI_MAX_DAILY_REQUESTS = int(os.environ.get("AI_MAX_DAILY_REQUESTS", "200"))
+
+
+async def call_claude(system_prompt: str, user_message: str, model: str = "sonnet", max_tokens: int = 2000) -> dict:
+    """Claude API çağrısı — tüm AI modülleri bu fonksiyonu kullanır."""
+    if not ANTHROPIC_API_KEY:
+        return {"error": "ANTHROPIC_API_KEY tanımlı değil", "text": ""}
+
+    # Günlük istek limiti kontrolü
+    bugun = datetime.utcnow().strftime("%Y-%m-%d")
+    gunluk_istek = await db.ai_request_log.count_documents({"tarih": {"$regex": f"^{bugun}"}})
+    if gunluk_istek >= AI_MAX_DAILY_REQUESTS:
+        return {"error": "Günlük AI istek limiti doldu", "text": ""}
+
+    model_id = AI_HAIKU_MODEL if model == "haiku" else AI_DEFAULT_MODEL
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client_http:
+            response = await client_http.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": ANTHROPIC_API_KEY,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                json={
+                    "model": model_id,
+                    "max_tokens": max_tokens,
+                    "system": system_prompt,
+                    "messages": [{"role": "user", "content": user_message}],
+                },
+            )
+            data = response.json()
+
+        # Log the request
+        token_in = data.get("usage", {}).get("input_tokens", 0)
+        token_out = data.get("usage", {}).get("output_tokens", 0)
+        maliyet = (token_in * 0.003 + token_out * 0.015) / 1000 if model != "haiku" else (token_in * 0.001 + token_out * 0.005) / 1000
+
+        await db.ai_request_log.insert_one({
+            "id": str(uuid.uuid4()),
+            "model": model_id,
+            "token_in": token_in,
+            "token_out": token_out,
+            "maliyet_usd": round(maliyet, 6),
+            "tarih": datetime.utcnow().isoformat(),
+        })
+
+        # Extract text from response
+        text = ""
+        for block in data.get("content", []):
+            if block.get("type") == "text":
+                text += block.get("text", "")
+
+        # Try to parse JSON from response
+        import json as json_mod
+        parsed = None
+        try:
+            # Clean markdown code blocks if present
+            clean = text.strip()
+            if clean.startswith("```"):
+                clean = clean.split("\n", 1)[1] if "\n" in clean else clean[3:]
+                if clean.endswith("```"):
+                    clean = clean[:-3]
+                clean = clean.strip()
+            parsed = json_mod.loads(clean)
+        except:
+            parsed = None
+
+        return {"text": text, "parsed": parsed, "tokens": token_in + token_out, "maliyet": maliyet, "error": None}
+
+    except httpx.TimeoutException:
+        return {"error": "AI yanıt süresi aşıldı (30sn). Lütfen tekrar deneyin.", "text": ""}
+    except Exception as e:
+        logging.error(f"Claude API error: {e}")
+        return {"error": f"AI hatası: {str(e)[:100]}", "text": ""}
+
+
+async def get_ogrenci_ai_verileri(ogrenci_id: str) -> dict:
+    """Bir öğrencinin tüm AI-beslenme verilerini toplar (8 kaynak)."""
+    ogrenci = await db.students.find_one({"id": ogrenci_id})
+    if not ogrenci:
+        ogrenci = await db.users.find_one({"id": ogrenci_id})
+    if not ogrenci:
+        return {}
+
+    # 1. Okuma kayıtları (son 30 gün)
+    otuz_gun_once = (datetime.utcnow() - timedelta(days=30)).isoformat()
+    logs = await db.reading_logs.find({"ogrenci_id": ogrenci_id, "tarih": {"$gte": otuz_gun_once}}).to_list(length=None)
+    toplam_dk = sum(l.get("sure_dakika", 0) for l in logs)
+    gun_sayisi = len(set(l.get("tarih", "")[:10] for l in logs))
+    kitap_sayisi = len(set(l.get("kitap_adi", "") for l in logs if l.get("kitap_adi")))
+
+    # 2. Streak hesaplama
+    tum_logs = await db.reading_logs.find({"ogrenci_id": ogrenci_id}).to_list(length=None)
+    tarihler = sorted(set(l.get("tarih", "")[:10] for l in tum_logs), reverse=True)
+    streak = 0
+    for i, t in enumerate(tarihler):
+        beklenen = (datetime.utcnow() - timedelta(days=i)).strftime("%Y-%m-%d")
+        if t == beklenen:
+            streak += 1
+        else:
+            break
+
+    # 3. Risk skoru
+    risk_data = {}
+    try:
+        # Basit risk hesaplama
+        risk_skor = 0
+        if gun_sayisi < 3: risk_skor += 30
+        elif gun_sayisi < 5: risk_skor += 15
+        if toplam_dk < 30: risk_skor += 15
+        elif toplam_dk < 60: risk_skor += 8
+        if streak == 0: risk_skor += 10
+        gorev_geciken = await db.gorevler.count_documents({"hedef_id": ogrenci_id, "durum": "bekliyor", "son_tarih": {"$lt": datetime.utcnow().isoformat()}})
+        if gorev_geciken > 0: risk_skor += 15
+        risk_seviye = "yuksek" if risk_skor > 60 else "orta" if risk_skor > 30 else "dusuk"
+        risk_data = {"skor": min(risk_skor, 100), "seviye": risk_seviye}
+    except:
+        risk_data = {"skor": 0, "seviye": "dusuk"}
+
+    # 4. XP + Lig
+    xp_data = {}
+    try:
+        toplam_xp = ogrenci.get("toplam_xp", 0)
+        lig_esikleri = {"bronz": 0, "gumus": 200, "altin": 500, "elmas": 1000}
+        lig = "bronz"
+        for l, e in sorted(lig_esikleri.items(), key=lambda x: x[1], reverse=True):
+            if toplam_xp >= e:
+                lig = l
+                break
+        xp_data = {"toplam": toplam_xp, "lig": lig}
+    except:
+        xp_data = {"toplam": 0, "lig": "bronz"}
+
+    # 5. Görevler
+    gorevler = await db.gorevler.find({"hedef_id": ogrenci_id}).to_list(length=None)
+    gorev_ozet = {
+        "toplam": len(gorevler),
+        "tamamlanan": len([g for g in gorevler if g.get("durum") == "tamamlandi"]),
+        "bekleyen": len([g for g in gorevler if g.get("durum") == "bekliyor"]),
+        "suresi_gecen": len([g for g in gorevler if g.get("durum") == "bekliyor" and g.get("son_tarih", "9") < datetime.utcnow().isoformat()]),
+    }
+
+    # 6. Giriş analizi (son rapor)
+    son_rapor = await db.diagnostic_raporlar.find({"ogrenci_id": ogrenci_id}).sort("olusturma_tarihi", -1).to_list(length=1)
+    analiz_data = {}
+    if son_rapor:
+        r = son_rapor[0]
+        analiz_data = {
+            "wpm": r.get("okuma_hizi", {}).get("wpm", 0),
+            "dogruluk": r.get("dogru_okuma", {}).get("dogruluk_orani", 0),
+            "prozodi": r.get("prozodik_okuma", {}).get("toplam", 0),
+        }
+        # Bloom puanları
+        anlama = r.get("okudugunu_anlama", {})
+        if anlama:
+            analiz_data["bloom"] = {
+                "bilgi": anlama.get("bilgi", 0),
+                "kavrama": anlama.get("kavrama", 0),
+                "uygulama": anlama.get("uygulama", 0),
+                "analiz": anlama.get("analiz", 0),
+                "sentez": anlama.get("sentez", 0),
+                "degerlendirme": anlama.get("degerlendirme", 0),
+            }
+
+    # 7. Test sonuçları
+    test_sonuclari = await db.kitap_test_sonuclari.find({"ogrenci_id": ogrenci_id}).to_list(length=None)
+    test_ozet = {"toplam_test": len(test_sonuclari), "ort_yuzde": 0}
+    if test_sonuclari:
+        test_ozet["ort_yuzde"] = round(sum(t.get("yuzde", 0) for t in test_sonuclari) / len(test_sonuclari))
+
+    return {
+        "ogrenci": {
+            "ad": ogrenci.get("ad", ""),
+            "soyad": ogrenci.get("soyad", ""),
+            "sinif": ogrenci.get("sinif", 0),
+            "kur": ogrenci.get("kur", ""),
+        },
+        "okuma_ozet": {
+            "son_30_gun_toplam_dk": toplam_dk,
+            "gun_sayisi": gun_sayisi,
+            "ort_gunluk_dk": round(toplam_dk / max(gun_sayisi, 1), 1),
+            "kitap_sayisi": kitap_sayisi,
+        },
+        "streak": {"mevcut": streak, "en_uzun": max(streak, ogrenci.get("en_uzun_streak", 0))},
+        "risk": risk_data,
+        "xp": xp_data,
+        "gorevler": gorev_ozet,
+        "analiz": analiz_data,
+        "test": test_ozet,
+    }
+
 
 # Create the main app without a prefix
 app = FastAPI(title="Okuma Becerileri Akademisi API")
@@ -3733,6 +3936,266 @@ _original_kur_atla = None  # placeholder
 
 
 # ─────────────────────────────────────────────
+# AI KOÇLUK + DNA + SORU ÜRETİMİ + HİKAYE
+# ─────────────────────────────────────────────
+
+AI_KOCLUK_SYSTEM_PROMPT = """Sen deneyimli bir ilkokul okuma koçusun. Türkiye'de çalışıyorsun. MEB Türkçe müfredatını ve Bloom taksonomisini biliyorsun.
+Görevin: Verilen öğrenci verilerini analiz ederek kişiselleştirilmiş koçluk raporu üretmek.
+DİL: Türkçe. Pozitif ve yapıcı dil kullan. Öğretmene yardımcı ol, öğrenciyi motive et.
+FORMAT: Yanıtını SADECE JSON olarak ver, başka metin ekleme. Markdown code block kullanma."""
+
+AI_SORU_SYSTEM_PROMPT = """Sen Türkçe dil eğitimi uzmanısın. Bloom taksonomisini ve MEB müfredatını biliyorsun.
+Verilen metinden çoktan seçmeli sorular üreteceksin. Her soru 4 şıklı olacak.
+FORMAT: SADECE JSON array ver: [{"soru":"...", "secenekler":["A","B","C","D"], "dogru_cevap":0, "taksonomi":"bilgi|kavrama|uygulama|analiz|sentez|degerlendirme"}]"""
+
+AI_HIKAYE_SYSTEM_PROMPT = """Sen çocuk kitabı yazarısın. MEB Türkçe müfredatını biliyorsun.
+Verilen sınıf seviyesi, tema ve hedef kelimeleri kullanarak kısa bir okuma parçası yazacaksın.
+Hedef kelimelerin TÜMÜNÜ metnin içinde doğal şekilde kullan.
+FORMAT: SADECE JSON ver: {"baslik":"...", "metin":"...", "kelime_sayisi":0, "kullanilan_kelimeler":[], "sorular":[5 Bloom sorusu]}"""
+
+
+@api_router.get("/ai/dna/{ogrenci_id}")
+async def get_okuma_dna(ogrenci_id: str, current_user=Depends(get_current_user)):
+    """7 boyutlu Okuma DNA profili hesapla (Claude API kullanmaz — mevcut verilerden)."""
+    v = await get_ogrenci_ai_verileri(ogrenci_id)
+    if not v:
+        raise HTTPException(status_code=404, detail="Öğrenci bulunamadı")
+
+    ok = v["okuma_ozet"]
+    # 1. Kelime Gücü (0-100)
+    sinif = v["ogrenci"].get("sinif", 3)
+    hedef_kelime = {1:150, 2:300, 3:500, 4:700, 5:1000, 6:1300, 7:1600, 8:2000}.get(sinif, 500)
+    bilinen = await db.kelime_bankasi.count_documents({"ogrenci_id": ogrenci_id, "ogrenildi": True}) if await db.kelime_bankasi.count_documents({}) > 0 else int(hedef_kelime * 0.5)
+    kelime_gucu = min(100, round(bilinen / hedef_kelime * 100))
+
+    # 2. Akıcılık (0-100)
+    wpm = v["analiz"].get("wpm", 0)
+    norm_wpm = {1:50, 2:75, 3:95, 4:115, 5:130, 6:145, 7:155, 8:165}.get(sinif, 95)
+    akicilik = min(100, round(wpm / norm_wpm * 100)) if wpm > 0 else 50
+
+    # 3. Anlama Derinliği (0-100)
+    bloom = v["analiz"].get("bloom", {})
+    if bloom:
+        anlama = round((bloom.get("bilgi",0)*0.1 + bloom.get("kavrama",0)*0.15 + bloom.get("uygulama",0)*0.2 + bloom.get("analiz",0)*0.25 + bloom.get("sentez",0)*0.15 + bloom.get("degerlendirme",0)*0.15))
+    else:
+        anlama = v["test"].get("ort_yuzde", 50)
+
+    # 4. Dikkat Süresi (0-100)
+    ort_dk = ok.get("ort_gunluk_dk", 0)
+    dikkat = min(100, round(ort_dk / 20 * 100)) if ort_dk > 0 else 30
+
+    # 5. Zorluk Toleransı (0-100)
+    zorluk_tol = 50  # Varsayılan, zor metinlerdeki başarı verisi birikince geliştirilecek
+
+    # 6. Kelime Tekrar İhtiyacı (0-100, yüksek = çok tekrara ihtiyacı var)
+    tekrar_ihtiyac = max(0, 100 - kelime_gucu)
+
+    # 7. Okuma Psikolojisi
+    toplam_kitap = ok.get("kitap_sayisi", 0)
+    streak_m = v["streak"].get("mevcut", 0)
+    if toplam_kitap >= 3 and streak_m >= 5:
+        psikoloji = "keşifçi"
+    elif streak_m < 2 and ok.get("gun_sayisi", 0) < 5:
+        psikoloji = "kararsız"
+    else:
+        psikoloji = "güvenli"
+
+    # Profil tipi
+    if akicilik > 70 and anlama < 50:
+        profil_tipi = "hızlı_okuyucu"
+    elif akicilik < 40 and anlama > 70:
+        profil_tipi = "analitik_okuyucu"
+    elif bloom and bloom.get("sentez", 0) > 60:
+        profil_tipi = "hayalci_okuyucu"
+    elif streak_m < 3 and ok.get("gun_sayisi", 0) < 10:
+        profil_tipi = "başlangıç_okuyucu"
+    else:
+        profil_tipi = "dengeli_okuyucu"
+
+    profil_label = {"hızlı_okuyucu": "📖 Hızlı Okuyucu", "analitik_okuyucu": "🔍 Analitik Okuyucu", "hayalci_okuyucu": "🌈 Hayalci Okuyucu", "başlangıç_okuyucu": "🌱 Başlangıç Okuyucu", "dengeli_okuyucu": "⚖️ Dengeli Okuyucu"}
+
+    dna = {
+        "ogrenci_id": ogrenci_id,
+        "boyutlar": {
+            "kelime_gucu": kelime_gucu,
+            "akicilik": akicilik,
+            "anlama_derinligi": anlama,
+            "dikkat_suresi": dikkat,
+            "zorluk_toleransi": zorluk_tol,
+            "kelime_tekrar_ihtiyaci": tekrar_ihtiyac,
+            "okuma_psikolojisi": psikoloji,
+        },
+        "profil_tipi": profil_tipi,
+        "profil_label": profil_label.get(profil_tipi, "📖 Okuyucu"),
+        "sinif": sinif,
+        "son_guncelleme": datetime.utcnow().isoformat(),
+    }
+
+    # Cache'e kaydet
+    await db.okuma_dna.update_one({"ogrenci_id": ogrenci_id}, {"$set": dna}, upsert=True)
+    return dna
+
+
+@api_router.post("/ai/kocluk/{ogrenci_id}")
+async def ai_kocluk(ogrenci_id: str, current_user=Depends(get_current_user)):
+    """Tam AI koçluk raporu (10 modül). 24 saat cache."""
+    # Cache kontrolü
+    cache = await db.ai_kocluk_cache.find_one({
+        "ogrenci_id": ogrenci_id,
+        "tarih": {"$gte": (datetime.utcnow() - timedelta(hours=AI_CACHE_HOURS)).isoformat()}
+    })
+    if cache:
+        cache.pop("_id", None)
+        return cache
+
+    # Veri topla
+    v = await get_ogrenci_ai_verileri(ogrenci_id)
+    if not v or not v.get("ogrenci", {}).get("ad"):
+        raise HTTPException(status_code=404, detail="Öğrenci bulunamadı")
+
+    # DNA hesapla
+    dna = None
+    try:
+        dna_response = await get_okuma_dna(ogrenci_id, current_user)
+        dna = dna_response
+    except:
+        dna = {"profil_tipi": "bilinmiyor", "boyutlar": {}}
+
+    import json as json_mod
+    user_message = f"""Öğrenci verileri:
+{json_mod.dumps(v, ensure_ascii=False, indent=2)}
+
+Okuma DNA:
+{json_mod.dumps(dna, ensure_ascii=False, indent=2) if dna else "Hesaplanamadı"}
+
+Şu 8 modülü JSON olarak üret:
+{{
+  "durum_degerlendirmesi": {{"guclu_yonler": ["..."], "gelisim_alanlari": ["..."]}},
+  "risk_analizi": {{"seviye": "düşük|orta|yüksek", "faktorler": ["..."], "aciliyet": "..."}},
+  "mudahale_plani": {{"hafta_1": "...", "hafta_2": "...", "hafta_3": "...", "hafta_4": "..."}},
+  "veliye_mesaj": "...",
+  "haftalik_gorevler": [{{"gun": "Pazartesi", "gorev": "...", "bloom": "..."}}],
+  "kitap_tavsiyeleri": [{{"ad": "...", "yazar": "...", "neden": "..."}}],
+  "motivasyon_mesaji": "...",
+  "kelime_mudahale": "...",
+  "metin_recetesi": {{"paragraf_uzunlugu": "...", "soyutluk": "...", "aksiyon": "...", "hedef_kelime_orani": "..."}}
+}}"""
+
+    result = await call_claude(AI_KOCLUK_SYSTEM_PROMPT, user_message, model="sonnet", max_tokens=3000)
+
+    if result.get("error"):
+        raise HTTPException(status_code=503, detail=result["error"])
+
+    rapor = {
+        "id": str(uuid.uuid4()),
+        "ogrenci_id": ogrenci_id,
+        "dna": dna,
+        "veriler": v,
+        "ai_analiz": result.get("parsed") or result.get("text", ""),
+        "ai_ham_metin": result.get("text", ""),
+        "model": AI_DEFAULT_MODEL,
+        "token": result.get("tokens", 0),
+        "maliyet": result.get("maliyet", 0),
+        "tarih": datetime.utcnow().isoformat(),
+    }
+
+    await db.ai_kocluk_cache.insert_one(rapor)
+    rapor.pop("_id", None)
+    return rapor
+
+
+@api_router.get("/ai/kocluk/{ogrenci_id}/motivasyon")
+async def ai_motivasyon(ogrenci_id: str, current_user=Depends(get_current_user)):
+    """Günlük kişisel motivasyon mesajı (Haiku — hızlı ve ucuz)."""
+    v = await get_ogrenci_ai_verileri(ogrenci_id)
+    if not v:
+        return {"mesaj": "Bugün okumak için harika bir gün! 📚"}
+
+    ad = v["ogrenci"].get("ad", "Öğrenci")
+    streak = v["streak"].get("mevcut", 0)
+    bugun_dk = v["okuma_ozet"].get("ort_gunluk_dk", 0)
+
+    prompt = f"{ad}, streak: {streak} gün, ortalama {bugun_dk} dk/gün okuyor. 1 cümle motivasyon mesajı yaz. Türkçe, sıcak, kişisel. Sadece mesaj metni ver, başka bir şey yazma."
+
+    result = await call_claude("Sen çocuklara motivasyon veren sıcak bir okuma koçusun.", prompt, model="haiku", max_tokens=100)
+    mesaj = result.get("text", f"Harika gidiyorsun {ad}! 🔥 Streak'in {streak} gün!")
+
+    return {"mesaj": mesaj.strip().strip('"')}
+
+
+@api_router.post("/ai/soru-uret")
+async def ai_soru_uret(payload: dict, current_user=Depends(get_current_user)):
+    """Metin + sınıf → Bloom taksonomili 5-10 soru üretimi."""
+    metin = payload.get("metin", "")
+    sinif = payload.get("sinif", 4)
+    soru_sayisi = payload.get("soru_sayisi", 5)
+
+    if len(metin) < 50:
+        raise HTTPException(status_code=400, detail="Metin en az 50 karakter olmalı")
+
+    user_msg = f"""Sınıf: {sinif}
+Soru sayısı: {soru_sayisi}
+Her Bloom basamağından en az 1 soru olsun (bilgi, kavrama, uygulama, analiz, sentez, degerlendirme).
+
+METİN:
+{metin[:3000]}
+
+SADECE JSON array döndür: [{{"soru":"...", "secenekler":["A","B","C","D"], "dogru_cevap":0, "taksonomi":"bilgi"}}]"""
+
+    result = await call_claude(AI_SORU_SYSTEM_PROMPT, user_msg, model="sonnet", max_tokens=2000)
+
+    if result.get("error"):
+        raise HTTPException(status_code=503, detail=result["error"])
+
+    sorular = result.get("parsed") or []
+    if isinstance(sorular, dict):
+        sorular = sorular.get("sorular", [])
+
+    return {"sorular": sorular, "token": result.get("tokens", 0), "maliyet": result.get("maliyet", 0)}
+
+
+@api_router.post("/ai/hikaye-uret")
+async def ai_hikaye_uret(payload: dict, current_user=Depends(get_current_user)):
+    """Sınıf + tema + hedef kelimeler → kişisel hikâye + 5 Bloom sorusu."""
+    sinif = payload.get("sinif", 3)
+    tema = payload.get("tema", "Doğa ve Evren")
+    kelimeler = payload.get("kelimeler", [])
+    kelime_sayisi = payload.get("kelime_sayisi", 150)
+
+    user_msg = f"""Sınıf: {sinif}. sınıf
+Tema: {tema}
+Hedef kelimeler: {', '.join(kelimeler) if kelimeler else 'pusula, keşif, macera, mevsim, göç'}
+Kelime sayısı: ~{kelime_sayisi}
+Cümle uzunluğu: max {8 + sinif} kelime
+
+SADECE JSON döndür:
+{{"baslik":"...", "metin":"...", "kelime_sayisi":0, "kullanilan_kelimeler":[], "sorular":[{{"soru":"...", "secenekler":["A","B","C","D"], "dogru_cevap":0, "taksonomi":"bilgi"}}]}}"""
+
+    result = await call_claude(AI_HIKAYE_SYSTEM_PROMPT, user_msg, model="sonnet", max_tokens=2500)
+
+    if result.get("error"):
+        raise HTTPException(status_code=503, detail=result["error"])
+
+    return {"hikaye": result.get("parsed") or result.get("text", ""), "token": result.get("tokens", 0), "maliyet": result.get("maliyet", 0)}
+
+
+@api_router.get("/ai/maliyet-ozet")
+async def ai_maliyet_ozet(current_user=Depends(require_role(UserRole.ADMIN))):
+    """Admin: AI maliyet özeti."""
+    bugun = datetime.utcnow().strftime("%Y-%m-%d")
+    bu_ay = datetime.utcnow().strftime("%Y-%m")
+
+    gunluk = await db.ai_request_log.find({"tarih": {"$regex": f"^{bugun}"}}).to_list(length=None)
+    aylik = await db.ai_request_log.find({"tarih": {"$regex": f"^{bu_ay}"}}).to_list(length=None)
+
+    return {
+        "gunluk": {"istek": len(gunluk), "maliyet_usd": round(sum(r.get("maliyet_usd", 0) for r in gunluk), 4)},
+        "aylik": {"istek": len(aylik), "maliyet_usd": round(sum(r.get("maliyet_usd", 0) for r in aylik), 4)},
+        "gunluk_limit": AI_MAX_DAILY_REQUESTS,
+    }
+
+
+# ─────────────────────────────────────────────
 # AI BİLGİ TABANI — PDF/DOCX Yükleme + AI Öğrenme + Puan Sistemi
 # ─────────────────────────────────────────────
 
@@ -3745,6 +4208,123 @@ AI_EGITIM_PUANLARI = {
 }
 
 DESTEKLENEN_FORMATLAR = [".pdf", ".docx", ".doc"]
+
+
+def hesapla_guven_skoru(analiz_sonuc, sinif):
+    """AI Güven Skoru: Yükleme kalitesini 0-100 puanlar"""
+    skor = 0
+    detay = {}
+
+    # 1. Kelime Çeşitliliği (max 25 puan)
+    kelimeler = analiz_sonuc.get("hedef_kelimeler", [])
+    kelime_sayisi = len(kelimeler)
+    if kelime_sayisi >= 30:
+        detay["kelime_cesitliligi"] = 25
+    elif kelime_sayisi >= 20:
+        detay["kelime_cesitliligi"] = 20
+    elif kelime_sayisi >= 10:
+        detay["kelime_cesitliligi"] = 15
+    elif kelime_sayisi >= 5:
+        detay["kelime_cesitliligi"] = 10
+    else:
+        detay["kelime_cesitliligi"] = 3
+    skor += detay["kelime_cesitliligi"]
+
+    # 2. Soru Kalitesi — Bloom dağılımı (max 25 puan)
+    sorular = analiz_sonuc.get("sorular", [])
+    bloom_dagilim = set()
+    for s in sorular:
+        b = s.get("bloom_basamagi") or s.get("taksonomi", "")
+        if b:
+            bloom_dagilim.add(b)
+    if len(bloom_dagilim) >= 5:
+        detay["soru_kalitesi"] = 25
+    elif len(bloom_dagilim) >= 4:
+        detay["soru_kalitesi"] = 20
+    elif len(bloom_dagilim) >= 3:
+        detay["soru_kalitesi"] = 15
+    elif len(bloom_dagilim) >= 2:
+        detay["soru_kalitesi"] = 10
+    else:
+        detay["soru_kalitesi"] = 5 if len(sorular) > 0 else 0
+    skor += detay["soru_kalitesi"]
+
+    # 3. Zorluk Uyumu — metnin zorluk puanı sınıf seviyesine uygun mu? (max 25 puan)
+    zorluk = analiz_sonuc.get("zorluk_puani", 5)
+    beklenen_zorluk = sinif  # 1. sınıf → 1, 4. sınıf → 4 civarı
+    fark = abs(zorluk - beklenen_zorluk)
+    if fark <= 1:
+        detay["zorluk_uyumu"] = 25
+    elif fark <= 2:
+        detay["zorluk_uyumu"] = 18
+    elif fark <= 3:
+        detay["zorluk_uyumu"] = 10
+    else:
+        detay["zorluk_uyumu"] = 3
+    skor += detay["zorluk_uyumu"]
+
+    # 4. Okuma Seviyesi Analizi — Grade Level Score varlığı (max 25 puan)
+    grade_level = analiz_sonuc.get("grade_level_score", {})
+    if grade_level:
+        gl_sinif = grade_level.get("tahmini_sinif", 0)
+        gl_fark = abs(gl_sinif - sinif)
+        if gl_fark <= 0.5:
+            detay["seviye_uyumu"] = 25
+        elif gl_fark <= 1:
+            detay["seviye_uyumu"] = 20
+        elif gl_fark <= 2:
+            detay["seviye_uyumu"] = 12
+        else:
+            detay["seviye_uyumu"] = 5
+    else:
+        detay["seviye_uyumu"] = 10  # Grade level yoksa orta puan
+    skor += detay["seviye_uyumu"]
+
+    return {"skor": min(skor, 100), "detay": detay, "seviye": "yuksek" if skor >= 75 else "orta" if skor >= 50 else "dusuk"}
+
+
+def hesapla_grade_level(metin):
+    """Okuma Seviyesi Analizi — Grade Level Score"""
+    kelimeler = metin.split()
+    kelime_sayisi = len(kelimeler)
+    if kelime_sayisi == 0:
+        return {"kelime_sayisi": 0, "ort_kelime_uzunlugu": 0, "ort_cumle_uzunlugu": 0, "tahmini_sinif": 1, "zorluk_puani": 1}
+
+    # Ortalama kelime uzunluğu
+    ort_kelime_uzunlugu = sum(len(k) for k in kelimeler) / kelime_sayisi
+
+    # Cümle sayısı
+    import re
+    cumleler = re.split(r'[.!?]+', metin)
+    cumle_sayisi = max(len([c for c in cumleler if c.strip()]), 1)
+    ort_cumle_uzunlugu = kelime_sayisi / cumle_sayisi
+
+    # Uzun kelime oranı (7+ harf)
+    uzun_kelime_orani = sum(1 for k in kelimeler if len(k) >= 7) / kelime_sayisi
+
+    # Soyut kelime tahmini (basit heuristik: -lık, -lik, -sel, -sal, -cilik gibi ekler)
+    soyut_ekler = ["lık", "lik", "luk", "lük", "sel", "sal", "cilik", "çilik", "sızlık", "sizlik"]
+    soyut_sayisi = sum(1 for k in kelimeler if any(k.lower().endswith(e) for e in soyut_ekler))
+    soyutluk_orani = soyut_sayisi / kelime_sayisi
+
+    # Grade Level hesaplama (Türkçe uyarlamalı basit formül)
+    # Temel: ort_cumle_uzunlugu * 0.3 + ort_kelime_uzunlugu * 0.5 + uzun_kelime_orani * 10 + soyutluk_orani * 15
+    ham_skor = (ort_cumle_uzunlugu * 0.3) + (ort_kelime_uzunlugu * 0.5) + (uzun_kelime_orani * 10) + (soyutluk_orani * 15)
+
+    # Sınıf seviyesine çevirme (1-8 arası)
+    tahmini_sinif = max(1, min(8, round(ham_skor / 2)))
+    zorluk_puani = max(1, min(10, round(ham_skor)))
+
+    return {
+        "kelime_sayisi": kelime_sayisi,
+        "cumle_sayisi": cumle_sayisi,
+        "ort_kelime_uzunlugu": round(ort_kelime_uzunlugu, 1),
+        "ort_cumle_uzunlugu": round(ort_cumle_uzunlugu, 1),
+        "uzun_kelime_orani": round(uzun_kelime_orani * 100, 1),
+        "soyutluk_orani": round(soyutluk_orani * 100, 1),
+        "tahmini_sinif": tahmini_sinif,
+        "zorluk_puani": zorluk_puani,
+    }
 
 
 @api_router.post("/ai/bilgi-tabani/yukle")
@@ -3776,6 +4356,22 @@ async def ai_bilgi_tabani_yukle(
     if bugun_yukleme >= limit:
         raise HTTPException(status_code=429, detail=f"Günlük yükleme limitine ulaştınız ({limit})")
 
+    # ── DUPLICATE KONTROL ──
+    import hashlib
+    dosya_hash = hashlib.sha256(icerik).hexdigest()
+    mevcut = await db.ai_yuklemeler.find_one({"dosya_hash": dosya_hash})
+    if mevcut:
+        raise HTTPException(status_code=409, detail=f"Bu dosya daha önce yüklenmiş: '{mevcut.get('kitap_adi', '')}' ({mevcut.get('tarih', '')[:10]}, {mevcut.get('yukleyen_ad', '')})")
+
+    # İsim bazlı benzerlik kontrolü (aynı kitap farklı dosya)
+    benzer = await db.ai_yuklemeler.find_one({
+        "kitap_adi": {"$regex": f"^{(kitap_adi or dosya.filename.replace(ext, '')).strip()[:30]}",  "$options": "i"},
+        "sinif": sinif,
+    })
+    duplicate_uyari = ""
+    if benzer:
+        duplicate_uyari = f"⚠️ Benzer yükleme mevcut: '{benzer.get('kitap_adi')}' ({benzer.get('tarih', '')[:10]}). Yine de yüklendi."
+
     import base64
     dosya_b64 = base64.b64encode(icerik).decode("utf-8")
 
@@ -3784,6 +4380,7 @@ async def ai_bilgi_tabani_yukle(
         "dosya_adi": dosya.filename,
         "dosya_boyut": len(icerik),
         "dosya_format": ext,
+        "dosya_hash": dosya_hash,
         "dosya_b64": dosya_b64,
         "sinif": sinif,
         "tur": tur,
@@ -3793,8 +4390,11 @@ async def ai_bilgi_tabani_yukle(
         "yukleyen_id": current_user["id"],
         "yukleyen_ad": f"{current_user.get('ad', '')} {current_user.get('soyad', '')}".strip(),
         "yukleyen_rol": current_user.get("role", ""),
-        "durum": "yuklendi",  # yuklendi → isleniyor → tamamlandi / hata
+        "durum": "yuklendi",
         "onayli": current_user.get("role") in ["admin", "coordinator"],
+        # AI Güven Skoru alanları (işleme sonrası doldurulur)
+        "guven_skoru": None,
+        "okuma_seviyesi": None,
         "sonuc": {},
         "versiyon": 1,
         "tarih": datetime.utcnow().isoformat(),
@@ -3818,7 +4418,10 @@ async def ai_bilgi_tabani_yukle(
 
     yukleme.pop("_id", None)
     yukleme.pop("dosya_b64", None)
-    return {"yukleme": yukleme, "puan_kazanilan": puan, "mesaj": f"✅ +{puan} puan! Dosya yüklendi, işlenmeyi bekliyor."}
+    mesaj = f"✅ +{puan} puan! Dosya yüklendi, işlenmeyi bekliyor."
+    if duplicate_uyari:
+        mesaj += f" {duplicate_uyari}"
+    return {"yukleme": yukleme, "puan_kazanilan": puan, "mesaj": mesaj}
 
 
 @api_router.get("/ai/bilgi-tabani/gecmis")
@@ -3863,6 +4466,20 @@ async def ai_bilgi_tabani_istatistik(current_user=Depends(get_current_user)):
                 "yukleme": doc["yukleme_sayisi"],
             })
 
+    # Güven skoru istatistikleri
+    guven_yuklemeler = await db.ai_yuklemeler.find({"guven_skoru": {"$ne": None}}, {"guven_skoru": 1}).to_list(length=None)
+    guven_skorlari = [y["guven_skoru"]["toplam"] for y in guven_yuklemeler if y.get("guven_skoru", {}).get("toplam")]
+    guven_ort = round(sum(guven_skorlari) / max(len(guven_skorlari), 1), 1) if guven_skorlari else 0
+    guven_dagilim = {"yuksek": 0, "orta": 0, "dusuk": 0}
+    for y in guven_yuklemeler:
+        sev = y.get("guven_skoru", {}).get("seviye", "")
+        if sev in guven_dagilim:
+            guven_dagilim[sev] += 1
+
+    # Duplicate önleme istatistikleri
+    toplam_hash = await db.ai_yuklemeler.distinct("dosya_hash")
+    duplicate_engellenen = toplam_yukleme - len(toplam_hash) if toplam_yukleme > len(toplam_hash) else 0
+
     return {
         "toplam_yukleme": toplam_yukleme,
         "tamamlanan": tamamlanan,
@@ -3871,6 +4488,8 @@ async def ai_bilgi_tabani_istatistik(current_user=Depends(get_current_user)):
         "toplam_ai_soru": toplam_soru,
         "sinif_dagilim": sinif_dagilim,
         "top_contributors": top_contributors,
+        "guven_skoru": {"ortalama": guven_ort, "dagilim": guven_dagilim},
+        "duplicate_engellenen": duplicate_engellenen,
     }
 
 
@@ -3903,6 +4522,146 @@ async def ai_egitim_puanlarim(current_user=Depends(get_current_user)):
         p.pop("_id", None)
     toplam = sum(p.get("puan", 0) for p in puanlar)
     return {"toplam": toplam, "detay": puanlar}
+
+
+# AI Güven Skoru hesaplama (yükleme sonrası çağrılır)
+@api_router.post("/ai/bilgi-tabani/guven-skoru/{yukleme_id}")
+async def ai_guven_skoru_hesapla(yukleme_id: str, payload: dict, current_user=Depends(get_current_user)):
+    """
+    AI işleme sonrası güven skoru hesaplar.
+    payload: { kelime_sayisi, benzersiz_kelime, soru_sayisi, bloom_dagilim{}, zorluk_puani, sinif }
+    """
+    kelime_sayisi = payload.get("kelime_sayisi", 0)
+    benzersiz = payload.get("benzersiz_kelime", 0)
+    soru_sayisi = payload.get("soru_sayisi", 0)
+    bloom = payload.get("bloom_dagilim", {})
+    zorluk = payload.get("zorluk_puani", 5)
+    sinif = payload.get("sinif", 3)
+
+    # 1. Kelime çeşitliliği skoru (0-25)
+    if kelime_sayisi == 0:
+        kelime_skor = 0
+    else:
+        cesitlilik = benzersiz / max(kelime_sayisi, 1)
+        kelime_skor = min(25, round(cesitlilik * 50))  # %50 çeşitlilik = 25 puan
+
+    # 2. Soru kalitesi skoru (0-25)
+    bloom_turleri = len([v for v in bloom.values() if v > 0])
+    soru_skor = 0
+    if soru_sayisi >= 5:
+        soru_skor += 10
+    elif soru_sayisi >= 3:
+        soru_skor += 5
+    soru_skor += min(15, bloom_turleri * 3)  # 5 bloom = 15 puan
+
+    # 3. Zorluk uyumu skoru (0-25)
+    # İdeal zorluk: sınıf seviyesine yakın (sinif * 1.2 civarı)
+    ideal_zorluk = min(10, sinif * 1.2)
+    zorluk_fark = abs(zorluk - ideal_zorluk)
+    zorluk_skor = max(0, 25 - round(zorluk_fark * 5))
+
+    # 4. İçerik zenginliği skoru (0-25)
+    icerik_skor = 0
+    if kelime_sayisi >= 500:
+        icerik_skor += 10
+    elif kelime_sayisi >= 200:
+        icerik_skor += 5
+    if benzersiz >= 50:
+        icerik_skor += 8
+    elif benzersiz >= 20:
+        icerik_skor += 4
+    if soru_sayisi >= 10:
+        icerik_skor += 7
+    elif soru_sayisi >= 5:
+        icerik_skor += 3
+
+    toplam = kelime_skor + soru_skor + zorluk_skor + icerik_skor
+    seviye = "yuksek" if toplam >= 70 else "orta" if toplam >= 40 else "dusuk"
+
+    guven = {
+        "toplam": toplam,
+        "seviye": seviye,
+        "detay": {
+            "kelime_cesitliligi": {"skor": kelime_skor, "max": 25, "aciklama": f"{benzersiz} benzersiz / {kelime_sayisi} toplam kelime"},
+            "soru_kalitesi": {"skor": soru_skor, "max": 25, "aciklama": f"{soru_sayisi} soru, {bloom_turleri} Bloom basamağı"},
+            "zorluk_uyumu": {"skor": zorluk_skor, "max": 25, "aciklama": f"Zorluk {zorluk}/10, {sinif}. sınıf için ideal ~{round(ideal_zorluk, 1)}"},
+            "icerik_zenginligi": {"skor": icerik_skor, "max": 25, "aciklama": f"{kelime_sayisi} kelime, {benzersiz} benzersiz, {soru_sayisi} soru"},
+        }
+    }
+
+    await db.ai_yuklemeler.update_one({"id": yukleme_id}, {"$set": {"guven_skoru": guven}})
+    return guven
+
+
+# Okuma Seviyesi Analizi (Grade Level Score)
+@api_router.post("/ai/bilgi-tabani/okuma-seviyesi")
+async def ai_okuma_seviyesi_hesapla(payload: dict, current_user=Depends(get_current_user)):
+    """
+    Metin zorluk analizi — adaptif motor için kritik.
+    payload: { metin, sinif_hedef }
+    Döner: Grade Level Score (1-8 sınıf eşdeğeri)
+    """
+    metin = payload.get("metin", "")
+    sinif_hedef = payload.get("sinif_hedef", 3)
+
+    if not metin or len(metin) < 50:
+        return {"hata": "Metin en az 50 karakter olmalı"}
+
+    # Metrik hesaplama
+    cumleler = [c.strip() for c in metin.replace("!", ".").replace("?", ".").split(".") if c.strip()]
+    kelimeler = metin.split()
+    toplam_kelime = len(kelimeler)
+    toplam_cumle = max(len(cumleler), 1)
+    toplam_hece = sum(hece_say(k) for k in kelimeler)
+
+    # Ort cümle uzunluğu (kelime/cümle)
+    ort_cumle = toplam_kelime / toplam_cumle
+    # Ort kelime uzunluğu (harf)
+    ort_kelime_uzunluk = sum(len(k) for k in kelimeler) / max(toplam_kelime, 1)
+    # Ort hece/kelime
+    ort_hece = toplam_hece / max(toplam_kelime, 1)
+
+    # Ateşman Okunabilirlik Formülü (Türkçe uyarlaması)
+    # Okunabilirlik = 198.825 – 40.175 × (hece/kelime) – 2.610 × (kelime/cümle)
+    atesman = 198.825 - (40.175 * ort_hece) - (2.610 * ort_cumle)
+    atesman = max(0, min(100, round(atesman, 1)))
+
+    # Grade level eşdeğeri
+    if atesman >= 90: grade = 1
+    elif atesman >= 80: grade = 2
+    elif atesman >= 70: grade = 3
+    elif atesman >= 60: grade = 4
+    elif atesman >= 50: grade = 5
+    elif atesman >= 40: grade = 6
+    elif atesman >= 30: grade = 7
+    else: grade = 8
+
+    # Zorluk puanı (1-10)
+    zorluk_puan = max(1, min(10, round((100 - atesman) / 10)))
+
+    # Sınıf uyumu
+    uyum = "uygun" if abs(grade - sinif_hedef) <= 1 else "kolay" if grade < sinif_hedef - 1 else "zor"
+
+    return {
+        "atesman_skoru": atesman,
+        "grade_level": grade,
+        "zorluk_puani": zorluk_puan,
+        "sinif_uyumu": uyum,
+        "metrikler": {
+            "toplam_kelime": toplam_kelime,
+            "toplam_cumle": toplam_cumle,
+            "ort_cumle_uzunlugu": round(ort_cumle, 1),
+            "ort_kelime_uzunlugu": round(ort_kelime_uzunluk, 1),
+            "ort_hece_kelime": round(ort_hece, 1),
+        },
+        "yorum": f"Ateşman skoru {atesman} → {grade}. sınıf seviyesi. Hedef {sinif_hedef}. sınıf için {uyum}."
+    }
+
+
+def hece_say(kelime):
+    """Türkçe hece sayma — sesli harf sayısı"""
+    sesliler = set("aeıioöuüAEIİOÖUÜ")
+    return max(1, sum(1 for h in kelime if h in sesliler))
 
 
 # ─────────────────────────────────────────────
