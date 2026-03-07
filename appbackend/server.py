@@ -4413,136 +4413,6 @@ async def ai_bilgi_tabani_yukle(
     return {"yukleme": yukleme, "puan_kazanilan": puan, "mesaj": mesaj}
 
 
-@api_router.post("/ai/bilgi-tabani/yukle-url")
-async def ai_bilgi_tabani_yukle_url(payload: dict, current_user=Depends(get_current_user)):
-    """URL'den PDF/Word indir ve bilgi tabanına ekle."""
-    url = payload.get("url", "").strip()
-    sinif = payload.get("sinif", 3)
-    tur = payload.get("tur", "ders_kitabi")
-    kitap_adi = payload.get("kitap_adi", "")
-    yazar = payload.get("yazar", "")
-
-    if not url:
-        raise HTTPException(status_code=400, detail="URL boş olamaz")
-
-    # URL formatı kontrolü
-    if not url.startswith("http://") and not url.startswith("https://"):
-        raise HTTPException(status_code=400, detail="Geçerli bir URL girin (http:// veya https://)")
-
-    # Dosya uzantısı kontrolü
-    import os as os_mod
-    url_path = url.split("?")[0].split("#")[0]
-    ext = os_mod.path.splitext(url_path)[1].lower()
-    if ext not in [".pdf", ".docx", ".doc"]:
-        # Uzantı URL'de yoksa content-type'dan bakacağız
-        ext = ".pdf"  # varsayılan
-
-    # Günlük limit kontrolü
-    bugun = datetime.utcnow().strftime("%Y-%m-%d")
-    bugun_yukleme = await db.ai_yuklemeler.count_documents({
-        "yukleyen_id": current_user["id"],
-        "tarih": {"$regex": f"^{bugun}"}
-    })
-    limit = 10 if current_user.get("role") in ["admin", "coordinator"] else 3
-    if bugun_yukleme >= limit:
-        raise HTTPException(status_code=429, detail=f"Günlük yükleme limitine ulaştınız ({limit})")
-
-    # URL'den dosya indir
-    try:
-        async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client_http:
-            response = await client_http.get(url, headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-            })
-            if response.status_code != 200:
-                raise HTTPException(status_code=400, detail=f"Dosya indirilemedi: HTTP {response.status_code}")
-
-            icerik = response.content
-            content_type = response.headers.get("content-type", "")
-
-            # Content-type'dan format belirle
-            if "pdf" in content_type:
-                ext = ".pdf"
-            elif "word" in content_type or "docx" in content_type:
-                ext = ".docx"
-            elif "msword" in content_type:
-                ext = ".doc"
-
-            if len(icerik) > 50 * 1024 * 1024:
-                raise HTTPException(status_code=400, detail="Dosya 50 MB'den büyük")
-            if len(icerik) < 1000:
-                raise HTTPException(status_code=400, detail="İndirilen dosya çok küçük veya boş. URL'yi kontrol edin.")
-
-    except httpx.TimeoutException:
-        raise HTTPException(status_code=408, detail="Dosya indirme zaman aşımına uğradı (60sn). URL'yi kontrol edin.")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Dosya indirme hatası: {str(e)[:200]}")
-
-    # Hash kontrolü
-    import hashlib
-    dosya_hash = hashlib.sha256(icerik).hexdigest()
-    mevcut = await db.ai_yuklemeler.find_one({"dosya_hash": dosya_hash})
-    if mevcut:
-        raise HTTPException(status_code=409, detail=f"Bu dosya daha önce yüklenmiş: '{mevcut.get('kitap_adi', '')}'")
-
-    # Dosya adını URL'den çıkar
-    dosya_adi = url.split("/")[-1].split("?")[0] or "indirilen_dosya" + ext
-    if not kitap_adi:
-        kitap_adi = dosya_adi.replace(ext, "").replace("_", " ").replace("-", " ").title()
-
-    import base64
-    dosya_b64 = base64.b64encode(icerik).decode("utf-8")
-
-    yukleme = {
-        "id": str(uuid.uuid4()),
-        "dosya_adi": dosya_adi,
-        "dosya_boyut": len(icerik),
-        "dosya_format": ext,
-        "dosya_hash": dosya_hash,
-        "dosya_b64": dosya_b64,
-        "kaynak_url": url,
-        "sinif": sinif,
-        "tur": tur,
-        "kitap_adi": kitap_adi,
-        "yazar": yazar,
-        "temalar": [],
-        "yukleyen_id": current_user["id"],
-        "yukleyen_ad": f"{current_user.get('ad', '')} {current_user.get('soyad', '')}".strip(),
-        "yukleyen_rol": current_user.get("role", ""),
-        "durum": "yuklendi",
-        "onayli": current_user.get("role") in ["admin", "coordinator"],
-        "guven_skoru": None,
-        "okuma_seviyesi": None,
-        "sonuc": {},
-        "versiyon": 1,
-        "tarih": datetime.utcnow().isoformat(),
-    }
-    await db.ai_yuklemeler.insert_one(yukleme)
-
-    # Puan ver
-    puan = AI_EGITIM_PUANLARI.get(f"{ext.replace('.', '')}_yukle", 20)
-    await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": puan}})
-    await db.ai_egitim_puanlari.insert_one({
-        "id": str(uuid.uuid4()),
-        "kullanici_id": current_user["id"],
-        "eylem": "url_yukle",
-        "dosya_adi": dosya_adi,
-        "sinif": sinif,
-        "puan": puan,
-        "tarih": datetime.utcnow().isoformat(),
-    })
-
-    yukleme.pop("_id", None)
-    yukleme.pop("dosya_b64", None)
-    return {
-        "yukleme": yukleme,
-        "puan_kazanilan": puan,
-        "mesaj": f"✅ +{puan} puan! '{kitap_adi}' URL'den indirildi ({len(icerik)//1024} KB).",
-        "boyut_kb": len(icerik) // 1024,
-    }
-
-
 @api_router.post("/ai/bilgi-tabani/isle/{yukleme_id}")
 async def ai_bilgi_tabani_isle(yukleme_id: str, current_user=Depends(get_current_user)):
     """Yüklenen dosyayı AI ile işle: metin çıkar → kelimeler + okuma parçaları + sorular üret."""
@@ -4795,6 +4665,106 @@ async def ai_bilgi_tabani_ilerleme(yukleme_id: str, current_user=Depends(get_cur
     if not yukleme:
         return {"ilerleme": 0, "durum": "bulunamadi"}
     return {"ilerleme": yukleme.get("ilerleme", 0), "durum": yukleme.get("durum", "yuklendi"), "sonuc": yukleme.get("sonuc", {})}
+
+
+@api_router.post("/ai/bilgi-tabani/yukle-url")
+async def ai_bilgi_tabani_yukle_url(payload: dict, current_user=Depends(get_current_user)):
+    """URL'den PDF/Word dosyası indirip yükle."""
+    url = (payload.get("url") or "").strip()
+    if not url or not url.startswith("http"):
+        raise HTTPException(status_code=400, detail="Geçerli bir URL girin")
+
+    sinif = payload.get("sinif", 3)
+    tur = payload.get("tur", "ders_kitabi")
+    kitap_adi = payload.get("kitap_adi", "")
+    yazar = payload.get("yazar", "")
+
+    # Dosyayı indir
+    try:
+        async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client_http:
+            resp = await client_http.get(url)
+            if resp.status_code != 200:
+                raise HTTPException(status_code=400, detail=f"Dosya indirilemedi: HTTP {resp.status_code}")
+            icerik = resp.content
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=408, detail="Dosya indirme zaman aşımı (60sn)")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"İndirme hatası: {str(e)[:200]}")
+
+    # Format tespiti
+    dosya_adi = url.split("/")[-1].split("?")[0]
+    ext = "." + dosya_adi.split(".")[-1].lower() if "." in dosya_adi else ""
+    if ext not in [".pdf", ".docx", ".doc"]:
+        # Content-Type'dan dene
+        ct = resp.headers.get("content-type", "")
+        if "pdf" in ct:
+            ext = ".pdf"
+            dosya_adi = dosya_adi or "indirilen.pdf"
+        elif "word" in ct or "docx" in ct:
+            ext = ".docx"
+            dosya_adi = dosya_adi or "indirilen.docx"
+        else:
+            ext = ".pdf"  # varsayılan
+            dosya_adi = dosya_adi or "indirilen.pdf"
+
+    if ext not in DESTEKLENEN_FORMATLAR:
+        raise HTTPException(status_code=400, detail=f"Desteklenmeyen format: {ext}")
+
+    # Duplicate kontrolü
+    import hashlib
+    dosya_hash = hashlib.sha256(icerik).hexdigest()
+    mevcut = await db.ai_yuklemeler.find_one({"dosya_hash": dosya_hash})
+    if mevcut:
+        raise HTTPException(status_code=409, detail=f"Bu dosya daha önce yüklenmiş: '{mevcut.get('kitap_adi', '')}'")
+
+    import base64
+    dosya_b64 = base64.b64encode(icerik).decode("utf-8")
+
+    yukleme = {
+        "id": str(uuid.uuid4()),
+        "dosya_adi": dosya_adi,
+        "dosya_boyut": len(icerik),
+        "dosya_format": ext,
+        "dosya_hash": dosya_hash,
+        "dosya_b64": dosya_b64,
+        "kaynak_url": url,
+        "sinif": sinif,
+        "tur": tur,
+        "kitap_adi": kitap_adi or dosya_adi.replace(ext, ""),
+        "yazar": yazar,
+        "temalar": [],
+        "yukleyen_id": current_user["id"],
+        "yukleyen_ad": f"{current_user.get('ad', '')} {current_user.get('soyad', '')}".strip(),
+        "yukleyen_rol": current_user.get("role", ""),
+        "durum": "yuklendi",
+        "onayli": current_user.get("role") in ["admin", "coordinator"],
+        "guven_skoru": None,
+        "okuma_seviyesi": None,
+        "sonuc": {},
+        "versiyon": 1,
+        "tarih": datetime.utcnow().isoformat(),
+    }
+    await db.ai_yuklemeler.insert_one(yukleme)
+
+    # Puan
+    puan = 20
+    await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": puan}})
+    await db.ai_egitim_puanlari.insert_one({
+        "id": str(uuid.uuid4()),
+        "kullanici_id": current_user["id"],
+        "eylem": "url_yukle",
+        "dosya_adi": dosya_adi,
+        "sinif": sinif,
+        "puan": puan,
+        "tarih": datetime.utcnow().isoformat(),
+    })
+
+    yukleme.pop("_id", None)
+    yukleme.pop("dosya_b64", None)
+    return {"yukleme": yukleme, "puan_kazanilan": puan, "mesaj": f"✅ +{puan} puan! Link'ten dosya indirildi ve yüklendi."}
+
+
+@api_router.get("/ai/bilgi-tabani/gecmis")
 async def ai_bilgi_tabani_gecmis(current_user=Depends(get_current_user)):
     filtre = {}
     if current_user.get("role") not in ["admin", "coordinator"]:
