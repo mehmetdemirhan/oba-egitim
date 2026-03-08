@@ -7008,6 +7008,72 @@ async def speech_istatistik(ogrenci_id: str, current_user=Depends(get_current_us
 
 
 # ─────────────────────────────────────────────
+# DALGA 3: OKUMA EVRENİ (5 BÖLGE)
+# ─────────────────────────────────────────────
+
+EVREN_BOLGELER = [
+    {"id":"orman","sira":1,"ad":"Orman Kitaplığı","emoji":"🌲","renk":"green","aciklama":"Okuma serüvenin burada başlıyor!","kosul":"Başlangıç — herkese açık","kilitAc":None},
+    {"id":"daglar","sira":2,"ad":"Kelime Dağları","emoji":"⛰️","renk":"blue","aciklama":"50 kelime öğrenince dağlara tırmanırsın!","kosul":"50 kelime öğren","kilitAc":{"tip":"kelime","deger":50}},
+    {"id":"liman","sira":3,"ad":"Hikâye Limanı","emoji":"⚓","renk":"cyan","aciklama":"5 kitap okuyunca limana yanaşırsın!","kosul":"5 kitap oku","kilitAc":{"tip":"kitap","deger":5}},
+    {"id":"kutuphane","sira":4,"ad":"Bilgelik Kütüphanesi","emoji":"🏰","renk":"purple","aciklama":"Bloom testlerinde %60 başarı sağla!","kosul":"Bloom skoru %60+","kilitAc":{"tip":"bloom","deger":60}},
+    {"id":"galaksi","sira":5,"ad":"Hayal Galaksisi","emoji":"🚀","renk":"orange","aciklama":"Her şeyi tamamlayınca galaksiye uçarsın!","kosul":"Hepsini tamamla","kilitAc":{"tip":"hepsi","deger":0}},
+]
+
+
+async def _evren_hesapla(ogrenci_id: str) -> dict:
+    kelime_sayisi = await db.kelime_tekrar.count_documents({"ogrenci_id": ogrenci_id, "seviye": {"$gte": 3}})
+    if kelime_sayisi == 0:
+        kelime_sayisi = await db.kelime_tekrar.count_documents({"ogrenci_id": ogrenci_id})
+    kitaplar = await db.okuma_kayitlari.distinct("kitap_adi", {"ogrenci_id": ogrenci_id, "kitap_adi": {"$exists": True, "$ne": ""}})
+    kitap_sayisi = len([k for k in kitaplar if k and k.strip()])
+    bloom_kayitlar = await db.ai_uretilen_sorular.find({"ogrenci_id": ogrenci_id, "cevaplandi": True}).sort("tarih", -1).to_list(length=30)
+    bloom_skoru = 0
+    if bloom_kayitlar:
+        dogru = sum(1 for k in bloom_kayitlar if k.get("dogru_mu"))
+        bloom_skoru = round(dogru / len(bloom_kayitlar) * 100)
+
+    bolgeler_durum = []
+    aktif_bolge = "orman"
+    for b in EVREN_BOLGELER:
+        acik = True; ilerleme = 100; kac_kaldi = ""
+        kil = b["kilitAc"]
+        if kil:
+            if kil["tip"] == "kelime":
+                acik = kelime_sayisi >= kil["deger"]; ilerleme = min(100, round(kelime_sayisi/kil["deger"]*100))
+                kac_kaldi = f"{max(0,kil['deger']-kelime_sayisi)} kelime daha" if not acik else ""
+            elif kil["tip"] == "kitap":
+                acik = kitap_sayisi >= kil["deger"]; ilerleme = min(100, round(kitap_sayisi/kil["deger"]*100))
+                kac_kaldi = f"{max(0,kil['deger']-kitap_sayisi)} kitap daha" if not acik else ""
+            elif kil["tip"] == "bloom":
+                acik = bloom_skoru >= kil["deger"]; ilerleme = min(100, bloom_skoru)
+                kac_kaldi = f"%{max(0,kil['deger']-bloom_skoru)} daha" if not acik else ""
+            elif kil["tip"] == "hepsi":
+                acik = kelime_sayisi >= 50 and kitap_sayisi >= 5 and bloom_skoru >= 60
+                ilerleme = round((min(100,kelime_sayisi/50*100)+min(100,kitap_sayisi/5*100)+min(100,bloom_skoru/60*100))/3)
+                kac_kaldi = "" if acik else "Önceki bölgeleri tamamla"
+        bolgeler_durum.append({**{k: v for k,v in b.items() if k != "kilitAc"}, "acik": acik, "ilerleme": ilerleme, "kac_kaldi": kac_kaldi})
+        if acik:
+            aktif_bolge = b["id"]
+
+    return {
+        "aktif_bolge": aktif_bolge,
+        "bolgeler": bolgeler_durum,
+        "istatistikler": {"kelime_sayisi": kelime_sayisi, "kitap_sayisi": kitap_sayisi, "bloom_skoru": bloom_skoru},
+    }
+
+
+@api_router.get("/ai/evren/durum/{ogrenci_id}")
+async def evren_durum(ogrenci_id: str, current_user=Depends(get_current_user)):
+    return await _evren_hesapla(ogrenci_id)
+
+
+@api_router.get("/ai/evren/durum-me")
+async def evren_durum_me(current_user=Depends(get_current_user)):
+    ogrenci_id = current_user.get("linked_id") or current_user.get("id")
+    return await _evren_hesapla(ogrenci_id)
+
+
+# ─────────────────────────────────────────────
 # DALGA 3: OKUMA DİKKAT ANALİZİ
 # ─────────────────────────────────────────────
 
