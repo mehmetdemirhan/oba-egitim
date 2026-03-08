@@ -4581,6 +4581,8 @@ function OgrenciPaneli({ user, logout }) {
   const [ligSiralama, setLigSiralama] = useState(null);
   const [aktifSekme, setAktifSekme] = useState("ana");
   const [gelisimAltSekme, setGelisimAltSekme] = useState("icerikler"); // icerikler, egzersizler, okumalarim
+  const [evrenData, setEvrenData] = useState(null);
+  const [evrenYukleniyor, setEvrenYukleniyor] = useState(false);
   const [aktifEkran, setAktifEkran] = useState(null);
   const [okumaBasladi, setOkumaBasladi] = useState(false);
   const [aiMotMesaj, setAiMotMesaj] = useState("");
@@ -5518,7 +5520,7 @@ function OgrenciPaneli({ user, logout }) {
           <h2 className="text-lg font-bold">🎯 Gelişim</h2>
           {/* Alt sekmeler */}
           <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
-            {[{id:"icerikler",l:"📚 İçerikler"},{id:"egzersizler",l:"👁️ Egzersizler"},{id:"okumalarim",l:"📖 Okumalarım"},{id:"kelime_evrimi",l:"🧠 Kelimelerim"}].map(s => (
+            {[{id:"icerikler",l:"📚 İçerikler"},{id:"egzersizler",l:"👁️ Egzersizler"},{id:"okumalarim",l:"📖 Okumalarım"},{id:"kelime_evrimi",l:"🧠 Kelimelerim"},{id:"evren",l:"🌍 Evren"}].map(s => (
               <button key={s.id} onClick={() => setGelisimAltSekme(s.id)}
                 className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${gelisimAltSekme === s.id ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}>{s.l}</button>
             ))}
@@ -5612,6 +5614,94 @@ function OgrenciPaneli({ user, logout }) {
               )}
             </div>);
           })()}
+
+          {/* ── Okuma Evreni ── */}
+          {gelisimAltSekme === "evren" && (
+            <div className="space-y-4">
+              {/* Yükle butonu veya data */}
+              {!evrenData && !evrenYukleniyor && (
+                <div className="text-center py-6">
+                  <div className="text-5xl mb-3">🌍</div>
+                  <h3 className="font-bold text-gray-800 mb-1">Okuma Evreni</h3>
+                  <p className="text-sm text-gray-500 mb-4">Hangi bölgedesin? Keşfet!</p>
+                  <button onClick={async () => { setEvrenYukleniyor(true); try { const r = await axios.get(`${API}/ai/evren/durum-me`); setEvrenData(r.data); } catch(e) {} setEvrenYukleniyor(false); }}
+                    className="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-2xl px-6 py-3 font-medium">
+                    🗺️ Evrenini Keşfet
+                  </button>
+                </div>
+              )}
+              {evrenYukleniyor && <div className="text-center py-8 text-gray-400">⏳ Yükleniyor...</div>}
+              {evrenData && (
+                <>
+                  {/* İstatistik özeti */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { label: "Kelime", val: evrenData.istatistikler.kelime_sayisi, hedef: 50, emoji: "📚" },
+                      { label: "Kitap", val: evrenData.istatistikler.kitap_sayisi, hedef: 5, emoji: "📖" },
+                      { label: "Bloom %", val: evrenData.istatistikler.bloom_skoru, hedef: 60, emoji: "🧠" },
+                    ].map(s => (
+                      <div key={s.label} className="bg-white rounded-2xl p-3 shadow-sm border text-center">
+                        <div className="text-xl">{s.emoji}</div>
+                        <div className="text-lg font-bold text-gray-800">{s.val}{s.label === "Bloom %" ? "%" : ""}</div>
+                        <div className="text-[10px] text-gray-400">{s.label}</div>
+                        <div className="w-full bg-gray-100 rounded-full h-1 mt-1">
+                          <div className="bg-green-400 h-1 rounded-full" style={{width:`${Math.min(100,Math.round(s.val/s.hedef*100))}%`}} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 5 Bölge yol haritası */}
+                  <div className="space-y-3">
+                    {evrenData.bolgeler.map((b, i) => {
+                      const aktif = evrenData.aktif_bolge === b.id;
+                      const renkMap = { green:"from-green-400 to-emerald-500", blue:"from-blue-400 to-blue-600", cyan:"from-cyan-400 to-teal-500", purple:"from-purple-400 to-purple-600", orange:"from-orange-400 to-red-500" };
+                      const bgMap = { green:"bg-green-50 border-green-200", blue:"bg-blue-50 border-blue-200", cyan:"bg-cyan-50 border-cyan-200", purple:"bg-purple-50 border-purple-200", orange:"bg-orange-50 border-orange-200" };
+                      return (
+                        <div key={b.id} className={`rounded-2xl border-2 p-4 transition-all ${
+                          aktif ? `${bgMap[b.renk]} shadow-md` : b.acik ? "bg-white border-gray-200" : "bg-gray-50 border-gray-100 opacity-60"
+                        }`}>
+                          <div className="flex items-center gap-3">
+                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${
+                              aktif ? `bg-gradient-to-br ${renkMap[b.renk]} shadow` : b.acik ? "bg-gray-100" : "bg-gray-200"
+                            }`}>{b.acik ? b.emoji : "🔒"}</div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-sm text-gray-800">{b.ad}</span>
+                                {aktif && <span className="text-[10px] bg-green-500 text-white rounded-full px-2 py-0.5 shrink-0">Buradasın ✨</span>}
+                              </div>
+                              <p className="text-xs text-gray-500 mt-0.5">{b.acik ? b.aciklama : b.kosul}</p>
+                              {!b.acik && b.kac_kaldi && (
+                                <p className="text-xs text-orange-500 font-medium mt-0.5">⏳ {b.kac_kaldi}</p>
+                              )}
+                            </div>
+                          </div>
+                          {/* İlerleme barı */}
+                          {!b.acik && (
+                            <div className="mt-3">
+                              <div className="flex justify-between text-[10px] text-gray-400 mb-1">
+                                <span>İlerleme</span><span>%{b.ilerleme}</span>
+                              </div>
+                              <div className="w-full bg-gray-200 rounded-full h-2">
+                                <div className={`bg-gradient-to-r ${renkMap[b.renk]} h-2 rounded-full transition-all`} style={{width:`${b.ilerleme}%`}} />
+                              </div>
+                            </div>
+                          )}
+                          {/* Bölge arası ok */}
+                          {i < evrenData.bolgeler.length - 1 && (
+                            <div className="text-center text-gray-300 text-xs mt-2">↓</div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <button onClick={async () => { setEvrenYukleniyor(true); try { const r = await axios.get(`${API}/ai/evren/durum-me`); setEvrenData(r.data); } catch(e) {} setEvrenYukleniyor(false); }}
+                    className="w-full text-xs text-center text-gray-400 py-2">🔄 Yenile</button>
+                </>
+              )}
+            </div>
+          )}
 
         </div>)}
 
