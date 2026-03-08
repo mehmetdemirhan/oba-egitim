@@ -5624,7 +5624,7 @@ function OgrenciPaneli({ user, logout }) {
                   <div className="text-5xl mb-3">🌍</div>
                   <h3 className="font-bold text-gray-800 mb-1">Okuma Evreni</h3>
                   <p className="text-sm text-gray-500 mb-4">Hangi bölgedesin? Keşfet!</p>
-                  <button onClick={async () => { setEvrenYukleniyor(true); try { const r = await axios.get(`${API}/ai/evren/durum-me`); setEvrenData(r.data); } catch(e) {} setEvrenYukleniyor(false); }}
+                  <button onClick={async () => { setEvrenYukleniyor(true); try { const r = await axios.get(`${API}/ai/evren/durum-me`); setEvrenData(r.data); } catch(e) { toast({ title: "Sunucu güncelleniyor, biraz bekle ve tekrar dene.", variant: "destructive" }); } setEvrenYukleniyor(false); }}
                     className="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-2xl px-6 py-3 font-medium">
                     🗺️ Evrenini Keşfet
                   </button>
