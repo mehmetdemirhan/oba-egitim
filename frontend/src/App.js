@@ -4604,6 +4604,7 @@ function OgrenciPaneli({ user, logout }) {
   const [speechGecmis, setSpeechGecmis] = useState([]);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
+  const [canliTranskript, setCanliTranskript] = useState(""); // canlı önizleme
   const [agaclar, setAgaclar] = useState([]);
   const [neOkudunForm, setNeOkudunForm] = useState({ kitap_adi: "", bolum: "", baslangic_sayfa: "", bitis_sayfa: "", not_text: "" });
   const [mesajlar, setMesajlar] = useState([]);
@@ -4680,7 +4681,8 @@ function OgrenciPaneli({ user, logout }) {
     setSeciliSpeechMetin(metin);
     setSpeechSonuc(null);
     setSpeechSure(0);
-    audioChunksRef.current = []; // transkript parçaları burada birikecek
+    audioChunksRef.current = [];
+    setCanliTranskript("");
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -4688,39 +4690,46 @@ function OgrenciPaneli({ user, logout }) {
       return;
     }
 
-    try {
-      // Mikrofon izni kontrol
-      await navigator.mediaDevices.getUserMedia({ audio: true });
+    // Mikrofon izni
+    try { await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch(e) { toast({ title: "Mikrofon erişimi gerekli. Lütfen izin ver.", variant: "destructive" }); return; }
 
-      const recognition = new SpeechRecognition();
-      recognition.lang = "tr-TR";
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.maxAlternatives = 1;
+    let aktif = true; // döngüyü kontrol eder
+    let birikmisTumMetin = ""; // tüm oturumun transkripti
 
-      mediaRecorderRef.current = recognition; // recognition'ı ref'e sakla (bitir için)
+    const recognition = new SpeechRecognition();
+    recognition.lang = "tr-TR";
+    recognition.continuous = true;
+    recognition.interimResults = false; // sadece final sonuçlar — daha güvenilir
+    recognition.maxAlternatives = 1;
 
-      recognition.onresult = (event) => {
-        let tumTranskript = "";
-        for (let i = 0; i < event.results.length; i++) {
-          tumTranskript += event.results[i][0].transcript + " ";
+    recognition.onresult = (event) => {
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          birikmisTumMetin += event.results[i][0].transcript + " ";
+          audioChunksRef.current = [birikmisTumMetin.trim()];
+          setCanliTranskript(birikmisTumMetin.trim());
         }
-        audioChunksRef.current = [tumTranskript.trim()]; // son transkripti sakla
-      };
+      }
+    };
 
-      recognition.onerror = (e) => {
-        if (e.error !== "aborted") {
-          toast({ title: `Ses tanıma hatası: ${e.error}`, variant: "destructive" });
-        }
-      };
+    recognition.onerror = (e) => {
+      if (e.error === "no-speech") return; // sessizlik — normal, devam et
+      if (e.error === "aborted") return;   // biz durdurduk
+      toast({ title: `Ses tanıma hatası: ${e.error}`, variant: "destructive" });
+    };
 
-      recognition.start();
-      setSpeechKayit(true);
-      speechSureRef.current = setInterval(() => setSpeechSure(s => s + 1), 1000);
+    // Chrome continuous modda 60sn'de bir kendiliğinden durabilir → yeniden başlat
+    recognition.onend = () => {
+      if (aktif) {
+        try { recognition.start(); } catch(e) {}
+      }
+    };
 
-    } catch(e) {
-      toast({ title: "Mikrofon erişimi gerekli. Lütfen izin ver.", variant: "destructive" });
-    }
+    recognition.start();
+    mediaRecorderRef.current = { recognition, durdur: () => { aktif = false; try { recognition.stop(); } catch(e) {} } };
+    setSpeechKayit(true);
+    speechSureRef.current = setInterval(() => setSpeechSure(s => s + 1), 1000);
   };
 
   const speechBitir = async () => {
@@ -4729,12 +4738,12 @@ function OgrenciPaneli({ user, logout }) {
     setSpeechYukleniyor(true);
 
     // Recognition'ı durdur
-    if (mediaRecorderRef.current) {
-      try { mediaRecorderRef.current.stop(); } catch(e) {}
+    if (mediaRecorderRef.current?.durdur) {
+      mediaRecorderRef.current.durdur();
     }
 
-    // Kısa bekleme — son sonuçların gelmesi için
-    await new Promise(r => setTimeout(r, 600));
+    // Son sonuçların gelmesi için bekle
+    await new Promise(r => setTimeout(r, 800));
 
     const transkript = audioChunksRef.current[0] || "";
 
@@ -4923,8 +4932,16 @@ function OgrenciPaneli({ user, logout }) {
               </div>
 
               <div className="bg-white rounded-2xl border-2 border-purple-200 p-4">
-                <div className="text-xs font-bold text-purple-700 mb-2">📖 Okunan Metin:</div>
+                <div className="text-xs font-bold text-purple-700 mb-2">📖 Yüksek sesle oku:</div>
                 <p className="text-sm text-gray-800 leading-relaxed font-medium">{seciliSpeechMetin.metin}</p>
+              </div>
+
+              {/* Canlı transkript */}
+              <div className="bg-gray-50 rounded-xl border p-3 min-h-[48px]">
+                <div className="text-[10px] text-gray-400 mb-1">🎤 Tarayıcının duyduğu:</div>
+                <p className="text-xs text-gray-600 italic">
+                  {canliTranskript || <span className="text-gray-300">Henüz ses algılanmadı — yüksek sesle okumaya başla</span>}
+                </p>
               </div>
 
               <button onClick={speechBitir} disabled={speechYukleniyor || speechSure < 3}
