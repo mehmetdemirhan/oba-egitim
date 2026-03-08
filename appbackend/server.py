@@ -7008,6 +7008,119 @@ async def speech_istatistik(ogrenci_id: str, current_user=Depends(get_current_us
 
 
 # ─────────────────────────────────────────────
+# DALGA 3: AI MOTİVASYON MOTORU
+# ─────────────────────────────────────────────
+
+@api_router.get("/ai/motivasyon/giris")
+async def motivasyon_giris(current_user=Depends(get_current_user)):
+    """
+    Her girişte çağrılır.
+    - Streak durumu + risk tespiti
+    - Geçmiş performansa göre adaptif hedef önerisi (5/10/15 dk)
+    - AI mesajı (varsa)
+    """
+    ogrenci_id = current_user.get("linked_id") or current_user.get("id")
+    bugun = datetime.utcnow().strftime("%Y-%m-%d")
+    dun = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
+
+    # Bugün zaten hedef seçilmiş mi?
+    hedef_kayit = await db.motivasyon_hedefler.find_one({"ogrenci_id": ogrenci_id, "tarih": bugun})
+    bugun_hedef = hedef_kayit.get("hedef_dk") if hedef_kayit else None
+
+    # Streak hesapla
+    son_7_gun = []
+    for i in range(7):
+        gun = (datetime.utcnow() - timedelta(days=i)).strftime("%Y-%m-%d")
+        var = await db.okuma_kayitlari.find_one({
+            "ogrenci_id": ogrenci_id,
+            "tarih": {"$gte": gun, "$lt": (datetime.utcnow() - timedelta(days=i-1)).strftime("%Y-%m-%d")}
+        })
+        son_7_gun.append(bool(var))
+    mevcut_streak = 0
+    for g in son_7_gun:
+        if g: mevcut_streak += 1
+        else: break
+
+    # Streak riski: dün okumadıysa ve streak > 0
+    dun_okuma = await db.okuma_kayitlari.find_one({
+        "ogrenci_id": ogrenci_id,
+        "tarih": {"$gte": dun, "$lt": bugun}
+    })
+    streak_risk = mevcut_streak > 2 and not dun_okuma
+
+    # Son 7 günün ortalama okuma süresi
+    son_okumalar = await db.okuma_kayitlari.find(
+        {"ogrenci_id": ogrenci_id}
+    ).sort("tarih", -1).to_list(length=7)
+    ort_sure = 0
+    if son_okumalar:
+        ort_sure = sum(k.get("sure_dakika", 0) for k in son_okumalar) / len(son_okumalar)
+
+    # Adaptif hedef önerisi
+    if ort_sure < 5:
+        onerilen_hedef = 5
+        hedef_label = "Küçük bir adım büyük fark yaratır!"
+    elif ort_sure < 12:
+        onerilen_hedef = 10
+        hedef_label = "İyi gidiyorsun, biraz daha uzat!"
+    else:
+        onerilen_hedef = 15
+        hedef_label = "Harika performans, zirvede kal!"
+
+    # AI mesajı
+    ad = current_user.get("ad", "")
+    ai_mesaj = ""
+    if ANTHROPIC_API_KEY:
+        try:
+            prompt = f"""Öğrenci adı: {ad}, streak: {mevcut_streak} gün, ortalama okuma: {ort_sure:.0f} dk/gün.
+Ona tek cümle, sıcak ve motive edici Türkçe bir mesaj yaz. Max 20 kelime."""
+            r = await call_claude("Kısa ve motive edici.", prompt, model="haiku", max_tokens=60)
+            ai_mesaj = r.get("text", "").strip()
+        except Exception:
+            pass
+
+    if not ai_mesaj:
+        # Mock mesajlar — streak'e göre
+        if streak_risk:
+            ai_mesaj = f"🔥 {mevcut_streak} günlük serinini korumak için bugün sadece 5 dakika oku!"
+        elif mevcut_streak >= 7:
+            ai_mesaj = f"Süper! {mevcut_streak} gün üst üste okudun, dur­ma! 🚀"
+        elif mevcut_streak >= 3:
+            ai_mesaj = f"🎯 {mevcut_streak} günlük seri harika gidiyor, devam et!"
+        else:
+            ai_mesaj = f"Merhaba {ad}! Bugün {onerilen_hedef} dakika okumaya ne dersin? 📖"
+
+    return {
+        "bugun_hedef": bugun_hedef,
+        "onerilen_hedef": onerilen_hedef,
+        "hedef_label": hedef_label,
+        "streak": mevcut_streak,
+        "streak_risk": streak_risk,
+        "streak_mesaji": f"🔥 {mevcut_streak} günlük seriniz kırılmak üzere!" if streak_risk else "",
+        "streak_alt_mesaj": "Bugün okuma yapmadın, hemen başla!" if streak_risk else "",
+        "ai_mesaj": ai_mesaj,
+        "ort_sure_dk": round(ort_sure, 1),
+    }
+
+
+@api_router.post("/ai/motivasyon/hedef-sec")
+async def motivasyon_hedef_sec(request: Request, current_user=Depends(get_current_user)):
+    """Öğrencinin seçtiği günlük hedefi kaydet."""
+    body = await request.json()
+    hedef_dk = int(body.get("hedef_dk", 10))
+    if hedef_dk not in [5, 10, 15]:
+        hedef_dk = 10
+    ogrenci_id = current_user.get("linked_id") or current_user.get("id")
+    bugun = datetime.utcnow().strftime("%Y-%m-%d")
+    await db.motivasyon_hedefler.update_one(
+        {"ogrenci_id": ogrenci_id, "tarih": bugun},
+        {"$set": {"hedef_dk": hedef_dk, "tarih": bugun, "ogrenci_id": ogrenci_id}},
+        upsert=True
+    )
+    return {"ok": True, "hedef_dk": hedef_dk}
+
+
+# ─────────────────────────────────────────────
 # DALGA 3: OKUMA EVRENİ (5 BÖLGE)
 # ─────────────────────────────────────────────
 
