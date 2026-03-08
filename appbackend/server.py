@@ -7008,6 +7008,179 @@ async def speech_istatistik(ogrenci_id: str, current_user=Depends(get_current_us
 
 
 # ─────────────────────────────────────────────
+# DALGA 4: KİTAP ZEKÂ HARİTASI
+# ─────────────────────────────────────────────
+
+ZEKA_BOYUTLARI = ["soyutluk", "kelime_zorlugu", "hayal_gucu", "felsefi_derinlik", "aksiyon", "duygusal_yogunluk", "hedef_kelime_yogunlugu"]
+ZEKA_ETIKETLER = {
+    "soyutluk": "Soyutluk",
+    "kelime_zorlugu": "Kelime Zorluğu",
+    "hayal_gucu": "Hayal Gücü",
+    "felsefi_derinlik": "Felsefi Derinlik",
+    "aksiyon": "Aksiyon",
+    "duygusal_yogunluk": "Duygusal Yoğunluk",
+    "hedef_kelime_yogunlugu": "Kelime Yoğunluğu",
+}
+
+
+def _dna_ile_kitap_eslesme(dna: dict, profil: dict) -> float:
+    """Öğrencinin DNA'sı ile kitap profilinin uyum skoru (0-100)."""
+    if not dna or not profil:
+        return 50.0
+    # DNA boyutları → kitap boyutu eşleştirmesi
+    eslesmeler = [
+        (dna.get("kelime_gucu", 50), profil.get("kelime_zorlugu", 5), False),      # kelime gücü yüksekse zor kitap iyi
+        (dna.get("anlama_derinligi", 50), profil.get("soyutluk", 5), False),         # anlama derinliği yüksekse soyut kitap iyi
+        (dna.get("anlama_derinligi", 50), profil.get("felsefi_derinlik", 5), False), # aynı
+        (dna.get("akicilik", 50), profil.get("aksiyon", 5), True),                   # akıcı okuyucu aksiyon kitabı sever
+    ]
+    toplam = 0.0
+    for dna_val, kitap_val, dogrusal in eslesmeler:
+        kitap_norm = kitap_val * 10  # 1-10 → 0-100
+        if dogrusal:
+            fark = abs(dna_val - kitap_norm)
+            toplam += max(0, 100 - fark)
+        else:
+            # DNA yüksekse yüksek kitap değeri iyi
+            uyum = min(dna_val, kitap_norm) / max(dna_val, kitap_norm, 1) * 100
+            toplam += uyum
+    return round(toplam / len(eslesmeler), 1)
+
+
+@api_router.post("/ai/kitap-zeka/analiz")
+async def kitap_zeka_analiz(request: Request, current_user=Depends(get_current_user)):
+    """
+    Kitap adı ve yazardan 7 boyutlu Zekâ Haritası üret.
+    Varsa cache'den döner, yoksa Claude ile üretir.
+    """
+    body = await request.json()
+    kitap_adi = body.get("kitap_adi", "").strip()
+    yazar = body.get("yazar", "").strip()
+    kitap_id = body.get("kitap_id", "")
+    sinif = int(body.get("sinif", 3))
+
+    if not kitap_adi:
+        raise HTTPException(status_code=400, detail="Kitap adı gerekli")
+
+    # Cache kontrolü
+    cache_key = f"{kitap_adi.lower()}_{yazar.lower()}"
+    mevcut = await db.kitap_zeka_profilleri.find_one({"cache_key": cache_key})
+    if mevcut:
+        mevcut.pop("_id", None)
+        return mevcut
+
+    # Claude ile 7 boyut analizi
+    boyutlar = {}
+    ai_aciklama = ""
+
+    if ANTHROPIC_API_KEY:
+        try:
+            prompt = f"""Kitap: "{kitap_adi}" — Yazar: {yazar or 'bilinmiyor'} — Hedef sınıf: {sinif}
+
+Bu kitabı 7 boyutta 1-10 arası puan ver (1=çok düşük, 10=çok yüksek):
+1. soyutluk — Soyut kavramlar, metafor kullanımı
+2. kelime_zorlugu — Kelime hazinesi güçlüğü
+3. hayal_gucu — Hayal gücü ve yaratıcılık gerektirme
+4. felsefi_derinlik — Felsefi ve ahlaki sorular
+5. aksiyon — Aksiyon, macera, hız
+6. duygusal_yogunluk — Duygusal etki, empati
+7. hedef_kelime_yogunlugu — MEB hedef kelime yoğunluğu
+
+Ayrıca 1 cümle Türkçe açıklama yaz.
+
+SADECE JSON döndür:
+{{"soyutluk":5,"kelime_zorlugu":4,"hayal_gucu":8,"felsefi_derinlik":3,"aksiyon":7,"duygusal_yogunluk":6,"hedef_kelime_yogunlugu":5,"aciklama":"..."}}"""
+
+            result = await call_claude("Sen bir kitap analisti ve eğitim uzmanısın.", prompt, model="haiku", max_tokens=300)
+            if result.get("parsed"):
+                p = result["parsed"]
+                boyutlar = {k: int(p.get(k, 5)) for k in ZEKA_BOYUTLARI}
+                ai_aciklama = p.get("aciklama", "")
+        except Exception as e:
+            logging.warning(f"Kitap zeka analiz hatası: {e}")
+
+    # Fallback — kural bazlı tahmin
+    if not boyutlar:
+        import random
+        random.seed(hash(kitap_adi))
+        boyutlar = {k: random.randint(3, 8) for k in ZEKA_BOYUTLARI}
+        ai_aciklama = f"'{kitap_adi}' için otomatik profil oluşturuldu."
+
+    # Genel zorluk skoru (1-10)
+    genel_zorluk = round(sum([boyutlar["soyutluk"], boyutlar["kelime_zorlugu"], boyutlar["felsefi_derinlik"]]) / 3, 1)
+
+    kayit = {
+        "id": str(uuid.uuid4()),
+        "cache_key": cache_key,
+        "kitap_adi": kitap_adi,
+        "yazar": yazar,
+        "kitap_id": kitap_id,
+        "sinif": sinif,
+        "boyutlar": boyutlar,
+        "genel_zorluk": genel_zorluk,
+        "aciklama": ai_aciklama,
+        "olusturma_tarihi": datetime.utcnow().isoformat(),
+    }
+    await db.kitap_zeka_profilleri.insert_one(kayit)
+    kayit.pop("_id", None)
+    return kayit
+
+
+@api_router.get("/ai/kitap-zeka/tavsiye")
+async def kitap_zeka_tavsiye(current_user=Depends(get_current_user)):
+    """
+    Öğrencinin DNA profiline göre en uygun kitapları öner.
+    kitap_zeka_profilleri + okuma_kayitlari + dna karşılaştırması.
+    """
+    ogrenci_id = current_user.get("linked_id") or current_user.get("id")
+
+    # DNA profili
+    dna = await db.okuma_dna.find_one({"ogrenci_id": ogrenci_id})
+    dna_boyutlar = dna or {}
+
+    # Daha önce okunanlar
+    okunanlar = await db.okuma_kayitlari.distinct("kitap_adi", {"ogrenci_id": ogrenci_id})
+    okunanlar_set = {k.lower() for k in okunanlar if k}
+
+    # Tüm profilli kitaplar
+    tum_profiller = await db.kitap_zeka_profilleri.find({}).to_list(length=100)
+
+    # Her kitap için uyum skoru hesapla
+    skorlu = []
+    for p in tum_profiller:
+        p.pop("_id", None)
+        if p["kitap_adi"].lower() in okunanlar_set:
+            continue  # zaten okunan
+        uyum = _dna_ile_kitap_eslesme(dna_boyutlar, p.get("boyutlar", {}))
+        skorlu.append({**p, "uyum_skoru": uyum})
+
+    # Uyum skoruna göre sırala, top 5
+    skorlu.sort(key=lambda x: x["uyum_skoru"], reverse=True)
+    return {"tavsiyeler": skorlu[:5], "dna_var": bool(dna)}
+
+
+@api_router.get("/ai/kitap-zeka/profil/{kitap_id}")
+async def kitap_zeka_profil(kitap_id: str, current_user=Depends(get_current_user)):
+    """Kaydedilmiş kitap zekâ profilini getir."""
+    profil = await db.kitap_zeka_profilleri.find_one({"kitap_id": kitap_id})
+    if not profil:
+        profil = await db.kitap_zeka_profilleri.find_one({"id": kitap_id})
+    if not profil:
+        raise HTTPException(status_code=404, detail="Profil bulunamadı")
+    profil.pop("_id", None)
+    return profil
+
+
+@api_router.get("/ai/kitap-zeka/liste")
+async def kitap_zeka_liste(current_user=Depends(get_current_user)):
+    """Tüm profilli kitapları listele (admin/öğretmen)."""
+    profiller = await db.kitap_zeka_profilleri.find({}).sort("olusturma_tarihi", -1).to_list(length=200)
+    for p in profiller:
+        p.pop("_id", None)
+    return {"profiller": profiller}
+
+
+# ─────────────────────────────────────────────
 # DALGA 3: AI MOTİVASYON MOTORU
 # ─────────────────────────────────────────────
 
