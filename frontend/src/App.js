@@ -4586,6 +4586,9 @@ function OgrenciPaneli({ user, logout }) {
   const [aktifEkran, setAktifEkran] = useState(null);
   const [okumaBasladi, setOkumaBasladi] = useState(false);
   const [aiMotMesaj, setAiMotMesaj] = useState("");
+  const [motivasyonData, setMotivasyonData] = useState(null);
+  const [gunlukHedef, setGunlukHedef] = useState(null); // 5, 10 veya 15 dk
+  const [hedefSecildi, setHedefSecildi] = useState(false);
   // Kelime Evrimi state'leri
   const [kelimeData, setKelimeData] = useState(null);
   const [aktifKelime, setAktifKelime] = useState(null);
@@ -4654,7 +4657,15 @@ function OgrenciPaneli({ user, logout }) {
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   // AI motivasyon mesajı
-  useEffect(() => { const f = async () => { try { const r = await axios.get(`${API}/ai/kocluk/${user.id}/motivasyon`); setAiMotMesaj(r.data.mesaj || ""); } catch(e) {} }; f(); }, [user.id]);
+  useEffect(() => { const f = async () => {
+    try { const r = await axios.get(`${API}/ai/kocluk/${user.id}/motivasyon`); setAiMotMesaj(r.data.mesaj || ""); } catch(e) {}
+    // Motivasyon Motoru: giriş verisi
+    try {
+      const r = await axios.get(`${API}/ai/motivasyon/giris`);
+      setMotivasyonData(r.data);
+      if (r.data.bugun_hedef) { setGunlukHedef(r.data.bugun_hedef); setHedefSecildi(true); }
+    } catch(e) {}
+  }; f(); }, [user.id]);
   // Kelime Evrimi verilerini yükle
   useEffect(() => { const f = async () => { try { const r = await axios.get(`${API}/ai/kelime-evrimi/${user.id}`); setKelimeData(r.data); } catch(e) {} }; f(); }, [user.id]);
   // Speech AI: metinler ve geçmiş
@@ -5324,14 +5335,71 @@ function OgrenciPaneli({ user, logout }) {
             <div className="bg-white rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-teal-600">{tamamlananGorevSayisi + tamamlananGelisim}</div><div className="text-[10px] text-gray-500">✅ Tamamlanan</div></div>
           </div>
 
-          {/* 🤖 AI Günlük Motivasyon Mesajı */}
-          {aiMotMesaj && (
-              <div className="bg-gradient-to-r from-cyan-50 to-blue-50 rounded-2xl p-4 border border-cyan-200 relative">
-                <div className="flex items-start gap-3">
-                  <div className="text-2xl">🤖</div>
-                  <div className="flex-1"><div className="text-xs font-medium text-cyan-700 mb-1">AI Koçun Diyor ki:</div><p className="text-sm text-gray-700">{aiMotMesaj}</p></div>
+          {/* ── AI Motivasyon Motoru ── */}
+          {/* Streak uyarısı — kritik */}
+          {motivasyonData?.streak_risk && (
+            <div className="bg-gradient-to-r from-red-500 to-orange-500 rounded-2xl p-4 text-white">
+              <div className="flex items-center gap-3">
+                <div className="text-3xl">🔥</div>
+                <div>
+                  <div className="font-bold text-sm">{motivasyonData.streak_mesaji}</div>
+                  <div className="text-xs opacity-80 mt-0.5">{motivasyonData.streak_alt_mesaj}</div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Günlük hedef seçimi */}
+          {!hedefSecildi ? (
+            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-4 border border-indigo-200">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xl">🎯</span>
+                <div>
+                  <div className="font-bold text-sm text-gray-800">Bugün ne kadar okuyacaksın?</div>
+                  {motivasyonData?.ai_mesaj && <p className="text-xs text-gray-500 mt-0.5">{motivasyonData.ai_mesaj}</p>}
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { dk: 5,  emoji: "🌱", label: "Kolay",  renk: "bg-green-500"  },
+                  { dk: 10, emoji: "⚡", label: "Orta",   renk: "bg-blue-500"   },
+                  { dk: 15, emoji: "🚀", label: "Kahraman", renk: "bg-purple-500" },
+                ].map(h => (
+                  <button key={h.dk} onClick={async () => {
+                    setGunlukHedef(h.dk); setHedefSecildi(true);
+                    try { await axios.post(`${API}/ai/motivasyon/hedef-sec`, { hedef_dk: h.dk }); } catch(e) {}
+                    toast({ title: `${h.emoji} Hedef: ${h.dk} dakika! Hadi başla!` });
+                  }} className={`${h.renk} text-white rounded-xl py-3 text-center transition-all active:scale-95`}>
+                    <div className="text-xl">{h.emoji}</div>
+                    <div className="font-bold text-sm">{h.dk} dk</div>
+                    <div className="text-[10px] opacity-80">{h.label}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            /* Hedef seçildi — ilerleme göster */
+            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-4 border border-indigo-200">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">🎯</span>
+                  <span className="font-bold text-sm text-gray-800">Bugünkü hedef: {gunlukHedef} dakika</span>
+                </div>
+                <button onClick={() => setHedefSecildi(false)} className="text-xs text-gray-400">Değiştir</button>
+              </div>
+              <div className="w-full bg-white rounded-full h-3 overflow-hidden border">
+                <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all"
+                  style={{ width: `${Math.min(100, Math.round((istatistik?.bugun_dakika || 0) / gunlukHedef * 100))}%` }} />
+              </div>
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>{istatistik?.bugun_dakika || 0} dk okundu</span>
+                <span>{Math.max(0, gunlukHedef - (istatistik?.bugun_dakika || 0))} dk kaldı</span>
+              </div>
+              {(istatistik?.bugun_dakika || 0) >= gunlukHedef && (
+                <div className="text-center mt-2 text-green-600 font-bold text-sm">🎉 Hedefe ulaştın! Harikasın!</div>
+              )}
+              {motivasyonData?.ai_mesaj && <p className="text-xs text-gray-500 mt-2 italic">{motivasyonData.ai_mesaj}</p>}
+            </div>
           )}
 
           {/* Haftalık hedef */}
