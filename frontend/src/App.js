@@ -4594,6 +4594,7 @@ function OgrenciPaneli({ user, logout }) {
   const [aktifKelime, setAktifKelime] = useState(null);
   const [cevapGosterim, setCevapGosterim] = useState(false);
   const [oyunData, setOyunData] = useState(null);
+  const [oyunDurum, setOyunDurum] = useState({}); // oyun içi state
   const [okumaSuresi, setOkumaSuresi] = useState(0);
   const [okumaDuraklatildi, setOkumaDuraklatildi] = useState(false);
   const okumaInterval = useRef(null);
@@ -5632,27 +5633,259 @@ function OgrenciPaneli({ user, logout }) {
                 </div>
               )}
 
+              {/* Oyun seç butonları */}
               <div className="grid grid-cols-2 gap-2">
-                {[["eslestirme","🎲 Eşleştirme"],["bosluk_doldurma","⬜ Boşluk Doldur"],["cumle_kurma","📝 Cümle Kur"],["kelime_avi","🔍 Kelime Avı"]].map(([t,l]) => (
+                {[["eslestirme","🎲","Eşleştirme"],["bosluk_doldurma","⬜","Boşluk Doldur"],["cumle_kurma","📝","Cümle Kur"],["kelime_avi","🔍","Kelime Avı"]].map(([t,e,l]) => (
                   <button key={t} onClick={async () => {
-                    try { const r = await axios.post(`${API}/ai/mini-oyun`, { tur: t, sinif: user.sinif || 3 }); setOyunData(r.data.oyun); } catch(e) {}
-                  }} className="bg-white rounded-xl p-3 border shadow-sm text-center hover:bg-gray-50 transition-all">
-                    <div className="text-lg">{l.split(" ")[0]}</div><div className="text-[10px] text-gray-600">{l.split(" ").slice(1).join(" ")}</div>
+                    setOyunData(null); setOyunDurum({});
+                    try { const r = await axios.post(`${API}/ai/mini-oyun`, { tur: t, sinif: user.sinif || 3 }); 
+                      const d = r.data.oyun;
+                      // Eşleştirme: anlamları karıştır
+                      if (d.tur === "eslestirme" && d.anlamlar) {
+                        const idx = [...Array(d.kelimeler.length).keys()];
+                        for (let i=idx.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[idx[i],idx[j]]=[idx[j],idx[i]];}
+                        d.karisikAnlamlar = idx.map(i=>({anlam:d.anlamlar[i],gercekIdx:i}));
+                      }
+                      // Kelime Avı: hedef kelimeleri rastgele kelimeler arasına göm
+                      if (d.tur === "kelime_avi" && d.kelimeler) {
+                        const ekstraKelimeler = ["kitap","orman","güneş","çiçek","deniz","yıldız","dağ","bulut","rüzgar","nehir","kelebek","taş","cam","kapı","pencere"];
+                        const karisik = [...d.kelimeler];
+                        while(karisik.length < 20) { const r=ekstraKelimeler[Math.floor(Math.random()*ekstraKelimeler.length)]; if(!karisik.includes(r)) karisik.push(r); }
+                        for(let i=karisik.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[karisik[i],karisik[j]]=[karisik[j],karisik[i]];}
+                        d.tumKelimeler = karisik;
+                      }
+                      setOyunData(d);
+                    } catch(e) {}
+                  }} className="bg-white rounded-xl p-4 border shadow-sm text-center hover:bg-cyan-50 transition-all active:scale-95">
+                    <div className="text-2xl mb-1">{e}</div><div className="text-xs font-medium text-gray-700">{l}</div>
                   </button>
                 ))}
               </div>
 
-              {oyunData && (
-                <div className="bg-white rounded-xl p-4 border-2 border-cyan-300 shadow-md">
-                  <div className="flex items-center justify-between mb-3"><h3 className="font-bold text-sm">{oyunData.baslik}</h3><button onClick={() => setOyunData(null)} className="text-xs text-gray-400">✕</button></div>
-                  <p className="text-xs text-gray-600 mb-3">{oyunData.aciklama}</p>
-                  {oyunData.tur === "eslestirme" && oyunData.kelimeler && (<div className="space-y-1.5">{oyunData.kelimeler.map((k, i) => (<div key={i} className="flex items-center gap-2 bg-gray-50 rounded-lg p-2"><span className="bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded text-xs font-bold min-w-[80px] text-center">{k}</span><span className="text-xs">↔</span><span className="text-xs text-gray-600">{oyunData.anlamlar?.[i] || ""}</span></div>))}</div>)}
-                  {oyunData.tur === "bosluk_doldurma" && oyunData.sorular && (<div className="space-y-2">{oyunData.sorular.map((s, i) => (<div key={i} className="bg-gray-50 rounded-lg p-2"><p className="text-xs mb-1">{s.cumle_bos}</p><div className="flex gap-1 flex-wrap">{(s.secenekler||[]).map((sec, j) => (<button key={j} className="text-[10px] px-2 py-1 rounded bg-white border hover:bg-cyan-50">{sec}</button>))}</div></div>))}</div>)}
-                  {oyunData.tur === "kelime_avi" && oyunData.kelimeler && (<div><p className="text-xs text-gray-500 mb-1">Bul: {oyunData.kelimeler.join(", ")}</p></div>)}
-                  {oyunData.tur === "cumle_kurma" && oyunData.sorular && (<div className="space-y-2">{oyunData.sorular.map((s, i) => (<div key={i} className="bg-gray-50 rounded-lg p-2"><p className="text-[10px] text-gray-400 mb-1">Hedef: {s.hedef_kelime}</p><div className="flex gap-1 flex-wrap">{(s.karisik||[]).map((k, j) => (<span key={j} className="text-[10px] bg-white border px-2 py-0.5 rounded">{k}</span>))}</div></div>))}</div>)}
-                  <Button className="w-full mt-3 bg-green-600 text-white text-sm" onClick={async () => { try { const r = await axios.post(`${API}/ai/mini-oyun/tamamla`, { tur: oyunData.tur, dogru: 5, toplam: 6 }); toast({ title: `🎮 ${r.data.mesaj} +${r.data.xp} XP` }); setOyunData(null); } catch(e) {} }}>Oyunu Tamamla ✅</Button>
-                </div>
-              )}
+              {oyunData && (() => {
+                // Ses efektleri
+                const sesCalDogru = () => { try { const ctx=new AudioContext(); const o=ctx.createOscillator(); const g=ctx.createGain(); o.connect(g); g.connect(ctx.destination); o.frequency.setValueAtTime(523,ctx.currentTime); o.frequency.setValueAtTime(659,ctx.currentTime+0.1); o.frequency.setValueAtTime(784,ctx.currentTime+0.2); g.gain.setValueAtTime(0.3,ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+0.5); o.start(); o.stop(ctx.currentTime+0.5); } catch(e){} };
+                const sesCalYanlis = () => { try { const ctx=new AudioContext(); const o=ctx.createOscillator(); const g=ctx.createGain(); o.connect(g); g.connect(ctx.destination); o.frequency.setValueAtTime(200,ctx.currentTime); o.frequency.setValueAtTime(150,ctx.currentTime+0.15); g.gain.setValueAtTime(0.3,ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+0.4); o.start(); o.stop(ctx.currentTime+0.4); } catch(e){} };
+
+                /* ── CÜMLE KURMA ── */
+                if (oyunData.tur === "cumle_kurma") {
+                  const sorular = oyunData.sorular || [];
+                  return (
+                    <div className="bg-white rounded-2xl p-4 border-2 border-cyan-300 shadow-md">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-bold text-sm">📝 {oyunData.baslik}</h3>
+                        <button onClick={() => setOyunData(null)} className="text-gray-400 text-lg leading-none">✕</button>
+                      </div>
+                      <p className="text-xs text-gray-500 mb-3">{oyunData.aciklama}</p>
+                      <div className="space-y-4">
+                        {sorular.map((s, si) => {
+                          const secilen = oyunDurum[`ck_${si}`] || [];
+                          const dogru = s.dogru || s.karisik?.slice().sort();
+                          const tamamlandi = oyunDurum[`ck_${si}_ok`];
+                          const yanlis = oyunDurum[`ck_${si}_yanlis`];
+                          return (
+                            <div key={si} className={`rounded-xl p-3 border-2 transition-all ${tamamlandi?"border-green-400 bg-green-50":yanlis?"border-red-300 bg-red-50":"border-gray-200 bg-gray-50"}`}>
+                              <div className="text-[10px] text-gray-400 mb-1">Hedef: <b>{s.hedef_kelime}</b></div>
+                              {/* Seçilen kelimeler alanı */}
+                              <div className={`min-h-[32px] flex flex-wrap gap-1 rounded-lg p-2 mb-2 border ${tamamlandi?"border-green-300 bg-green-100":yanlis?"border-red-200":"border-dashed border-gray-300 bg-white"}`}>
+                                {secilen.length===0 && <span className="text-[10px] text-gray-300">Kelimelere tıkla...</span>}
+                                {secilen.map((k,ki) => (
+                                  <span key={ki} onClick={() => {
+                                    if(tamamlandi) return;
+                                    const yeni = secilen.filter((_,i)=>i!==ki);
+                                    setOyunDurum(d=>({...d,[`ck_${si}`]:yeni,[`ck_${si}_yanlis`]:false}));
+                                  }} className="bg-blue-500 text-white text-xs px-2 py-0.5 rounded cursor-pointer hover:bg-red-400 transition-all">{k}</span>
+                                ))}
+                              </div>
+                              {/* Seçilebilir kelimeler */}
+                              <div className="flex flex-wrap gap-1">
+                                {(s.karisik||[]).map((k,ki) => {
+                                  const secildi = secilen.includes(k) && secilen.indexOf(k) === secilen.lastIndexOf(k);
+                                  return (
+                                    <button key={ki} disabled={secildi||tamamlandi} onClick={() => {
+                                      const yeni = [...secilen, k];
+                                      setOyunDurum(d=>({...d,[`ck_${si}`]:yeni}));
+                                      // Sıra doldu mu kontrol et
+                                      if (yeni.length === s.karisik.length) {
+                                        const dogruMu = yeni.join(" ") === (s.dogru||[]).join(" ");
+                                        if(dogruMu) { sesCalDogru(); setOyunDurum(d=>({...d,[`ck_${si}_ok`]:true})); }
+                                        else { sesCalYanlis(); setOyunDurum(d=>({...d,[`ck_${si}_yanlis`]:true})); setTimeout(()=>setOyunDurum(d=>({...d,[`ck_${si}`]:[],[`ck_${si}_yanlis`]:false})),800); }
+                                      }
+                                    }} className={`text-xs px-2 py-1 rounded border transition-all ${secildi||tamamlandi?"opacity-30 cursor-not-allowed bg-gray-100":"bg-white hover:bg-cyan-50 hover:border-cyan-400 cursor-pointer"}`}>{k}</button>
+                                  );
+                                })}
+                              </div>
+                              {tamamlandi && <div className="text-xs text-green-600 font-bold mt-1">✅ Doğru!</div>}
+                              {yanlis && <div className="text-xs text-red-500 mt-1">❌ Tekrar dene!</div>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {sorular.every((_,i)=>oyunDurum[`ck_${i}_ok`]) && (
+                        <button className="w-full mt-3 bg-green-600 text-white rounded-xl py-2 text-sm font-bold" onClick={async()=>{ try{const r=await axios.post(`${API}/ai/mini-oyun/tamamla`,{tur:oyunData.tur,dogru:sorular.length,toplam:sorular.length});toast({title:`🎮 ${r.data.mesaj} +${r.data.xp} XP`});setOyunData(null);}catch(e){} }}>🏆 Tamamla!</button>
+                      )}
+                    </div>
+                  );
+                }
+
+                /* ── BOŞLUK DOLDURMA ── */
+                if (oyunData.tur === "bosluk_doldurma") {
+                  const sorular = oyunData.sorular || [];
+                  return (
+                    <div className="bg-white rounded-2xl p-4 border-2 border-cyan-300 shadow-md">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-bold text-sm">⬜ {oyunData.baslik}</h3>
+                        <button onClick={() => setOyunData(null)} className="text-gray-400 text-lg leading-none">✕</button>
+                      </div>
+                      <p className="text-xs text-gray-500 mb-3">{oyunData.aciklama}</p>
+                      <div className="space-y-4">
+                        {sorular.map((s, si) => {
+                          const secilen = oyunDurum[`bd_${si}`];
+                          const tamamlandi = oyunDurum[`bd_${si}_ok`];
+                          const yanlis = oyunDurum[`bd_${si}_yanlis`];
+                          const cumle = s.cumle_bos || "";
+                          return (
+                            <div key={si} className={`rounded-xl p-3 border-2 transition-all ${tamamlandi?"border-green-400 bg-green-50":yanlis?"border-red-300 bg-red-50":"border-gray-200 bg-gray-50"}`}>
+                              <p className="text-sm font-medium mb-2 text-gray-800">
+                                {cumle.split("__").map((part, pi) => (
+                                  <span key={pi}>{part}{pi<cumle.split("__").length-1 && (
+                                    <span className={`inline-block mx-1 px-3 py-0.5 rounded-lg border-2 font-bold text-sm min-w-[60px] text-center transition-all ${tamamlandi?"bg-green-200 border-green-400 text-green-700":yanlis?"bg-red-100 border-red-300 text-red-600":"bg-white border-dashed border-gray-400 text-gray-400"}`}>
+                                      {secilen || "___"}
+                                    </span>
+                                  )}</span>
+                                ))}
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                {(s.secenekler||[]).map((sec, j) => (
+                                  <button key={j} disabled={!!tamamlandi} onClick={() => {
+                                    const dogruMu = sec === s.dogru_cevap;
+                                    setOyunDurum(d=>({...d,[`bd_${si}`]:sec}));
+                                    if(dogruMu) { sesCalDogru(); setTimeout(()=>setOyunDurum(d=>({...d,[`bd_${si}_ok`]:true})),300); }
+                                    else { sesCalYanlis(); setOyunDurum(d=>({...d,[`bd_${si}_yanlis`]:true})); setTimeout(()=>setOyunDurum(d=>({...d,[`bd_${si}`]:null,[`bd_${si}_yanlis`]:false})),700); }
+                                  }} className={`text-xs px-3 py-1.5 rounded-lg border-2 font-medium transition-all ${tamamlandi?"opacity-40 cursor-not-allowed":"hover:border-cyan-400 hover:bg-cyan-50 cursor-pointer bg-white border-gray-200"}`}>{sec}</button>
+                                ))}
+                              </div>
+                              {tamamlandi && <div className="text-xs text-green-600 font-bold mt-1">✅ Doğru!</div>}
+                              {yanlis && <div className="text-xs text-red-500 mt-1">❌ Yanlış, tekrar dene!</div>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {sorular.every((_,i)=>oyunDurum[`bd_${i}_ok`]) && (
+                        <button className="w-full mt-3 bg-green-600 text-white rounded-xl py-2 text-sm font-bold" onClick={async()=>{ try{const r=await axios.post(`${API}/ai/mini-oyun/tamamla`,{tur:oyunData.tur,dogru:sorular.length,toplam:sorular.length});toast({title:`🎮 ${r.data.mesaj} +${r.data.xp} XP`});setOyunData(null);}catch(e){} }}>🏆 Tamamla!</button>
+                      )}
+                    </div>
+                  );
+                }
+
+                /* ── KELİME AVCI ── */
+                if (oyunData.tur === "kelime_avi") {
+                  const hedefler = oyunData.kelimeler || [];
+                  const tumKelimeler = oyunData.tumKelimeler || hedefler;
+                  const bulunanlar = oyunDurum.ka_bulunanlar || [];
+                  return (
+                    <div className="bg-white rounded-2xl p-4 border-2 border-cyan-300 shadow-md">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-bold text-sm">🔍 {oyunData.baslik}</h3>
+                        <button onClick={() => setOyunData(null)} className="text-gray-400 text-lg leading-none">✕</button>
+                      </div>
+                      <p className="text-xs text-gray-500 mb-1">{oyunData.aciklama}</p>
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {hedefler.map((h,i) => (
+                          <span key={i} className={`text-xs px-2 py-1 rounded-full border font-medium transition-all ${bulunanlar.includes(h)?"bg-green-500 text-white border-green-500 line-through":"bg-yellow-50 text-yellow-700 border-yellow-300"}`}>{h}</span>
+                        ))}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {tumKelimeler.map((k,i) => {
+                          const hedefMi = hedefler.includes(k);
+                          const bulundu = bulunanlar.includes(k);
+                          return (
+                            <button key={i} disabled={bulundu} onClick={() => {
+                              if(hedefMi) {
+                                sesCalDogru();
+                                const yeni = [...bulunanlar, k];
+                                setOyunDurum(d=>({...d, ka_bulunanlar: yeni}));
+                              } else {
+                                sesCalYanlis();
+                                setOyunDurum(d=>({...d, ka_yanlis: k}));
+                                setTimeout(()=>setOyunDurum(d=>({...d, ka_yanlis:null})),600);
+                              }
+                            }} className={`text-xs px-3 py-1.5 rounded-xl border-2 font-medium transition-all ${
+                              bulundu ? "bg-green-500 text-white border-green-500 cursor-not-allowed" :
+                              oyunDurum.ka_yanlis===k ? "bg-red-100 border-red-400 text-red-600 animate-pulse" :
+                              "bg-white border-gray-200 hover:border-cyan-400 hover:bg-cyan-50 cursor-pointer"
+                            }`}>{k}</button>
+                          );
+                        })}
+                      </div>
+                      <div className="text-xs text-gray-400 mt-2">{bulunanlar.length}/{hedefler.length} bulundu</div>
+                      {bulunanlar.length === hedefler.length && (
+                        <button className="w-full mt-3 bg-green-600 text-white rounded-xl py-2 text-sm font-bold" onClick={async()=>{ try{const r=await axios.post(`${API}/ai/mini-oyun/tamamla`,{tur:oyunData.tur,dogru:hedefler.length,toplam:hedefler.length});toast({title:`🎮 ${r.data.mesaj} +${r.data.xp} XP`});setOyunData(null);}catch(e){} }}>🏆 Tamamla!</button>
+                      )}
+                    </div>
+                  );
+                }
+
+                /* ── KELİME EŞLEŞTİRME ── */
+                if (oyunData.tur === "eslestirme") {
+                  const kelimeler = oyunData.kelimeler || [];
+                  const karisikAnlamlar = oyunData.karisikAnlamlar || kelimeler.map((k,i)=>({anlam:oyunData.anlamlar[i],gercekIdx:i}));
+                  const seciliKelime = oyunDurum.es_seciliKelime; // index
+                  const eslesmiş = oyunDurum.es_eslesmis || []; // doğru eşleşen kelime indexleri
+                  const yanlisPair = oyunDurum.es_yanlis;
+                  return (
+                    <div className="bg-white rounded-2xl p-4 border-2 border-cyan-300 shadow-md">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-bold text-sm">🎲 {oyunData.baslik}</h3>
+                        <button onClick={() => setOyunData(null)} className="text-gray-400 text-lg leading-none">✕</button>
+                      </div>
+                      <p className="text-xs text-gray-500 mb-3">Bir kelime seç, sonra anlamına tıkla!</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {/* Sol: Kelimeler */}
+                        <div className="space-y-2">
+                          {kelimeler.map((k,i) => (
+                            <button key={i} disabled={eslesmiş.includes(i)} onClick={() => setOyunDurum(d=>({...d,es_seciliKelime:i===seciliKelime?null:i}))}
+                              className={`w-full text-xs px-3 py-2 rounded-xl border-2 font-bold transition-all ${
+                                eslesmiş.includes(i) ? "bg-green-100 border-green-400 text-green-700 cursor-not-allowed" :
+                                seciliKelime===i ? "bg-blue-500 text-white border-blue-500 shadow-md" :
+                                yanlisPair?.includes(i) ? "bg-red-100 border-red-400 animate-pulse" :
+                                "bg-cyan-50 border-cyan-200 hover:border-cyan-500 cursor-pointer"
+                              }`}>{k}</button>
+                          ))}
+                        </div>
+                        {/* Sağ: Karışık anlamlar */}
+                        <div className="space-y-2">
+                          {karisikAnlamlar.map((a,i) => (
+                            <button key={i} disabled={eslesmiş.includes(a.gercekIdx)} onClick={() => {
+                              if(seciliKelime === null || seciliKelime === undefined) return;
+                              const dogruMu = a.gercekIdx === seciliKelime;
+                              if(dogruMu) {
+                                sesCalDogru();
+                                setOyunDurum(d=>({...d, es_eslesmis:[...(d.es_eslesmis||[]),seciliKelime], es_seciliKelime:null}));
+                              } else {
+                                sesCalYanlis();
+                                setOyunDurum(d=>({...d, es_yanlis:[seciliKelime,a.gercekIdx]}));
+                                setTimeout(()=>setOyunDurum(d=>({...d,es_yanlis:null,es_seciliKelime:null})),800);
+                              }
+                            }} className={`w-full text-[10px] px-2 py-2 rounded-xl border-2 text-left transition-all ${
+                              eslesmiş.includes(a.gercekIdx) ? "bg-green-100 border-green-400 text-green-700 cursor-not-allowed" :
+                              yanlisPair?.includes(a.gercekIdx) ? "bg-red-100 border-red-400 animate-pulse" :
+                              seciliKelime!==null&&seciliKelime!==undefined ? "border-purple-300 hover:bg-purple-50 cursor-pointer bg-white" :
+                              "bg-white border-gray-200 cursor-not-allowed opacity-50"
+                            }`}>{a.anlam}</button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-400 mt-2 text-center">{eslesmiş.length}/{kelimeler.length} eşleşti</div>
+                      {eslesmiş.length === kelimeler.length && (
+                        <button className="w-full mt-3 bg-green-600 text-white rounded-xl py-2 text-sm font-bold" onClick={async()=>{ try{const r=await axios.post(`${API}/ai/mini-oyun/tamamla`,{tur:oyunData.tur,dogru:kelimeler.length,toplam:kelimeler.length});toast({title:`🎮 ${r.data.mesaj} +${r.data.xp} XP`});setOyunData(null);}catch(e){} }}>🏆 Tamamla!</button>
+                      )}
+                    </div>
+                  );
+                }
+
+                return null;
+              })()}
 
               {kelimeData?.bekleyenler?.length > 0 && !oyunData && (<>
                 <h3 className="font-bold text-sm text-gray-700">📝 Bugün Tekrar Edilecek Kelimeler</h3>
