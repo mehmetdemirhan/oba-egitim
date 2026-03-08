@@ -7008,6 +7008,266 @@ async def speech_istatistik(ogrenci_id: str, current_user=Depends(get_current_us
 
 
 # ─────────────────────────────────────────────
+# DALGA 3: OKUMA DİKKAT ANALİZİ
+# ─────────────────────────────────────────────
+
+def _dikkat_skoru_hesapla(metrikler: dict) -> dict:
+    """Davranış metriklerinden dikkat skoru üret."""
+    sure_sn = metrikler.get("sure_sn", 0)
+    kelime_sayisi = metrikler.get("kelime_sayisi", 100)
+    geri_scroll_sayisi = metrikler.get("geri_scroll_sayisi", 0)
+    zorluk_kelimeler = metrikler.get("zorluk_kelimeler", [])
+    duraklamalar = metrikler.get("duraklamalar", 0)  # anormal duraklamalar
+
+    # Beklenen okuma süresi (sinif normuna göre WPM)
+    sinif = metrikler.get("sinif", 3)
+    norm_wpm = {1:50, 2:75, 3:95, 4:115, 5:130}.get(sinif, 95)
+    beklenen_sure = (kelime_sayisi / norm_wpm) * 60  # saniye
+
+    # 1. Süre skoru — çok hızlı veya çok yavaş ise düşük
+    if beklenen_sure > 0:
+        oran = sure_sn / beklenen_sure
+        if 0.7 <= oran <= 1.5:
+            sure_skoru = 100
+        elif 0.5 <= oran < 0.7 or 1.5 < oran <= 2.0:
+            sure_skoru = 70
+        elif oran < 0.5:
+            sure_skoru = 40  # çok hızlı — atlıyor olabilir
+        else:
+            sure_skoru = 50  # çok yavaş — zorlanıyor
+    else:
+        sure_skoru = 60
+
+    # 2. Geri scroll — dikkatin dağıldığı veya anlamadığı bölümler
+    max_scroll = max(1, kelime_sayisi // 50)
+    scroll_skoru = max(0, 100 - (geri_scroll_sayisi / max_scroll) * 30)
+
+    # 3. Zorluk kelimeleri — tıklamak pozitif (merak) ama çok fazlası zorlandığını gösterir
+    if len(zorluk_kelimeler) == 0:
+        zorluk_skoru = 80  # hiç tıklamadı — anlıyor olabilir veya ilgisiz
+    elif len(zorluk_kelimeler) <= 3:
+        zorluk_skoru = 95  # meraklı — sağlıklı
+    elif len(zorluk_kelimeler) <= 6:
+        zorluk_skoru = 75  # biraz zorlanıyor
+    else:
+        zorluk_skoru = 55  # çok zorlanıyor
+
+    # 4. Duraklamalar
+    duraklama_skoru = max(40, 100 - duraklamalar * 10)
+
+    # Genel dikkat skoru (ağırlıklı ortalama)
+    dikkat = round(
+        sure_skoru * 0.35 +
+        scroll_skoru * 0.30 +
+        zorluk_skoru * 0.20 +
+        duraklama_skoru * 0.15
+    )
+
+    # Yorum
+    if dikkat >= 80:
+        yorum = "Harika konsantrasyon! Metni akıcı okudun."
+        oneri = None
+    elif dikkat >= 65:
+        yorum = "İyi odaklanma. Birkaç bölümde zorlandın."
+        oneri = "Zorlandığın kelimeleri not et ve tekrar bak." if zorluk_kelimeler else "Biraz daha yavaş okumayı dene."
+    elif dikkat >= 50:
+        yorum = "Dikkat dağınıklığı var. Bazı bölümleri tekrar okumalısın."
+        oneri = "Sessiz bir ortamda okumayı dene. Kısa molalar ver."
+    else:
+        yorum = "Bu bölümü anlamakta zorlandın. Tekrar okumalısın."
+        oneri = "Bu metni bir daha yavaşça oku. Zor kelimelerin anlamına bak."
+
+    return {
+        "dikkat_skoru": dikkat,
+        "alt_skorlar": {
+            "sure": round(sure_skoru),
+            "scroll": round(scroll_skoru),
+            "zorluk": round(zorluk_skoru),
+            "duraklama": round(duraklama_skoru),
+        },
+        "yorum": yorum,
+        "oneri": oneri,
+        "zorluk_kelimeler": zorluk_kelimeler[:10],
+        "geri_oku_onerisi": dikkat < 60,
+    }
+
+
+@api_router.post("/ai/dikkat/kaydet")
+async def dikkat_kaydet(request: Request, current_user=Depends(get_current_user)):
+    """Okuma oturumunun dikkat metriklerini kaydet ve analiz et."""
+    body = await request.json()
+    ogrenci_id = current_user.get("linked_id") or current_user.get("id")
+
+    metrikler = {
+        "sure_sn": body.get("sure_sn", 0),
+        "kelime_sayisi": body.get("kelime_sayisi", 100),
+        "geri_scroll_sayisi": body.get("geri_scroll_sayisi", 0),
+        "zorluk_kelimeler": body.get("zorluk_kelimeler", []),
+        "duraklamalar": body.get("duraklamalar", 0),
+        "sinif": body.get("sinif", 3),
+    }
+
+    analiz = _dikkat_skoru_hesapla(metrikler)
+
+    # Veritabanına kaydet
+    kayit_id = str(uuid.uuid4())
+    await db.dikkat_log.insert_one({
+        "id": kayit_id,
+        "ogrenci_id": ogrenci_id,
+        "kitap_adi": body.get("kitap_adi", ""),
+        "bolum": body.get("bolum", ""),
+        "metrikler": metrikler,
+        "analiz": analiz,
+        "tarih": datetime.utcnow().isoformat(),
+    })
+
+    # DNA dikkat boyutunu güncelle — son 5 oturumun ortalaması
+    son_kayitlar = await db.dikkat_log.find(
+        {"ogrenci_id": ogrenci_id}
+    ).sort("tarih", -1).to_list(length=5)
+    son_kayitlar_pop = [k for k in son_kayitlar if k.get("_id")]
+    for k in son_kayitlar:
+        k.pop("_id", None)
+
+    if son_kayitlar:
+        ort_dikkat = round(sum(k["analiz"]["dikkat_skoru"] for k in son_kayitlar) / len(son_kayitlar))
+        await db.okuma_dna.update_one(
+            {"ogrenci_id": ogrenci_id},
+            {"$set": {"boyutlar.dikkat_suresi": ort_dikkat, "son_guncelleme": datetime.utcnow().isoformat()}},
+        )
+
+    return {**analiz, "id": kayit_id}
+
+
+@api_router.get("/ai/dikkat/gecmis/{ogrenci_id}")
+async def dikkat_gecmis(ogrenci_id: str, current_user=Depends(get_current_user)):
+    """Öğrencinin dikkat analizi geçmişi."""
+    kayitlar = await db.dikkat_log.find(
+        {"ogrenci_id": ogrenci_id}
+    ).sort("tarih", -1).to_list(length=20)
+    for k in kayitlar:
+        k.pop("_id", None)
+    return kayitlar
+
+
+# ─────────────────────────────────────────────
+# DALGA 3: OKUMA DİKKAT ANALİZİ
+# ─────────────────────────────────────────────
+
+@api_router.post("/ai/dikkat/kaydet")
+async def dikkat_kaydet(request: Request, current_user=Depends(get_current_user)):
+    """
+    Okuma oturumu dikkat metriklerini kaydet, DNA dikkat boyutunu güncelle.
+    Girdi: sure_sn, geri_scroll, zorluk_kelimeler, duraklamalar, scroll_hizi, okuma_id
+    """
+    body = await request.json()
+    ogrenci_id = current_user.get("linked_id") or current_user.get("id")
+
+    sure_sn      = int(body.get("sure_sn", 0))
+    geri_scroll  = int(body.get("geri_scroll", 0))
+    zorluk_kels  = body.get("zorluk_kelimeler", [])
+    duraklamalar = int(body.get("duraklamalar", 0))
+    scroll_hizi  = float(body.get("scroll_hizi_ort", 0))   # px/sn
+    okuma_id     = body.get("okuma_id", "")
+    sinif        = int(body.get("sinif", 3))
+
+    # Dikkat skoru hesapla (0-100)
+    # Düşük geri scroll → iyi dikkat
+    # Az duraklatma → iyi akış
+    # Normal scroll hızı (50-200 px/sn) → iyi okuma
+    sure_dk = max(1, sure_sn / 60)
+
+    geri_penalti   = min(40, geri_scroll * 3)
+    durak_penalti  = min(20, duraklamalar * 5)
+    hiz_bonus      = 10 if 30 <= scroll_hizi <= 250 else 0
+    zorluk_bonus   = min(15, len(zorluk_kels) * 3)  # kelime tıklama dikkat göstergesi
+
+    dikkat_skoru = max(10, 100 - geri_penalti - durak_penalti + hiz_bonus + zorluk_bonus)
+    dikkat_skoru = round(min(100, dikkat_skoru))
+
+    # Seviye ve tavsiye
+    if dikkat_skoru >= 80:
+        seviye = "odakli"
+        mesaj  = "Harika! Okurken çok iyi odaklandın. 🎯"
+    elif dikkat_skoru >= 60:
+        seviye = "iyi"
+        mesaj  = "Güzel bir okuma! Birkaç bölümde geri döndün, bu normaldir."
+    elif dikkat_skoru >= 40:
+        seviye = "orta"
+        mesaj  = "Bazı bölümler zor geldi gibi görünüyor. Yavaş okumayı dene."
+    else:
+        seviye = "dagitik"
+        mesaj  = "Bugün dikkatini toplamak zor olmuş olabilir. Kısa mola ver ve tekrar dene."
+
+    # AI ile daha derin yorum (varsa)
+    ai_yorum = None
+    if ANTHROPIC_API_KEY and len(zorluk_kels) > 0:
+        try:
+            prompt = f"""Öğrenci okuma dikkat analizi (Sınıf: {sinif}):
+- Okuma süresi: {sure_dk:.1f} dakika
+- Geri scroll sayısı: {geri_scroll}
+- Duraklatma sayısı: {duraklamalar}
+- Zorluk çekilen kelimeler: {', '.join(zorluk_kels[:5]) if zorluk_kels else 'yok'}
+- Dikkat skoru: {dikkat_skoru}/100
+
+Öğrenciye 2 cümle kısa ve motive edici Türkçe geri bildirim yaz. Çocuksu ama akıllıca."""
+            r = await call_claude("Kısa ve motive edici geri bildirim ver.", prompt, model="haiku", max_tokens=150)
+            ai_yorum = r.get("text", "")
+        except Exception:
+            pass
+
+    # MongoDB'ye kaydet
+    kayit = {
+        "id": str(uuid.uuid4()),
+        "ogrenci_id": ogrenci_id,
+        "okuma_id": okuma_id,
+        "sure_sn": sure_sn,
+        "geri_scroll": geri_scroll,
+        "zorluk_kelimeler": zorluk_kels,
+        "duraklamalar": duraklamalar,
+        "scroll_hizi_ort": scroll_hizi,
+        "dikkat_skoru": dikkat_skoru,
+        "seviye": seviye,
+        "tarih": datetime.utcnow().isoformat(),
+    }
+    await db.dikkat_log.insert_one(kayit)
+
+    # DNA dikkat boyutunu güncelle
+    try:
+        mevcut = await db.okuma_dna.find_one({"ogrenci_id": ogrenci_id})
+        if mevcut:
+            eski = mevcut.get("dikkat_suresi", 50)
+            yeni = round(eski * 0.7 + dikkat_skoru * 0.3)  # ağırlıklı ortalama
+            await db.okuma_dna.update_one(
+                {"ogrenci_id": ogrenci_id},
+                {"$set": {"dikkat_suresi": yeni, "son_guncelleme": datetime.utcnow().isoformat()}}
+            )
+    except Exception as e:
+        logging.warning(f"DNA güncelleme hatası: {e}")
+
+    return {
+        "dikkat_skoru": dikkat_skoru,
+        "seviye": seviye,
+        "mesaj": mesaj,
+        "ai_yorum": ai_yorum,
+        "geri_bildirim": {
+            "geri_scroll": geri_scroll,
+            "zorluk_kels": zorluk_kels,
+            "duraklamalar": duraklamalar,
+        },
+    }
+
+
+@api_router.get("/ai/dikkat/gecmis/{ogrenci_id}")
+async def dikkat_gecmis(ogrenci_id: str, current_user=Depends(get_current_user)):
+    """Son 20 dikkat kaydı — trend grafik için."""
+    kayitlar = await db.dikkat_log.find({"ogrenci_id": ogrenci_id}).sort("tarih", -1).to_list(length=20)
+    for k in kayitlar:
+        k.pop("_id", None)
+    return kayitlar
+
+
+# ─────────────────────────────────────────────
 # DALGA 3: AI OKUMA ARKADAŞI (4 KARAKTER)
 # ─────────────────────────────────────────────
 
