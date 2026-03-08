@@ -1319,6 +1319,7 @@ function BildirimZili({ user }) {
 function BekleyenlerKarti({ bekleyenler, onRefresh, onTabChange }) {
   const { toast } = useToast();
   const [acikDetay, setAcikDetay] = useState(null);
+  const [zekaModal, setZekaModal] = useState(null);
 
   const adminKararMetin = async (id, onay, direkt = false) => {
     try { await axios.post(`${API}/diagnostic/texts/${id}/admin-karar`, { onay, direkt }); toast({ title: direkt ? "✅ Direkt havuza alındı" : onay ? "🗳️ Oylama başlatıldı" : "❌ Reddedildi" }); onRefresh(); }
@@ -1431,6 +1432,57 @@ function BekleyenlerKarti({ bekleyenler, onRefresh, onTabChange }) {
         )}
       </CardContent>
     </Card>
+
+    {/* Zekâ Haritası Modalı */}
+    {zekaModal && (
+      <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setZekaModal(null)}>
+        <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-t-2xl p-4 text-white">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="text-xs opacity-70 mb-0.5">🧠 Zekâ Haritası</div>
+                <div className="font-bold text-base leading-tight">{zekaModal.kitap_adi}</div>
+                {zekaModal.yazar && <div className="text-xs opacity-80 mt-0.5">{zekaModal.yazar}</div>}
+              </div>
+              <button onClick={() => setZekaModal(null)} className="text-white/70 hover:text-white text-2xl leading-none ml-2">✕</button>
+            </div>
+          </div>
+          {zekaModal.yukleniyor ? (
+            <div className="p-8 text-center"><div className="text-4xl mb-3 animate-spin">🧠</div><div className="text-sm text-gray-500">AI analiz ediyor...</div></div>
+          ) : zekaModal.profil ? (() => {
+            const boyutlar = zekaModal.profil.boyutlar || {};
+            const etiketler = {soyutluk:"Soyutluk",kelime_zorlugu:"Kelime Zorluğu",hayal_gucu:"Hayal Gücü",felsefi_derinlik:"Felsefi Derinlik",aksiyon:"Aksiyon",duygusal_yogunluk:"Duygusal Yoğunluk",hedef_kelime_yogunlugu:"Kelime Yoğunluğu"};
+            const renkler = {soyutluk:"bg-blue-400",kelime_zorlugu:"bg-red-400",hayal_gucu:"bg-yellow-400",felsefi_derinlik:"bg-indigo-400",aksiyon:"bg-orange-400",duygusal_yogunluk:"bg-pink-400",hedef_kelime_yogunlugu:"bg-green-400"};
+            const genelZorluk = zekaModal.profil.genel_zorluk || 5;
+            const seviye = genelZorluk <= 3 ? {l:"Kolay",r:"bg-green-100 text-green-700"} : genelZorluk <= 6 ? {l:"Orta",r:"bg-yellow-100 text-yellow-700"} : {l:"Zor",r:"bg-red-100 text-red-700"};
+            return (
+              <div className="p-4 space-y-4">
+                <div className="flex items-center justify-between bg-gray-50 rounded-xl p-3">
+                  <div className="text-sm font-medium text-gray-700">Genel Zorluk</div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex gap-0.5">{[1,2,3,4,5,6,7,8,9,10].map(n => (<div key={n} className={`w-2.5 h-2.5 rounded-full ${n <= genelZorluk ? "bg-purple-500" : "bg-gray-200"}`} />))}</div>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${seviye.r}`}>{seviye.l}</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {Object.entries(etiketler).map(([k, label]) => {
+                    const val = boyutlar[k] || 0;
+                    return (
+                      <div key={k}>
+                        <div className="flex justify-between text-xs mb-1"><span className="text-gray-600">{label}</span><span className="font-bold text-gray-800">{val}/10</span></div>
+                        <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full rounded-full ${renkler[k]}`} style={{width:`${val*10}%`}} /></div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {zekaModal.profil.aciklama && (<div className="bg-purple-50 rounded-xl p-3 border border-purple-100"><div className="text-xs text-purple-700 font-medium mb-1">🤖 AI Yorumu</div><p className="text-xs text-gray-700 leading-relaxed">{zekaModal.profil.aciklama}</p></div>)}
+                <button onClick={() => setZekaModal(null)} className="w-full bg-purple-600 text-white rounded-xl py-3 text-sm font-bold">Kapat</button>
+              </div>
+            );
+          })() : (<div className="p-6 text-center text-sm text-gray-400">Profil yüklenemedi.</div>)}
+        </div>
+      </div>
+    )}
   );
 }
 
