@@ -1355,6 +1355,7 @@ function BekleyenlerKarti({ bekleyenler, onRefresh, onTabChange }) {
   };
 
   return (
+    <>
     <Card className="border-2 border-orange-200 shadow-sm">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center justify-between">
@@ -1483,6 +1484,7 @@ function BekleyenlerKarti({ bekleyenler, onRefresh, onTabChange }) {
         </div>
       </div>
     )}
+    </>
   );
 }
 
