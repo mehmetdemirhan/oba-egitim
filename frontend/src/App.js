@@ -4605,6 +4605,14 @@ function OgrenciPaneli({ user, logout }) {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const [canliTranskript, setCanliTranskript] = useState(""); // canlı önizleme
+  // AI Arkadaş state'leri
+  const [arkadasKarakterler, setArkadasKarakterler] = useState([]);
+  const [seciliKarakter, setSeciliKarakter] = useState(null);
+  const [arkadasSohbet, setArkadasSohbet] = useState([]);
+  const [arkadasMesaj, setArkadasMesaj] = useState("");
+  const [arkadasYukleniyor, setArkadasYukleniyor] = useState(false);
+  const [arkadasKalanHak, setArkadasKalanHak] = useState(20);
+  const arkadasSonRef = useRef(null);
   const [agaclar, setAgaclar] = useState([]);
   const [neOkudunForm, setNeOkudunForm] = useState({ kitap_adi: "", bolum: "", baslangic_sayfa: "", bitis_sayfa: "", not_text: "" });
   const [mesajlar, setMesajlar] = useState([]);
@@ -4652,6 +4660,17 @@ function OgrenciPaneli({ user, logout }) {
     };
     f();
   }, [ogrenciId, profil?.sinif]);
+  // AI Arkadaş: karakterleri yükle
+  useEffect(() => {
+    const f = async () => {
+      try { const r = await axios.get(`${API}/ai/arkadas/karakterler`); setArkadasKarakterler(r.data.karakterler || []); } catch(e) {}
+    };
+    f();
+  }, []);
+  // Sohbet scroll — yeni mesaj gelince en alta kaydır
+  useEffect(() => {
+    arkadasSonRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [arkadasSohbet]);
   // Okuma sayacı
   useEffect(() => {
     if (okumaBasladi && !okumaDuraklatildi) {
@@ -4684,52 +4703,60 @@ function OgrenciPaneli({ user, logout }) {
     audioChunksRef.current = [];
     setCanliTranskript("");
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      toast({ title: "Tarayıcın sesli okumayı desteklemiyor. Chrome kullan.", variant: "destructive" });
-      return;
-    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-    // Mikrofon izni
-    try { await navigator.mediaDevices.getUserMedia({ audio: true }); }
-    catch(e) { toast({ title: "Mikrofon erişimi gerekli. Lütfen izin ver.", variant: "destructive" }); return; }
+      // MediaRecorder — ses dosyası kaydeder (Whisper için)
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm")
+        ? "audio/webm"
+        : "audio/mp4";
 
-    let aktif = true; // döngüyü kontrol eder
-    let birikmisTumMetin = ""; // tüm oturumun transkripti
+      const mr = new MediaRecorder(stream, { mimeType });
+      const chunks = [];
+      mr.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      mr.onstop = () => { audioChunksRef.current = chunks; };
+      mr.start(500);
 
-    const recognition = new SpeechRecognition();
-    recognition.lang = "tr-TR";
-    recognition.continuous = true;
-    recognition.interimResults = false; // sadece final sonuçlar — daha güvenilir
-    recognition.maxAlternatives = 1;
-
-    recognition.onresult = (event) => {
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        if (event.results[i].isFinal) {
-          birikmisTumMetin += event.results[i][0].transcript + " ";
-          audioChunksRef.current = [birikmisTumMetin.trim()];
-          setCanliTranskript(birikmisTumMetin.trim());
-        }
-      }
-    };
-
-    recognition.onerror = (e) => {
-      if (e.error === "no-speech") return; // sessizlik — normal, devam et
-      if (e.error === "aborted") return;   // biz durdurduk
-      toast({ title: `Ses tanıma hatası: ${e.error}`, variant: "destructive" });
-    };
-
-    // Chrome continuous modda 60sn'de bir kendiliğinden durabilir → yeniden başlat
-    recognition.onend = () => {
-      if (aktif) {
+      // Web Speech API — varsa canlı önizleme için paralel çalıştır
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      let recognition = null;
+      if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.lang = "tr-TR";
+        recognition.continuous = true;
+        recognition.interimResults = false;
+        let canliMetin = "";
+        recognition.onresult = (e) => {
+          for (let i = e.resultIndex; i < e.results.length; i++) {
+            if (e.results[i].isFinal) {
+              canliMetin += e.results[i][0].transcript + " ";
+              setCanliTranskript(canliMetin.trim());
+            }
+          }
+        };
+        recognition.onerror = () => {};
+        recognition.onend = () => { if (recognition._aktif) try { recognition.start(); } catch(e) {} };
+        recognition._aktif = true;
         try { recognition.start(); } catch(e) {}
       }
-    };
 
-    recognition.start();
-    mediaRecorderRef.current = { recognition, durdur: () => { aktif = false; try { recognition.stop(); } catch(e) {} } };
-    setSpeechKayit(true);
-    speechSureRef.current = setInterval(() => setSpeechSure(s => s + 1), 1000);
+      mediaRecorderRef.current = {
+        mr, stream, recognition,
+        durdur: () => {
+          mr.stop();
+          stream.getTracks().forEach(t => t.stop());
+          if (recognition) { recognition._aktif = false; try { recognition.stop(); } catch(e) {} }
+        }
+      };
+
+      setSpeechKayit(true);
+      speechSureRef.current = setInterval(() => setSpeechSure(s => s + 1), 1000);
+
+    } catch(e) {
+      toast({ title: "Mikrofon erişimi gerekli. Lütfen izin ver.", variant: "destructive" });
+    }
   };
 
   const speechBitir = async () => {
@@ -4737,24 +4764,30 @@ function OgrenciPaneli({ user, logout }) {
     setSpeechKayit(false);
     setSpeechYukleniyor(true);
 
-    // Recognition'ı durdur
     if (mediaRecorderRef.current?.durdur) {
       mediaRecorderRef.current.durdur();
     }
 
-    // Son sonuçların gelmesi için bekle
+    // MediaRecorder'ın onstop'u çalışması için bekle
     await new Promise(r => setTimeout(r, 800));
 
-    const transkript = audioChunksRef.current[0] || "";
+    const chunks = audioChunksRef.current;
+    const mimeType = chunks[0]?.type || "audio/webm";
+    const ext = mimeType.includes("mp4") ? "mp4" : "webm";
 
     try {
+      const blob = new Blob(chunks, { type: mimeType });
       const fd = new FormData();
-      fd.append("transkript", transkript);
+      fd.append("ses_dosyasi", blob, `ses.${ext}`);
+      fd.append("transkript", canliTranskript); // Web Speech varsa bonus olarak gönder
       fd.append("metin_id", seciliSpeechMetin?.id || "");
       fd.append("ogrenci_id", ogrenciId || "");
       fd.append("sure_sn", speechSure.toString());
       fd.append("sinif", (profil?.sinif || user?.sinif || 3).toString());
-      const r = await axios.post(`${API}/ai/speech/analiz`, fd, { timeout: 60000 });
+      const r = await axios.post(`${API}/ai/speech/analiz`, fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 90000
+      });
       setSpeechSonuc(r.data);
       toast({ title: `🎤 Analiz tamam! ${r.data.genel_skor}/100 puan • +${r.data.xp_kazanildi} XP` });
       try { const gr = await axios.get(`${API}/ai/speech/gecmis/${ogrenciId}`); setSpeechGecmis(gr.data); } catch(e) {}
@@ -4762,6 +4795,29 @@ function OgrenciPaneli({ user, logout }) {
       toast({ title: "Analiz hatası. Lütfen tekrar dene.", variant: "destructive" });
     }
     setSpeechYukleniyor(false);
+  };
+
+  // ── AI ARKADAŞ Fonksiyonu ──
+  const arkadasMesajGonder = async (e) => {
+    e?.preventDefault();
+    if (!arkadasMesaj.trim() || !seciliKarakter || arkadasYukleniyor) return;
+    const yeniMesaj = arkadasMesaj.trim();
+    setArkadasMesaj("");
+    const yeniSohbet = [...arkadasSohbet, { rol: "user", icerik: yeniMesaj }];
+    setArkadasSohbet(yeniSohbet);
+    setArkadasYukleniyor(true);
+    try {
+      const r = await axios.post(`${API}/ai/arkadas/sohbet`, {
+        karakter_id: seciliKarakter.id,
+        mesaj: yeniMesaj,
+        gecmis: arkadasSohbet.slice(-6),
+      });
+      setArkadasSohbet([...yeniSohbet, { rol: "assistant", icerik: r.data.yanit }]);
+      setArkadasKalanHak(r.data.gunluk_kalan ?? 20);
+    } catch(e) {
+      setArkadasSohbet([...yeniSohbet, { rol: "assistant", icerik: "Ups! Bir sorun oluştu. Tekrar dene 🙏" }]);
+    }
+    setArkadasYukleniyor(false);
   };
 
   const okumaKaydet = async (e) => {
@@ -5084,6 +5140,7 @@ function OgrenciPaneli({ user, logout }) {
   // ── ANA PANEL — Sadeleştirilmiş 4 Tab ──
   const sekmeler = [
     { id: "ana", label: "Ana Sayfa", icon: "🏠" },
+    { id: "arkadas", label: "Arkadaşım", icon: "💬" },
     { id: "gorevler", label: "Görevlerim", icon: "📌", badge: bekleyenGorevler.length || null },
     { id: "gelisim", label: "Gelişim", icon: "🎯" },
     { id: "siralama", label: "Sıralama", icon: "🏆" },
@@ -5218,6 +5275,126 @@ function OgrenciPaneli({ user, logout }) {
             {okumaKayitlari.slice(0,3).map(k => (<div key={k.id} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0"><div className="text-sm font-medium truncate flex-1">{k.kitap_adi || "—"}</div><div className="text-xs text-gray-400">{k.sure_dakika} dk</div></div>))}
           </div>)}
         </>)}
+
+        {/* ═══ AI ARKADAŞIM ═══ */}
+        {aktifSekme === "arkadas" && (
+          <div className="space-y-4">
+            {!seciliKarakter ? (
+              /* Karakter seçim ekranı */
+              <div className="space-y-4">
+                <div className="text-center">
+                  <div className="text-2xl mb-1">💬</div>
+                  <h2 className="text-lg font-bold text-gray-800">Okuma Arkadaşını Seç</h2>
+                  <p className="text-sm text-gray-500">Kitaplar hakkında konuşabileceğin bir arkadaş seç</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {(arkadasKarakterler.length > 0 ? arkadasKarakterler : [
+                    { id:"baykus", ad:"Bilge Baykuş", emoji:"🦉", renk:"purple", tanim:"Derin sorular soran, düşündüren" },
+                    { id:"robot", ad:"Robot Kaptan", emoji:"🤖", renk:"blue", tanim:"Heyecanlı, eğlenceli, macera dolu" },
+                    { id:"dede", ad:"Kütüphane Dedesi", emoji:"📖", renk:"amber", tanim:"Hikâye anlatan, sıcak, bilge" },
+                    { id:"kedi", ad:"Gezgin Kedi", emoji:"🐱", renk:"green", tanim:"Hayal gücü yüksek, yaratıcı" },
+                  ]).map(k => {
+                    const renkler = {
+                      purple: "border-purple-200 bg-purple-50 hover:border-purple-400",
+                      blue: "border-blue-200 bg-blue-50 hover:border-blue-400",
+                      amber: "border-amber-200 bg-amber-50 hover:border-amber-400",
+                      green: "border-green-200 bg-green-50 hover:border-green-400",
+                    };
+                    return (
+                      <button key={k.id} onClick={() => { setSeciliKarakter(k); setArkadasSohbet([]); }}
+                        className={`border-2 rounded-2xl p-4 text-left transition-all ${renkler[k.renk] || renkler.purple}`}>
+                        <div className="text-3xl mb-2">{k.emoji}</div>
+                        <div className="font-bold text-sm text-gray-800">{k.ad}</div>
+                        <div className="text-xs text-gray-500 mt-1">{k.tanim}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="bg-blue-50 rounded-xl p-3 border border-blue-100">
+                  <div className="text-xs text-blue-700">💡 Günlük 20 mesaj hakkın var. Sadece kitap ve okuma hakkında konuşabilirsin.</div>
+                </div>
+              </div>
+            ) : (
+              /* Sohbet ekranı */
+              <div className="flex flex-col h-[calc(100vh-180px)]">
+                {/* Header */}
+                <div className={`flex items-center justify-between p-3 rounded-2xl mb-3 ${
+                  seciliKarakter.renk === "purple" ? "bg-purple-100" :
+                  seciliKarakter.renk === "blue" ? "bg-blue-100" :
+                  seciliKarakter.renk === "amber" ? "bg-amber-100" : "bg-green-100"
+                }`}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">{seciliKarakter.emoji}</span>
+                    <div>
+                      <div className="font-bold text-sm text-gray-800">{seciliKarakter.ad}</div>
+                      <div className="text-xs text-gray-500">{arkadasKalanHak} mesaj hakkı kaldı</div>
+                    </div>
+                  </div>
+                  <button onClick={() => { setSeciliKarakter(null); setArkadasSohbet([]); }}
+                    className="text-xs text-gray-500 hover:text-gray-700 bg-white rounded-lg px-2 py-1">← Değiştir</button>
+                </div>
+
+                {/* Mesajlar */}
+                <div className="flex-1 overflow-y-auto space-y-3 pb-2">
+                  {/* Karşılama mesajı */}
+                  {arkadasSohbet.length === 0 && (
+                    <div className="flex gap-2">
+                      <span className="text-xl shrink-0">{seciliKarakter.emoji}</span>
+                      <div className="bg-white rounded-2xl rounded-tl-none p-3 shadow-sm border max-w-[80%]">
+                        <p className="text-sm text-gray-700">
+                          {seciliKarakter.id === "baykus" && "Huu huu! Merhaba! Bugün hangi kitabı okudun? Benimle paylaşmak ister misin?"}
+                          {seciliKarakter.id === "robot" && "BİP BOP! Merhaba kahraman! SÜPER bir okuma günü geçirdin mi? Anlat bakalım!"}
+                          {seciliKarakter.id === "dede" && "Hoş geldin yavrucuğum. Bugün ne güzel kitaplar okudun? Anlat bakalım dedeye."}
+                          {seciliKarakter.id === "kedi" && "Miyav! Merhaba! Ben bugün bir kitabın içinden yeni çıktım. Sen ne okudun?"}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {arkadasSohbet.map((m, i) => (
+                    <div key={i} className={`flex gap-2 ${m.rol === "user" ? "flex-row-reverse" : ""}`}>
+                      {m.rol === "assistant" && <span className="text-xl shrink-0">{seciliKarakter.emoji}</span>}
+                      <div className={`rounded-2xl p-3 shadow-sm max-w-[80%] text-sm ${
+                        m.rol === "user"
+                          ? "bg-blue-500 text-white rounded-tr-none"
+                          : "bg-white border text-gray-700 rounded-tl-none"
+                      }`}>
+                        {m.icerik}
+                      </div>
+                    </div>
+                  ))}
+                  {arkadasYukleniyor && (
+                    <div className="flex gap-2">
+                      <span className="text-xl">{seciliKarakter.emoji}</span>
+                      <div className="bg-white rounded-2xl rounded-tl-none p-3 shadow-sm border">
+                        <div className="flex gap-1">{[0,1,2].map(i => <div key={i} className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{animationDelay:`${i*0.15}s`}} />)}</div>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={arkadasSonRef} />
+                </div>
+
+                {/* Input */}
+                <form onSubmit={arkadasMesajGonder} className="flex gap-2 pt-2 border-t">
+                  <input
+                    value={arkadasMesaj}
+                    onChange={e => setArkadasMesaj(e.target.value)}
+                    placeholder={`${seciliKarakter.ad}'na yaz...`}
+                    maxLength={200}
+                    disabled={arkadasYukleniyor || arkadasKalanHak <= 0}
+                    className="flex-1 rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:opacity-50"
+                  />
+                  <button type="submit" disabled={!arkadasMesaj.trim() || arkadasYukleniyor || arkadasKalanHak <= 0}
+                    className="bg-blue-500 text-white rounded-xl px-4 py-2 text-sm font-medium disabled:opacity-40">
+                    Gönder
+                  </button>
+                </form>
+                {arkadasKalanHak <= 0 && (
+                  <p className="text-xs text-center text-red-500 mt-1">Bugünlük mesaj hakkın bitti. Yarın tekrar konuşabilirsin!</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ═══ GÖREVLERİM ═══ */}
         {aktifSekme === "gorevler" && (<div className="space-y-3"><h2 className="text-lg font-bold">📌 Görevlerim</h2>
