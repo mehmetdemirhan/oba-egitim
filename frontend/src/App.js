@@ -4595,6 +4595,9 @@ function OgrenciPaneli({ user, logout }) {
   const [cevapGosterim, setCevapGosterim] = useState(false);
   const [oyunData, setOyunData] = useState(null);
   const [oyunDurum, setOyunDurum] = useState({}); // oyun içi state
+  const [oyunSure, setOyunSure] = useState(0); // saniye sayacı
+  const [oyunSkor, setOyunSkor] = useState(null); // tamamlama skoru {sure, rekor}
+  const oyunSureRef = useRef(null);
   const [okumaSuresi, setOkumaSuresi] = useState(0);
   const [okumaDuraklatildi, setOkumaDuraklatildi] = useState(false);
   const okumaInterval = useRef(null);
@@ -5637,7 +5640,8 @@ function OgrenciPaneli({ user, logout }) {
               <div className="grid grid-cols-2 gap-2">
                 {[["eslestirme","🎲","Eşleştirme"],["bosluk_doldurma","⬜","Boşluk Doldur"],["cumle_kurma","📝","Cümle Kur"],["kelime_avi","🔍","Kelime Avı"]].map(([t,e,l]) => (
                   <button key={t} onClick={async () => {
-                    setOyunData(null); setOyunDurum({});
+                    setOyunData(null); setOyunDurum({}); setOyunSkor(null);
+                    clearInterval(oyunSureRef.current); setOyunSure(0);
                     try { const r = await axios.post(`${API}/ai/mini-oyun`, { tur: t, sinif: user.sinif || 3 }); 
                       const d = r.data.oyun;
                       // Eşleştirme: anlamları karıştır
@@ -5655,6 +5659,8 @@ function OgrenciPaneli({ user, logout }) {
                         d.tumKelimeler = karisik;
                       }
                       setOyunData(d);
+                      // Süre sayacını başlat
+                      oyunSureRef.current = setInterval(() => setOyunSure(s => s+1), 1000);
                     } catch(e) {}
                   }} className="bg-white rounded-xl p-4 border shadow-sm text-center hover:bg-cyan-50 transition-all active:scale-95">
                     <div className="text-2xl mb-1">{e}</div><div className="text-xs font-medium text-gray-700">{l}</div>
@@ -5662,7 +5668,47 @@ function OgrenciPaneli({ user, logout }) {
                 ))}
               </div>
 
+              {/* Skor kartı — oyun bittikten sonra */}
+              {oyunSkor && !oyunData && (
+                <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-2xl p-5 border-2 border-yellow-300 text-center shadow-md">
+                  <div className="text-4xl mb-2">{oyunSkor.yeniRekor ? "🏆" : "🎮"}</div>
+                  <h3 className="font-bold text-gray-800 text-base mb-1">{oyunSkor.yeniRekor ? "Yeni Rekor!" : "Tamamlandı!"}</h3>
+                  <div className="grid grid-cols-2 gap-3 my-3">
+                    <div className="bg-white rounded-xl p-3 border">
+                      <div className="text-2xl font-bold text-indigo-600 font-mono">{`${Math.floor(oyunSkor.sure/60).toString().padStart(2,'0')}:${(oyunSkor.sure%60).toString().padStart(2,'0')}`}</div>
+                      <div className="text-xs text-gray-500">⏱ Bu Süre</div>
+                    </div>
+                    <div className="bg-white rounded-xl p-3 border">
+                      <div className="text-2xl font-bold text-green-600 font-mono">{`${Math.floor(oyunSkor.rekor/60).toString().padStart(2,'0')}:${(oyunSkor.rekor%60).toString().padStart(2,'0')}`}</div>
+                      <div className="text-xs text-gray-500">🥇 En İyi</div>
+                    </div>
+                  </div>
+                  <div className="text-sm font-bold text-orange-600 mb-3">+{oyunSkor.xp} XP kazandın!</div>
+                  <button onClick={() => setOyunSkor(null)} className="text-xs text-gray-400 underline">Kapat</button>
+                </div>
+              )}
+
               {oyunData && (() => {
+                // Süre formatlama
+                const sureFmt = (s) => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
+
+                // Tamamlama fonksiyonu — süreyi durdur, skor hesapla, backend'e gönder
+                const oyunuBitir = async (tur, dogru, toplam) => {
+                  clearInterval(oyunSureRef.current);
+                  const sure = oyunSure;
+                  try {
+                    const r = await axios.post(`${API}/ai/mini-oyun/tamamla`, {tur, dogru, toplam, sure_sn: sure});
+                    // Rekor kontrolü (localStorage'da saklıyoruz)
+                    const rekorKey = `oyun_rekor_${tur}`;
+                    const eskiRekor = parseInt(localStorage.getItem(rekorKey) || '9999');
+                    const yeniRekor = sure < eskiRekor;
+                    if (yeniRekor) localStorage.setItem(rekorKey, sure);
+                    setOyunSkor({ sure, rekor: yeniRekor ? sure : eskiRekor, yeniRekor, xp: r.data.xp, mesaj: r.data.mesaj });
+                    toast({ title: `🎮 ${r.data.mesaj} +${r.data.xp} XP — Süre: ${sureFmt(sure)}${yeniRekor?' 🏆 YENİ REKOR!':''}` });
+                    setOyunData(null);
+                  } catch(e) {}
+                };
+
                 // Ses efektleri
                 const sesCalDogru = () => { try { const ctx=new AudioContext(); const o=ctx.createOscillator(); const g=ctx.createGain(); o.connect(g); g.connect(ctx.destination); o.frequency.setValueAtTime(523,ctx.currentTime); o.frequency.setValueAtTime(659,ctx.currentTime+0.1); o.frequency.setValueAtTime(784,ctx.currentTime+0.2); g.gain.setValueAtTime(0.3,ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+0.5); o.start(); o.stop(ctx.currentTime+0.5); } catch(e){} };
                 const sesCalYanlis = () => { try { const ctx=new AudioContext(); const o=ctx.createOscillator(); const g=ctx.createGain(); o.connect(g); g.connect(ctx.destination); o.frequency.setValueAtTime(200,ctx.currentTime); o.frequency.setValueAtTime(150,ctx.currentTime+0.15); g.gain.setValueAtTime(0.3,ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+0.4); o.start(); o.stop(ctx.currentTime+0.4); } catch(e){} };
@@ -5674,7 +5720,7 @@ function OgrenciPaneli({ user, logout }) {
                     <div className="bg-white rounded-2xl p-4 border-2 border-cyan-300 shadow-md">
                       <div className="flex items-center justify-between mb-2">
                         <h3 className="font-bold text-sm">📝 {oyunData.baslik}</h3>
-                        <button onClick={() => setOyunData(null)} className="text-gray-400 text-lg leading-none">✕</button>
+                        <div className="flex items-center gap-2"><span className="font-mono text-sm font-bold text-indigo-600">⏱ {sureFmt(oyunSure)}</span><button onClick={() => { clearInterval(oyunSureRef.current); setOyunData(null); }} className="text-gray-400 text-lg leading-none">✕</button></div>
                       </div>
                       <p className="text-xs text-gray-500 mb-3">{oyunData.aciklama}</p>
                       <div className="space-y-4">
@@ -5722,7 +5768,7 @@ function OgrenciPaneli({ user, logout }) {
                         })}
                       </div>
                       {sorular.every((_,i)=>oyunDurum[`ck_${i}_ok`]) && (
-                        <button className="w-full mt-3 bg-green-600 text-white rounded-xl py-2 text-sm font-bold" onClick={async()=>{ try{const r=await axios.post(`${API}/ai/mini-oyun/tamamla`,{tur:oyunData.tur,dogru:sorular.length,toplam:sorular.length});toast({title:`🎮 ${r.data.mesaj} +${r.data.xp} XP`});setOyunData(null);}catch(e){} }}>🏆 Tamamla!</button>
+                        <button className="w-full mt-3 bg-green-600 text-white rounded-xl py-2 text-sm font-bold" onClick={async()=>{ oyunuBitir(oyunData.tur, sorular.length, sorular.length); }}>🏆 Tamamla!</button>
                       )}
                     </div>
                   );
@@ -5735,7 +5781,7 @@ function OgrenciPaneli({ user, logout }) {
                     <div className="bg-white rounded-2xl p-4 border-2 border-cyan-300 shadow-md">
                       <div className="flex items-center justify-between mb-2">
                         <h3 className="font-bold text-sm">⬜ {oyunData.baslik}</h3>
-                        <button onClick={() => setOyunData(null)} className="text-gray-400 text-lg leading-none">✕</button>
+                        <div className="flex items-center gap-2"><span className="font-mono text-sm font-bold text-indigo-600">⏱ {sureFmt(oyunSure)}</span><button onClick={() => { clearInterval(oyunSureRef.current); setOyunData(null); }} className="text-gray-400 text-lg leading-none">✕</button></div>
                       </div>
                       <p className="text-xs text-gray-500 mb-3">{oyunData.aciklama}</p>
                       <div className="space-y-4">
@@ -5758,7 +5804,7 @@ function OgrenciPaneli({ user, logout }) {
                               <div className="flex flex-wrap gap-2">
                                 {(s.secenekler||[]).map((sec, j) => (
                                   <button key={j} disabled={!!tamamlandi} onClick={() => {
-                                    const dogruMu = sec === s.dogru_cevap;
+                                    const dogruMu = sec === s.dogru;
                                     setOyunDurum(d=>({...d,[`bd_${si}`]:sec}));
                                     if(dogruMu) { sesCalDogru(); setTimeout(()=>setOyunDurum(d=>({...d,[`bd_${si}_ok`]:true})),300); }
                                     else { sesCalYanlis(); setOyunDurum(d=>({...d,[`bd_${si}_yanlis`]:true})); setTimeout(()=>setOyunDurum(d=>({...d,[`bd_${si}`]:null,[`bd_${si}_yanlis`]:false})),700); }
@@ -5772,7 +5818,7 @@ function OgrenciPaneli({ user, logout }) {
                         })}
                       </div>
                       {sorular.every((_,i)=>oyunDurum[`bd_${i}_ok`]) && (
-                        <button className="w-full mt-3 bg-green-600 text-white rounded-xl py-2 text-sm font-bold" onClick={async()=>{ try{const r=await axios.post(`${API}/ai/mini-oyun/tamamla`,{tur:oyunData.tur,dogru:sorular.length,toplam:sorular.length});toast({title:`🎮 ${r.data.mesaj} +${r.data.xp} XP`});setOyunData(null);}catch(e){} }}>🏆 Tamamla!</button>
+                        <button className="w-full mt-3 bg-green-600 text-white rounded-xl py-2 text-sm font-bold" onClick={async()=>{ oyunuBitir(oyunData.tur, sorular.length, sorular.length); }}>🏆 Tamamla!</button>
                       )}
                     </div>
                   );
@@ -5787,7 +5833,7 @@ function OgrenciPaneli({ user, logout }) {
                     <div className="bg-white rounded-2xl p-4 border-2 border-cyan-300 shadow-md">
                       <div className="flex items-center justify-between mb-2">
                         <h3 className="font-bold text-sm">🔍 {oyunData.baslik}</h3>
-                        <button onClick={() => setOyunData(null)} className="text-gray-400 text-lg leading-none">✕</button>
+                        <div className="flex items-center gap-2"><span className="font-mono text-sm font-bold text-indigo-600">⏱ {sureFmt(oyunSure)}</span><button onClick={() => { clearInterval(oyunSureRef.current); setOyunData(null); }} className="text-gray-400 text-lg leading-none">✕</button></div>
                       </div>
                       <p className="text-xs text-gray-500 mb-1">{oyunData.aciklama}</p>
                       <div className="flex flex-wrap gap-1 mb-3">
@@ -5820,7 +5866,7 @@ function OgrenciPaneli({ user, logout }) {
                       </div>
                       <div className="text-xs text-gray-400 mt-2">{bulunanlar.length}/{hedefler.length} bulundu</div>
                       {bulunanlar.length === hedefler.length && (
-                        <button className="w-full mt-3 bg-green-600 text-white rounded-xl py-2 text-sm font-bold" onClick={async()=>{ try{const r=await axios.post(`${API}/ai/mini-oyun/tamamla`,{tur:oyunData.tur,dogru:hedefler.length,toplam:hedefler.length});toast({title:`🎮 ${r.data.mesaj} +${r.data.xp} XP`});setOyunData(null);}catch(e){} }}>🏆 Tamamla!</button>
+                        <button className="w-full mt-3 bg-green-600 text-white rounded-xl py-2 text-sm font-bold" onClick={async()=>{ oyunuBitir(oyunData.tur, hedefler.length, hedefler.length); }}>🏆 Tamamla!</button>
                       )}
                     </div>
                   );
@@ -5837,7 +5883,7 @@ function OgrenciPaneli({ user, logout }) {
                     <div className="bg-white rounded-2xl p-4 border-2 border-cyan-300 shadow-md">
                       <div className="flex items-center justify-between mb-2">
                         <h3 className="font-bold text-sm">🎲 {oyunData.baslik}</h3>
-                        <button onClick={() => setOyunData(null)} className="text-gray-400 text-lg leading-none">✕</button>
+                        <div className="flex items-center gap-2"><span className="font-mono text-sm font-bold text-indigo-600">⏱ {sureFmt(oyunSure)}</span><button onClick={() => { clearInterval(oyunSureRef.current); setOyunData(null); }} className="text-gray-400 text-lg leading-none">✕</button></div>
                       </div>
                       <p className="text-xs text-gray-500 mb-3">Bir kelime seç, sonra anlamına tıkla!</p>
                       <div className="grid grid-cols-2 gap-2">
@@ -5878,7 +5924,7 @@ function OgrenciPaneli({ user, logout }) {
                       </div>
                       <div className="text-xs text-gray-400 mt-2 text-center">{eslesmiş.length}/{kelimeler.length} eşleşti</div>
                       {eslesmiş.length === kelimeler.length && (
-                        <button className="w-full mt-3 bg-green-600 text-white rounded-xl py-2 text-sm font-bold" onClick={async()=>{ try{const r=await axios.post(`${API}/ai/mini-oyun/tamamla`,{tur:oyunData.tur,dogru:kelimeler.length,toplam:kelimeler.length});toast({title:`🎮 ${r.data.mesaj} +${r.data.xp} XP`});setOyunData(null);}catch(e){} }}>🏆 Tamamla!</button>
+                        <button className="w-full mt-3 bg-green-600 text-white rounded-xl py-2 text-sm font-bold" onClick={async()=>{ oyunuBitir(oyunData.tur, kelimeler.length, kelimeler.length); }}>🏆 Tamamla!</button>
                       )}
                     </div>
                   );
