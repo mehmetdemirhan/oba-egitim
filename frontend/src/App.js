@@ -4627,6 +4627,7 @@ function OgrenciPaneli({ user, logout }) {
   const [zekaModal, setZekaModal] = useState(null);
   const [zekaYukleniyor, setZekaYukleniyor] = useState(false);
   const [kitapTavsiye, setKitapTavsiye] = useState([]);
+  const [dnaData, setDnaData] = useState(null);
   const [okumaSuresi, setOkumaSuresi] = useState(0);
   const [okumaDuraklatildi, setOkumaDuraklatildi] = useState(false);
   const okumaInterval = useRef(null);
@@ -4705,6 +4706,11 @@ function OgrenciPaneli({ user, logout }) {
   // Kitap Zekâ Tavsiye
   useEffect(() => {
     const f = async () => { try { const r = await axios.get(`${API}/ai/kitap-zeka/tavsiye`); setKitapTavsiye(r.data.tavsiyeler || []); } catch(e) {} };
+    f();
+  }, [ogrenciId]);
+  // Okuma DNA
+  useEffect(() => {
+    const f = async () => { try { const r = await axios.get(`${API}/ai/dna/${ogrenciId}`); setDnaData(r.data); } catch(e) {} };
     f();
   }, [ogrenciId]);
 
@@ -5144,6 +5150,75 @@ function OgrenciPaneli({ user, logout }) {
 
           {/* Haftalık hedef */}
           {istatistik && (<div className="bg-white rounded-2xl p-4 shadow-sm border"><div className="flex items-center justify-between mb-2"><div className="text-sm font-medium text-gray-700">Haftalık Hedef</div><span className="text-sm font-bold text-gray-700">{istatistik.aktif_gunler_7}/4 gün</span></div><div className="flex gap-1">{[0,1,2,3].map(i => (<div key={i} className={`flex-1 h-3 rounded-full ${i < istatistik.aktif_gunler_7 ? 'bg-gradient-to-r from-orange-400 to-red-500' : 'bg-gray-100'}`} />))}</div><p className="text-xs text-gray-400 mt-2">Haftada en az 4 gün okuma 📖</p></div>)}
+
+          {/* 🧠 Okuma Zekâm */}
+          {dnaData && (() => {
+            const boyutlar = dnaData.boyutlar || {};
+            const profil = dnaData.profil_label || "📖 Okuyucu";
+            const satirlar = [
+              { key: "kelime_gucu",       label: "Kelime Gücü",        emoji: "📚", renk: "from-blue-400 to-blue-600" },
+              { key: "akicilik",          label: "Akıcılık",           emoji: "⚡", renk: "from-orange-400 to-orange-600" },
+              { key: "anlama_derinligi",  label: "Anlama",             emoji: "🔍", renk: "from-green-400 to-green-600" },
+              { key: "dikkat_suresi",     label: "Dikkat Süresi",      emoji: "🎯", renk: "from-purple-400 to-purple-600" },
+              { key: "zorluk_toleransi",  label: "Zorluk Toleransı",   emoji: "💪", renk: "from-red-400 to-red-500" },
+            ];
+            const guclu = satirlar.filter(s => (boyutlar[s.key]||0) >= 70);
+            const gelistir = satirlar.filter(s => (boyutlar[s.key]||0) < 50);
+            return (
+              <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+                {/* Header */}
+                <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">🧠</span>
+                    <div>
+                      <div className="text-white font-bold text-sm">Okuma Zekâm</div>
+                      <div className="text-white/70 text-[10px]">Kişisel okuma profili</div>
+                    </div>
+                  </div>
+                  <div className="bg-white/20 text-white text-xs font-bold px-3 py-1 rounded-full">{profil}</div>
+                </div>
+                {/* Boyutlar */}
+                <div className="p-4 space-y-2.5">
+                  {satirlar.map(({ key, label, emoji, renk }) => {
+                    const val = boyutlar[key] || 0;
+                    return (
+                      <div key={key}>
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-1.5 text-xs text-gray-700 font-medium">
+                            <span>{emoji}</span><span>{label}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-gray-800">{val}</span>
+                            <span className="text-[9px] text-gray-400">/100</span>
+                          </div>
+                        </div>
+                        <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div className={`h-full bg-gradient-to-r ${renk} rounded-full transition-all duration-700`} style={{width:`${val}%`}} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Güçlü & Geliştirilecek */}
+                {(guclu.length > 0 || gelistir.length > 0) && (
+                  <div className="px-4 pb-4 grid grid-cols-2 gap-2">
+                    {guclu.length > 0 && (
+                      <div className="bg-green-50 rounded-xl p-2.5 border border-green-100">
+                        <div className="text-[10px] text-green-700 font-bold mb-1">💚 Güçlü Yönlerin</div>
+                        {guclu.map(s => <div key={s.key} className="text-[10px] text-green-600">{s.emoji} {s.label}</div>)}
+                      </div>
+                    )}
+                    {gelistir.length > 0 && (
+                      <div className="bg-amber-50 rounded-xl p-2.5 border border-amber-100">
+                        <div className="text-[10px] text-amber-700 font-bold mb-1">🌱 Geliştir</div>
+                        {gelistir.map(s => <div key={s.key} className="text-[10px] text-amber-600">{s.emoji} {s.label}</div>)}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* 🧠 Sana Özel Kitaplar */}
           {kitapTavsiye.length > 0 && (
