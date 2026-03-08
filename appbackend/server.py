@@ -6842,16 +6842,28 @@ async def speech_analiz(
     if ses_dosyasi and OPENAI_API_KEY:
         try:
             ses_bytes = await ses_dosyasi.read()
-            async with httpx.AsyncClient(timeout=60.0) as c:
+            # Dosya uzantısını ve mime type'ı belirle
+            filename = ses_dosyasi.filename or "ses.webm"
+            content_type = ses_dosyasi.content_type or "audio/webm"
+            # Whisper desteklenen formatlar: mp4, webm, mp3, wav, m4a, ogg
+            if "mp4" in content_type or filename.endswith(".mp4"):
+                mime = "audio/mp4"
+                ext = "mp4"
+            else:
+                mime = "audio/webm"
+                ext = "webm"
+            async with httpx.AsyncClient(timeout=90.0) as c:
                 resp = await c.post(
                     "https://api.openai.com/v1/audio/transcriptions",
                     headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
-                    files={"file": (ses_dosyasi.filename or "ses.webm", ses_bytes, "audio/webm")},
+                    files={"file": (f"ses.{ext}", ses_bytes, mime)},
                     data={"model": "whisper-1", "language": "tr"},
                 )
                 if resp.status_code == 200:
                     transkript = resp.json().get("text", "")
                     whisper_kullanildi = True
+                else:
+                    logging.warning(f"Whisper API yanıt: {resp.status_code} — {resp.text[:200]}")
         except Exception as e:
             logging.warning(f"Whisper API hatası: {e}")
 
@@ -6993,6 +7005,232 @@ async def speech_istatistik(ogrenci_id: str, current_user=Depends(get_current_us
             "tarih": en_iyi["tarih"][:10],
         },
     }
+
+
+# ─────────────────────────────────────────────
+# DALGA 3: AI OKUMA ARKADAŞI (4 KARAKTER)
+# ─────────────────────────────────────────────
+
+AI_ARKADAS_KARAKTERLER = {
+    "baykus": {
+        "id": "baykus",
+        "ad": "Bilge Baykuş",
+        "emoji": "🦉",
+        "renk": "purple",
+        "tanim": "Derin sorular soran, düşündüren",
+        "sistem_prompt": """Sen Bilge Baykuş'sun. İlkokul öğrencilerine okuma konusunda yardım eden bilge ve meraklı bir baykussun.
+Özelliğin: Derin, düşündürücü sorular sorarsın. Bloom taksonomisinin analiz ve değerlendirme basamaklarını kullanırsın.
+Kurallar:
+- Her yanıtta 1-2 cümle konuş, sonra 1 soru sor
+- Türkçe konuş, sade ve anlaşılır
+- Asla kişisel bilgi sorma
+- Sadece kitap, okuma, öğrenme hakkında konuş
+- Yanıt max 3 cümle olsun
+- Sen bir baykussun, bazen "Huu huu!" diyebilirsin""",
+    },
+    "robot": {
+        "id": "robot",
+        "ad": "Robot Kaptan",
+        "emoji": "🤖",
+        "renk": "blue",
+        "tanim": "Heyecanlı, eğlenceli, macera dolu",
+        "sistem_prompt": """Sen Robot Kaptan'sın! İlkokul öğrencileriyle konuşan süper heyecanlı bir robotsun!
+Özelliğin: Her şeyi macera ve keşif olarak görürsün. Okumayı bir uzay yolculuğuna benzetirsin.
+Kurallar:
+- Heyecanlı konuş! Bazen "SÜPER!" veya "İNANILMAZ!" diyebilirsin
+- Her yanıt max 3 cümle
+- Türkçe konuş
+- Sadece kitap ve okuma hakkında konuş
+- Asla kişisel bilgi sorma
+- Bazen robotça sesler çıkarabilirsin: bip bop!""",
+    },
+    "dede": {
+        "id": "dede",
+        "ad": "Kütüphane Dedesi",
+        "emoji": "📖",
+        "renk": "amber",
+        "tanim": "Hikâye anlatan, sıcak, bilge",
+        "sistem_prompt": """Sen Kütüphane Dedesi'sin. Yıllarca kütüphanede çalışmış, binlerce kitap okumuş, çok sevilen bir dedesin.
+Özelliğin: Her konuya bağlantılı bir hikâye veya kitap hatırlarsın. Sıcak ve sevecensin.
+Kurallar:
+- "Ah, bir keresinde bir kitapta..." diye başlayabilirsin
+- Her yanıt max 3 cümle
+- Türkçe konuş, samimi ve sıcak ol
+- Sadece kitap, okuma, hikâye hakkında konuş
+- Asla kişisel bilgi sorma
+- Bazen "Güzel kitaplar güzel rüyalar getirir" gibi atasözü söyleyebilirsin""",
+    },
+    "kedi": {
+        "id": "kedi",
+        "ad": "Gezgin Kedi",
+        "emoji": "🐱",
+        "renk": "green",
+        "tanim": "Hayal gücü yüksek, yaratıcı, eğlenceli",
+        "sistem_prompt": """Sen Gezgin Kedi'sin! Dünyanın her yerine seyahat etmiş, her kitabın içine girmiş bir kedisin.
+Özelliğin: Hayal gücünü kullanırsın. Kitapların içindeki dünyaları canlandırırsın.
+Kurallar:
+- "Miyav! Bir keresinde o kitabın içine girmiştim ve..." diyebilirsin
+- Her yanıt max 3 cümle
+- Türkçe konuş, eğlenceli ve yaratıcı ol
+- Sadece kitap, okuma, hayal gücü hakkında konuş
+- Asla kişisel bilgi sorma
+- Bazen "Miyav!" diyebilirsin""",
+    },
+}
+
+# Günlük sohbet limiti
+AI_ARKADAS_GUNLUK_LIMIT = 20
+AI_ARKADAS_MODERASYON_ESIK = 50  # Her 50 mesajda moderasyon
+
+
+def _arkadas_icerik_kontrol(mesaj: str) -> bool:
+    """Çocuk güvenliği: uygunsuz içerik filtresi."""
+    yasak_kelimeler = ["şifre", "adres", "telefon", "ev", "okul adresi", "nerede oturuyorsun"]
+    mesaj_lower = mesaj.lower()
+    return not any(k in mesaj_lower for k in yasak_kelimeler)
+
+
+@api_router.get("/ai/arkadas/karakterler")
+async def arkadas_karakterler(current_user=Depends(get_current_user)):
+    """4 AI arkadaş karakterini getir."""
+    return {
+        "karakterler": [
+            {k: v for k, v in kar.items() if k != "sistem_prompt"}
+            for kar in AI_ARKADAS_KARAKTERLER.values()
+        ]
+    }
+
+
+@api_router.post("/ai/arkadas/sohbet")
+async def arkadas_sohbet(request: Request, current_user=Depends(get_current_user)):
+    """Seçili karakterle sohbet et."""
+    body = await request.json()
+    karakter_id = body.get("karakter_id", "baykus")
+    mesaj = body.get("mesaj", "").strip()
+    gecmis = body.get("gecmis", [])  # [{rol: "user"|"assistant", icerik: "..."}]
+    kitap_baglami = body.get("kitap_baglami", "")  # isteğe bağlı kitap adı
+
+    if not mesaj:
+        raise HTTPException(status_code=400, detail="Mesaj boş olamaz")
+    if len(mesaj) > 500:
+        raise HTTPException(status_code=400, detail="Mesaj çok uzun")
+    if not _arkadas_icerik_kontrol(mesaj):
+        raise HTTPException(status_code=400, detail="Bu tür bilgileri paylaşma — güvenliğin önemli!")
+
+    karakter = AI_ARKADAS_KARAKTERLER.get(karakter_id, AI_ARKADAS_KARAKTERLER["baykus"])
+    ogrenci_id = current_user.get("linked_id") or current_user.get("id")
+
+    # Günlük limit kontrolü
+    bugun = datetime.utcnow().strftime("%Y-%m-%d")
+    gunluk_sayac = await db.ai_arkadas_log.count_documents({
+        "ogrenci_id": ogrenci_id,
+        "tarih": {"$gte": bugun}
+    })
+    if gunluk_sayac >= AI_ARKADAS_GUNLUK_LIMIT:
+        return {
+            "yanit": f"Bugün çok yoruldum! {karakter['emoji']} Yarın tekrar konuşalım. Bugün {AI_ARKADAS_GUNLUK_LIMIT} mesaj hakkın bitti.",
+            "limit_doldu": True,
+        }
+
+    # Claude API ile yanıt
+    sistem = karakter["sistem_prompt"]
+    if kitap_baglami:
+        sistem += f"\n\nÖğrenci şu an '{kitap_baglami}' kitabı hakkında konuşmak istiyor."
+
+    # Sohbet geçmişini mesaj formatına çevir
+    claude_mesajlar = []
+    for h in gecmis[-6:]:  # son 6 mesaj (3 tur)
+        claude_mesajlar.append({
+            "role": "user" if h["rol"] == "user" else "assistant",
+            "content": h["icerik"]
+        })
+    claude_mesajlar.append({"role": "user", "content": mesaj})
+
+    yanit_metni = ""
+    if ANTHROPIC_API_KEY:
+        try:
+            result = await call_claude(sistem, mesaj, model="haiku", max_tokens=200)
+            # call_claude single-turn, multi-turn için direkt API çağrısı
+            if len(claude_mesajlar) > 1:
+                async with httpx.AsyncClient(timeout=30.0) as c:
+                    resp = await c.post(
+                        "https://api.anthropic.com/v1/messages",
+                        headers={
+                            "x-api-key": ANTHROPIC_API_KEY,
+                            "anthropic-version": "2023-06-01",
+                            "content-type": "application/json",
+                        },
+                        json={
+                            "model": AI_HAIKU_MODEL,
+                            "max_tokens": 200,
+                            "system": sistem,
+                            "messages": claude_mesajlar,
+                        }
+                    )
+                    if resp.status_code == 200:
+                        yanit_metni = resp.json()["content"][0]["text"]
+            else:
+                yanit_metni = result.get("text", "")
+        except Exception as e:
+            logging.warning(f"AI Arkadaş API hatası: {e}")
+
+    # API yoksa veya hata varsa — karakter bazlı mock yanıt
+    if not yanit_metni:
+        mock_yanitlar = {
+            "baykus": [
+                f"Huu huu! '{mesaj[:20]}...' çok ilginç bir düşünce! Peki, bu sana ne hissettiriyor?",
+                "Harika bir soru! Kitaplar bize çok şey öğretir. Sen ne düşünüyorsun?",
+                "Huu huu! Okumak zihnimizi açar. Bu kitapta en çok hangi bölümü sevdin?",
+            ],
+            "robot": [
+                "BİP BOP! SÜPER düşünce! Bu kitap gerçekten bir uzay macerası gibi! Devam et!",
+                "İNANILMAZ! Okumak bir zaman makinesi gibi, her sayfada yeni bir dünyaya gidiyorsun!",
+                "SÜPER! Bip bop! Seninle okuma macerası yapmak çok eğlenceli!",
+            ],
+            "dede": [
+                "Ah, güzel bir düşünce. Bir keresinde benzer bir kitap okumuştum, çok etkileyiciydi.",
+                "Güzel kitaplar güzel rüyalar getirir. Okumaya devam et, çok işine yarayacak.",
+                "Ah, biliyor musun, bu bana eski bir hikâyeyi hatırlattı. Kitaplar hayatımızı zenginleştirir.",
+            ],
+            "kedi": [
+                f"Miyav! Ben de o kitabın içine girmiştim! Çok heyecanlıydı! Sen de hayal et!",
+                "Miyav miyav! Kitaplar beni yeni dünyalara götürüyor. Sen hangi dünyaya gitmek istersin?",
+                "Miyav! Hayal gücün çok güçlü! Her kitap yeni bir macera kapısı açar!",
+            ],
+        }
+        import random
+        yanit_metni = random.choice(mock_yanitlar.get(karakter_id, mock_yanitlar["baykus"]))
+
+    # Veritabanına kaydet
+    await db.ai_arkadas_log.insert_one({
+        "id": str(uuid.uuid4()),
+        "ogrenci_id": ogrenci_id,
+        "karakter_id": karakter_id,
+        "mesaj": mesaj,
+        "yanit": yanit_metni,
+        "kitap_baglami": kitap_baglami,
+        "tarih": datetime.utcnow().strftime("%Y-%m-%d"),
+        "tarih_tam": datetime.utcnow().isoformat(),
+    })
+
+    return {
+        "yanit": yanit_metni,
+        "karakter": {k: v for k, v in karakter.items() if k != "sistem_prompt"},
+        "gunluk_kalan": max(0, AI_ARKADAS_GUNLUK_LIMIT - gunluk_sayac - 1),
+        "limit_doldu": False,
+    }
+
+
+@api_router.get("/ai/arkadas/gecmis/{ogrenci_id}")
+async def arkadas_gecmis(ogrenci_id: str, karakter_id: str = "", current_user=Depends(get_current_user)):
+    """Öğrencinin belirli karakterle veya tüm sohbet geçmişi."""
+    filtre = {"ogrenci_id": ogrenci_id}
+    if karakter_id:
+        filtre["karakter_id"] = karakter_id
+    kayitlar = await db.ai_arkadas_log.find(filtre).sort("tarih_tam", -1).to_list(length=100)
+    for k in kayitlar:
+        k.pop("_id", None)
+    return kayitlar
 
 
 # ─────────────────────────────────────────────
