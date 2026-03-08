@@ -4592,6 +4592,10 @@ function OgrenciPaneli({ user, logout }) {
   const [okumaSuresi, setOkumaSuresi] = useState(0);
   const [okumaDuraklatildi, setOkumaDuraklatildi] = useState(false);
   const okumaInterval = useRef(null);
+  // Dikkat Analizi state'leri
+  const [dikkatMetrikler, setDikkatMetrikler] = useState({ geri_scroll: 0, zorluk_kelimeler: [], duraklamalar: 0 });
+  const [dikkatSonuc, setDikkatSonuc] = useState(null);
+  const dikkatBaslangicRef = useRef(null);
   // Speech AI state'leri
   const [speechMod, setSpeechMod] = useState(false);
   const [speechMetinler, setSpeechMetinler] = useState([]);
@@ -4687,8 +4691,40 @@ function OgrenciPaneli({ user, logout }) {
 
   const dakikaStr = (sn) => `${Math.floor(sn/60).toString().padStart(2,'0')}:${(sn%60).toString().padStart(2,'0')}`;
   const agacEmoji = (b) => b < 30 ? "🌱" : b < 70 ? "🌿" : "🌳";
-  const okumaBaslat = () => { setOkumaBasladi(true); setOkumaDuraklatildi(false); setOkumaSuresi(0); setAgaclar([]); setAktifEkran("okuma"); };
-  const okumaBitir = () => { clearInterval(okumaInterval.current); setOkumaBasladi(false); setNeOkudunForm({ kitap_adi:"", bolum:"", baslangic_sayfa:"", bitis_sayfa:"", not_text:"" }); setAktifEkran("ne-okudun"); };
+  const okumaBaslat = () => {
+    setOkumaBasladi(true); setOkumaDuraklatildi(false); setOkumaSuresi(0); setAgaclar([]);
+    // Dikkat analizi sıfırla
+    setDikkatMetrikler({ geri_scroll: 0, zorluk_kelimeler: [], duraklamalar: 0 });
+    setDikkatSonuc(null);
+    dikkatBaslangicRef.current = {
+      sonScrollY: window.scrollY,
+      geri: 0,
+      scrollHizilari: [],  // px/sn örnekleri
+      sonScrollZaman: Date.now(),
+      sonScrollYon: 0,
+    };
+    setAktifEkran("okuma");
+  };
+  const okumaBitir = async () => {
+    clearInterval(okumaInterval.current); setOkumaBasladi(false);
+    // Dikkat verilerini backend'e gönder
+    const ref = dikkatBaslangicRef.current || {};
+    const hizlar = ref.scrollHizilari || [];
+    const ortHiz = hizlar.length > 0 ? hizlar.reduce((a,b) => a+b, 0)/hizlar.length : 0;
+    try {
+      const r = await axios.post(`${API}/ai/dikkat/kaydet`, {
+        sure_sn: okumaSuresi,
+        geri_scroll: dikkatMetrikler.geri_scroll,
+        zorluk_kelimeler: dikkatMetrikler.zorluk_kelimeler,
+        duraklamalar: dikkatMetrikler.duraklamalar,
+        scroll_hizi_ort: Math.round(ortHiz),
+        sinif: profil?.sinif || user?.sinif || 3,
+      });
+      setDikkatSonuc(r.data);
+    } catch(e) {}
+    setNeOkudunForm({ kitap_adi:"", bolum:"", baslangic_sayfa:"", bitis_sayfa:"", not_text:"" });
+    setAktifEkran("ne-okudun");
+  };
 
   // Socratic Reading state
   const [socraticSoru, setSocraticSoru] = useState(null);
@@ -5065,18 +5101,72 @@ function OgrenciPaneli({ user, logout }) {
   }
 
   if (aktifEkran === "okuma") {
+    const handleScroll = () => {
+      if (!dikkatBaslangicRef.current) return;
+      const simdi = window.scrollY;
+      const zamansimdi = Date.now();
+      const ref = dikkatBaslangicRef.current;
+      const dt = (zamansimdi - (ref.sonScrollZaman || zamansimdi)) / 1000;
+      const dy = Math.abs(simdi - (ref.sonScrollY || simdi));
+      if (dt > 0.05 && dy > 0) {
+        ref.scrollHizilari = ref.scrollHizilari || [];
+        ref.scrollHizilari.push(dy / dt);
+        if (ref.scrollHizilari.length > 50) ref.scrollHizilari.shift();
+      }
+      if (simdi < (ref.sonScrollY || 0) - 50) {
+        setDikkatMetrikler(d => ({ ...d, geri_scroll: d.geri_scroll + 1 }));
+      }
+      ref.sonScrollY = simdi;
+      ref.sonScrollZaman = zamansimdi;
+    };
+    const dikkatRenk = dikkatMetrikler.geri_scroll <= 2 ? "green" : dikkatMetrikler.geri_scroll <= 5 ? "yellow" : "red";
+    const dikkatEmoji = dikkatRenk === "green" ? "🎯" : dikkatRenk === "yellow" ? "🙂" : "😅";
+    const dikkatLabel = dikkatRenk === "green" ? "Odaklısın" : dikkatRenk === "yellow" ? "İyi gidiyor" : "Dikkatini topla";
     return (
-      <div className="min-h-screen bg-gradient-to-b from-green-50 to-emerald-100 flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-b from-green-50 to-emerald-100 flex flex-col items-center justify-center p-4"
+           onScroll={handleScroll}>
         <div className="max-w-md w-full text-center space-y-8">
-          <div className="text-lg text-green-800 font-medium">Fiziksel kitabını aç ve oku 📖</div>
+          <div className="flex justify-center gap-2 text-xs flex-wrap">
+            <span className={`rounded-full px-3 py-1 font-medium ${dikkatRenk === "green" ? "bg-green-100 text-green-700" : dikkatRenk === "yellow" ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-600"}`}>{dikkatEmoji} {dikkatLabel}</span>
+            {dikkatMetrikler.geri_scroll > 0 && (<span className="bg-orange-100 text-orange-600 rounded-full px-3 py-1">↩ {dikkatMetrikler.geri_scroll} geri dönüş</span>)}
+            {dikkatMetrikler.zorluk_kelimeler.length > 0 && (<span className="bg-yellow-100 rounded-full px-3 py-1 text-yellow-700">📝 {dikkatMetrikler.zorluk_kelimeler.length} zor kelime</span>)}
+          </div>
           <div className="min-h-[120px] flex items-end justify-center gap-1 flex-wrap p-4 bg-white/50 rounded-3xl">
             {agaclar.length === 0 && <div className="text-4xl opacity-30">🌱</div>}
             {agaclar.map(a => (<span key={a.id} className="text-3xl transition-all duration-500" style={{ transform: `scale(${0.5+a.buyume/200})`, opacity: 0.5+a.buyume/200 }}>{agacEmoji(a.buyume)}</span>))}
           </div>
           <div className="text-xs text-green-600">Her dakika ormanda bir ağaç büyür</div>
           <div className="text-6xl font-mono font-bold text-green-900">{dakikaStr(okumaSuresi)}</div>
+          {/* Zor kelime kaydet butonu */}
+          <div className="bg-white/70 rounded-2xl p-3">
+            <p className="text-xs text-gray-500 mb-2">Anlamadığın kelime var mı?</p>
+            <div className="flex gap-2 justify-center flex-wrap mb-2">
+              {dikkatMetrikler.zorluk_kelimeler.map((k,i) => (
+                <span key={i} className="bg-yellow-100 text-yellow-700 text-xs px-2 py-1 rounded-lg border border-yellow-200">{k}</span>
+              ))}
+            </div>
+            <div className="flex gap-2 justify-center">
+              <input id="zorKelimeInput" placeholder="Kelimeyi yaz..." maxLength={30}
+                className="border rounded-lg px-2 py-1 text-xs w-32 focus:outline-none focus:ring-1 focus:ring-yellow-300"
+                onKeyDown={e => {
+                  if (e.key === "Enter" && e.target.value.trim()) {
+                    setDikkatMetrikler(d => ({ ...d, zorluk_kelimeler: [...d.zorluk_kelimeler, e.target.value.trim()].slice(-10) }));
+                    e.target.value = "";
+                  }
+                }}
+              />
+              <button className="bg-yellow-400 text-white rounded-lg px-2 py-1 text-xs"
+                onClick={() => {
+                  const inp = document.getElementById("zorKelimeInput");
+                  if (inp?.value.trim()) {
+                    setDikkatMetrikler(d => ({ ...d, zorluk_kelimeler: [...d.zorluk_kelimeler, inp.value.trim()].slice(-10) }));
+                    inp.value = "";
+                  }
+                }}>+Ekle</button>
+            </div>
+          </div>
           <div className="flex gap-4 justify-center">
-            <Button onClick={() => setOkumaDuraklatildi(!okumaDuraklatildi)} variant="outline" className="rounded-full px-8 py-3 text-lg border-green-300 text-green-700">{okumaDuraklatildi ? "▶ Devam Et" : "⏸ Duraklat"}</Button>
+            <Button onClick={() => { setOkumaDuraklatildi(p => { if (!p) setDikkatMetrikler(d => ({...d, duraklamalar: d.duraklamalar+1})); return !p; }); }} variant="outline" className="rounded-full px-6 py-3 text-base border-green-300 text-green-700">{okumaDuraklatildi ? "▶ Devam Et" : "⏸ Duraklat"}</Button>
             <Button onClick={okumaBitir} className="rounded-full px-8 py-3 text-lg bg-gradient-to-r from-green-500 to-emerald-600 text-white" disabled={okumaSuresi < 30}>✅ Bitirdim</Button>
           </div>
           {okumaSuresi < 30 && <p className="text-xs text-gray-400">En az 30 saniye okuman gerekiyor</p>}
@@ -5090,7 +5180,26 @@ function OgrenciPaneli({ user, logout }) {
     const dk = Math.max(1, Math.round(okumaSuresi / 60));
     return (
       <div className="min-h-screen bg-gradient-to-b from-orange-50 to-yellow-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full"><Card className="border-0 shadow-lg"><CardHeader className="text-center"><div className="text-4xl mb-2">🌳🌳🌳</div><CardTitle>Harika! {dk} dakika okudun.</CardTitle><p className="text-gray-500 text-sm">Bugün ne okudun?</p></CardHeader>
+        <div className="max-w-md w-full space-y-3">
+          {/* Dikkat Analizi Sonucu */}
+          {dikkatSonuc && (
+            <div className={`rounded-2xl p-4 border ${dikkatSonuc.seviye === "odakli" ? "bg-green-50 border-green-200" : dikkatSonuc.seviye === "iyi" ? "bg-blue-50 border-blue-200" : dikkatSonuc.seviye === "orta" ? "bg-yellow-50 border-yellow-200" : "bg-red-50 border-red-200"}`}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-bold text-sm">🎯 Dikkat Analizi</span>
+                <span className={`text-2xl font-bold ${dikkatSonuc.dikkat_skoru >= 80 ? "text-green-600" : dikkatSonuc.dikkat_skoru >= 60 ? "text-blue-600" : "text-orange-500"}`}>{dikkatSonuc.dikkat_skoru}/100</span>
+              </div>
+              <p className="text-sm text-gray-700">{dikkatSonuc.ai_yorum || dikkatSonuc.mesaj}</p>
+              {dikkatSonuc.geri_bildirim?.zorluk_kels?.length > 0 && (
+                <div className="mt-2">
+                  <span className="text-xs text-gray-500">Zor kelimeler: </span>
+                  {dikkatSonuc.geri_bildirim.zorluk_kels.map((k,i) => (
+                    <span key={i} className="text-xs bg-yellow-100 text-yellow-700 rounded px-1 mr-1">{k}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          <Card className="border-0 shadow-lg"><CardHeader className="text-center"><div className="text-4xl mb-2">🌳🌳🌳</div><CardTitle>Harika! {dk} dakika okudun.</CardTitle><p className="text-gray-500 text-sm">Bugün ne okudun?</p></CardHeader>
           <CardContent><form onSubmit={okumaKaydet} className="space-y-4">
             <div><Label>Kitap Adı *</Label><Input value={neOkudunForm.kitap_adi} onChange={e => setNeOkudunForm({...neOkudunForm, kitap_adi: e.target.value})} required placeholder="Kitabın adı" /></div>
             <div><Label>Bölüm</Label><Input value={neOkudunForm.bolum} onChange={e => setNeOkudunForm({...neOkudunForm, bolum: e.target.value})} placeholder="Bölüm 3" /></div>
