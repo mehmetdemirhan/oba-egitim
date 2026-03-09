@@ -8211,6 +8211,7 @@ async def materyal_uret(req: Request, current_user=Depends(get_current_user)):
 
     prompt = tur_prompts.get(tur, tur_prompts["soru_seti"]) + "\n\nSADECE JSON döndür, başka hiçbir şey yazma. Tüm anahtarlar çift tırnak içinde olsun."
 
+
     import json as _json
 
     if not GEMINI_API_KEY:
@@ -8218,21 +8219,73 @@ async def materyal_uret(req: Request, current_user=Depends(get_current_user)):
     else:
         logging.info(f"Gemini çağrısı başlıyor: tur={tur}, kitap={kitap_adi}, metin_len={len(metin_ek)}")
 
+    async def _parse_gemini_json(raw_text: str):
+        """Gemini yanıtından JSON çıkar."""
+        raw_text = raw_text.strip()
+        # ```json ... ``` veya ``` ... ``` bloklarını temizle
+        if "```" in raw_text:
+            import re
+            match = re.search(r"```(?:json)?\s*([\s\S]*?)```", raw_text)
+            if match:
+                raw_text = match.group(1).strip()
+            else:
+                raw_text = re.sub(r"```(?:json)?", "", raw_text).replace("```", "").strip()
+        # { ... } içini al
+        brace_start = raw_text.find("{")
+        brace_end = raw_text.rfind("}")
+        if brace_start != -1 and brace_end != -1:
+            raw_text = raw_text[brace_start:brace_end+1]
+        return _json.loads(raw_text)
+
     try:
         raw = await _gemini_call(prompt, max_tokens=4000)
         logging.info(f"Gemini yanıt alındı: {len(raw)} karakter")
-        raw = raw.strip()
-        if raw.startswith("```"):
-            lines = raw.split("\n")
-            raw = "\n".join(lines[1:] if lines[0].startswith("```") else lines)
-            raw = raw.rstrip("```").strip()
-        result = _json.loads(raw)
+        result = await _parse_gemini_json(raw)
         result["tur"] = tur
         result["kitap_adi"] = kitap_adi
         return result
     except Exception as e:
-        logging.error(f"Gemini materyal hatası: {type(e).__name__}: {e}")
-        # Mock — tam 10 soru
+        logging.error(f"Gemini materyal hatası (1. deneme): {type(e).__name__}: {e}")
+        # 2. deneme: daha basit prompt ile tekrar dene
+        if GEMINI_API_KEY:
+            try:
+                basit_prompt = (
+                    f"'{kitap_adi}' kitabı için {sinif}. sınıf öğrencisine 10 anlama sorusu üret.\n"
+                    f"Bu kitabın GERÇEK karakterlerini, mekanlarını ve olaylarını kullan.\n"
+                    f"Her soru kitabı okumayan birinin bilemeyeceği kadar özgün olsun.\n"
+                    f"{'Kitap metni: ' + metin_ek[:3000] if metin_ek else ''}\n\n"
+                    f"SADECE JSON döndür:\n"
+                    f"{{\"baslik\": \"string\", \"sorular\": ["
+                    f"{{\"soru\": \"string\", \"secenekler\": [\"A) ...\",\"B) ...\",\"C) ...\",\"D) ...\"], \"dogru\": \"A) ...\", \"bloom_basamak\": \"Bilgi\"}}"
+                    f"]}}"
+                )
+                raw2 = await _gemini_call(basit_prompt, max_tokens=3000)
+                logging.info(f"Gemini 2. deneme yanıtı: {len(raw2)} karakter")
+                result = await _parse_gemini_json(raw2)
+                result["tur"] = tur
+                result["kitap_adi"] = kitap_adi
+                return result
+            except Exception as e2:
+                logging.error(f"Gemini 2. deneme de başarısız: {e2}")
+
+        # Son çare: Gemini'den kitap adına göre özgün fallback al
+        if GEMINI_API_KEY:
+            try:
+                fallback_prompt = (
+                    f"Türk ilkokul öğrencileri için '{kitap_adi}' kitabı hakkında 10 soru üret. "
+                    f"Sorular bu kitaba ÖZGÜN olsun, genel sorular olmasın. "
+                    f"JSON: {{\"baslik\": \"string\", \"sorular\": [{{\"soru\": \"string\", \"secenekler\": [\"A) x\",\"B) x\",\"C) x\",\"D) x\"], \"dogru\": \"A) x\", \"bloom_basamak\": \"Bilgi\"}}]}}"
+                )
+                raw3 = await _gemini_call(fallback_prompt, max_tokens=2000)
+                result = await _parse_gemini_json(raw3)
+                result["tur"] = tur
+                result["kitap_adi"] = kitap_adi
+                return result
+            except Exception as e3:
+                logging.error(f"Gemini fallback da başarısız: {e3}")
+
+        # Hiçbir şey çalışmadıysa son çare statik mock (artık sadece gerçekten API yoksa)
+        logging.error("TÜM Gemini denemeleri başarısız — statik mock kullanılıyor")
         bloom_list = ["Bilgi","Kavrama","Uygulama","Analiz","Kavrama","Uygulama","Bilgi","Sentez","Değerlendirme","Yaratma"]
         if tur == "soru_seti":
             sorular = []
