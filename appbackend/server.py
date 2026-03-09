@@ -8009,58 +8009,170 @@ async def materyal_uret(req: Request, current_user=Depends(get_current_user)):
     icerik_id  = data.get("icerik_id", "")
     metin_icerigi = data.get("metin_icerigi", "")  # Frontend'den doğrudan gelen metin
 
-    # Yüklü dosya içeriğini DB'den çek (varsa)
+    # ── Metin toplama: öncelik sırası ──────────────────────────────────────
+    # 1. Frontend'den gönderilen metin (manuel yapıştırma)
+    # 2. icerik_id → gelisim_icerik koleksiyonundan (okuma_metni veya dosya_b64)
+    # 3. kitap_adi → ai_okuma_parcalari koleksiyonundan (parçaları birleştir)
+    # 4. kitap_adi → ai_yuklemeler koleksiyonundan (AI yükleme metni)
+    # 5. kitap_adi → ai_uretilen_sorular koleksiyonundan (soru metinleri ipucu)
+    # 6. Hiçbiri yoksa: Gemini kitap adını bilerek kendi bilgisiyle üretir
+
     metin_ek = ""
-    # Önce frontend'den gelen metni kullan
+    metin_kaynak = "yok"
+
+    # 1. Frontend'den metin geldiyse kullan
     if metin_icerigi and metin_icerigi.strip():
-        metin_ek = f"\n\nKİTAP/METİN İÇERİĞİ:\n{metin_icerigi.strip()[:5000]}"
-    # Eğer frontend'den metin gelmemişse DB'den çek
+        metin_ek = f"\n\nKİTAP/METİN İÇERİĞİ (kullanıcı girişi):\n{metin_icerigi.strip()[:6000]}"
+        metin_kaynak = "frontend"
+        logging.info(f"[MATERYAL] Kaynak: frontend, {len(metin_icerigi)} karakter")
+
+    # 2. icerik_id varsa gelisim_icerik'ten çek
     if not metin_ek and icerik_id:
         try:
             icerik_doc = await db.gelisim_icerik.find_one({"id": icerik_id})
+            if not icerik_doc:
+                icerik_doc = await db.gelisim_icerik.find_one({"_id": icerik_id})
             if icerik_doc:
                 if icerik_doc.get("okuma_metni"):
-                    metin_ek = f"\n\nMETİN İÇERİĞİ:\n{icerik_doc['okuma_metni'][:4000]}"
+                    metin_ek = f"\n\nKİTAP METNİ:\n{icerik_doc['okuma_metni'][:6000]}"
+                    metin_kaynak = "gelisim_icerik.okuma_metni"
                 elif icerik_doc.get("dosya_b64"):
-                    import base64
+                    import base64, io
                     try:
                         raw_bytes = base64.b64decode(icerik_doc["dosya_b64"])
                         dosya_turu = icerik_doc.get("dosya_turu", "")
                         if dosya_turu == "pdf":
-                            try:
-                                import io
-                                from pypdf import PdfReader
-                                reader = PdfReader(io.BytesIO(raw_bytes))
-                                metin = " ".join(p.extract_text() or "" for p in reader.pages[:10])
-                                metin_ek = f"\n\nKİTAP/METİN İÇERİĞİ (PDF'den):\n{metin[:4000]}"
-                            except Exception:
-                                pass
+                            from pypdf import PdfReader
+                            reader = PdfReader(io.BytesIO(raw_bytes))
+                            metin = " ".join(p.extract_text() or "" for p in reader.pages[:15])
+                            metin_ek = f"\n\nKİTAP METNİ (PDF):\n{metin[:6000]}"
+                            metin_kaynak = "gelisim_icerik.pdf"
                         elif dosya_turu in ("docx", "doc"):
-                            try:
-                                import io, docx
-                                doc = docx.Document(io.BytesIO(raw_bytes))
-                                metin = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
-                                metin_ek = f"\n\nKİTAP/METİN İÇERİĞİ (Word'den):\n{metin[:4000]}"
-                            except Exception:
-                                pass
-                    except Exception:
-                        pass
-        except Exception:
-            pass
+                            import docx as _docx
+                            doc2 = _docx.Document(io.BytesIO(raw_bytes))
+                            metin = "\n".join(p.text for p in doc2.paragraphs if p.text.strip())
+                            metin_ek = f"\n\nKİTAP METNİ (Word):\n{metin[:6000]}"
+                            metin_kaynak = "gelisim_icerik.docx"
+                    except Exception as b64_e:
+                        logging.error(f"[MATERYAL] Dosya decode hatası: {b64_e}")
+            logging.info(f"[MATERYAL] icerik_id kaynağı: {metin_kaynak}")
+        except Exception as db_e:
+            logging.error(f"[MATERYAL] gelisim_icerik çekme hatası: {db_e}")
+
+    # 3. kitap_adi'na göre ai_okuma_parcalari'ndan parçaları birleştir
+    if not metin_ek and kitap_adi:
+        try:
+            parcalar = await db.ai_okuma_parcalari.find(
+                {"kitap_adi": {"$regex": kitap_adi[:30], "$options": "i"}}
+            ).sort("bolum", 1).to_list(length=20)
+            if parcalar:
+                parca_metinler = []
+                for p in parcalar:
+                    m = p.get("metin_kesit") or p.get("metin") or p.get("icerik") or ""
+                    if m:
+                        parca_metinler.append(m)
+                if parca_metinler:
+                    birlesik = "\n\n".join(parca_metinler)
+                    metin_ek = f"\n\nKİTAP METNİ (okuma parçaları, {len(parcalar)} bölüm):\n{birlesik[:7000]}"
+                    metin_kaynak = f"ai_okuma_parcalari ({len(parcalar)} parça)"
+                    logging.info(f"[MATERYAL] {len(parcalar)} okuma parçası bulundu, toplam {len(birlesik)} karakter")
+        except Exception as e:
+            logging.error(f"[MATERYAL] ai_okuma_parcalari hatası: {e}")
+
+    # 4. ai_yuklemeler koleksiyonundan metin ara
+    if not metin_ek and kitap_adi:
+        try:
+            yukleme = await db.ai_yuklemeler.find_one(
+                {"kitap_adi": {"$regex": kitap_adi[:30], "$options": "i"}}
+            )
+            if yukleme:
+                m = yukleme.get("metin") or yukleme.get("icerik") or yukleme.get("ozet") or ""
+                if m:
+                    metin_ek = f"\n\nKİTAP METNİ (yükleme):\n{m[:6000]}"
+                    metin_kaynak = "ai_yuklemeler"
+                    logging.info(f"[MATERYAL] ai_yuklemeler'den metin bulundu: {len(m)} karakter")
+                # dosya_b64 varsa oku
+                elif yukleme.get("dosya_b64"):
+                    import base64, io
+                    try:
+                        raw_bytes = base64.b64decode(yukleme["dosya_b64"])
+                        dosya_turu = yukleme.get("dosya_turu", "")
+                        if dosya_turu == "pdf":
+                            from pypdf import PdfReader
+                            reader = PdfReader(io.BytesIO(raw_bytes))
+                            metin = " ".join(p.extract_text() or "" for p in reader.pages[:15])
+                            if metin.strip():
+                                metin_ek = f"\n\nKİTAP METNİ (yükleme PDF):\n{metin[:6000]}"
+                                metin_kaynak = "ai_yuklemeler.pdf"
+                                logging.info(f"[MATERYAL] Yükleme PDF okundu: {len(metin)} karakter")
+                        elif dosya_turu in ("docx", "doc"):
+                            import docx as _docx
+                            doc3 = _docx.Document(io.BytesIO(raw_bytes))
+                            metin = "\n".join(p.text for p in doc3.paragraphs if p.text.strip())
+                            if metin.strip():
+                                metin_ek = f"\n\nKİTAP METNİ (yükleme Word):\n{metin[:6000]}"
+                                metin_kaynak = "ai_yuklemeler.docx"
+                    except Exception as yk_e:
+                        logging.error(f"[MATERYAL] Yükleme dosya hatası: {yk_e}")
+        except Exception as e:
+            logging.error(f"[MATERYAL] ai_yuklemeler hatası: {e}")
+
+    # 5. ai_uretilen_sorular'dan ipucu topla (metin parçaları varsa)
+    if not metin_ek and kitap_adi:
+        try:
+            sorular_db = await db.ai_uretilen_sorular.find(
+                {"kitap_adi": {"$regex": kitap_adi[:30], "$options": "i"}}
+            ).to_list(length=30)
+            if sorular_db:
+                soru_ipuclari = []
+                for s in sorular_db[:10]:
+                    metin_ref = s.get("metin_ref") or s.get("paragraf") or ""
+                    if metin_ref:
+                        soru_ipuclari.append(metin_ref)
+                if soru_ipuclari:
+                    metin_ek = f"\n\nKİTAP METİN PARÇALARI (daha önce üretilmiş sorulardan):\n" + "\n".join(soru_ipuclari[:5])
+                    metin_kaynak = "ai_uretilen_sorular.metin_ref"
+                else:
+                    # En azından soru metinlerini ipucu olarak ver
+                    mevcut_sorular = [s.get("soru","") for s in sorular_db[:5] if s.get("soru")]
+                    if mevcut_sorular:
+                        metin_ek = f"\n\nNOT: Bu kitap için daha önce üretilmiş {len(sorular_db)} soru var. Benzer içerik ve zorluk seviyesini koru ama FARKLI sorular üret:\n" + "\n".join(f"- {s}" for s in mevcut_sorular)
+                        metin_kaynak = "ai_uretilen_sorular.ipucu"
+                logging.info(f"[MATERYAL] ai_uretilen_sorular'dan {len(sorular_db)} kayıt bulundu")
+        except Exception as e:
+            logging.error(f"[MATERYAL] ai_uretilen_sorular hatası: {e}")
+
+    logging.info(f"[MATERYAL] Toplam metin kaynağı: {metin_kaynak}, metin_ek uzunluğu: {len(metin_ek)}")
 
     metin_bilgi = f" (Yazar: {yazar})" if yazar else ""
     has_metin = bool(metin_ek.strip())
-    metin_bağlam = metin_ek if metin_ek else f"\n\n(Not: Kitap metni mevcut değil, genel bilgilerine göre üret.)"
 
-    # Metin varsa karakterler/mekanlar/olaylar odaklı ek talimat
-    metin_odak = (
-        "\nÖNEMLİ: Verilen metni dikkatlice oku. Sorular MUTLAKA:\n"
-        "- Metinde geçen gerçek karakter adlarını kullan\n"
-        "- Metinde geçen mekan/yer adlarını kullan\n"
-        "- Metinde yaşanan olaylara, diyaloglara ve ayrıntılara dayansın\n"
-        "- Genel/soyut sorular değil, o metne özgü somut sorular olsun\n"
-        "- Doğru cevap metinde açıkça bulunabilir olsun\n"
-    ) if has_metin else ""
+    # Metin varsa: metne özgü talimatlar
+    # Metin yoksa: Gemini'nin kendi bilgisini kullanması için güçlü talimat
+    if has_metin:
+        metin_bağlam = metin_ek
+        metin_odak = (
+            "\n🔴 ZORUNLU: Aşağıdaki kitap metnini SATIR SATIR oku. Sorular MUTLAKA:\n"
+            "- Metinde GEÇen GERÇEK karakter isimlerini kullan (uydurma)\n"
+            "- Metinde GEÇen mekan, yer, nesne adlarını kullan\n"
+            "- Metindeki GERÇEK olaylara, diyaloglara, ayrıntılara dayan\n"
+            "- 'Karakterin özelliği nedir?' gibi SOYUT sorular YASAK\n"
+            "- Her sorunun doğru cevabı metinde AÇIKÇA bulunabilmeli\n"
+            "- Yanlış şıklar metindeki benzer detaylardan üretilmeli (inandırıcı)\n"
+        )
+    else:
+        metin_bağlam = (
+            f"\n\n📚 KİTAP BİLGİSİ: '{kitap_adi}' — sen bu kitabı biliyorsun. "
+            f"Kitabın GERÇEK karakterlerini, GERÇEK mekanlarını, GERÇEK olaylarını kullan. "
+            f"Bu kitabı hiç okumamış biri bu soruları yanlış cevaplasın, kitabı okuyan doğru cevaplasın."
+        )
+        metin_odak = (
+            "\n🔴 ZORUNLU: Bu kitabın GERÇEK içeriğinden soru üret:\n"
+            "- Kitaptaki GERÇEK karakter adlarını şıklara yaz\n"
+            "- Kitaptaki GERÇEK olayları sor\n"
+            "- 'Karakterin özelliği nedir?' gibi SOYUT/JENERİK sorular YASAK\n"
+            "- Yanlış şıklar da mantıklı ama yanlış olsun\n"
+        )
 
     tur_prompts = {
         "soru_seti": (
@@ -8101,15 +8213,25 @@ async def materyal_uret(req: Request, current_user=Depends(get_current_user)):
 
     import json as _json
 
+    if not GEMINI_API_KEY:
+        logging.warning("GEMINI_API_KEY yok — mock döndürülüyor")
+    else:
+        logging.info(f"Gemini çağrısı başlıyor: tur={tur}, kitap={kitap_adi}, metin_len={len(metin_ek)}")
+
     try:
         raw = await _gemini_call(prompt, max_tokens=4000)
+        logging.info(f"Gemini yanıt alındı: {len(raw)} karakter")
         raw = raw.strip()
         if raw.startswith("```"):
             lines = raw.split("\n")
             raw = "\n".join(lines[1:] if lines[0].startswith("```") else lines)
             raw = raw.rstrip("```").strip()
         result = _json.loads(raw)
+        result["tur"] = tur
+        result["kitap_adi"] = kitap_adi
+        return result
     except Exception as e:
+        logging.error(f"Gemini materyal hatası: {type(e).__name__}: {e}")
         # Mock — tam 10 soru
         bloom_list = ["Bilgi","Kavrama","Uygulama","Analiz","Kavrama","Uygulama","Bilgi","Sentez","Değerlendirme","Yaratma"]
         if tur == "soru_seti":
