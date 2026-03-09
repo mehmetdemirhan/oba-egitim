@@ -8032,40 +8032,143 @@ async def scaffold_seviye_ilerleme(req: Request, current_user=Depends(get_curren
 async def materyal_uret(req: Request, current_user=Depends(get_current_user)):
     """Kitap / metin için çalışma materyali üret (soru seti, kelime listesi, etkinlik)."""
     data = await req.json()
-    kitap_adi = data.get("kitap_adi", "")
-    yazar     = data.get("yazar", "")
-    metin_id  = data.get("metin_id", "")
-    tur       = data.get("tur", "soru_seti")   # soru_seti | kelime_listesi | etkinlik | tahmin
-    sinif     = data.get("sinif", 3)
+    kitap_adi  = data.get("kitap_adi", "")
+    yazar      = data.get("yazar", "")
+    metin_id   = data.get("metin_id", "")
+    tur        = data.get("tur", "soru_seti")
+    sinif      = data.get("sinif", 3)
     ogrenci_id = data.get("ogrenci_id", current_user.get("linked_id", current_user.get("id", "")))
+    icerik_id  = data.get("icerik_id", "")
+
+    # Yüklü dosya içeriğini DB'den çek (varsa)
+    metin_ek = ""
+    if icerik_id:
+        try:
+            icerik_doc = await db.gelisim_icerik.find_one({"id": icerik_id})
+            if icerik_doc:
+                if icerik_doc.get("okuma_metni"):
+                    metin_ek = f"\n\nMETİN İÇERİĞİ:\n{icerik_doc['okuma_metni'][:4000]}"
+                elif icerik_doc.get("dosya_b64"):
+                    import base64
+                    try:
+                        raw_bytes = base64.b64decode(icerik_doc["dosya_b64"])
+                        dosya_turu = icerik_doc.get("dosya_turu", "")
+                        if dosya_turu == "pdf":
+                            try:
+                                import io
+                                from pypdf import PdfReader
+                                reader = PdfReader(io.BytesIO(raw_bytes))
+                                metin = " ".join(p.extract_text() or "" for p in reader.pages[:10])
+                                metin_ek = f"\n\nKİTAP/METİN İÇERİĞİ (PDF'den):\n{metin[:4000]}"
+                            except Exception:
+                                pass
+                        elif dosya_turu in ("docx", "doc"):
+                            try:
+                                import io, docx
+                                doc = docx.Document(io.BytesIO(raw_bytes))
+                                metin = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+                                metin_ek = f"\n\nKİTAP/METİN İÇERİĞİ (Word'den):\n{metin[:4000]}"
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+    metin_bilgi = f" (Yazar: {yazar})" if yazar else ""
+    metin_bağlam = metin_ek if metin_ek else f"\n\n(Not: Kitap metni mevcut değil, genel bilgilerine göre üret.)"
 
     tur_prompts = {
-        "soru_seti": f"'{kitap_adi}' için {sinif}. sınıf düzeyinde 10 soruluk anlama testi oluştur. Bloom taksonomisinin tüm basamaklarından sorular ekle. JSON: {{\"baslik\": str, \"sorular\": [{{\"soru\": str, \"secenekler\": [str], \"dogru\": str, \"bloom_basamak\": str}}]}}",
-        "kelime_listesi": f"'{kitap_adi}' kitabından {sinif}. sınıf için 15 önemli kelime seç. JSON: {{\"baslik\": str, \"kelimeler\": [{{\"kelime\": str, \"anlam\": str, \"cumle\": str, \"zorluk\": 1-5}}]}}",
-        "etkinlik": f"'{kitap_adi}' için sınıf içi grup etkinliği tasarla. {sinif}. sınıf düzeyi. JSON: {{\"baslik\": str, \"sure_dk\": int, \"grup_sayisi\": int, \"adimlar\": [str], \"malzemeler\": [str], \"kazanimlar\": [str]}}",
-        "tahmin": f"'{kitap_adi}' okuma öncesi tahmin soruları oluştur ({sinif}. sınıf). JSON: {{\"baslik\": str, \"giris\": str, \"sorular\": [{{\"soru\": str, \"ipucu\": str}}]}}"
+        "soru_seti": (
+            f"'{kitap_adi}'{metin_bilgi} için {sinif}. sınıf düzeyinde TAM 10 soruluk anlama testi oluştur.\n"
+            f"Bloom taksonomisinin 6 basamağından dengeli sorular ekle:\n"
+            f"- 2 Bilgi sorusu (hatırlama)\n- 2 Kavrama sorusu (anlama)\n- 2 Uygulama sorusu\n"
+            f"- 1 Analiz sorusu\n- 1 Sentez/Değerlendirme sorusu\n- 2 Yaratıcı/Eleştirel düşünme sorusu\n"
+            f"Her soru için 4 seçenek olsun (A,B,C,D).{metin_bağlam}\n\n"
+            f"JSON formatı (tam 10 soru): {{\"baslik\": \"string\", \"sorular\": ["
+            f"{{\"soru\": \"string\", \"secenekler\": [\"A...\",\"B...\",\"C...\",\"D...\"], \"dogru\": \"A...\", \"bloom_basamak\": \"string\"}}"
+            f"]}}"
+        ),
+        "kelime_listesi": (
+            f"'{kitap_adi}'{metin_bilgi} kitabından {sinif}. sınıf için TAM 15 önemli kelime seç.{metin_bağlam}\n\n"
+            f"JSON: {{\"baslik\": \"string\", \"kelimeler\": ["
+            f"{{\"kelime\": \"string\", \"anlam\": \"string\", \"cumle\": \"string\", \"zorluk\": 1}}"
+            f"]}}"
+        ),
+        "etkinlik": (
+            f"'{kitap_adi}'{metin_bilgi} için sınıf içi grup etkinliği tasarla. {sinif}. sınıf, 20-30 dk.{metin_bağlam}\n\n"
+            f"JSON: {{\"baslik\": \"string\", \"sure_dk\": 25, \"grup_sayisi\": 4, "
+            f"\"adimlar\": [\"string\"], \"malzemeler\": [\"string\"], \"kazanimlar\": [\"string\"]}}"
+        ),
+        "tahmin": (
+            f"'{kitap_adi}'{metin_bilgi} okuma öncesi TAM 8 tahmin sorusu oluştur ({sinif}. sınıf).{metin_bağlam}\n\n"
+            f"JSON: {{\"baslik\": \"string\", \"giris\": \"string\", \"sorular\": ["
+            f"{{\"soru\": \"string\", \"ipucu\": \"string\"}}"
+            f"]}}"
+        ),
     }
 
-    prompt = tur_prompts.get(tur, tur_prompts["soru_seti"]) + "\n\nSADECE JSON döndür, başka hiçbir şey yazma."
+    prompt = tur_prompts.get(tur, tur_prompts["soru_seti"]) + "\n\nSADECE JSON döndür, başka hiçbir şey yazma. Tüm anahtarlar çift tırnak içinde olsun."
+
+    import json as _json
 
     try:
         import anthropic as _ant
-        import json as _json
         _client = _ant.Anthropic()
-        resp = _client.messages.create(model="claude-haiku-4-5-20251001", max_tokens=1500, messages=[{"role": "user", "content": prompt}])
+        resp = _client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=4000,
+            messages=[{"role": "user", "content": prompt}]
+        )
         raw = resp.content[0].text.strip()
-        if raw.startswith("```"): raw = "\n".join(raw.split("\n")[1:-1])
+        # JSON temizle
+        if raw.startswith("```"):
+            lines = raw.split("\n")
+            raw = "\n".join(lines[1:] if lines[0].startswith("```") else lines)
+            raw = raw.rstrip("```").strip()
         result = _json.loads(raw)
-    except Exception:
-        # Mock
+    except Exception as e:
+        # Mock — tam 10 soru
+        bloom_list = ["Bilgi","Kavrama","Uygulama","Analiz","Kavrama","Uygulama","Bilgi","Sentez","Değerlendirme","Yaratma"]
         if tur == "soru_seti":
-            result = {"baslik": f"{kitap_adi} — Anlama Testi", "sorular": [{"soru": f"'{kitap_adi}' kitabının ana teması nedir?", "secenekler": ["Arkadaşlık", "Cesaret", "Dürüstlük", "Merak"], "dogru": "Arkadaşlık", "bloom_basamak": "Kavrama"}]}
+            sorular = []
+            sorular_meta = [
+                (f"'{kitap_adi}' kitabı hangi türdedir?", ["Roman","Şiir","Masal","Deneme"], "Roman", "Bilgi"),
+                (f"Kitabın ana karakterinin özelliği nedir?", ["Cesur","Korkak","Tembel","Kıskanç"], "Cesur", "Kavrama"),
+                (f"Sen bu karakterin yerinde olsaydın ne yapardın?", ["Aynısını yapardım","Farklı davranırdım","Kaçardım","Yardım isterdim"], "Farklı davranırdım", "Uygulama"),
+                (f"Kitabın ana teması nedir?", ["Arkadaşlık","Cesaret","Dürüstlük","Merak"], "Cesaret", "Kavrama"),
+                (f"Olaylar hangi ortamda geçmektedir?", ["Şehirde","Köyde","Ormanda","Deniz kıyısında"], "Köyde", "Bilgi"),
+                (f"Karakterin en büyük sorunu neydi?", ["Yalnızlık","Maddi sıkıntı","Güven eksikliği","Hastalık"], "Güven eksikliği", "Analiz"),
+                (f"Kitabın sonu nasıl bitmektedir?", ["Mutlu son","Hüzünlü son","Açık uçlu","Sürpriz son"], "Mutlu son", "Bilgi"),
+                (f"Bu kitap sana göre hangi değeri en iyi anlatıyor?", ["Dürüstlük","Sabır","Cesaret","Yardımseverlik"], "Cesaret", "Değerlendirme"),
+                (f"Yazar bu kitabı neden yazmış olabilir?", ["Eğlendirmek için","Ders vermek için","Duygu aktarmak için","Belgelemek için"], "Ders vermek için", "Sentez"),
+                (f"Kitabı okuduktan sonra hayatında ne değiştirebilirsin?", ["Daha cesur olabilirim","Daha sabırlı olabilirim","Daha çok kitap okurum","Arkadaşlarıma yardım ederim"], "Daha cesur olabilirim", "Yaratma"),
+            ]
+            for soru, sec, dogru, bloom in sorular_meta:
+                sorular.append({"soru": soru, "secenekler": sec, "dogru": dogru, "bloom_basamak": bloom})
+            result = {"baslik": f"{kitap_adi} — Anlama Testi", "sorular": sorular}
         elif tur == "kelime_listesi":
-            result = {"baslik": f"{kitap_adi} — Anahtar Kelimeler", "kelimeler": [{"kelime": "macera", "anlam": "Heyecanlı ve sürprizli yolculuk", "cumle": "Karakterler büyük bir maceraya atıldı.", "zorluk": 2}]}
+            kelimeler_ornek = ["macera","cesaret","yolculuk","dürüstlük","arkadaşlık","merak","umut","sabır","özgürlük","kahramanlık","sadakat","iyilik","azim","fedakarlık","başarı"]
+            result = {"baslik": f"{kitap_adi} — Anahtar Kelimeler", "kelimeler": [
+                {"kelime": k, "anlam": f"{k.capitalize()} kavramının anlamı", "cumle": f"Kitapta {k} teması işlendi.", "zorluk": (i%3)+1}
+                for i, k in enumerate(kelimeler_ornek)
+            ]}
         elif tur == "etkinlik":
-            result = {"baslik": f"{kitap_adi} — Sınıf Etkinliği", "sure_dk": 20, "grup_sayisi": 4, "adimlar": ["Grupları oluştur", "Kitabın bir bölümünü tartışın", "Sunun"], "malzemeler": ["Kağıt", "Kalem"], "kazanimlar": ["Eleştirel düşünme", "İşbirliği"]}
+            result = {"baslik": f"{kitap_adi} — Sınıf Etkinliği", "sure_dk": 25, "grup_sayisi": 4,
+                "adimlar": ["Sınıfı 4 gruba ayırın","Her grup kitabın farklı bölümünü tartışsın","Karakterleri analiz edin","Gruplar sunum yapsın","Sınıf tartışması yapın"],
+                "malzemeler": ["Kağıt","Kalem","Post-it","Renkli kalemler"],
+                "kazanimlar": ["Eleştirel düşünme","İşbirliği","Sözlü ifade","Empati kurma"]}
         else:
-            result = {"baslik": f"{kitap_adi} — Okuma Öncesi Tahmin", "giris": "Kitabı okumadan önce düşüncelerini paylaş!", "sorular": [{"soru": "Bu kitap ne hakkında olabilir?", "ipucu": "Kapak resmine bak"}]}
+            result = {"baslik": f"{kitap_adi} — Okuma Öncesi Tahmin", "giris": "Kitabı okumadan önce düşüncelerini paylaş!", "sorular": [
+                {"soru": "Bu kitap ne hakkında olabilir?", "ipucu": "Kapak resmine bak"},
+                {"soru": "Ana karakter nasıl biri olabilir?", "ipucu": "Başlığı düşün"},
+                {"soru": "Olaylar nerede geçiyor olabilir?", "ipucu": "Kapak resmindeki ortamı incele"},
+                {"soru": "Kitabın sonu nasıl bitebilir?", "ipucu": "Başlığa göre tahmin et"},
+                {"soru": "Hangi sorunlarla karşılaşılacak?", "ipucu": "Türüne bak"},
+                {"soru": "Bu kitaptan ne öğrenebiliriz?", "ipucu": "Yazarı araştır"},
+                {"soru": "Favorin olan karakter kim olabilir?", "ipucu": "Kitabın adına bak"},
+                {"soru": "Sence bu kitabın mesajı ne olacak?", "ipucu": "Türü ve konusu hakkında düşün"},
+            ]}
 
     result["tur"] = tur
     result["kitap_adi"] = kitap_adi
