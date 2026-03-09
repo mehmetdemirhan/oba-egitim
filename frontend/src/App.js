@@ -8943,8 +8943,20 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                     const m = adminAiSonuc;
                     const turLabel = {soru_seti:"Soru Seti",kelime_listesi:"Kelime Listesi",etkinlik:"Sınıf Etkinliği",tahmin:"Tahmin Soruları"};
                     const bloomRenkFn = function(b){ return ({"Bilgi":"bg-blue-100 text-blue-700","Kavrama":"bg-green-100 text-green-700","Uygulama":"bg-yellow-100 text-yellow-700","Analiz":"bg-orange-100 text-orange-700","Sentez":"bg-red-100 text-red-700","Değerlendirme":"bg-red-100 text-red-700","Yaratma":"bg-purple-100 text-purple-700"})[b] || "bg-gray-100 text-gray-600"; };
+                    const dbg = m._debug;
                     return (
                       <div className="space-y-3">
+                        {/* DEBUG SATIRI — geliştirme aşamasında */}
+                        {dbg && (
+                          <div className={`text-[10px] rounded-lg px-3 py-2 font-mono ${dbg.mock ? "bg-red-50 border border-red-200 text-red-700" : "bg-green-50 border border-green-200 text-green-700"}`}>
+                            {dbg.mock ? "⚠️ MOCK (Gemini çalışmadı)" : `✅ Gemini (deneme: ${dbg.deneme})`}
+                            {" | "}key: {dbg.gemini_key_var ? `var (${dbg.gemini_key_uzunluk} kr)` : "YOK ❌"}
+                            {" | "}metin: {dbg.metin_uzunluk > 0 ? `${dbg.metin_uzunluk} kr (${dbg.metin_kaynak})` : "bulunamadı"}
+                            {dbg.hata1 && <div className="mt-1 text-red-600">Hata1: {dbg.hata1}</div>}
+                            {dbg.hata2 && <div className="mt-1 text-red-600">Hata2: {dbg.hata2}</div>}
+                            {dbg.hata3 && <div className="mt-1 text-red-600">Hata3: {dbg.hata3}</div>}
+                          </div>
+                        )}
                         <div className="flex items-center justify-between">
                           <div className="font-bold text-gray-800">{m.kitap_adi}</div>
                           <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">{turLabel[m.tur]||m.tur}</span>
