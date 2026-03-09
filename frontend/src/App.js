@@ -8820,7 +8820,10 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                     try {
                       const r = await axios.post(`${API}/ai/materyal/uret`, {
                         kitap_adi: adminAiModal.kitap.baslik, tur: adminAiMateryalTur,
-                        sinif: parseInt(adminAiModal.kitap.kitap_yas_grubu) || 4, ogrenci_id: user.id
+                        sinif: parseInt(adminAiModal.kitap.kitap_yas_grubu) || 4,
+                        ogrenci_id: user.id,
+                        icerik_id: adminAiModal.kitap.id || "",
+                        yazar: adminAiModal.kitap.kitap_yazar || ""
                       });
                       setAdminAiSonuc(r.data); toast({ title: "📋 Materyal hazır!" });
                     } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
@@ -8839,26 +8842,65 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                           <span className="font-bold text-sm text-gray-800">{m.kitap_adi}</span>
                           <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full ml-auto capitalize">{({soru_seti:"Soru Seti",kelime_listesi:"Kelime Listesi",etkinlik:"Sınıf Etkinliği",tahmin:"Tahmin Soruları"})[m.tur]||m.tur}</span>
                         </div>
-                        {m.tur === "soru_seti" && m.sorular?.map((s,i) => (
-                          <div key={i} className="bg-white rounded-lg p-3 mb-2 border border-purple-100 last:mb-0">
-                            <div className="font-medium text-sm mb-2">{i+1}. {s.soru}</div>
-                            <div className="grid grid-cols-2 gap-1">
-                              {(s.secenekler||[]).map((sec,j) => (
-                                <div key={j} className={`text-xs px-2 py-1 rounded ${j===s.dogru_cevap?"bg-green-100 text-green-700 font-bold":"bg-gray-50 text-gray-600"}`}>
-                                  {["A","B","C","D"][j]}) {sec}
+                        {m.tur === "soru_seti" && (
+                          <div className="space-y-2">
+                            <div className="text-xs text-purple-600 font-medium mb-2">{m.sorular?.length || 0} soru • Bloom Taksonomisi uyumlu</div>
+                            {m.sorular?.map((s,i) => {
+                              const dogru_idx = s.secenekler ? s.secenekler.findIndex(sec => sec === s.dogru || sec.startsWith(s.dogru?.substring(0,10))) : -1;
+                              const bloomRenk = {"Bilgi":"bg-blue-100 text-blue-700","Kavrama":"bg-green-100 text-green-700","Uygulama":"bg-yellow-100 text-yellow-700","Analiz":"bg-orange-100 text-orange-700","Sentez":"bg-red-100 text-red-700","Değerlendirme":"bg-red-100 text-red-700","Yaratma":"bg-purple-100 text-purple-700"}[s.bloom_basamak] || "bg-gray-100 text-gray-600";
+                              return (
+                                <div key={i} className="bg-white rounded-lg p-3 border border-purple-100">
+                                  <div className="flex items-start justify-between gap-2 mb-2">
+                                    <div className="font-medium text-sm">{i+1}. {s.soru}</div>
+                                    {s.bloom_basamak && <span className={`text-[10px] px-2 py-0.5 rounded-full flex-shrink-0 font-medium ${bloomRenk}`}>{s.bloom_basamak}</span>}
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-1">
+                                    {(s.secenekler||[]).map((sec,j) => (
+                                      <div key={j} className={`text-xs px-2 py-1 rounded ${j===dogru_idx||sec===s.dogru?"bg-green-100 text-green-700 font-bold":"bg-gray-50 text-gray-600"}`}>
+                                        {["A","B","C","D"][j]}) {sec}
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
-                              ))}
-                            </div>
+                              );
+                            })}
                           </div>
-                        ))}
-                        {m.tur === "kelime_listesi" && m.kelimeler?.map((k,i) => (
-                          <div key={i} className="flex gap-2 bg-white rounded-lg p-2 mb-1.5 border border-purple-100 last:mb-0">
-                            <span className="font-bold text-purple-600 text-sm flex-shrink-0">{i+1}.</span>
-                            <div><span className="font-semibold text-sm">{k.kelime}</span>{k.anlam && <span className="text-xs text-gray-500 ml-2">— {k.anlam}</span>}{k.ornek && <div className="text-xs text-gray-400 italic mt-0.5">"{k.ornek}"</div>}</div>
+                        )}
+                        {m.tur === "kelime_listesi" && (
+                          <div className="space-y-1.5">
+                            <div className="text-xs text-purple-600 font-medium mb-2">{m.kelimeler?.length || 0} kelime</div>
+                            {m.kelimeler?.map((k,i) => (
+                              <div key={i} className="bg-white rounded-lg p-2.5 border border-purple-100">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-purple-600 text-sm w-5">{i+1}.</span>
+                                  <span className="font-semibold text-sm">{k.kelime}</span>
+                                  {k.zorluk && <span className="text-[10px] bg-purple-50 text-purple-500 px-1.5 rounded-full ml-auto">{"⭐".repeat(Math.min(k.zorluk,5))}</span>}
+                                </div>
+                                {k.anlam && <div className="text-xs text-gray-500 mt-1 ml-7">{k.anlam}</div>}
+                                {(k.cumle||k.ornek) && <div className="text-xs text-gray-400 italic mt-0.5 ml-7">"{k.cumle||k.ornek}"</div>}
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                        {(m.tur === "etkinlik" || m.tur === "tahmin") && m.icerik && (
-                          <div className="bg-white rounded-lg p-3 text-sm text-gray-700 border border-purple-100 whitespace-pre-wrap">{m.icerik}</div>
+                        )}
+                        {m.tur === "etkinlik" && (
+                          <div className="space-y-2">
+                            {m.sure_dk && <div className="flex gap-3 text-xs text-gray-600"><span>⏱ {m.sure_dk} dk</span>{m.grup_sayisi && <span>👥 {m.grup_sayisi} grup</span>}</div>}
+                            {m.adimlar?.length > 0 && <div><div className="text-xs font-semibold text-gray-600 mb-1">📋 Adımlar</div>{m.adimlar.map((a,i)=><div key={i} className="text-xs bg-white rounded p-2 border border-purple-100 mb-1">{i+1}. {a}</div>)}</div>}
+                            {m.malzemeler?.length > 0 && <div><div className="text-xs font-semibold text-gray-600 mb-1">🎒 Malzemeler</div><div className="flex flex-wrap gap-1">{m.malzemeler.map((mal,i)=><span key={i} className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full">{mal}</span>)}</div></div>}
+                            {m.kazanimlar?.length > 0 && <div><div className="text-xs font-semibold text-gray-600 mb-1">🎯 Kazanımlar</div><div className="flex flex-wrap gap-1">{m.kazanimlar.map((k,i)=><span key={i} className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full">{k}</span>)}</div></div>}
+                          </div>
+                        )}
+                        {m.tur === "tahmin" && (
+                          <div className="space-y-2">
+                            {m.giris && <div className="text-sm text-gray-600 italic bg-white rounded-lg p-2.5 border border-purple-100">{m.giris}</div>}
+                            <div className="text-xs font-medium text-purple-600 mb-1">{m.sorular?.length || 0} tahmin sorusu</div>
+                            {m.sorular?.map((s,i)=>(
+                              <div key={i} className="bg-white rounded-lg p-2.5 border border-purple-100">
+                                <div className="text-sm font-medium">{i+1}. {s.soru}</div>
+                                {s.ipucu && <div className="text-xs text-amber-600 mt-1">💡 İpucu: {s.ipucu}</div>}
+                              </div>
+                            ))}
+                          </div>
                         )}
                       </div>
                       <button onClick={() => setAdminAiSonuc(null)} className="w-full bg-gray-100 text-gray-700 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-200 transition-colors">
