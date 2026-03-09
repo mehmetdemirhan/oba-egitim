@@ -3005,6 +3005,18 @@ async def fix_missing_ids(current_user=Depends(require_role(UserRole.ADMIN))):
         await db.diagnostic_oturumlar.update_one({"_id": doc["_id"]}, {"$set": {"id": str(uuid.uuid4())}})
     return {"fixed": fixed, "message": "ID düzeltme tamamlandı"}
 
+@api_router.get("/admin/gemini-test")
+async def gemini_test(current_user=Depends(require_role(UserRole.ADMIN))):
+    """Gemini API bağlantısını test et — sadece admin."""
+    key = GEMINI_API_KEY
+    if not key:
+        return {"durum": "HATA", "sebep": "GEMINI_API_KEY environment variable tanımlı değil", "key_uzunluk": 0}
+    try:
+        yanit = await _gemini_call("Merhaba! Sadece 'Gemini çalışıyor' yaz.", max_tokens=50)
+        return {"durum": "OK", "yanit": yanit, "key_uzunluk": len(key), "model": AI_MODEL}
+    except Exception as e:
+        return {"durum": "HATA", "sebep": str(e), "key_uzunluk": len(key), "model": AI_MODEL}
+
 @api_router.get("/admin/debug-metinler")
 async def debug_metinler(current_user=Depends(require_role(UserRole.ADMIN))):
     """Tüm metinleri ham haliyle göster"""
