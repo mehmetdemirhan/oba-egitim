@@ -37,14 +37,34 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
 
 # ─────────────────────────────────────────────
-# CLAUDE AI YARDIMCI FONKSİYONLAR
+# GEMINI AI YARDIMCI FONKSİYONLAR
 # ─────────────────────────────────────────────
 
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-AI_DEFAULT_MODEL = os.environ.get("AI_DEFAULT_MODEL", "claude-sonnet-4-20250514")
-AI_HAIKU_MODEL = "claude-haiku-4-5-20251001"
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")  # geriye dönük uyumluluk
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", os.environ.get("ANTHROPIC_API_KEY", ""))
+AI_MODEL = "gemini-2.0-flash"  # ücretsiz, hızlı
+AI_DEFAULT_MODEL = os.environ.get("AI_DEFAULT_MODEL", AI_MODEL)
+AI_HAIKU_MODEL = AI_MODEL
 AI_CACHE_HOURS = int(os.environ.get("AI_CACHE_HOURS", "24"))
-AI_MAX_DAILY_REQUESTS = int(os.environ.get("AI_MAX_DAILY_REQUESTS", "200"))
+AI_MAX_DAILY_REQUESTS = int(os.environ.get("AI_MAX_DAILY_REQUESTS", "500"))
+
+async def _gemini_call(prompt: str, system: str = "", max_tokens: int = 4000) -> str:
+    """Gemini API çağrısı — tek nokta."""
+    key = GEMINI_API_KEY
+    if not key:
+        raise Exception("GEMINI_API_KEY tanımlı değil")
+    full_prompt = f"{system}\n\n{prompt}" if system else prompt
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{AI_MODEL}:generateContent?key={key}"
+    payload = {
+        "contents": [{"parts": [{"text": full_prompt}]}],
+        "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.7}
+    }
+    async with httpx.AsyncClient(timeout=90.0) as c:
+        r = await c.post(url, json=payload)
+        data = r.json()
+        if "candidates" not in data:
+            raise Exception(f"Gemini hata: {data}")
+        return data["candidates"][0]["content"]["parts"][0]["text"]
 
 
 def _mock_bilgi_tabani_response(user_message: str) -> dict:
@@ -85,64 +105,31 @@ def _mock_bilgi_tabani_response(user_message: str) -> dict:
 
 
 async def call_claude(system_prompt: str, user_message: str, model: str = "sonnet", max_tokens: int = 2000) -> dict:
-    """Claude API çağrısı — tüm AI modülleri bu fonksiyonu kullanır."""
-    if not ANTHROPIC_API_KEY:
-        # Bilgi tabanı işleme için mock data, diğerleri için hata
+    """AI API çağrısı — Gemini Flash kullanır."""
+    if not GEMINI_API_KEY:
         if "hedef_kelimeler" in user_message or "METİN:" in user_message:
             return _mock_bilgi_tabani_response(user_message)
-        return {"error": "ANTHROPIC_API_KEY tanımlı değil", "text": ""}
+        return {"error": "GEMINI_API_KEY tanımlı değil", "text": ""}
 
-    # Günlük istek limiti kontrolü
     bugun = datetime.utcnow().strftime("%Y-%m-%d")
     gunluk_istek = await db.ai_request_log.count_documents({"tarih": {"$regex": f"^{bugun}"}})
     if gunluk_istek >= AI_MAX_DAILY_REQUESTS:
         return {"error": "Günlük AI istek limiti doldu", "text": ""}
 
-    model_id = AI_HAIKU_MODEL if model == "haiku" else AI_DEFAULT_MODEL
-
     try:
-        async with httpx.AsyncClient(timeout=90.0) as client_http:
-            response = await client_http.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "x-api-key": ANTHROPIC_API_KEY,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                },
-                json={
-                    "model": model_id,
-                    "max_tokens": max_tokens,
-                    "system": system_prompt,
-                    "messages": [{"role": "user", "content": user_message}],
-                },
-            )
-            data = response.json()
-
-        # Log the request
-        token_in = data.get("usage", {}).get("input_tokens", 0)
-        token_out = data.get("usage", {}).get("output_tokens", 0)
-        maliyet = (token_in * 0.003 + token_out * 0.015) / 1000 if model != "haiku" else (token_in * 0.001 + token_out * 0.005) / 1000
-
+        text = await _gemini_call(user_message, system=system_prompt, max_tokens=max_tokens)
         await db.ai_request_log.insert_one({
             "id": str(uuid.uuid4()),
-            "model": model_id,
-            "token_in": token_in,
-            "token_out": token_out,
-            "maliyet_usd": round(maliyet, 6),
+            "model": AI_MODEL,
             "tarih": datetime.utcnow().isoformat(),
         })
-
-        # Extract text from response
-        text = ""
-        for block in data.get("content", []):
-            if block.get("type") == "text":
-                text += block.get("text", "")
 
         # Try to parse JSON from response
         import json as json_mod
         parsed = None
+        import json as json_mod
+        parsed = None
         try:
-            # Clean markdown code blocks if present
             clean = text.strip()
             if clean.startswith("```"):
                 clean = clean.split("\n", 1)[1] if "\n" in clean else clean[3:]
@@ -153,12 +140,12 @@ async def call_claude(system_prompt: str, user_message: str, model: str = "sonne
         except:
             parsed = None
 
-        return {"text": text, "parsed": parsed, "tokens": token_in + token_out, "maliyet": maliyet, "error": None}
+        return {"text": text, "parsed": parsed, "tokens": 0, "maliyet": 0, "error": None}
 
     except httpx.TimeoutException:
-        return {"error": "AI yanıt süresi aşıldı (30sn). Lütfen tekrar deneyin.", "text": ""}
+        return {"error": "AI yanıt süresi aşıldı. Lütfen tekrar deneyin.", "text": ""}
     except Exception as e:
-        logging.error(f"Claude API error: {e}")
+        logging.error(f"Gemini API error: {e}")
         return {"error": f"AI hatası: {str(e)[:100]}", "text": ""}
 
 
@@ -5538,7 +5525,7 @@ Kurallar:
         "okuma_parcasi": len(tum_parcalar),
         "uretilen_soru": len(tum_sorular),
         "bonus_puan": bonus,
-        "mock": not bool(ANTHROPIC_API_KEY),
+        "mock": not bool(GEMINI_API_KEY),
         "kelimeler": tum_kelimeler,
         "parcalar": tum_parcalar,
         "sorular": tum_sorular,
@@ -6928,7 +6915,7 @@ async def speech_analiz(
     analiz["whisper_kullanildi"] = whisper_kullanildi
 
     # Claude ile derin analiz (API key varsa)
-    if ANTHROPIC_API_KEY and beklenen_metin and transkript:
+    if GEMINI_API_KEY and beklenen_metin and transkript:
         ai_prompt = f"""Öğrenci okuma analizi (Sınıf: {sinif}):
 
 Beklenen metin: {beklenen_metin}
@@ -7129,7 +7116,7 @@ async def kitap_zeka_analiz(request: Request, current_user=Depends(get_current_u
     boyutlar = {}
     ai_aciklama = ""
 
-    if ANTHROPIC_API_KEY:
+    if GEMINI_API_KEY:
         try:
             prompt = f"""Kitap: "{kitap_adi}" — Yazar: {yazar or 'bilinmiyor'} — Hedef sınıf: {sinif}
 
@@ -7299,7 +7286,7 @@ async def motivasyon_giris(current_user=Depends(get_current_user)):
     # AI mesajı
     ad = current_user.get("ad", "")
     ai_mesaj = ""
-    if ANTHROPIC_API_KEY:
+    if GEMINI_API_KEY:
         try:
             prompt = f"""Öğrenci adı: {ad}, streak: {mevcut_streak} gün, ortalama okuma: {ort_sure:.0f} dk/gün.
 Ona tek cümle, sıcak ve motive edici Türkçe bir mesaj yaz. Max 20 kelime."""
@@ -7609,7 +7596,7 @@ async def dikkat_kaydet(request: Request, current_user=Depends(get_current_user)
 
     # AI ile daha derin yorum (varsa)
     ai_yorum = None
-    if ANTHROPIC_API_KEY and len(zorluk_kels) > 0:
+    if GEMINI_API_KEY and len(zorluk_kels) > 0:
         try:
             prompt = f"""Öğrenci okuma dikkat analizi (Sınıf: {sinif}):
 - Okuma süresi: {sure_dk:.1f} dakika
@@ -7815,28 +7802,15 @@ async def arkadas_sohbet(request: Request, current_user=Depends(get_current_user
     claude_mesajlar.append({"role": "user", "content": mesaj})
 
     yanit_metni = ""
-    if ANTHROPIC_API_KEY:
+    if GEMINI_API_KEY:
         try:
             result = await call_claude(sistem, mesaj, model="haiku", max_tokens=200)
             # call_claude single-turn, multi-turn için direkt API çağrısı
             if len(claude_mesajlar) > 1:
-                async with httpx.AsyncClient(timeout=30.0) as c:
-                    resp = await c.post(
-                        "https://api.anthropic.com/v1/messages",
-                        headers={
-                            "x-api-key": ANTHROPIC_API_KEY,
-                            "anthropic-version": "2023-06-01",
-                            "content-type": "application/json",
-                        },
-                        json={
-                            "model": AI_HAIKU_MODEL,
-                            "max_tokens": 200,
-                            "system": sistem,
-                            "messages": claude_mesajlar,
-                        }
-                    )
-                    if resp.status_code == 200:
-                        yanit_metni = resp.json()["content"][0]["text"]
+                # Multi-turn: tüm geçmişi tek prompt olarak gönder
+                gecmis = "\n".join([f"{m['role'].upper()}: {m['content'] if isinstance(m['content'], str) else m['content'][0].get('text','')}" for m in claude_mesajlar])
+                multi_prompt = f"{sistem}\n\nKONUŞMA GEÇMİŞİ:\n{gecmis}\n\nASISTAN:"
+                yanit_metni = await _gemini_call(multi_prompt, max_tokens=200)
             else:
                 yanit_metni = result.get("text", "")
         except Exception as e:
@@ -7965,14 +7939,8 @@ Yanıtı SADECE JSON olarak ver, başka hiçbir şey yazma:
 }}"""
 
     try:
-        import anthropic as _ant
-        _client = _ant.Anthropic()
-        resp = _client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=2000,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        raw = resp.content[0].text.strip()
+        raw = await _gemini_call(prompt, max_tokens=2000)
+        raw = raw.strip()
         import json as _json
         if raw.startswith("```"): raw = raw.split("```")[1]
         if raw.startswith("json"): raw = raw[4:]
@@ -8039,10 +8007,15 @@ async def materyal_uret(req: Request, current_user=Depends(get_current_user)):
     sinif      = data.get("sinif", 3)
     ogrenci_id = data.get("ogrenci_id", current_user.get("linked_id", current_user.get("id", "")))
     icerik_id  = data.get("icerik_id", "")
+    metin_icerigi = data.get("metin_icerigi", "")  # Frontend'den doğrudan gelen metin
 
     # Yüklü dosya içeriğini DB'den çek (varsa)
     metin_ek = ""
-    if icerik_id:
+    # Önce frontend'den gelen metni kullan
+    if metin_icerigi and metin_icerigi.strip():
+        metin_ek = f"\n\nKİTAP/METİN İÇERİĞİ:\n{metin_icerigi.strip()[:5000]}"
+    # Eğer frontend'den metin gelmemişse DB'den çek
+    if not metin_ek and icerik_id:
         try:
             icerik_doc = await db.gelisim_icerik.find_one({"id": icerik_id})
             if icerik_doc:
@@ -8076,27 +8049,43 @@ async def materyal_uret(req: Request, current_user=Depends(get_current_user)):
             pass
 
     metin_bilgi = f" (Yazar: {yazar})" if yazar else ""
+    has_metin = bool(metin_ek.strip())
     metin_bağlam = metin_ek if metin_ek else f"\n\n(Not: Kitap metni mevcut değil, genel bilgilerine göre üret.)"
+
+    # Metin varsa karakterler/mekanlar/olaylar odaklı ek talimat
+    metin_odak = (
+        "\nÖNEMLİ: Verilen metni dikkatlice oku. Sorular MUTLAKA:\n"
+        "- Metinde geçen gerçek karakter adlarını kullan\n"
+        "- Metinde geçen mekan/yer adlarını kullan\n"
+        "- Metinde yaşanan olaylara, diyaloglara ve ayrıntılara dayansın\n"
+        "- Genel/soyut sorular değil, o metne özgü somut sorular olsun\n"
+        "- Doğru cevap metinde açıkça bulunabilir olsun\n"
+    ) if has_metin else ""
 
     tur_prompts = {
         "soru_seti": (
             f"'{kitap_adi}'{metin_bilgi} için {sinif}. sınıf düzeyinde TAM 10 soruluk anlama testi oluştur.\n"
+            f"{metin_odak}"
             f"Bloom taksonomisinin 6 basamağından dengeli sorular ekle:\n"
-            f"- 2 Bilgi sorusu (hatırlama)\n- 2 Kavrama sorusu (anlama)\n- 2 Uygulama sorusu\n"
-            f"- 1 Analiz sorusu\n- 1 Sentez/Değerlendirme sorusu\n- 2 Yaratıcı/Eleştirel düşünme sorusu\n"
-            f"Her soru için 4 seçenek olsun (A,B,C,D).{metin_bağlam}\n\n"
+            f"- 2 Bilgi sorusu (metinde doğrudan geçen bilgi)\n"
+            f"- 2 Kavrama sorusu (olayı kendi sözlerinle anlat)\n"
+            f"- 2 Uygulama sorusu (sen olsaydın ne yapardın?)\n"
+            f"- 1 Analiz sorusu (neden-sonuç ilişkisi)\n"
+            f"- 1 Sentez/Değerlendirme sorusu\n"
+            f"- 2 Yaratıcı/Eleştirel düşünme sorusu\n"
+            f"Her soru için 4 seçenek olsun (A,B,C,D). Yanlış seçenekler inandırıcı olsun.{metin_bağlam}\n\n"
             f"JSON formatı (tam 10 soru): {{\"baslik\": \"string\", \"sorular\": ["
             f"{{\"soru\": \"string\", \"secenekler\": [\"A...\",\"B...\",\"C...\",\"D...\"], \"dogru\": \"A...\", \"bloom_basamak\": \"string\"}}"
             f"]}}"
         ),
         "kelime_listesi": (
-            f"'{kitap_adi}'{metin_bilgi} kitabından {sinif}. sınıf için TAM 15 önemli kelime seç.{metin_bağlam}\n\n"
+            f"'{kitap_adi}'{metin_bilgi} kitabından {sinif}. sınıf için TAM 15 önemli kelime seç.{metin_odak}{metin_bağlam}\n\n"
             f"JSON: {{\"baslik\": \"string\", \"kelimeler\": ["
-            f"{{\"kelime\": \"string\", \"anlam\": \"string\", \"cumle\": \"string\", \"zorluk\": 1}}"
+            f"{{\"kelime\": \"string\", \"anlam\": \"string\", \"cumle\": \"metinden örnek veya benzeri cümle\", \"zorluk\": 1}}"
             f"]}}"
         ),
         "etkinlik": (
-            f"'{kitap_adi}'{metin_bilgi} için sınıf içi grup etkinliği tasarla. {sinif}. sınıf, 20-30 dk.{metin_bağlam}\n\n"
+            f"'{kitap_adi}'{metin_bilgi} için sınıf içi grup etkinliği tasarla. {sinif}. sınıf, 20-30 dk.{metin_odak}{metin_bağlam}\n\n"
             f"JSON: {{\"baslik\": \"string\", \"sure_dk\": 25, \"grup_sayisi\": 4, "
             f"\"adimlar\": [\"string\"], \"malzemeler\": [\"string\"], \"kazanimlar\": [\"string\"]}}"
         ),
@@ -8113,15 +8102,8 @@ async def materyal_uret(req: Request, current_user=Depends(get_current_user)):
     import json as _json
 
     try:
-        import anthropic as _ant
-        _client = _ant.Anthropic()
-        resp = _client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=4000,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        raw = resp.content[0].text.strip()
-        # JSON temizle
+        raw = await _gemini_call(prompt, max_tokens=4000)
+        raw = raw.strip()
         if raw.startswith("```"):
             lines = raw.split("\n")
             raw = "\n".join(lines[1:] if lines[0].startswith("```") else lines)
@@ -8260,11 +8242,9 @@ SADECE JSON döndür:
 }}"""
 
     try:
-        import anthropic as _ant
         import json as _json
-        _client = _ant.Anthropic()
-        resp = _client.messages.create(model="claude-haiku-4-5-20251001", max_tokens=2500, messages=[{"role": "user", "content": prompt}])
-        raw = resp.content[0].text.strip()
+        raw = await _gemini_call(prompt, max_tokens=2500)
+        raw = raw.strip()
         if raw.startswith("```"): raw = "\n".join(raw.split("\n")[1:-1])
         result = _json.loads(raw)
     except Exception as e:
