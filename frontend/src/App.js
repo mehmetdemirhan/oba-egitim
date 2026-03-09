@@ -8832,55 +8832,54 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                         ); })}
                       </div>
 
-                      {/* Metin / Bölüm Girişi */}
-                      <div className="border-2 border-dashed border-purple-200 rounded-xl p-3 bg-purple-50/40">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="text-xs font-semibold text-purple-700">📄 Kitap / Metin İçeriği</div>
-                          <div className="flex items-center gap-2">
-                            {adminAiMetin.trim().length > 20 && (
-                              <span className="text-[10px] text-purple-500 bg-purple-100 px-2 py-0.5 rounded-full">
-                                {adminAiMetin.trim().split(/\s+/).length} kelime ✓
-                              </span>
-                            )}
-                            {adminAiMetin && (
-                              <button onClick={() => setAdminAiMetin("")} className="text-[10px] text-red-400 hover:text-red-600">Temizle</button>
-                            )}
+                      {/* Metin / Bölüm Girişi - İsteğe bağlı */}
+                      <div className="border border-dashed border-purple-200 rounded-xl bg-purple-50/20">
+                        <button
+                          onClick={() => setAdminAiMetin(adminAiMetin === "__gizle__" ? "" : (adminAiMetin || "__gizle__"))}
+                          className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-purple-600 hover:text-purple-800"
+                        >
+                          <span>📄 Özel metin yapıştır (isteğe bağlı)</span>
+                          <span className="text-purple-400">{adminAiMetin && adminAiMetin !== "__gizle__" ? "▲ gizle" : "▼ aç"}</span>
+                        </button>
+                        {adminAiMetin !== "__gizle__" && (
+                          <div className="px-3 pb-3">
+                            <textarea
+                              value={adminAiMetin}
+                              onChange={e => setAdminAiMetin(e.target.value)}
+                              placeholder={"Farklı bir metin yapıştırmak isterseniz buraya ekleyin.\n\nBırakırsanız AI zaten DB'deki kitap içeriğini otomatik okuyacak."}
+                              rows={4}
+                              className="w-full bg-white border border-purple-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-400 resize-y transition-colors placeholder-gray-400"
+                            />
+                            <p className="text-[10px] text-green-600 mt-1">
+                              ✅ Boş bırakırsanız AI kitabı veritabanından otomatik okur.
+                            </p>
                           </div>
-                        </div>
-                        <textarea
-                          value={adminAiMetin}
-                          onChange={e => setAdminAiMetin(e.target.value)}
-                          placeholder={"Kitabın ilgili bölümünü veya metnini buraya yapıştırın...\n\nMetin eklediğinizde AI gerçek karakterler, mekan adları ve olaylara göre sorular üretir."}
-                          rows={5}
-                          className="w-full bg-white border border-purple-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-400 resize-y transition-colors placeholder-gray-400"
-                        />
-                        {!adminAiMetin.trim() && (
-                          <p className="text-[10px] text-amber-600 mt-1.5">
-                            ⚠️ Metin girilmezse AI kitap adına göre genel sorular üretir. En iyi sonuç için metin ekleyin.
-                          </p>
                         )}
                       </div>
 
-                      <button onClick={async () => {
+                      <button disabled={adminAiYukleniyor} onClick={async () => {
                         setAdminAiYukleniyor(true);
                         try {
-                          // Kitapta kayıtlı metin varsa onu da al
-                          let metin = adminAiMetin.trim();
+                          // Kullanıcının yapıştırdığı metin (gizle durumu hariç)
+                          let metin = (adminAiMetin && adminAiMetin !== "__gizle__") ? adminAiMetin.trim() : "";
                           if (!metin && adminAiModal.kitap.okuma_metni) metin = adminAiModal.kitap.okuma_metni;
-                          const r = await axios.post(`${API}/ai/materyal/uret`, {
+                          // Backend otomatik olarak DB'den kitap metnini çekecek
+                          const payload = {
                             kitap_adi: adminAiModal.kitap.baslik, tur: adminAiMateryalTur,
                             sinif: parseInt(adminAiModal.kitap.kitap_yas_grubu) || 4,
-                            ogrenci_id: user.id, icerik_id: adminAiModal.kitap.id || "",
+                            ogrenci_id: user.id,
+                            icerik_id: adminAiModal.kitap.id || adminAiModal.kitap._id || "",
                             yazar: adminAiModal.kitap.kitap_yazar || "",
                             metin_icerigi: metin
-                          });
+                          };
+                          const r = await axios.post(`${API}/ai/materyal/uret`, payload);
                           setAdminAiSonuc(r.data);
                           if (r.data.sorular) setAdminAiDuzenSorular(r.data.sorular.map(function(s){ return Object.assign({},s,{secenekler:(s.secenekler||[]).slice()}); }));
                           toast({ title: "📋 Materyal hazır!" });
-                        } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
+                        } catch(e) { toast({ title: "Hata: " + (e.response?.data?.detail || e.message), variant: "destructive" }); }
                         setAdminAiYukleniyor(false);
-                      }} className={`w-full rounded-xl py-3 font-bold text-sm transition-all ${adminAiMetin.trim() ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:opacity-90" : "bg-gradient-to-r from-gray-400 to-gray-500 text-white hover:from-purple-600 hover:to-indigo-600"}`}>
-                        {adminAiMetin.trim() ? "🤖 Metne Göre Materyal Üret" : "🤖 Materyali Üret (Genel)"}
+                      }} className="w-full rounded-xl py-3 font-bold text-sm transition-all bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:opacity-90">
+                        {adminAiYukleniyor ? "⏳ Üretiyor..." : "🤖 AI ile Materyal Üret"}
                       </button>
                     </div>
                   )}
