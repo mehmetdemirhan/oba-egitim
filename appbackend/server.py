@@ -47,11 +47,11 @@ GEMINI_API_KEY_3 = os.environ.get("GEMINI_API_KEY_3", "")  # 3. key
 
 # Model rotasyon listesi — kota dolunca bir sonrakini dene
 GEMINI_MODELS = [
-    "gemini-2.0-flash",
-    "gemini-2.0-flash-lite",
-    "gemini-1.5-flash-002",
-    "gemini-1.5-flash-001",
-    "gemini-1.5-pro-002",
+    "gemini-2.0-flash",           # ana model
+    "gemini-2.0-flash-lite",      # hafif, az kota
+    "gemini-flash-latest",        # alias - farklı kota havuzu
+    "gemini-flash-lite-latest",   # en hafif
+    "gemini-2.5-flash",           # en güçlü flash
 ]
 AI_MODEL = os.environ.get("AI_DEFAULT_MODEL", GEMINI_MODELS[0])
 AI_DEFAULT_MODEL = AI_MODEL
