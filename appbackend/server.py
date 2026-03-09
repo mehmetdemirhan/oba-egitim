@@ -49,9 +49,9 @@ GEMINI_API_KEY_3 = os.environ.get("GEMINI_API_KEY_3", "")  # 3. key
 GEMINI_MODELS = [
     "gemini-2.0-flash",
     "gemini-2.0-flash-lite",
-    "gemini-1.5-flash-latest",
-    "gemini-1.5-flash-8b-latest",
-    "gemini-1.5-pro-latest",
+    "gemini-1.5-flash-002",
+    "gemini-1.5-flash-001",
+    "gemini-1.5-pro-002",
 ]
 AI_MODEL = os.environ.get("AI_DEFAULT_MODEL", GEMINI_MODELS[0])
 AI_DEFAULT_MODEL = AI_MODEL
@@ -3051,6 +3051,24 @@ async def gemini_test(current_user=Depends(require_role(UserRole.ADMIN))):
         return {"durum": "OK", "yanit": yanit, "key_uzunluk": len(key), "model": AI_MODEL}
     except Exception as e:
         return {"durum": "HATA", "sebep": str(e), "key_uzunluk": len(key), "model": AI_MODEL}
+
+@api_router.get("/admin/gemini-modeller")
+async def gemini_modeller(current_user=Depends(require_role(UserRole.ADMIN))):
+    """Kullanılabilir Gemini modellerini listele."""
+    key = GEMINI_API_KEY
+    if not key:
+        return {"hata": "API key yok"}
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as c:
+            r = await c.get(f"https://generativelanguage.googleapis.com/v1beta/models?key={key}")
+            data = r.json()
+        modeller = []
+        for m in data.get("models", []):
+            if "generateContent" in m.get("supportedGenerationMethods", []):
+                modeller.append(m.get("name", "").replace("models/", ""))
+        return {"modeller": modeller, "toplam": len(modeller)}
+    except Exception as e:
+        return {"hata": str(e)}
 
 @api_router.get("/admin/debug-metinler")
 async def debug_metinler(current_user=Depends(require_role(UserRole.ADMIN))):
