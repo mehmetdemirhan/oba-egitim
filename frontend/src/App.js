@@ -7459,6 +7459,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
   const [adminAiMateryalTur, setAdminAiMateryalTur] = useState("soru_seti");
   const [adminAiDuzenMod, setAdminAiDuzenMod] = useState(false); // tam ekran düzenleme
   const [adminAiDuzenSorular, setAdminAiDuzenSorular] = useState([]); // düzenlenebilir soru listesi
+  const [adminAiMetin, setAdminAiMetin] = useState(""); // kitap/metin içeriği
   const [adminScaffoldSeviye, setAdminScaffoldSeviye] = useState("orta");
 
   const fetchAll = useCallback(async () => {
@@ -8801,7 +8802,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                   {adminAiDuzenMod && (
                     <button onClick={() => setAdminAiDuzenMod(false)} className="text-xs bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg font-medium">← Küçült</button>
                   )}
-                  <button onClick={() => { setAdminAiModal(null); setAdminAiSonuc(null); setAdminAiDuzenMod(false); }} className="text-white/80 hover:text-white text-xl font-bold w-8 h-8 flex items-center justify-center">✕</button>
+                  <button onClick={() => { setAdminAiModal(null); setAdminAiSonuc(null); setAdminAiDuzenMod(false); setAdminAiMetin(""); }} className="text-white/80 hover:text-white text-xl font-bold w-8 h-8 flex items-center justify-center">✕</button>
                 </div>
               </div>
             </div>
@@ -8830,22 +8831,56 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                           </button>
                         ); })}
                       </div>
+
+                      {/* Metin / Bölüm Girişi */}
+                      <div className="border-2 border-dashed border-purple-200 rounded-xl p-3 bg-purple-50/40">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="text-xs font-semibold text-purple-700">📄 Kitap / Metin İçeriği</div>
+                          <div className="flex items-center gap-2">
+                            {adminAiMetin.trim().length > 20 && (
+                              <span className="text-[10px] text-purple-500 bg-purple-100 px-2 py-0.5 rounded-full">
+                                {adminAiMetin.trim().split(/\s+/).length} kelime ✓
+                              </span>
+                            )}
+                            {adminAiMetin && (
+                              <button onClick={() => setAdminAiMetin("")} className="text-[10px] text-red-400 hover:text-red-600">Temizle</button>
+                            )}
+                          </div>
+                        </div>
+                        <textarea
+                          value={adminAiMetin}
+                          onChange={e => setAdminAiMetin(e.target.value)}
+                          placeholder={"Kitabın ilgili bölümünü veya metnini buraya yapıştırın...\n\nMetin eklediğinizde AI gerçek karakterler, mekan adları ve olaylara göre sorular üretir."}
+                          rows={5}
+                          className="w-full bg-white border border-purple-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-400 resize-y transition-colors placeholder-gray-400"
+                        />
+                        {!adminAiMetin.trim() && (
+                          <p className="text-[10px] text-amber-600 mt-1.5">
+                            ⚠️ Metin girilmezse AI kitap adına göre genel sorular üretir. En iyi sonuç için metin ekleyin.
+                          </p>
+                        )}
+                      </div>
+
                       <button onClick={async () => {
                         setAdminAiYukleniyor(true);
                         try {
+                          // Kitapta kayıtlı metin varsa onu da al
+                          let metin = adminAiMetin.trim();
+                          if (!metin && adminAiModal.kitap.okuma_metni) metin = adminAiModal.kitap.okuma_metni;
                           const r = await axios.post(`${API}/ai/materyal/uret`, {
                             kitap_adi: adminAiModal.kitap.baslik, tur: adminAiMateryalTur,
                             sinif: parseInt(adminAiModal.kitap.kitap_yas_grubu) || 4,
                             ogrenci_id: user.id, icerik_id: adminAiModal.kitap.id || "",
-                            yazar: adminAiModal.kitap.kitap_yazar || ""
+                            yazar: adminAiModal.kitap.kitap_yazar || "",
+                            metin_icerigi: metin
                           });
                           setAdminAiSonuc(r.data);
                           if (r.data.sorular) setAdminAiDuzenSorular(r.data.sorular.map(function(s){ return Object.assign({},s,{secenekler:(s.secenekler||[]).slice()}); }));
                           toast({ title: "📋 Materyal hazır!" });
                         } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
                         setAdminAiYukleniyor(false);
-                      }} className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl py-3 font-bold text-sm hover:opacity-90 transition-opacity">
-                        🤖 Materyali Üret
+                      }} className={`w-full rounded-xl py-3 font-bold text-sm transition-all ${adminAiMetin.trim() ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:opacity-90" : "bg-gradient-to-r from-gray-400 to-gray-500 text-white hover:from-purple-600 hover:to-indigo-600"}`}>
+                        {adminAiMetin.trim() ? "🤖 Metne Göre Materyal Üret" : "🤖 Materyali Üret (Genel)"}
                       </button>
                     </div>
                   )}
