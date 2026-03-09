@@ -7447,7 +7447,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
   const [aiIslemDurum, setAiIslemDurum] = useState("");
   const [aiSonuc, setAiSonuc] = useState(null);
   const [aiSonucSekme, setAiSonucSekme] = useState("kelimeler");
-  const [adminForm, setAdminForm] = useState({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [], makale_link: "", makale_dosya_turu: "link", kitap_yazar: "", kitap_isbn: "", kitap_yayinevi: "", kitap_sayfa: "", kitap_yas_grubu: "", kitap_link: "", kitap_kapak: "" });
+  const [adminForm, setAdminForm] = useState({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [], makale_link: "", makale_dosya_turu: "link", kitap_yazar: "", kitap_isbn: "", kitap_yayinevi: "", kitap_sayfa: "", kitap_yas_grubu: "", kitap_link: "", kitap_kapak: "", dosya_b64: "", dosya_adi: "", dosya_turu: "", okuma_metni: "", okuma_seviye: "orta", okuma_sure: 5 });
   const [kitapYukleniyor, setKitapYukleniyor] = useState(false);
   const [yeniSoru, setYeniSoru] = useState({ soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0, taksonomi: "kavrama" });
   const [gelisimSekme, setGelisimSekme] = useState("icerikler");
@@ -7470,9 +7470,9 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
   // AI Bilgi Tabanı verilerini yükle
   useEffect(() => { const f = async () => { try { const r = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setAiYuklemeler(Array.isArray(r.data)?r.data:[]); } catch(e) {} try { const r = await axios.get(`${API}/ai/bilgi-tabani/istatistik`); setAiStat(r.data); } catch(e) {} try { const r = await axios.get(`${API}/ai/bilgi-tabani/puanlarim`); setAiPuanlar(r.data); } catch(e) {} }; f(); }, [user]);
 
-  const turIcon = (tur) => ({ hizmetici: <GraduationCap className="h-5 w-5"/>, film: <Film className="h-5 w-5"/>, kitap: <BookMarked className="h-5 w-5"/>, makale: <FileText className="h-5 w-5"/> }[tur] || <BookOpen className="h-5 w-5"/>);
-  const turLabel = (tur) => ({ hizmetici: "Hizmetiçi Eğitim", film: "Film", kitap: "Kitap", makale: "Makale" }[tur] || tur);
-  const turColor = (tur) => ({ hizmetici: "bg-blue-100 text-blue-600", film: "bg-purple-100 text-purple-600", kitap: "bg-green-100 text-green-600", makale: "bg-orange-100 text-orange-600" }[tur] || "bg-gray-100 text-gray-600");
+  const turIcon = (tur) => ({ hizmetici: <GraduationCap className="h-5 w-5"/>, film: <Film className="h-5 w-5"/>, kitap: <BookMarked className="h-5 w-5"/>, makale: <FileText className="h-5 w-5"/>, okuma_parcasi: <BookOpen className="h-5 w-5"/> }[tur] || <BookOpen className="h-5 w-5"/>);
+  const turLabel = (tur) => ({ hizmetici: "Hizmetiçi Eğitim", film: "Film", kitap: "Kitap", makale: "Makale", okuma_parcasi: "Okuma Parçası" }[tur] || tur);
+  const turColor = (tur) => ({ hizmetici: "bg-blue-100 text-blue-600", film: "bg-purple-100 text-purple-600", kitap: "bg-green-100 text-green-600", makale: "bg-orange-100 text-orange-600", okuma_parcasi: "bg-amber-100 text-amber-600" }[tur] || "bg-gray-100 text-gray-600");
   const durumBadge = (d) => ({
     beklemede: <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full font-medium">⏳ Yönetici Onayı Bekliyor</span>,
     oylama: <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">🗳️ Öğretmen Oylamasında</span>,
@@ -7558,7 +7558,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
     e.preventDefault();
     try {
       await axios.post(`${API}/gelisim/icerik`, adminForm);
-      setAdminForm({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [], makale_link: "", makale_dosya_turu: "link", kitap_yazar: "", kitap_isbn: "", kitap_yayinevi: "", kitap_sayfa: "", kitap_yas_grubu: "", kitap_link: "", kitap_kapak: "" });
+      setAdminForm({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [], makale_link: "", makale_dosya_turu: "link", kitap_yazar: "", kitap_isbn: "", kitap_yayinevi: "", kitap_sayfa: "", kitap_yas_grubu: "", kitap_link: "", kitap_kapak: "", dosya_b64: "", dosya_adi: "", dosya_turu: "", okuma_metni: "", okuma_seviye: "orta", okuma_sure: 5 });
       setGorunum("liste"); fetchAll();
       toast({ title: (user.role === "admin" || user.role === "coordinator") ? "İçerik oylama aşamasına alındı" : "İçerik yönetici onayına gönderildi" });
     } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
@@ -7717,6 +7717,60 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
     );
   }
 
+  // ── OKUMA PARÇASI GÖRÜNÜMÜ ──
+  if (gorunum === "okuma" && aktifIcerik) {
+    const kelimeSayisi = aktifIcerik.okuma_metni?.trim().split(/\s+/).length || 0;
+    const tahminiSure = Math.ceil(kelimeSayisi / 200); // Ort. 200 kelime/dk
+    return (
+      <div className="max-w-2xl mx-auto space-y-4">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={() => setGorunum("liste")}>← Geri</Button>
+          <div>
+            <h2 className="text-lg font-bold">{aktifIcerik.baslik}</h2>
+            <div className="flex items-center gap-3 text-xs text-gray-500">
+              {aktifIcerik.okuma_seviye && (
+                <span className={`px-2 py-0.5 rounded-full font-medium ${
+                  aktifIcerik.okuma_seviye==="kolay"?"bg-green-100 text-green-700":
+                  aktifIcerik.okuma_seviye==="zor"?"bg-red-100 text-red-700":
+                  "bg-yellow-100 text-yellow-700"}`}>
+                  {aktifIcerik.okuma_seviye==="kolay"?"🌱 Kolay":aktifIcerik.okuma_seviye==="zor"?"🌳 Zor":"🌿 Orta"}
+                </span>
+              )}
+              <span>📖 {kelimeSayisi} kelime</span>
+              <span>⏱ ~{tahminiSure} dk</span>
+            </div>
+          </div>
+        </div>
+
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-6">
+            {aktifIcerik.aciklama && (
+              <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 mb-5 text-sm text-amber-800">
+                {aktifIcerik.aciklama}
+              </div>
+            )}
+            <div className="prose max-w-none">
+              <div className="text-base text-gray-800 leading-[1.9] whitespace-pre-wrap font-['Georgia',serif] tracking-wide">
+                {aktifIcerik.okuma_metni}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="flex gap-3">
+          {aktifIcerik.sorular?.length > 0 && (
+            <Button onClick={() => setGorunum("test")} className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white">
+              📝 Anlama Testini Çöz (+10 puan)
+            </Button>
+          )}
+          <Button variant="outline" onClick={() => handleTamamla(false, aktifIcerik)} className="flex-1">
+            ✓ Okudum, Tamamlandı (+1 puan)
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   if (gorunum === "test" && aktifIcerik) {
     return (
       <div className="max-w-2xl mx-auto space-y-6">
@@ -7786,7 +7840,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
               <div>
                 <Label className="mb-2 block">Tür</Label>
                 <div className="flex flex-wrap gap-2">
-                  {[{v:"hizmetici",l:"🎓 Hizmetiçi Eğitim"},{v:"film",l:"🎬 Film"},{v:"kitap",l:"📚 Kitap"},{v:"makale",l:"📄 Makale"}].map(t => (
+                  {[{v:"hizmetici",l:"🎓 Hizmetiçi Eğitim"},{v:"film",l:"🎬 Film"},{v:"kitap",l:"📚 Kitap"},{v:"makale",l:"📄 Makale"},{v:"okuma_parcasi",l:"📝 Okuma Parçası"}].map(t => (
                     <button key={t.v} type="button" onClick={() => setAdminForm({...adminForm, tur: t.v})}
                       className={`px-4 py-2 rounded-lg text-sm font-medium transition-all border ${adminForm.tur === t.v ? 'bg-orange-500 text-white border-orange-500 shadow-md' : 'bg-white text-gray-600 border-gray-200 hover:border-orange-300 hover:bg-orange-50'}`}>
                       {t.l}
@@ -7871,8 +7925,102 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                       <div><Label>Yaş Grubu / Sınıf</Label><Input value={adminForm.kitap_yas_grubu} onChange={e => setAdminForm({...adminForm, kitap_yas_grubu: e.target.value})} placeholder="Örn: 8-10 yaş, 3. sınıf" /></div>
                     </div>
                   </div>
+
+                  {/* PDF / Word yükleme */}
+                  <div className="border-t border-green-200 pt-4">
+                    <div className="text-xs font-semibold text-green-800 mb-2">📎 Kitap Dosyası (PDF veya Word) <span className="text-gray-400 font-normal">— isteğe bağlı</span></div>
+                    {adminForm.dosya_adi ? (
+                      <div className="flex items-center gap-3 bg-white rounded-lg border border-green-200 p-3">
+                        <span className="text-2xl">{adminForm.dosya_turu === "pdf" ? "📕" : "📘"}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-gray-800 truncate">{adminForm.dosya_adi}</div>
+                          <div className="text-xs text-gray-500">{adminForm.dosya_turu?.toUpperCase()} • Yüklendi ✅</div>
+                        </div>
+                        <button type="button" onClick={() => setAdminForm({...adminForm, dosya_b64:"", dosya_adi:"", dosya_turu:""})}
+                          className="text-red-400 hover:text-red-600 text-sm font-medium">Kaldır</button>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center border-2 border-dashed border-green-300 rounded-xl p-5 cursor-pointer hover:border-green-500 hover:bg-green-50 transition-all group">
+                        <span className="text-3xl mb-2 group-hover:scale-110 transition-transform">📄</span>
+                        <span className="text-sm font-medium text-gray-700">PDF veya Word dosyası seç</span>
+                        <span className="text-xs text-gray-400 mt-1">Maks. 20MB • .pdf, .docx, .doc</span>
+                        <input type="file" accept=".pdf,.docx,.doc" className="hidden" onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const fd = new FormData();
+                          fd.append("dosya", file);
+                          try {
+                            const r = await axios.post(`${API}/gelisim/dosya-yukle`, fd, { headers: {"Content-Type": "multipart/form-data"} });
+                            setAdminForm(prev => ({...prev, dosya_b64: r.data.dosya_b64, dosya_adi: r.data.dosya_adi, dosya_turu: r.data.dosya_turu}));
+                            toast({ title: `✅ ${r.data.dosya_adi} yüklendi (${r.data.boyut_kb} KB)` });
+                          } catch(e) { toast({ title: e.response?.data?.detail || "Yükleme hatası", variant: "destructive" }); }
+                        }} />
+                      </label>
+                    )}
+                  </div>
                 </div>
               )}
+
+              {/* ── OKUMA PARÇASI ALANLARI ── */}
+              {adminForm.tur === "okuma_parcasi" && (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-4">
+                  <div className="font-semibold text-sm text-amber-800">📝 Okuma Parçası Bilgileri</div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs">Okuma Süresi (dk)</Label>
+                      <Input type="number" min="1" max="60" value={adminForm.okuma_sure} onChange={e => setAdminForm({...adminForm, okuma_sure: parseInt(e.target.value)||5})} placeholder="5" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Seviye</Label>
+                      <div className="flex gap-1 mt-1">
+                        {[{v:"kolay",l:"🌱 Kolay"},{v:"orta",l:"🌿 Orta"},{v:"zor",l:"🌳 Zor"}].map(s => (
+                          <button key={s.v} type="button" onClick={() => setAdminForm({...adminForm, okuma_seviye: s.v})}
+                            className={`flex-1 py-1.5 rounded-lg text-xs font-medium border transition-all ${adminForm.okuma_seviye===s.v?"bg-amber-500 text-white border-amber-500":"bg-white text-gray-600 border-gray-200 hover:border-amber-400"}`}>
+                            {s.l}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Metin yazma veya dosyadan yükleme */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <Label className="text-xs">Okuma Metni *</Label>
+                      <div className="flex gap-2">
+                        {/* Dosyadan yükle */}
+                        <label className="text-xs text-amber-700 font-medium cursor-pointer bg-white border border-amber-300 px-2.5 py-1 rounded-lg hover:bg-amber-50 transition-colors">
+                          {adminForm.dosya_adi ? `📄 ${adminForm.dosya_adi}` : "📄 Dosyadan Yükle"}
+                          <input type="file" accept=".pdf,.docx,.doc,.txt" className="hidden" onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const fd = new FormData();
+                            fd.append("dosya", file);
+                            try {
+                              const r = await axios.post(`${API}/gelisim/dosya-yukle`, fd, { headers: {"Content-Type": "multipart/form-data"} });
+                              setAdminForm(prev => ({...prev, dosya_b64: r.data.dosya_b64, dosya_adi: r.data.dosya_adi, dosya_turu: r.data.dosya_turu}));
+                              toast({ title: `✅ ${r.data.dosya_adi} yüklendi` });
+                            } catch(e) { toast({ title: e.response?.data?.detail || "Hata", variant: "destructive" }); }
+                          }} />
+                        </label>
+                        {adminForm.okuma_metni.trim().length > 10 && (
+                          <span className="text-xs text-gray-400">{adminForm.okuma_metni.trim().split(/\s+/).length} kelime</span>
+                        )}
+                      </div>
+                    </div>
+                    <textarea
+                      value={adminForm.okuma_metni}
+                      onChange={e => setAdminForm({...adminForm, okuma_metni: e.target.value})}
+                      placeholder="Okuma parçasını buraya yaz veya sağ üstten dosya yükle..."
+                      rows={10}
+                      className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-400 transition-colors resize-y leading-relaxed"
+                    />
+                    {adminForm.dosya_adi && !adminForm.okuma_metni && (
+                      <p className="text-xs text-amber-600 mt-1">💡 Dosya yüklendi. Metin otomatik doldurulacak veya metni manuel ekleyebilirsiniz.</p>
+                    )}
+                  </div>
+                </div>
 
               {/* Soru Ekleme */}
               <div className="border-2 border-dashed border-gray-200 rounded-xl p-4 space-y-4">
@@ -8504,6 +8652,12 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                         </div>
                         {!tamamlandi && (
                           <div className="flex gap-2 mt-4 flex-wrap">
+                            {icerik.tur === "okuma_parcasi" && icerik.okuma_metni && (
+                              <Button size="sm" onClick={() => { setAktifIcerik(icerik); setGorunum("okuma"); }}
+                                className="bg-gradient-to-r from-amber-500 to-orange-500 text-white">
+                                📖 Okumaya Başla
+                              </Button>
+                            )}
                             {icerik.sorular?.length > 0 && (
                               <Button size="sm" onClick={() => { setAktifIcerik(icerik); setGorunum("test"); setTestCevaplari([]); }}
                                 className="bg-gradient-to-r from-orange-500 to-red-500 text-white">
