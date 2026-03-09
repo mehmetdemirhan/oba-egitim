@@ -4635,6 +4635,7 @@ function OgrenciPaneli({ user, logout }) {
   // Materyal Üretici
   const [materyalSonuc, setMateryalSonuc] = useState(null);
   const [materyalYukleniyor, setMateryalYukleniyor] = useState(false);
+  const [materyalKitapAdi, setMateryalKitapAdi] = useState("");
   // Adaptive Story
   const [hikayeData, setHikayeData] = useState(null);
   const [hikayeYukleniyor, setHikayeYukleniyor] = useState(false);
@@ -4696,7 +4697,7 @@ function OgrenciPaneli({ user, logout }) {
   // Speech AI: metinler ve geçmiş
   useEffect(() => {
     const f = async () => {
-      const sinif = linkedStudent?.sinif || user?.sinif || 3;
+      const sinif = profil?.sinif || user?.sinif || 3;
       try { const r = await axios.get(`${API}/ai/speech/metinler?sinif=${sinif}`); setSpeechMetinler(r.data.metinler || []); } catch(e) {}
       try { const r = await axios.get(`${API}/ai/speech/gecmis/${ogrenciId}`); setSpeechGecmis(r.data || []); } catch(e) {}
     };
@@ -4772,14 +4773,14 @@ function OgrenciPaneli({ user, logout }) {
       const fd = new FormData();
       fd.append("ses_dosyasi", blob, "ses.webm");
       fd.append("metin_id", seciliSpeechMetin?.id || "");
-      fd.append("ogrenci_id", linkedStudent?.id || user?.id || "");
+      fd.append("ogrenci_id", ogrenciId);
       fd.append("sure_sn", speechSure.toString());
-      fd.append("sinif", (linkedStudent?.sinif || user?.sinif || 3).toString());
+      fd.append("sinif", (profil?.sinif || user?.sinif || 3).toString());
       const r = await axios.post(`${API}/ai/speech/analiz`, fd, { headers: { "Content-Type": "multipart/form-data" }, timeout: 60000 });
       setSpeechSonuc(r.data);
       toast({ title: `🎤 Analiz tamam! ${r.data.genel_skor}/100 puan • +${r.data.xp_kazanildi} XP` });
       // Geçmişi yenile
-      try { const gr = await axios.get(`${API}/ai/speech/gecmis/${linkedStudent?.id || user?.id}`); setSpeechGecmis(gr.data); } catch(e) {}
+      try { const gr = await axios.get(`${API}/ai/speech/gecmis/${ogrenciId}`); setSpeechGecmis(gr.data); } catch(e) {}
     } catch(e) {
       toast({ title: "Analiz hatası. Lütfen tekrar dene.", variant: "destructive" });
     }
@@ -5024,6 +5025,81 @@ function OgrenciPaneli({ user, logout }) {
   }
 
   // ── NE OKUDUN? ──
+  if (aktifEkran === "scaffold" && !scaffoldData) {
+    const havuzKitaplar = gelisimIcerikleri.filter(i => i.tur === "kitap");
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-purple-50">
+        <div className="max-w-md mx-auto p-4 space-y-4">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setAktifEkran(null)} className="text-indigo-600 text-sm">← Geri</button>
+            <h2 className="text-base font-bold text-indigo-900">📖 Seviyeli Okuma</h2>
+          </div>
+          <div className="bg-white rounded-2xl p-4 border shadow-sm">
+            <div className="text-sm font-bold text-gray-800 mb-1">Hangi kitabı okumak istiyorsun?</div>
+            <div className="text-xs text-gray-500 mb-4">AI kitabı Kolay → Orta → Orijinal olarak hazırlar</div>
+            {havuzKitaplar.length > 0 && (
+              <div className="mb-4">
+                <div className="text-xs font-medium text-gray-500 mb-2">📚 Kitap Havuzundan Seç</div>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {havuzKitaplar.map(k => (
+                    <button key={k.id} disabled={scaffoldYukleniyor}
+                      onClick={async () => {
+                        setScaffoldYukleniyor(true);
+                        try {
+                          const r = await axios.post(`${API}/ai/scaffold/olustur`, {
+                            kitap_adi: k.baslik, kitap_id: k.id,
+                            sinif: profil?.sinif || user.sinif || 3, ogrenci_id: ogrenciId
+                          });
+                          setScaffoldData(r.data); setScaffoldSeviye(r.data.onerilen_seviye || "orta");
+                        } catch(e) { toast({title:"Hata",variant:"destructive"}); }
+                        setScaffoldYukleniyor(false);
+                      }}
+                      className="w-full text-left bg-indigo-50 border-2 border-indigo-100 hover:border-indigo-400 rounded-xl p-3 transition-all disabled:opacity-50 flex items-center gap-3 active:scale-[0.98]">
+                      <span className="text-2xl flex-shrink-0">📚</span>
+                      <div className="min-w-0">
+                        <div className="font-semibold text-sm text-gray-800 truncate">{k.baslik}</div>
+                        {k.kitap_yazar && <div className="text-xs text-gray-500">{k.kitap_yazar}</div>}
+                      </div>
+                      {scaffoldYukleniyor && <span className="ml-auto text-indigo-400 text-lg">⏳</span>}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 my-4">
+                  <div className="flex-1 h-px bg-gray-200"/><span className="text-xs text-gray-400">veya farklı kitap</span><div className="flex-1 h-px bg-gray-200"/>
+                </div>
+              </div>
+            )}
+            {(() => {
+              const [manuelAd, setManuelAd] = React.useState(havuzKitaplar.length === 0 ? "Küçük Prens" : "");
+              return (
+                <div className="flex gap-2">
+                  <input value={manuelAd} onChange={e => setManuelAd(e.target.value)}
+                    placeholder="Kitap adını yaz..."
+                    className="flex-1 border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-400" />
+                  <button disabled={!manuelAd.trim() || scaffoldYukleniyor}
+                    onClick={async () => {
+                      setScaffoldYukleniyor(true);
+                      try {
+                        const r = await axios.post(`${API}/ai/scaffold/olustur`, {
+                          kitap_adi: manuelAd.trim(), kitap_id: "manuel",
+                          sinif: profil?.sinif || user.sinif || 3, ogrenci_id: ogrenciId
+                        });
+                        setScaffoldData(r.data); setScaffoldSeviye(r.data.onerilen_seviye || "orta");
+                      } catch(e) { toast({title:"Hata",variant:"destructive"}); }
+                      setScaffoldYukleniyor(false);
+                    }}
+                    className="bg-indigo-600 text-white rounded-xl px-4 py-2.5 text-sm font-bold disabled:opacity-40 whitespace-nowrap">
+                    {scaffoldYukleniyor ? "⏳" : "📖 Hazırla"}
+                  </button>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (aktifEkran === "scaffold" && scaffoldData) {
     const seviyeler = scaffoldData.seviyeler || {};
     const mevcut = seviyeler[scaffoldSeviye] || {};
@@ -5345,7 +5421,7 @@ function OgrenciPaneli({ user, logout }) {
             <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 px-1">🤖 AI Araçları</div>
             <div className="grid grid-cols-3 gap-2">
               {/* Scaffold Reading */}
-              <button onClick={() => { setAktifSekme("gelisim"); setGelisimAltSekme("icerikler"); }}
+              <button onClick={() => { setScaffoldData(null); setAktifEkran("scaffold"); }}
                 className="bg-white rounded-2xl p-3 border shadow-sm text-center hover:border-indigo-400 hover:bg-indigo-50 transition-all active:scale-95 group">
                 <div className="text-2xl mb-1.5">📖</div>
                 <div className="text-[11px] font-bold text-gray-800 group-hover:text-indigo-700">Seviyeli Okuma</div>
@@ -5900,7 +5976,48 @@ function OgrenciPaneli({ user, logout }) {
                   <div><div className="font-bold text-sm">AI Materyal Üretici</div><div className="text-xs text-gray-500">Kitabın için çalışma materyali üret</div></div>
                 </div>
 
+                {/* Kitap seçimi — havuzdan + manuel */}
+                <div className="mb-4">
+                  <div className="text-xs font-medium text-gray-600 mb-1.5">📚 Kitap Seç</div>
+                  {(() => {
+                    const havuzKitaplar = gelisimIcerikleri.filter(i => i.tur === "kitap");
+                    return havuzKitaplar.length > 0 ? (
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                          {havuzKitaplar.map(k => (
+                            <button key={k.id} onClick={() => setMateryalKitapAdi(k.baslik)}
+                              className={`text-[11px] px-2.5 py-1.5 rounded-xl border-2 transition-all flex items-center gap-1 ${materyalKitapAdi===k.baslik?"bg-teal-500 text-white border-teal-500":"bg-gray-50 text-gray-600 border-gray-200 hover:border-teal-400 hover:bg-teal-50"}`}>
+                              📚 {k.baslik}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="relative">
+                          <input value={materyalKitapAdi} onChange={e => setMateryalKitapAdi(e.target.value)}
+                            placeholder="veya farklı kitap adı yaz..."
+                            className="w-full border-2 border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-teal-400 transition-colors" />
+                          {materyalKitapAdi && <button onClick={() => setMateryalKitapAdi("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">✕</button>}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <input value={materyalKitapAdi} onChange={e => setMateryalKitapAdi(e.target.value)}
+                          placeholder="Kitap adını yaz..."
+                          className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-teal-400 transition-colors" />
+                        <div className="flex flex-wrap gap-1.5">
+                          {["Küçük Prens","Pinokyo","Alice Harikalar Diyarında","Heidi","Pollyanna"].map(k => (
+                            <button key={k} onClick={() => setMateryalKitapAdi(k)}
+                              className={`text-[11px] px-2.5 py-1 rounded-full border transition-all ${materyalKitapAdi===k?"bg-teal-500 text-white border-teal-500":"bg-gray-50 text-gray-600 border-gray-200 hover:border-teal-400"}`}>
+                              {k}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
                 {/* Materyal tipi */}
+                <div className="text-xs font-medium text-gray-600 mb-2">Materyal Türü Seç</div>
                 <div className="grid grid-cols-2 gap-2 mb-4">
                   {[
                     {id:"soru_seti",e:"📝",l:"Soru Seti",a:"10 soruluk anlama testi"},
@@ -5908,17 +6025,17 @@ function OgrenciPaneli({ user, logout }) {
                     {id:"etkinlik",e:"👥",l:"Sınıf Etkinliği",a:"Grup aktivitesi"},
                     {id:"tahmin",e:"🔮",l:"Tahmin Soruları",a:"Okuma öncesi"}
                   ].map(t => {
-                    const secili = materyalSonuc?.tur === t.id;
+                    const secili = materyalSonuc?.tur === t.id && materyalSonuc?.kitap_adi === materyalKitapAdi;
                     return (
                       <button key={t.id} onClick={async () => {
                         if (materyalYukleniyor) return;
-                        const kitapAdi = prompt("Hangi kitap için materyal üreteyim?") || "Kitap";
-                        if (!kitapAdi) return;
+                        const kitapAdi = materyalKitapAdi.trim() || "Küçük Prens";
+                        if (!materyalKitapAdi.trim()) setMateryalKitapAdi("Küçük Prens");
                         setMateryalYukleniyor(true); setMateryalSonuc(null);
                         try {
                           const r = await axios.post(`${API}/ai/materyal/uret`, {
                             kitap_adi: kitapAdi, tur: t.id,
-                            sinif: user.sinif || profil?.sinif || 3,
+                            sinif: profil?.sinif || user.sinif || 3,
                             ogrenci_id: ogrenciId
                           });
                           setMateryalSonuc(r.data);
@@ -7335,6 +7452,12 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
   const [yeniSoru, setYeniSoru] = useState({ soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0, taksonomi: "kavrama" });
   const [gelisimSekme, setGelisimSekme] = useState("icerikler");
   const [egzersizPuanlari, setEgzersizPuanlari] = useState({});
+  // Admin AI araç state'leri
+  const [adminAiModal, setAdminAiModal] = useState(null); // { kitap, mod: "materyal"|"scaffold" }
+  const [adminAiYukleniyor, setAdminAiYukleniyor] = useState(false);
+  const [adminAiSonuc, setAdminAiSonuc] = useState(null);
+  const [adminAiMateryalTur, setAdminAiMateryalTur] = useState("soru_seti");
+  const [adminScaffoldSeviye, setAdminScaffoldSeviye] = useState("orta");
 
   const fetchAll = useCallback(async () => {
     try { const r = await axios.get(`${API}/gelisim/icerik`); setIcerikler(r.data); } catch(e) {}
@@ -8370,13 +8493,28 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                             </Button>
                           </div>
                         )}
-                        {/* Kitap türü ise bölüm bazlı soru yönetimi */}
+                        {/* Kitap türü ise bölüm bazlı soru yönetimi + AI araçları */}
                         {icerik.tur === "kitap" && (user.role === "admin" || user.role === "coordinator" || user.role === "teacher") && (
-                          <Button size="sm" variant="outline" className="mt-2 text-teal-600 border-teal-300 hover:bg-teal-50" onClick={async () => {
-                            setSoruYonetimiIcerik(icerik);
-                            try { const r = await axios.get(`${API}/kitaplar/${icerik.id}/sorular`); setKitapSorulari(Array.isArray(r.data) ? r.data : []); } catch(e) { setKitapSorulari([]); }
-                            setGorunum("soru-yonetimi");
-                          }}>📝 Bölüm Soruları ({icerik._soru_sayisi || "Ekle"})</Button>
+                          <div className="mt-3 space-y-2">
+                            <Button size="sm" variant="outline" className="text-teal-600 border-teal-300 hover:bg-teal-50" onClick={async () => {
+                              setSoruYonetimiIcerik(icerik);
+                              try { const r = await axios.get(`${API}/kitaplar/${icerik.id}/sorular`); setKitapSorulari(Array.isArray(r.data) ? r.data : []); } catch(e) { setKitapSorulari([]); }
+                              setGorunum("soru-yonetimi");
+                            }}>📝 Bölüm Soruları ({icerik._soru_sayisi || "Ekle"})</Button>
+                            {/* AI Araçları - sadece admin/coordinator */}
+                            {(user.role === "admin" || user.role === "coordinator") && (
+                              <div className="flex gap-2 flex-wrap">
+                                <Button size="sm" variant="outline" className="text-purple-600 border-purple-300 hover:bg-purple-50"
+                                  onClick={() => { setAdminAiModal({ kitap: icerik, mod: "materyal" }); setAdminAiSonuc(null); setAdminAiMateryalTur("soru_seti"); }}>
+                                  🤖 AI Materyal Üret
+                                </Button>
+                                <Button size="sm" variant="outline" className="text-indigo-600 border-indigo-300 hover:bg-indigo-50"
+                                  onClick={() => { setAdminAiModal({ kitap: icerik, mod: "scaffold" }); setAdminAiSonuc(null); setAdminScaffoldSeviye("orta"); }}>
+                                  📖 Seviyeli Okuma Önizle
+                                </Button>
+                              </div>
+                            )}
+                          </div>
                         )}
                       </CardContent>
                     </Card>
@@ -8436,6 +8574,164 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
         </div>
       </div>
       )} {/* /gelisimSekme === icerikler */}
+
+      {/* ═══ ADMİN AI ARAÇ MODAL ═══ */}
+      {adminAiModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className={`p-4 rounded-t-2xl text-white ${adminAiModal.mod === "materyal" ? "bg-gradient-to-r from-purple-600 to-indigo-600" : "bg-gradient-to-r from-indigo-600 to-blue-600"}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{adminAiModal.mod === "materyal" ? "🤖" : "📖"}</span>
+                  <div>
+                    <div className="font-bold">{adminAiModal.mod === "materyal" ? "AI Materyal Üretici" : "Seviyeli Okuma Önizleme"}</div>
+                    <div className="text-xs opacity-80 truncate max-w-[220px]">📚 {adminAiModal.kitap.baslik}</div>
+                  </div>
+                </div>
+                <button onClick={() => { setAdminAiModal(null); setAdminAiSonuc(null); }} className="text-white/80 hover:text-white text-xl font-bold">✕</button>
+              </div>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* MATERYAL MODU */}
+              {adminAiModal.mod === "materyal" && (<>
+                <div>
+                  <div className="text-xs font-medium text-gray-600 mb-2">Materyal Türü</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      {id:"soru_seti",e:"📝",l:"Soru Seti",a:"10 soruluk anlama testi"},
+                      {id:"kelime_listesi",e:"📖",l:"Kelime Listesi",a:"15 anahtar kelime"},
+                      {id:"etkinlik",e:"👥",l:"Sınıf Etkinliği",a:"Grup aktivitesi"},
+                      {id:"tahmin",e:"🔮",l:"Tahmin Soruları",a:"Okuma öncesi"},
+                    ].map(t => (
+                      <button key={t.id} onClick={() => { setAdminAiMateryalTur(t.id); setAdminAiSonuc(null); }}
+                        className={`p-3 rounded-xl border-2 text-left transition-all ${adminAiMateryalTur===t.id?"border-purple-500 bg-purple-50":"border-gray-100 bg-gray-50 hover:border-purple-300"}`}>
+                        <div className="text-xl mb-0.5">{t.e}</div>
+                        <div className="font-bold text-xs text-gray-800">{t.l}</div>
+                        <div className="text-[10px] text-gray-500">{t.a}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {!adminAiSonuc && !adminAiYukleniyor && (
+                  <button onClick={async () => {
+                    setAdminAiYukleniyor(true);
+                    try {
+                      const r = await axios.post(`${API}/ai/materyal/uret`, {
+                        kitap_adi: adminAiModal.kitap.baslik, tur: adminAiMateryalTur,
+                        sinif: parseInt(adminAiModal.kitap.kitap_yas_grubu) || 4, ogrenci_id: user.id
+                      });
+                      setAdminAiSonuc(r.data); toast({ title: "📋 Materyal hazır!" });
+                    } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
+                    setAdminAiYukleniyor(false);
+                  }} className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl py-3 font-bold text-sm hover:opacity-90 transition-opacity">
+                    🤖 Materyali Üret
+                  </button>
+                )}
+                {adminAiYukleniyor && <div className="text-center py-8"><div className="text-4xl animate-spin mb-3">⚙️</div><div className="text-sm text-gray-500">AI materyal hazırlıyor...</div></div>}
+                {adminAiSonuc && !adminAiYukleniyor && (() => {
+                  const m = adminAiSonuc;
+                  return (
+                    <div className="space-y-3">
+                      <div className="bg-purple-50 rounded-xl p-3 border border-purple-100">
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="font-bold text-sm text-gray-800">{m.kitap_adi}</span>
+                          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full ml-auto capitalize">{({soru_seti:"Soru Seti",kelime_listesi:"Kelime Listesi",etkinlik:"Sınıf Etkinliği",tahmin:"Tahmin Soruları"})[m.tur]||m.tur}</span>
+                        </div>
+                        {m.tur === "soru_seti" && m.sorular?.map((s,i) => (
+                          <div key={i} className="bg-white rounded-lg p-3 mb-2 border border-purple-100 last:mb-0">
+                            <div className="font-medium text-sm mb-2">{i+1}. {s.soru}</div>
+                            <div className="grid grid-cols-2 gap-1">
+                              {(s.secenekler||[]).map((sec,j) => (
+                                <div key={j} className={`text-xs px-2 py-1 rounded ${j===s.dogru_cevap?"bg-green-100 text-green-700 font-bold":"bg-gray-50 text-gray-600"}`}>
+                                  {["A","B","C","D"][j]}) {sec}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                        {m.tur === "kelime_listesi" && m.kelimeler?.map((k,i) => (
+                          <div key={i} className="flex gap-2 bg-white rounded-lg p-2 mb-1.5 border border-purple-100 last:mb-0">
+                            <span className="font-bold text-purple-600 text-sm flex-shrink-0">{i+1}.</span>
+                            <div><span className="font-semibold text-sm">{k.kelime}</span>{k.anlam && <span className="text-xs text-gray-500 ml-2">— {k.anlam}</span>}{k.ornek && <div className="text-xs text-gray-400 italic mt-0.5">"{k.ornek}"</div>}</div>
+                          </div>
+                        ))}
+                        {(m.tur === "etkinlik" || m.tur === "tahmin") && m.icerik && (
+                          <div className="bg-white rounded-lg p-3 text-sm text-gray-700 border border-purple-100 whitespace-pre-wrap">{m.icerik}</div>
+                        )}
+                      </div>
+                      <button onClick={() => setAdminAiSonuc(null)} className="w-full bg-gray-100 text-gray-700 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-200 transition-colors">
+                        🔄 Farklı Tür Üret
+                      </button>
+                    </div>
+                  );
+                })()}
+              </>)}
+
+              {/* SCAFFOLD MODU */}
+              {adminAiModal.mod === "scaffold" && (<>
+                {!adminAiSonuc && !adminAiYukleniyor && (
+                  <div className="space-y-3">
+                    <div className="bg-indigo-50 rounded-xl p-3 text-sm text-indigo-700 border border-indigo-100">
+                      Bu kitap için Kolay / Orta / Orijinal 3 seviye metin üretilir. Öğrenciler kendi seviyelerinden başlayıp ilerleyebilir.
+                    </div>
+                    <div>
+                      <div className="text-xs font-medium text-gray-600 mb-2">Önizleme Seviyesi</div>
+                      <div className="flex gap-2">
+                        {[{id:"kolay",l:"🌱 Kolay"},{id:"orta",l:"🌿 Orta"},{id:"orijinal",l:"🌳 Orijinal"}].map(s => (
+                          <button key={s.id} onClick={() => setAdminScaffoldSeviye(s.id)}
+                            className={`flex-1 py-2 rounded-xl text-xs font-bold border-2 transition-all ${adminScaffoldSeviye===s.id?"border-indigo-500 bg-indigo-100 text-indigo-800":"border-gray-200 bg-gray-50 text-gray-600"}`}>
+                            {s.l}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <button onClick={async () => {
+                      setAdminAiYukleniyor(true);
+                      try {
+                        const r = await axios.post(`${API}/ai/scaffold/olustur`, {
+                          kitap_adi: adminAiModal.kitap.baslik, kitap_id: adminAiModal.kitap.id,
+                          sinif: parseInt(adminAiModal.kitap.kitap_yas_grubu) || 4, ogrenci_id: user.id
+                        });
+                        setAdminAiSonuc(r.data); setAdminScaffoldSeviye(r.data.onerilen_seviye || "orta");
+                        toast({ title: "📖 Seviyeli metin hazır!" });
+                      } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
+                      setAdminAiYukleniyor(false);
+                    }} className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-xl py-3 font-bold text-sm hover:opacity-90 transition-opacity">
+                      📖 Seviyeli Metni Üret
+                    </button>
+                  </div>
+                )}
+                {adminAiYukleniyor && <div className="text-center py-8"><div className="text-4xl animate-spin mb-3">📖</div><div className="text-sm text-gray-500">3 seviye metin hazırlanıyor...</div></div>}
+                {adminAiSonuc && !adminAiYukleniyor && (() => {
+                  const seviyeler = adminAiSonuc.seviyeler || {};
+                  const mevcut = seviyeler[adminScaffoldSeviye] || {};
+                  return (
+                    <div className="space-y-3">
+                      <div className="flex gap-2">
+                        {[{id:"kolay",l:"🌱 Kolay"},{id:"orta",l:"🌿 Orta"},{id:"orijinal",l:"🌳 Orijinal"}].map(s => (
+                          <button key={s.id} onClick={() => setAdminScaffoldSeviye(s.id)}
+                            className={`flex-1 py-2 rounded-xl text-xs font-bold border-2 transition-all ${adminScaffoldSeviye===s.id?"border-indigo-500 bg-indigo-100 text-indigo-800":"border-gray-200 bg-gray-50"}`}>
+                            {s.l}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="bg-white rounded-xl border-2 border-indigo-100 p-4 max-h-72 overflow-y-auto">
+                        <div className="font-bold text-indigo-800 mb-2">{mevcut.baslik || adminAiSonuc.kitap_adi}</div>
+                        <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{mevcut.metin || "Metin bulunamadı"}</div>
+                        {mevcut.kelime_sayisi && <div className="text-xs text-gray-400 mt-2">{mevcut.kelime_sayisi} kelime</div>}
+                      </div>
+                      <button onClick={() => setAdminAiSonuc(null)} className="w-full bg-gray-100 text-gray-700 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-200">
+                        🔄 Yeniden Üret
+                      </button>
+                    </div>
+                  );
+                })()}
+              </>)}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Red Sebebi Dialog */}
       <Dialog open={!!redDialogIcerik} onOpenChange={() => { setRedDialogIcerik(null); setRedSebep(""); }}>
