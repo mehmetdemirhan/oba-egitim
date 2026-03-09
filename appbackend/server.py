@@ -42,29 +42,63 @@ security = HTTPBearer()
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")  # geriye dönük uyumluluk
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", os.environ.get("ANTHROPIC_API_KEY", ""))
-AI_MODEL = "gemini-2.0-flash"  # ücretsiz, hızlı
-AI_DEFAULT_MODEL = os.environ.get("AI_DEFAULT_MODEL", AI_MODEL)
+GEMINI_API_KEY_2 = os.environ.get("GEMINI_API_KEY_2", "")  # Yedek key
+GEMINI_API_KEY_3 = os.environ.get("GEMINI_API_KEY_3", "")  # 3. key
+
+# Model rotasyon listesi — kota dolunca bir sonrakini dene
+GEMINI_MODELS = [
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",   # daha az kota tüketir
+    "gemini-1.5-flash",        # eski ama stabil
+    "gemini-1.5-flash-8b",     # en hafif model
+]
+AI_MODEL = os.environ.get("AI_DEFAULT_MODEL", GEMINI_MODELS[0])
+AI_DEFAULT_MODEL = AI_MODEL
 AI_HAIKU_MODEL = AI_MODEL
 AI_CACHE_HOURS = int(os.environ.get("AI_CACHE_HOURS", "24"))
 AI_MAX_DAILY_REQUESTS = int(os.environ.get("AI_MAX_DAILY_REQUESTS", "500"))
 
 async def _gemini_call(prompt: str, system: str = "", max_tokens: int = 4000) -> str:
-    """Gemini API çağrısı — tek nokta."""
-    key = GEMINI_API_KEY
-    if not key:
+    """Gemini API çağrısı — model rotasyonu + çoklu key desteği."""
+    all_keys = [k for k in [GEMINI_API_KEY, GEMINI_API_KEY_2, GEMINI_API_KEY_3] if k]
+    if not all_keys:
         raise Exception("GEMINI_API_KEY tanımlı değil")
+
     full_prompt = f"{system}\n\n{prompt}" if system else prompt
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{AI_MODEL}:generateContent?key={key}"
-    payload = {
-        "contents": [{"parts": [{"text": full_prompt}]}],
-        "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.7}
-    }
-    async with httpx.AsyncClient(timeout=90.0) as c:
-        r = await c.post(url, json=payload)
-        data = r.json()
-        if "candidates" not in data:
-            raise Exception(f"Gemini hata: {data}")
-        return data["candidates"][0]["content"]["parts"][0]["text"]
+    last_error = "Bilinmeyen hata"
+
+    for key in all_keys:
+        for model in GEMINI_MODELS:
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
+                payload = {
+                    "contents": [{"parts": [{"text": full_prompt}]}],
+                    "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.7}
+                }
+                async with httpx.AsyncClient(timeout=60.0) as c:
+                    r = await c.post(url, json=payload)
+                    data = r.json()
+
+                if "candidates" in data:
+                    logging.info(f"[GEMINI] ✅ Başarılı: model={model}")
+                    return data["candidates"][0]["content"]["parts"][0]["text"]
+
+                err_code = data.get("error", {}).get("code", 0)
+                err_msg = str(data.get("error", {}).get("message", data))
+                last_error = f"{model}: {err_msg[:200]}"
+                is_quota = (err_code == 429 or "RESOURCE_EXHAUSTED" in err_msg or "quota" in err_msg.lower())
+                if is_quota:
+                    logging.warning(f"[GEMINI] ⚠️ Kota ({model}) → sonraki deneniyor")
+                    continue
+                logging.error(f"[GEMINI] ❌ Kalıcı hata {err_code}: {err_msg[:100]}")
+                break
+
+            except Exception as ex:
+                last_error = str(ex)[:200]
+                logging.warning(f"[GEMINI] Exception ({model}): {last_error[:80]}")
+                continue
+
+    raise Exception(f"Tüm Gemini modelleri başarısız. Son hata: {last_error}")
 
 
 def _mock_bilgi_tabani_response(user_message: str) -> dict:
