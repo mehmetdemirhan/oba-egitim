@@ -8021,6 +8021,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                     )}
                   </div>
                 </div>
+              )}
 
               {/* Soru Ekleme */}
               <div className="border-2 border-dashed border-gray-200 rounded-xl p-4 space-y-4">
