@@ -3053,8 +3053,8 @@ async def gemini_test(current_user=Depends(require_role(UserRole.ADMIN))):
         return {"durum": "HATA", "sebep": str(e), "key_uzunluk": len(key), "model": AI_MODEL}
 
 @api_router.get("/admin/gemini-modeller")
-async def gemini_modeller(current_user=Depends(require_role(UserRole.ADMIN))):
-    """Kullanılabilir Gemini modellerini listele."""
+async def gemini_modeller():
+    """Kullanılabilir Gemini modellerini listele — geçici public."""
     key = GEMINI_API_KEY
     if not key:
         return {"hata": "API key yok"}
