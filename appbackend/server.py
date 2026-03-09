@@ -8159,31 +8159,43 @@ async def materyal_uret(req: Request, current_user=Depends(get_current_user)):
     metin_bilgi = f" (Yazar: {yazar})" if yazar else ""
     has_metin = bool(metin_ek.strip())
 
+    # Metin yoksa: Gemini'den önce kitap hakkında bağlam üret
+    if not has_metin and GEMINI_API_KEY:
+        try:
+            baglam_prompt = (
+                f"Türkçe çocuk kitabı: '{kitap_adi}'{metin_bilgi}\n"
+                f"Bu kitap hakkında bildiklerini yaz. Eğer bu kitabı bilmiyorsan, "
+                f"kitap adından ve yazarından çıkarabileceğin ipuçlarıyla tahmini bir içerik özeti yaz.\n"
+                f"Şunları belirt: Ana karakter kim? Nerede geçiyor? Temel olay nedir? Önemli yan karakterler? "
+                f"Kitabın mesajı/teması nedir? Dikkat çekici sahneler?\n"
+                f"Kısa ve net yaz (200-300 kelime)."
+            )
+            kitap_baglaami = await _gemini_call(baglam_prompt, max_tokens=600)
+            metin_ek = f"\n\nKİTAP HAKKINDA BİLGİ (AI analizi):\n{kitap_baglaami.strip()}"
+            metin_kaynak = "gemini_baglam"
+            has_metin = True
+            logging.info(f"[MATERYAL] Gemini'den kitap bağlamı alındı: {len(kitap_baglaami)} karakter")
+        except Exception as baglam_e:
+            logging.error(f"[MATERYAL] Bağlam üretme hatası: {baglam_e}")
+
     # Metin varsa: metne özgü talimatlar
-    # Metin yoksa: Gemini'nin kendi bilgisini kullanması için güçlü talimat
     if has_metin:
         metin_bağlam = metin_ek
         metin_odak = (
-            "\n🔴 ZORUNLU: Aşağıdaki kitap metnini SATIR SATIR oku. Sorular MUTLAKA:\n"
-            "- Metinde GEÇen GERÇEK karakter isimlerini kullan (uydurma)\n"
-            "- Metinde GEÇen mekan, yer, nesne adlarını kullan\n"
-            "- Metindeki GERÇEK olaylara, diyaloglara, ayrıntılara dayan\n"
-            "- 'Karakterin özelliği nedir?' gibi SOYUT sorular YASAK\n"
-            "- Her sorunun doğru cevabı metinde AÇIKÇA bulunabilmeli\n"
-            "- Yanlış şıklar metindeki benzer detaylardan üretilmeli (inandırıcı)\n"
+            "\n🔴 ZORUNLU: Aşağıdaki kitap bilgisini kullan. Sorular MUTLAKA:\n"
+            "- Kitaptaki GERÇEK karakter isimlerini kullan\n"
+            "- Kitaptaki GERÇEK olayları, mekanları, detayları sor\n"
+            "- 'Karakterin özelliği nedir?' gibi SOYUT/JENERİK sorular KESİNLİKLE YASAK\n"
+            "- Doğru cevap açıkça bulunabilmeli, yanlış şıklar inandırıcı ama yanlış olsun\n"
         )
     else:
-        metin_bağlam = (
-            f"\n\n📚 KİTAP BİLGİSİ: '{kitap_adi}' — sen bu kitabı biliyorsun. "
-            f"Kitabın GERÇEK karakterlerini, GERÇEK mekanlarını, GERÇEK olaylarını kullan. "
-            f"Bu kitabı hiç okumamış biri bu soruları yanlış cevaplasın, kitabı okuyan doğru cevaplasın."
-        )
+        metin_bağlam = ""
         metin_odak = (
-            "\n🔴 ZORUNLU: Bu kitabın GERÇEK içeriğinden soru üret:\n"
-            "- Kitaptaki GERÇEK karakter adlarını şıklara yaz\n"
-            "- Kitaptaki GERÇEK olayları sor\n"
-            "- 'Karakterin özelliği nedir?' gibi SOYUT/JENERİK sorular YASAK\n"
-            "- Yanlış şıklar da mantıklı ama yanlış olsun\n"
+            "\n🔴 ZORUNLU: Kitap adından yola çıkarak ÖZGİN sorular üret. YASAK sorular:\n"
+            "- 'Kitabın ana karakterinin özelliği nedir?' → YASAK\n"
+            "- 'Kitap hangi türdedir?' → YASAK  \n"
+            "- 'Olaylar hangi ortamda geçer?' → YASAK\n"
+            "Bunların yerine kitabın adından ve içeriğinden tahmin edilen özgün sorular sor.\n"
         )
 
     tur_prompts = {
