@@ -7557,7 +7557,31 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
   const icerikKaydet = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(`${API}/gelisim/icerik`, adminForm);
+      // Backend modeliyle uyumlu payload — tüm alanlar gönderilir,
+      // eski backend extra fields'ı ignore etmiyorsa sadece bilinen alanlar gönderilir
+      const payload = {
+        baslik: adminForm.baslik,
+        tur: adminForm.tur,
+        aciklama: adminForm.aciklama,
+        hedef_kitle: adminForm.hedef_kitle,
+        sorular: adminForm.sorular,
+        makale_link: adminForm.makale_link || null,
+        makale_dosya_turu: adminForm.makale_dosya_turu || null,
+        kitap_yazar: adminForm.kitap_yazar || null,
+        kitap_isbn: adminForm.kitap_isbn || null,
+        kitap_yayinevi: adminForm.kitap_yayinevi || null,
+        kitap_sayfa: adminForm.kitap_sayfa || null,
+        kitap_yas_grubu: adminForm.kitap_yas_grubu || null,
+        kitap_link: adminForm.kitap_link || null,
+        kitap_kapak: adminForm.kitap_kapak || null,
+        dosya_b64: adminForm.dosya_b64 || null,
+        dosya_adi: adminForm.dosya_adi || null,
+        dosya_turu: adminForm.dosya_turu || null,
+        okuma_metni: adminForm.okuma_metni || null,
+        okuma_seviye: adminForm.okuma_seviye || null,
+        okuma_sure: adminForm.okuma_sure || null,
+      };
+      await axios.post(`${API}/gelisim/icerik`, payload);
       setAdminForm({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [], makale_link: "", makale_dosya_turu: "link", kitap_yazar: "", kitap_isbn: "", kitap_yayinevi: "", kitap_sayfa: "", kitap_yas_grubu: "", kitap_link: "", kitap_kapak: "", dosya_b64: "", dosya_adi: "", dosya_turu: "", okuma_metni: "", okuma_seviye: "orta", okuma_sure: 5 });
       setGorunum("liste"); fetchAll();
       toast({ title: (user.role === "admin" || user.role === "coordinator") ? "İçerik oylama aşamasına alındı" : "İçerik yönetici onayına gönderildi" });
