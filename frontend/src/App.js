@@ -8391,6 +8391,16 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                           <Button size="sm" onClick={() => adminKarar(icerik.id, true, false)} className="bg-blue-600 hover:bg-blue-700 text-white">🗳️ Oylama Başlat</Button>
                           <Button size="sm" onClick={() => adminKarar(icerik.id, true, true)} className="bg-green-600 hover:bg-green-700 text-white">✅ Direkt Yayına Al</Button>
                           <Button size="sm" variant="destructive" onClick={() => adminKarar(icerik.id, false)}>❌ Reddet</Button>
+                          {icerik.tur === "kitap" && (<>
+                            <Button size="sm" variant="outline" className="text-purple-600 border-purple-300 hover:bg-purple-50"
+                              onClick={() => { setAdminAiModal({ kitap: icerik, mod: "materyal" }); setAdminAiSonuc(null); setAdminAiMateryalTur("soru_seti"); }}>
+                              🤖 AI Materyal
+                            </Button>
+                            <Button size="sm" variant="outline" className="text-indigo-600 border-indigo-300 hover:bg-indigo-50"
+                              onClick={() => { setAdminAiModal({ kitap: icerik, mod: "scaffold" }); setAdminAiSonuc(null); }}>
+                              📖 Seviyeli Okuma
+                            </Button>
+                          </>)}
                         </div>
                       </CardContent>
                     </Card>
@@ -8446,6 +8456,18 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                           {oran !== null && (<div className="mb-3"><div className="w-full bg-gray-200 rounded-full h-2"><div className={`h-2 rounded-full transition-all ${oran >= 60 ? 'bg-green-500' : 'bg-orange-500'}`} style={{width:`${oran}%`}}></div></div><p className="text-xs text-gray-500 mt-1">%60 onay gerekli • Şu an %{oran}</p></div>)}
                           {kullandi ? (<div className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">✓ Oyunuzu kullandınız: <strong>{kullandi.onay ? "Onay ✅" : "Red ❌"}</strong>{!kullandi.onay && kullandi.sebep && <span className="text-gray-600"> — {kullandi.sebep}</span>}</div>
                           ) : (<div className="flex gap-2"><Button size="sm" onClick={() => oyVer(true, "", icerik)} className="bg-green-600 hover:bg-green-700 text-white flex-1">✅ Onayla (+2 puan)</Button><Button size="sm" variant="destructive" className="flex-1" onClick={() => { setRedDialogIcerik(icerik); }}>❌ Reddet</Button></div>)}
+                          {icerik.tur === "kitap" && (user.role === "admin" || user.role === "coordinator") && (
+                            <div className="flex gap-2 mt-2">
+                              <Button size="sm" variant="outline" className="flex-1 text-purple-600 border-purple-300 hover:bg-purple-50"
+                                onClick={() => { setAdminAiModal({ kitap: icerik, mod: "materyal" }); setAdminAiSonuc(null); setAdminAiMateryalTur("soru_seti"); }}>
+                                🤖 AI Materyal
+                              </Button>
+                              <Button size="sm" variant="outline" className="flex-1 text-indigo-600 border-indigo-300 hover:bg-indigo-50"
+                                onClick={() => { setAdminAiModal({ kitap: icerik, mod: "scaffold" }); setAdminAiSonuc(null); }}>
+                                📖 Seviyeli Okuma
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
