@@ -3049,13 +3049,30 @@ class SoruModel(BaseModel):
 
 class IcerikCreate(BaseModel):
     baslik: str
-    tur: str  # hizmetici, film, kitap, makale
+    tur: str  # hizmetici, film, kitap, makale, okuma_parcasi
     aciklama: str = ""
     hedef_kitle: str  # ogretmen, ogrenci, hepsi
     sorular: List[SoruModel] = []
     # Makale alanları
     makale_link: Optional[str] = None
     makale_dosya_turu: Optional[str] = None  # pdf, word, link
+    # Kitap ek alanlar
+    kitap_yazar: Optional[str] = None
+    kitap_isbn: Optional[str] = None
+    kitap_yayinevi: Optional[str] = None
+    kitap_sayfa: Optional[str] = None
+    kitap_yas_grubu: Optional[str] = None
+    kitap_link: Optional[str] = None
+    kitap_kapak: Optional[str] = None
+    kitap_bolum_sayisi: Optional[int] = None
+    # Kitap/makale dosya (base64)
+    dosya_b64: Optional[str] = None
+    dosya_adi: Optional[str] = None
+    dosya_turu: Optional[str] = None  # pdf, docx
+    # Okuma parçası
+    okuma_metni: Optional[str] = None
+    okuma_seviye: Optional[str] = None  # kolay, orta, zor
+    okuma_sure: Optional[int] = None  # dakika
 
 class IcerikModel(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -3066,10 +3083,24 @@ class IcerikModel(BaseModel):
     sorular: List[SoruModel] = []
     makale_link: Optional[str] = None
     makale_dosya_turu: Optional[str] = None
+    kitap_yazar: Optional[str] = None
+    kitap_isbn: Optional[str] = None
+    kitap_yayinevi: Optional[str] = None
+    kitap_sayfa: Optional[str] = None
+    kitap_yas_grubu: Optional[str] = None
+    kitap_link: Optional[str] = None
+    kitap_kapak: Optional[str] = None
+    kitap_bolum_sayisi: Optional[int] = None
+    dosya_b64: Optional[str] = None
+    dosya_adi: Optional[str] = None
+    dosya_turu: Optional[str] = None
+    okuma_metni: Optional[str] = None
+    okuma_seviye: Optional[str] = None
+    okuma_sure: Optional[int] = None
     ekleyen_id: str = ""
     ekleyen_ad: str = ""
     durum: str = "beklemede"  # beklemede, oylama, yayinda, reddedildi
-    oylar: dict = Field(default_factory=dict)  # {user_id: {"oy": True/False, "sebep": ""}}
+    oylar: dict = Field(default_factory=dict)
     olusturma_tarihi: datetime = Field(default_factory=datetime.utcnow)
     yayin_tarihi: Optional[datetime] = None
 
@@ -3092,6 +3123,31 @@ class TamamlamaModel(BaseModel):
     toplam_soru: int = 0
     kazanilan_puan: int = 0
     tarih: datetime = Field(default_factory=datetime.utcnow)
+
+# Dosya yükleme endpoint — kitap PDF/Word gelişim içeriğine eklenir
+@api_router.post("/gelisim/dosya-yukle")
+async def gelisim_dosya_yukle(
+    dosya: UploadFile = File(...),
+    current_user=Depends(get_current_user)
+):
+    role = current_user.get("role", "")
+    if role not in ["admin", "coordinator", "teacher"]:
+        raise HTTPException(status_code=403, detail="Yetkisiz")
+    import os, base64
+    ext = os.path.splitext(dosya.filename)[1].lower()
+    if ext not in [".pdf", ".docx", ".doc", ".txt"]:
+        raise HTTPException(status_code=400, detail=f"Desteklenmeyen format: {ext}. Desteklenen: .pdf, .docx, .doc, .txt")
+    icerik = await dosya.read()
+    if len(icerik) > 20 * 1024 * 1024:  # 20MB
+        raise HTTPException(status_code=400, detail="Dosya 20MB'dan büyük olamaz")
+    dosya_b64 = base64.b64encode(icerik).decode("utf-8")
+    dosya_turu = "pdf" if ext == ".pdf" else "docx"
+    return {
+        "dosya_b64": dosya_b64,
+        "dosya_adi": dosya.filename,
+        "dosya_turu": dosya_turu,
+        "boyut_kb": len(icerik) // 1024
+    }
 
 # İçerik ekleme (admin veya öğretmen)
 @api_router.post("/gelisim/icerik")
@@ -7842,6 +7898,305 @@ async def arkadas_gecmis(ogrenci_id: str, karakter_id: str = "", current_user=De
     kayitlar = await db.ai_arkadas_log.find(filtre).sort("tarih_tam", -1).to_list(length=100)
     for k in kayitlar:
         k.pop("_id", None)
+    return kayitlar
+
+
+# ═══════════════════════════════════════════════════════════
+# DALGA 4 — SCAFFOLD READING
+# ═══════════════════════════════════════════════════════════
+
+@api_router.post("/ai/scaffold/olustur")
+async def scaffold_olustur(req: Request, current_user=Depends(get_current_user)):
+    """Seçilen kitap için DNA'ya göre 3 zorluk seviyesi üretir."""
+    data = await req.json()
+    kitap_adi = data.get("kitap_adi", "")
+    kitap_id  = data.get("kitap_id", "")
+    ogrenci_id = data.get("ogrenci_id", current_user.get("linked_id", current_user.get("id", "")))
+    sinif = data.get("sinif", 3)
+
+    # DNA bak
+    dna = await db.okuma_dna.find_one({"ogrenci_id": ogrenci_id})
+    seviye_skoru = 5  # varsayılan orta
+    if dna:
+        b = dna.get("boyutlar", {})
+        seviye_skoru = round((b.get("anlama_derinligi", 50) + b.get("kelime_gucu", 50) + b.get("akicilik", 50)) / 30)
+
+    # Cache
+    cache = await db.scaffold_cache.find_one({"kitap_id": kitap_id, "ogrenci_id": ogrenci_id})
+    if cache:
+        cache.pop("_id", None)
+        return cache
+
+    prompt = f"""Sen bir çocuk edebiyatı uzmanısın. "{kitap_adi}" kitabı için {sinif}. sınıf öğrencisine uygun 3 seviyeli scaffold okuma materyali oluştur.
+
+Öğrencinin DNA seviyesi: {seviye_skoru}/10 (anlama + kelime + akıcılık ortalaması)
+Önerilen seviye: {"Kolay" if seviye_skoru <= 3 else "Orta" if seviye_skoru <= 6 else "Orijinal"}
+
+Her seviye için 150-200 kelimelik bir paragraf yaz:
+1. KOLAY: Çok basit cümleler, günlük kelimeler, net olay sırası
+2. ORTA: Orta uzunlukta cümleler, bazı edebi ifadeler, dolaylı anlatım
+3. ORİJİNAL: Kitabın gerçek üslubuna yakın, zengin dil, soyut kavramlar
+
+Yanıtı SADECE JSON olarak ver, başka hiçbir şey yazma:
+{{
+  "kitap_adi": "{kitap_adi}",
+  "onerilen_seviye": "kolay|orta|orijinal",
+  "seviyeler": {{
+    "kolay": {{
+      "baslik": "Kolay Versiyon",
+      "metin": "...",
+      "kelime_sayisi": 150,
+      "anahtar_kelimeler": ["kelime1", "kelime2", "kelime3"]
+    }},
+    "orta": {{
+      "baslik": "Orta Versiyon",
+      "metin": "...",
+      "kelime_sayisi": 170,
+      "anahtar_kelimeler": ["kelime1", "kelime2", "kelime3"]
+    }},
+    "orijinal": {{
+      "baslik": "Orijinal Üslup",
+      "metin": "...",
+      "kelime_sayisi": 190,
+      "anahtar_kelimeler": ["kelime1", "kelime2", "kelime3"]
+    }}
+  }},
+  "zpd_aciklama": "Öğrencinin neden bu seviyede başlaması gerektiğinin kısa açıklaması"
+}}"""
+
+    try:
+        import anthropic as _ant
+        _client = _ant.Anthropic()
+        resp = _client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=2000,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        raw = resp.content[0].text.strip()
+        import json as _json
+        if raw.startswith("```"): raw = raw.split("```")[1]
+        if raw.startswith("json"): raw = raw[4:]
+        result = _json.loads(raw.strip())
+    except Exception:
+        # Mock
+        result = {
+            "kitap_adi": kitap_adi,
+            "onerilen_seviye": "orta" if seviye_skoru <= 6 else "orijinal",
+            "seviyeler": {
+                "kolay": {"baslik": "Kolay Versiyon", "metin": f"'{kitap_adi}' adlı kitapta çok güzel bir hikâye anlatılıyor. Karakterler birlikte maceralar yaşıyor. Her gün yeni şeyler öğreniyorlar. Arkadaşlık çok önemli bir değer.", "kelime_sayisi": 40, "anahtar_kelimeler": ["hikâye", "macera", "arkadaşlık"]},
+                "orta": {"baslik": "Orta Versiyon", "metin": f"'{kitap_adi}', okuyucuyu farklı bir dünyaya sürüklüyor. Baş karakter zorluklarla karşılaşırken içindeki gücü keşfediyor. Yazar, duyguları etkileyici bir biçimde aktarıyor.", "kelime_sayisi": 45, "anahtar_kelimeler": ["karakter", "zorluk", "keşif"]},
+                "orijinal": {"baslik": "Orijinal Üslup", "metin": f"'{kitap_adi}' sayfalarında soluk soluğa ilerleyen bir anlatı, okuyucuyu gerçeklikle kurgunun sınırında bırakıyor. İnsan doğasının derinliklerine inen bu eser, her yaştan okura farklı bir şey söylüyor.", "kelime_sayisi": 50, "anahtar_kelimeler": ["anlatı", "gerçeklik", "kurgu"]}
+            },
+            "zpd_aciklama": f"DNA profiline göre (seviye {seviye_skoru}/10) orta seviyeden başlamanı öneriyoruz."
+        }
+
+    result["ogrenci_id"] = ogrenci_id
+    result["kitap_id"] = kitap_id
+    result["dna_seviye"] = seviye_skoru
+    result["tarih"] = datetime.utcnow().isoformat()
+    await db.scaffold_cache.update_one({"kitap_id": kitap_id, "ogrenci_id": ogrenci_id}, {"$set": result}, upsert=True)
+    return result
+
+
+@api_router.post("/ai/scaffold/seviye-ilerleme")
+async def scaffold_seviye_ilerleme(req: Request, current_user=Depends(get_current_user)):
+    """Öğrenci okumayı tamamladı — bir üst seviyeye geç veya tebrik et."""
+    data = await req.json()
+    ogrenci_id = data.get("ogrenci_id", current_user.get("linked_id", current_user.get("id", "")))
+    mevcut_seviye = data.get("mevcut_seviye", "kolay")
+    dogru_oran = data.get("dogru_oran", 0.7)
+
+    siradaki = {"kolay": "orta", "orta": "orijinal", "orijinal": None}
+    sonraki = siradaki.get(mevcut_seviye)
+
+    if dogru_oran >= 0.7 and sonraki:
+        mesaj = f"Harika! {'Orta' if sonraki == 'orta' else 'Orijinal'} seviyeye geçmeye hazırsın! 🎉"
+        xp = 15
+    elif dogru_oran >= 0.7 and not sonraki:
+        mesaj = "Tebrikler! Kitabı tüm seviyelerde tamamladın! 🏆"
+        xp = 30
+    else:
+        mesaj = "Biraz daha pratik yapman iyi olur. Aynı seviyeyi tekrar dene."
+        xp = 5
+        sonraki = mevcut_seviye
+
+    await db.xp_logs.insert_one({"ogrenci_id": ogrenci_id, "xp": xp, "kaynak": "scaffold", "tarih": datetime.utcnow().isoformat()})
+    return {"sonraki_seviye": sonraki, "mesaj": mesaj, "xp": xp, "ilerledi": dogru_oran >= 0.7}
+
+
+# ═══════════════════════════════════════════════════════════
+# DALGA 4 — AI MATERYAl ÜRETİCİ
+# ═══════════════════════════════════════════════════════════
+
+@api_router.post("/ai/materyal/uret")
+async def materyal_uret(req: Request, current_user=Depends(get_current_user)):
+    """Kitap / metin için çalışma materyali üret (soru seti, kelime listesi, etkinlik)."""
+    data = await req.json()
+    kitap_adi = data.get("kitap_adi", "")
+    yazar     = data.get("yazar", "")
+    metin_id  = data.get("metin_id", "")
+    tur       = data.get("tur", "soru_seti")   # soru_seti | kelime_listesi | etkinlik | tahmin
+    sinif     = data.get("sinif", 3)
+    ogrenci_id = data.get("ogrenci_id", current_user.get("linked_id", current_user.get("id", "")))
+
+    tur_prompts = {
+        "soru_seti": f"'{kitap_adi}' için {sinif}. sınıf düzeyinde 10 soruluk anlama testi oluştur. Bloom taksonomisinin tüm basamaklarından sorular ekle. JSON: {{\"baslik\": str, \"sorular\": [{{\"soru\": str, \"secenekler\": [str], \"dogru\": str, \"bloom_basamak\": str}}]}}",
+        "kelime_listesi": f"'{kitap_adi}' kitabından {sinif}. sınıf için 15 önemli kelime seç. JSON: {{\"baslik\": str, \"kelimeler\": [{{\"kelime\": str, \"anlam\": str, \"cumle\": str, \"zorluk\": 1-5}}]}}",
+        "etkinlik": f"'{kitap_adi}' için sınıf içi grup etkinliği tasarla. {sinif}. sınıf düzeyi. JSON: {{\"baslik\": str, \"sure_dk\": int, \"grup_sayisi\": int, \"adimlar\": [str], \"malzemeler\": [str], \"kazanimlar\": [str]}}",
+        "tahmin": f"'{kitap_adi}' okuma öncesi tahmin soruları oluştur ({sinif}. sınıf). JSON: {{\"baslik\": str, \"giris\": str, \"sorular\": [{{\"soru\": str, \"ipucu\": str}}]}}"
+    }
+
+    prompt = tur_prompts.get(tur, tur_prompts["soru_seti"]) + "\n\nSADECE JSON döndür, başka hiçbir şey yazma."
+
+    try:
+        import anthropic as _ant
+        import json as _json
+        _client = _ant.Anthropic()
+        resp = _client.messages.create(model="claude-haiku-4-5-20251001", max_tokens=1500, messages=[{"role": "user", "content": prompt}])
+        raw = resp.content[0].text.strip()
+        if raw.startswith("```"): raw = "\n".join(raw.split("\n")[1:-1])
+        result = _json.loads(raw)
+    except Exception:
+        # Mock
+        if tur == "soru_seti":
+            result = {"baslik": f"{kitap_adi} — Anlama Testi", "sorular": [{"soru": f"'{kitap_adi}' kitabının ana teması nedir?", "secenekler": ["Arkadaşlık", "Cesaret", "Dürüstlük", "Merak"], "dogru": "Arkadaşlık", "bloom_basamak": "Kavrama"}]}
+        elif tur == "kelime_listesi":
+            result = {"baslik": f"{kitap_adi} — Anahtar Kelimeler", "kelimeler": [{"kelime": "macera", "anlam": "Heyecanlı ve sürprizli yolculuk", "cumle": "Karakterler büyük bir maceraya atıldı.", "zorluk": 2}]}
+        elif tur == "etkinlik":
+            result = {"baslik": f"{kitap_adi} — Sınıf Etkinliği", "sure_dk": 20, "grup_sayisi": 4, "adimlar": ["Grupları oluştur", "Kitabın bir bölümünü tartışın", "Sunun"], "malzemeler": ["Kağıt", "Kalem"], "kazanimlar": ["Eleştirel düşünme", "İşbirliği"]}
+        else:
+            result = {"baslik": f"{kitap_adi} — Okuma Öncesi Tahmin", "giris": "Kitabı okumadan önce düşüncelerini paylaş!", "sorular": [{"soru": "Bu kitap ne hakkında olabilir?", "ipucu": "Kapak resmine bak"}]}
+
+    result["tur"] = tur
+    result["kitap_adi"] = kitap_adi
+    result["sinif"] = sinif
+    result["tarih"] = datetime.utcnow().isoformat()
+
+    # Kaydet + XP
+    await db.ai_materyal_log.insert_one({"ogrenci_id": ogrenci_id, "kitap_adi": kitap_adi, "tur": tur, "tarih": datetime.utcnow().isoformat()})
+    await db.xp_logs.insert_one({"ogrenci_id": ogrenci_id, "xp": 5, "kaynak": "materyal_uret", "tarih": datetime.utcnow().isoformat()})
+    return result
+
+
+@api_router.get("/ai/materyal/gecmis/{ogrenci_id}")
+async def materyal_gecmis(ogrenci_id: str, current_user=Depends(get_current_user)):
+    kayitlar = await db.ai_materyal_log.find({"ogrenci_id": ogrenci_id}).sort("tarih", -1).to_list(length=20)
+    for k in kayitlar: k.pop("_id", None)
+    return kayitlar
+
+
+# ═══════════════════════════════════════════════════════════
+# DALGA 4 — ADAPTIVE STORY ENGINE
+# ═══════════════════════════════════════════════════════════
+
+@api_router.post("/ai/hikaye/olustur")
+async def hikaye_olustur(req: Request, current_user=Depends(get_current_user)):
+    """DNA + ilgi alanı → kişisel hikâye + 5 Bloom sorusu + kelime kartları."""
+    data = await req.json()
+    ogrenci_id  = data.get("ogrenci_id", current_user.get("linked_id", current_user.get("id", "")))
+    ilgi_alani  = data.get("ilgi_alani", "macera")   # macera, hayvan, uzay, tarih, spor, arkadaşlık
+    kahraman_ad = data.get("kahraman_ad", "Kahraman")
+    sinif       = int(data.get("sinif", 3))
+    sure_dk     = data.get("sure_dk", 5)  # hedef okuma süresi
+
+    # DNA profili
+    dna = await db.okuma_dna.find_one({"ogrenci_id": ogrenci_id})
+    boyutlar = dna.get("boyutlar", {}) if dna else {}
+    kelime_gucu = boyutlar.get("kelime_gucu", 50)
+    anlama = boyutlar.get("anlama_derinligi", 50)
+    profil_tipi = dna.get("profil_tipi", "dengeli_okuyucu") if dna else "dengeli_okuyucu"
+
+    # MEB kelime havuzu (sınıfa göre mini örnek)
+    meb_kelimeler = {
+        1: ["ev", "okul", "anne", "baba", "arkadaş"],
+        2: ["macera", "cesur", "yardım", "dürüst", "başarı"],
+        3: ["merak", "keşif", "sorumluluk", "empati", "özgüven"],
+        4: ["analiz", "strateji", "iletişim", "liderlik", "çözüm"],
+        5: ["eleştiri", "perspektif", "hipotez", "kanıt", "sentez"],
+    }.get(sinif, ["merak", "keşif", "arkadaşlık"])
+
+    kelime_zorluk = "basit" if kelime_gucu < 40 else "orta" if kelime_gucu < 70 else "zengin"
+    hikaye_uzunluk = sure_dk * 100  # kelime
+
+    prompt = f"""Sen çocuklar için kişiselleştirilmiş hikâyeler yazan yaratıcı bir yazarsın.
+
+Öğrenci profili:
+- Ad: {kahraman_ad}
+- Sınıf: {sinif}
+- İlgi alanı: {ilgi_alani}
+- Okuma seviyesi: {profil_tipi}
+- Kelime zenginliği: {kelime_zorluk}
+- Anlama derinliği: {anlama}/100
+
+Hikâyeye şu MEB kelimelerini doğal biçimde dahil et: {", ".join(meb_kelimeler)}
+
+Kurallar:
+- Baş karakter adı: {kahraman_ad}
+- Tema: {ilgi_alani}
+- Uzunluk: yaklaşık {hikaye_uzunluk} kelime
+- Dil: {kelime_zorluk} kelime zenginliği
+- Mutlu son zorunlu
+- MEB Erdemler: sabır, dürüstlük, merak, empati, cesaret değerlerinden en az 2'si tema olsun
+
+SADECE JSON döndür:
+{{
+  "baslik": "Hikâye başlığı",
+  "hikaye": "Tam hikâye metni ({hikaye_uzunluk} kelime)",
+  "kullanilan_meb_kelimeleri": ["kelime1", "kelime2"],
+  "kazanilan_deger": "sabır|dürüstlük|merak|empati|cesaret",
+  "bloom_sorulari": [
+    {{"basamak": "Hatırlama", "soru": "...", "ipucu": "..."}},
+    {{"basamak": "Kavrama", "soru": "...", "ipucu": "..."}},
+    {{"basamak": "Uygulama", "soru": "...", "ipucu": "..."}},
+    {{"basamak": "Analiz", "soru": "...", "ipucu": "..."}},
+    {{"basamak": "Değerlendirme", "soru": "...", "ipucu": "..."}}
+  ],
+  "kelime_kartlari": [
+    {{"kelime": "...", "anlam": "...", "cumle": "..."}}
+  ]
+}}"""
+
+    try:
+        import anthropic as _ant
+        import json as _json
+        _client = _ant.Anthropic()
+        resp = _client.messages.create(model="claude-haiku-4-5-20251001", max_tokens=2500, messages=[{"role": "user", "content": prompt}])
+        raw = resp.content[0].text.strip()
+        if raw.startswith("```"): raw = "\n".join(raw.split("\n")[1:-1])
+        result = _json.loads(raw)
+    except Exception as e:
+        result = {
+            "baslik": f"{kahraman_ad}'ın {ilgi_alani.capitalize()} Macerası",
+            "hikaye": f"{kahraman_ad} bir gün ormanda yürürken sihirli bir kapıyla karşılaştı. Kapının arkasında harika bir dünya vardı. Merakla içeri girdi ve yeni arkadaşlar edindi. Birlikte zorlukları aşmayı öğrendiler. Cesaret ve dürüstlükle her engeli geçtiler. Sonunda eve döndüklerinde çok şey öğrenmişlerdi.",
+            "kullanilan_meb_kelimeleri": meb_kelimeler[:2],
+            "kazanilan_deger": "merak",
+            "bloom_sorulari": [
+                {"basamak": "Hatırlama", "soru": f"{kahraman_ad} ormanda ne buldu?", "ipucu": "Kapı ile ilgili düşün."},
+                {"basamak": "Kavrama", "soru": "Karakterler ne öğrendi?", "ipucu": "Birlikte ne yaptılar?"},
+                {"basamak": "Uygulama", "soru": "Sen olsaydın ne yapardın?", "ipucu": "Kendi deneyiminden düşün."},
+                {"basamak": "Analiz", "soru": "Hikâyedeki ana sorun neydi?", "ipucu": "Zorlukları düşün."},
+                {"basamak": "Değerlendirme", "soru": "Hikâye sana ne öğretti?", "ipucu": "Değerleri düşün."}
+            ],
+            "kelime_kartlari": [{"kelime": meb_kelimeler[0], "anlam": "Önemli bir değer", "cumle": f"{kahraman_ad} {meb_kelimeler[0]} gösterdi."}]
+        }
+
+    result["ogrenci_id"] = ogrenci_id
+    result["ilgi_alani"] = ilgi_alani
+    result["kahraman_ad"] = kahraman_ad
+    result["sinif"] = sinif
+    result["tarih"] = datetime.utcnow().isoformat()
+
+    hikaye_id = str(__import__("uuid").uuid4())[:8]
+    result["hikaye_id"] = hikaye_id
+    await db.ai_hikaye_log.insert_one({**result})
+    await db.xp_logs.insert_one({"ogrenci_id": ogrenci_id, "xp": 10, "kaynak": "adaptif_hikaye", "tarih": datetime.utcnow().isoformat()})
+    return result
+
+
+@api_router.get("/ai/hikaye/gecmis/{ogrenci_id}")
+async def hikaye_gecmis(ogrenci_id: str, current_user=Depends(get_current_user)):
+    kayitlar = await db.ai_hikaye_log.find({"ogrenci_id": ogrenci_id}).sort("tarih", -1).to_list(length=10)
+    for k in kayitlar: k.pop("_id", None)
     return kayitlar
 
 
