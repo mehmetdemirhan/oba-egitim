@@ -7419,6 +7419,51 @@ function AiMerkezi({ user }) {
 }
 
 
+function GeminiDurumSatiri({ apiBase }) {
+  const [durum, setDurum] = React.useState(null); // null | "kontrol" | "ok" | "hata"
+  const [mesaj, setMesaj] = React.useState("");
+
+  const kontrol = async () => {
+    setDurum("kontrol");
+    setMesaj("");
+    try {
+      const token = localStorage.getItem("oba_token");
+      const r = await axios.get(`${apiBase}/admin/gemini-test`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (r.data.durum === "OK") {
+        setDurum("ok");
+        setMesaj(`✅ Gemini çalışıyor — model: ${r.data.model}`);
+      } else {
+        setDurum("hata");
+        setMesaj(`❌ ${r.data.sebep}`);
+      }
+    } catch(e) {
+      setDurum("hata");
+      setMesaj(`❌ ${e.response?.data?.detail || e.message}`);
+    }
+  };
+
+  return (
+    <div className={`rounded-lg px-3 py-2 text-xs flex items-center justify-between gap-2 ${
+      durum === "ok" ? "bg-green-50 border border-green-200" :
+      durum === "hata" ? "bg-red-50 border border-red-200" :
+      "bg-gray-50 border border-gray-200"
+    }`}>
+      <span className="text-gray-500 font-medium">🤖 Gemini API</span>
+      {durum === "kontrol" ? (
+        <span className="text-blue-500 animate-pulse">Kontrol ediliyor...</span>
+      ) : mesaj ? (
+        <span className={durum === "ok" ? "text-green-700" : "text-red-600"}>{mesaj}</span>
+      ) : (
+        <button onClick={kontrol} className="text-purple-600 hover:text-purple-800 font-semibold underline">
+          Durumu kontrol et
+        </button>
+      )}
+    </div>
+  );
+}
+
 function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabChange }) {
   const { toast } = useToast();
   const [icerikler, setIcerikler] = useState([]);
@@ -8815,6 +8860,8 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                 <div>
                   {!adminAiSonuc && !adminAiYukleniyor && (
                     <div className="space-y-4">
+                      {/* Gemini API Durum Kontrolü */}
+                      <GeminiDurumSatiri apiBase={API} />
                       <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Materyal Türü</div>
                       <div className="grid grid-cols-2 gap-2">
                         {[
