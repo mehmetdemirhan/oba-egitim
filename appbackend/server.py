@@ -8249,15 +8249,25 @@ async def materyal_uret(req: Request, current_user=Depends(get_current_user)):
             raw_text = raw_text[brace_start:brace_end+1]
         return _json.loads(raw_text)
 
+    _debug = {
+        "metin_kaynak": metin_kaynak,
+        "metin_uzunluk": len(metin_ek),
+        "gemini_key_var": bool(GEMINI_API_KEY),
+        "gemini_key_uzunluk": len(GEMINI_API_KEY) if GEMINI_API_KEY else 0,
+    }
+
     try:
         raw = await _gemini_call(prompt, max_tokens=4000)
         logging.info(f"Gemini yanıt alındı: {len(raw)} karakter")
         result = await _parse_gemini_json(raw)
         result["tur"] = tur
         result["kitap_adi"] = kitap_adi
+        result["_debug"] = {**_debug, "deneme": 1, "hata": None}
         return result
     except Exception as e:
-        logging.error(f"Gemini materyal hatası (1. deneme): {type(e).__name__}: {e}")
+        hata1 = f"{type(e).__name__}: {e}"
+        logging.error(f"Gemini materyal hatası (1. deneme): {hata1}")
+        _debug["hata1"] = hata1
         # 2. deneme: daha basit prompt ile tekrar dene
         if GEMINI_API_KEY:
             try:
@@ -8276,9 +8286,12 @@ async def materyal_uret(req: Request, current_user=Depends(get_current_user)):
                 result = await _parse_gemini_json(raw2)
                 result["tur"] = tur
                 result["kitap_adi"] = kitap_adi
+                result["_debug"] = {**_debug, "deneme": 2, "hata": None}
                 return result
             except Exception as e2:
-                logging.error(f"Gemini 2. deneme de başarısız: {e2}")
+                hata2 = str(e2)
+                logging.error(f"Gemini 2. deneme de başarısız: {hata2}")
+                _debug["hata2"] = hata2
 
         # Son çare: Gemini'den kitap adına göre özgün fallback al
         if GEMINI_API_KEY:
@@ -8292,9 +8305,12 @@ async def materyal_uret(req: Request, current_user=Depends(get_current_user)):
                 result = await _parse_gemini_json(raw3)
                 result["tur"] = tur
                 result["kitap_adi"] = kitap_adi
+                result["_debug"] = {**_debug, "deneme": 3, "hata": None}
                 return result
             except Exception as e3:
-                logging.error(f"Gemini fallback da başarısız: {e3}")
+                hata3 = str(e3)
+                logging.error(f"Gemini fallback da başarısız: {hata3}")
+                _debug["hata3"] = hata3
 
         # Hiçbir şey çalışmadıysa son çare statik mock (artık sadece gerçekten API yoksa)
         logging.error("TÜM Gemini denemeleri başarısız — statik mock kullanılıyor")
@@ -8343,6 +8359,7 @@ async def materyal_uret(req: Request, current_user=Depends(get_current_user)):
     result["kitap_adi"] = kitap_adi
     result["sinif"] = sinif
     result["tarih"] = datetime.utcnow().isoformat()
+    result["_debug"] = {**_debug, "deneme": 0, "mock": True}  # mock kullanıldı
 
     # Kaydet + XP
     await db.ai_materyal_log.insert_one({"ogrenci_id": ogrenci_id, "kitap_adi": kitap_adi, "tur": tur, "tarih": datetime.utcnow().isoformat()})
