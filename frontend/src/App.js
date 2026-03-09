@@ -4628,6 +4628,18 @@ function OgrenciPaneli({ user, logout }) {
   const [zekaYukleniyor, setZekaYukleniyor] = useState(false);
   const [kitapTavsiye, setKitapTavsiye] = useState([]);
   const [dnaData, setDnaData] = useState(null);
+  // Scaffold
+  const [scaffoldData, setScaffoldData] = useState(null);
+  const [scaffoldSeviye, setScaffoldSeviye] = useState("orta");
+  const [scaffoldYukleniyor, setScaffoldYukleniyor] = useState(false);
+  // Materyal Üretici
+  const [materyalSonuc, setMateryalSonuc] = useState(null);
+  const [materyalYukleniyor, setMateryalYukleniyor] = useState(false);
+  // Adaptive Story
+  const [hikayeData, setHikayeData] = useState(null);
+  const [hikayeYukleniyor, setHikayeYukleniyor] = useState(false);
+  const [hikayeForm, setHikayeForm] = useState({ ilgi_alani: "macera", kahraman_ad: "" });
+  const [hikayeBloom, setHikayeBloom] = useState(null); // seçili bloom sorusu
   const [okumaSuresi, setOkumaSuresi] = useState(0);
   const [okumaDuraklatildi, setOkumaDuraklatildi] = useState(false);
   const okumaInterval = useRef(null);
@@ -5012,6 +5024,82 @@ function OgrenciPaneli({ user, logout }) {
   }
 
   // ── NE OKUDUN? ──
+  if (aktifEkran === "scaffold" && scaffoldData) {
+    const seviyeler = scaffoldData.seviyeler || {};
+    const mevcut = seviyeler[scaffoldSeviye] || {};
+    const siralamaSeviye = ["kolay","orta","orijinal"];
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-purple-50">
+        <div className="max-w-md mx-auto p-4 space-y-4">
+          {/* Header */}
+          <div className="flex items-center gap-3">
+            <button onClick={() => setAktifEkran(null)} className="text-indigo-600 text-sm">← Geri</button>
+            <h2 className="text-base font-bold text-indigo-900">📖 Seviyeli Okuma</h2>
+          </div>
+          <div className="text-center bg-white rounded-2xl p-3 border shadow-sm">
+            <div className="text-sm font-bold text-gray-800">{scaffoldData.kitap_adi}</div>
+            <div className="text-xs text-gray-500 mt-0.5">{scaffoldData.zpd_aciklama}</div>
+          </div>
+
+          {/* Seviye seçici */}
+          <div className="flex gap-2">
+            {siralamaSeviye.map(sev => {
+              const etiket = {kolay:"🌱 Kolay",orta:"🌿 Orta",orijinal:"🌳 Orijinal"}[sev];
+              const onerilen = scaffoldData.onerilen_seviye === sev;
+              return (
+                <button key={sev} onClick={() => setScaffoldSeviye(sev)}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold border-2 transition-all ${scaffoldSeviye===sev?"border-indigo-500 bg-indigo-500 text-white":"border-gray-200 bg-white text-gray-600 hover:border-indigo-300"}`}>
+                  {etiket}{onerilen && <span className="block text-[9px] opacity-80">⭐ Önerilen</span>}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Metin */}
+          <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+            <div className={`px-4 py-3 border-b ${scaffoldSeviye==="kolay"?"bg-green-50 border-green-100":scaffoldSeviye==="orta"?"bg-yellow-50 border-yellow-100":"bg-indigo-50 border-indigo-100"}`}>
+              <div className="flex items-center justify-between">
+                <div className="font-bold text-sm text-gray-800">{mevcut.baslik}</div>
+                <div className="text-xs text-gray-400">{mevcut.kelime_sayisi} kelime</div>
+              </div>
+            </div>
+            <div className="p-4">
+              <p className="text-sm text-gray-800 leading-relaxed">{mevcut.metin}</p>
+            </div>
+            {mevcut.anahtar_kelimeler?.length > 0 && (
+              <div className="px-4 pb-4 flex flex-wrap gap-1.5">
+                {mevcut.anahtar_kelimeler.map((k,i) => (
+                  <span key={i} className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">{k}</span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* İlerleme butonu */}
+          {scaffoldSeviye !== "orijinal" && (
+            <button onClick={async () => {
+              try {
+                const r = await axios.post(`${API}/ai/scaffold/seviye-ilerleme`, {
+                  ogrenci_id: ogrenciId, mevcut_seviye: scaffoldSeviye, dogru_oran: 0.8
+                });
+                toast({ title: r.data.mesaj });
+                if (r.data.ilerledi && r.data.sonraki_seviye) setScaffoldSeviye(r.data.sonraki_seviye);
+              } catch(e) {}
+            }} className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl py-3 font-bold text-sm">
+              Okudum, bir üst seviyeye geç! 🚀
+            </button>
+          )}
+          {scaffoldSeviye === "orijinal" && (
+            <button onClick={() => { setAktifEkran(null); toast({ title: "🏆 Kitabı tüm seviyelerde tamamladın! +30 XP" }); }}
+              className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 text-white rounded-xl py-3 font-bold text-sm">
+              🏆 Tamamladım!
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   if (aktifEkran === "ne-okudun") {
     const dk = Math.max(1, Math.round(okumaSuresi / 60));
     return (
@@ -5252,6 +5340,34 @@ function OgrenciPaneli({ user, logout }) {
             </button>
           </div>
 
+          {/* ═══ AI ÖZELLİKLERİ KISAYOLLAR ═══ */}
+          <div>
+            <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 px-1">🤖 AI Araçları</div>
+            <div className="grid grid-cols-3 gap-2">
+              {/* Scaffold Reading */}
+              <button onClick={() => { setAktifSekme("gelisim"); setGelisimAltSekme("icerikler"); }}
+                className="bg-white rounded-2xl p-3 border shadow-sm text-center hover:border-indigo-400 hover:bg-indigo-50 transition-all active:scale-95 group">
+                <div className="text-2xl mb-1.5">📖</div>
+                <div className="text-[11px] font-bold text-gray-800 group-hover:text-indigo-700">Seviyeli Okuma</div>
+                <div className="text-[9px] text-gray-400 mt-0.5">Kolay → Orta → Zor</div>
+              </button>
+              {/* Adaptive Story */}
+              <button onClick={() => { setAktifSekme("gelisim"); setGelisimAltSekme("hikayem"); }}
+                className="bg-white rounded-2xl p-3 border shadow-sm text-center hover:border-pink-400 hover:bg-pink-50 transition-all active:scale-95 group">
+                <div className="text-2xl mb-1.5">✨</div>
+                <div className="text-[11px] font-bold text-gray-800 group-hover:text-pink-700">Bana Özel Hikâye</div>
+                <div className="text-[9px] text-gray-400 mt-0.5">AI hikâye yazar</div>
+              </button>
+              {/* Materyal Üretici */}
+              <button onClick={() => { setAktifSekme("gelisim"); setGelisimAltSekme("materyal"); }}
+                className="bg-white rounded-2xl p-3 border shadow-sm text-center hover:border-teal-400 hover:bg-teal-50 transition-all active:scale-95 group">
+                <div className="text-2xl mb-1.5">📋</div>
+                <div className="text-[11px] font-bold text-gray-800 group-hover:text-teal-700">Materyal Üret</div>
+                <div className="text-[9px] text-gray-400 mt-0.5">Soru seti, kelime</div>
+              </button>
+            </div>
+          </div>
+
           {/* Bekleyen görevler kısa */}
           {bekleyenGorevler.length > 0 && (<div className="bg-white rounded-2xl p-4 shadow-sm border">
             <div className="flex items-center justify-between mb-3"><h3 className="font-bold text-sm text-gray-900">📌 Görevlerin</h3><button onClick={() => setAktifSekme("gorevler")} className="text-xs text-blue-600">Tümü →</button></div>
@@ -5304,12 +5420,47 @@ function OgrenciPaneli({ user, logout }) {
         {aktifSekme === "gelisim" && (<div className="space-y-4">
           <h2 className="text-lg font-bold">🎯 Gelişim</h2>
           {/* Alt sekmeler */}
-          <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
-            {[{id:"icerikler",l:"📚 İçerikler"},{id:"egzersizler",l:"👁️ Egzersizler"},{id:"okumalarim",l:"📖 Okumalarım"},{id:"kelime_evrimi",l:"🧠 Kelimelerim"}].map(s => (
+          <div className="flex gap-1 bg-gray-100 p-1 rounded-xl overflow-x-auto">
+            {[{id:"icerikler",l:"📚 İçerik"},{id:"egzersizler",l:"👁️ Egzersiz"},{id:"okumalarim",l:"📖 Okuma"},{id:"kelime_evrimi",l:"🧠 Kelime"},{id:"hikayem",l:"✨ Hikâye"},{id:"materyal",l:"📋 Materyal"}].map(s => (
               <button key={s.id} onClick={() => setGelisimAltSekme(s.id)}
-                className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${gelisimAltSekme === s.id ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}>{s.l}</button>
+                className={`flex-shrink-0 px-3 py-2 rounded-lg text-xs font-medium transition-all ${gelisimAltSekme === s.id ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}>{s.l}</button>
             ))}
           </div>
+
+          {/* Hikâye ve Materyal için üst banner */}
+          {gelisimAltSekme === "hikayem" && (
+            <div className="bg-gradient-to-r from-pink-500 to-purple-600 rounded-2xl p-4 text-white">
+              <div className="flex items-center gap-3">
+                <div className="text-3xl">✨</div>
+                <div>
+                  <div className="font-bold text-base">Bana Özel Hikâye</div>
+                  <div className="text-xs opacity-80">DNA profilin + ilgi alanına göre AI hikâye yazar, Bloom soruları üretir</div>
+                </div>
+              </div>
+            </div>
+          )}
+          {gelisimAltSekme === "materyal" && (
+            <div className="bg-gradient-to-r from-teal-500 to-cyan-600 rounded-2xl p-4 text-white">
+              <div className="flex items-center gap-3">
+                <div className="text-3xl">📋</div>
+                <div>
+                  <div className="font-bold text-base">AI Materyal Üretici</div>
+                  <div className="text-xs opacity-80">Herhangi bir kitap için soru seti, kelime listesi, sınıf etkinliği üret</div>
+                </div>
+              </div>
+            </div>
+          )}
+          {gelisimAltSekme === "icerikler" && (
+            <div className="bg-gradient-to-r from-indigo-500 to-blue-600 rounded-2xl p-4 text-white">
+              <div className="flex items-center gap-3">
+                <div className="text-3xl">📖</div>
+                <div>
+                  <div className="font-bold text-base">Kitaplar & İçerikler</div>
+                  <div className="text-xs opacity-80">Kitap kartlarında 📖 Seviyeli Oku ve 🧠 Zekâ Haritası butonlarını dene!</div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* İçerikler */}
           {gelisimAltSekme === "icerikler" && (<>
@@ -5318,11 +5469,26 @@ function OgrenciPaneli({ user, logout }) {
                 <Card key={ic.id} className={`border-0 shadow-sm ${done ? 'opacity-60' : ''}`}><CardContent className="p-4"><div className="flex items-start justify-between gap-3"><div>
                   <div className="flex items-center gap-2"><span className="text-lg">{({hizmetici:"🎓",film:"🎬",kitap:"📚",makale:"📄"})[ic.tur] || "📋"}</span><div className="font-bold text-sm truncate">{ic.baslik}</div></div>
                   {ic.aciklama && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{ic.aciklama}</p>}
-                  {ic.tur === "kitap" && (<button onClick={async () => {
-                    setZekaModal({kitap_adi:ic.baslik,yazar:ic.kitap_yazar||"",profil:null,yukleniyor:true});
-                    try { const r = await axios.post(`${API}/ai/kitap-zeka/analiz`,{kitap_adi:ic.baslik,yazar:ic.kitap_yazar||"",kitap_id:ic.id,sinif:user.sinif||3}); setZekaModal({kitap_adi:ic.baslik,yazar:ic.kitap_yazar||"",profil:r.data,yukleniyor:false}); }
-                    catch(e) { setZekaModal(null); }
-                  }} className="mt-1 flex items-center gap-1 text-[10px] text-purple-600 font-medium hover:text-purple-800">🧠 Zekâ Haritası</button>)}
+                  {ic.tur === "kitap" && (
+                    <div className="flex items-center gap-3 mt-1">
+                      <button onClick={async () => {
+                        setZekaModal({kitap_adi:ic.baslik,yazar:ic.kitap_yazar||"",profil:null,yukleniyor:true});
+                        try { const r = await axios.post(`${API}/ai/kitap-zeka/analiz`,{kitap_adi:ic.baslik,yazar:ic.kitap_yazar||"",kitap_id:ic.id,sinif:user.sinif||3}); setZekaModal({kitap_adi:ic.baslik,yazar:ic.kitap_yazar||"",profil:r.data,yukleniyor:false}); }
+                        catch(e) { setZekaModal(null); }
+                      }} className="flex items-center gap-1 text-[10px] text-purple-600 font-medium hover:text-purple-800">🧠 Zekâ Haritası</button>
+                      <button onClick={async () => {
+                        setScaffoldYukleniyor(true); setScaffoldData(null);
+                        try {
+                          const r = await axios.post(`${API}/ai/scaffold/olustur`,{kitap_adi:ic.baslik,kitap_id:ic.id,sinif:user.sinif||3,ogrenci_id:ogrenciId});
+                          setScaffoldData(r.data); setScaffoldSeviye(r.data.onerilen_seviye||"orta");
+                          setAktifEkran("scaffold");
+                        } catch(e) { toast({title:"Hata",variant:"destructive"}); }
+                        setScaffoldYukleniyor(false);
+                      }} disabled={scaffoldYukleniyor} className="flex items-center gap-1 text-[10px] text-indigo-600 font-medium hover:text-indigo-800 disabled:opacity-50">
+                        {scaffoldYukleniyor?"⏳":"📖"} Seviyeli Oku
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="flex-shrink-0">{done ? <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full whitespace-nowrap">✅</span> : <Button size="sm" className="bg-orange-500 text-white text-xs" onClick={() => gelisimTamamla(ic.id)}>Tamamla</Button>}</div></div></CardContent></Card>
               ); })
@@ -5600,6 +5766,240 @@ function OgrenciPaneli({ user, logout }) {
               )}
             </div>);
           })()}
+
+          {/* ═══ HİKÂYEM (Adaptive Story Engine) ═══ */}
+          {gelisimAltSekme === "hikayem" && (
+            <div className="space-y-4">
+              {!hikayeData ? (
+                <div className="bg-white rounded-2xl p-5 border shadow-sm space-y-4">
+                  <div className="flex items-center gap-3 mb-1">
+                    <div className="w-10 h-10 bg-gradient-to-br from-pink-400 to-purple-500 rounded-xl flex items-center justify-center text-xl">✨</div>
+                    <div><div className="font-bold text-sm">Bana Özel Hikâye</div><div className="text-xs text-gray-500">AI senin için kişisel hikâye yazar</div></div>
+                  </div>
+
+                  <div>
+                    <div className="text-xs text-gray-600 font-medium mb-2">Kahraman adın</div>
+                    <input value={hikayeForm.kahraman_ad} onChange={e => setHikayeForm(f=>({...f,kahraman_ad:e.target.value}))}
+                      placeholder={`${user.ad || "Kahraman"}`}
+                      className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300" />
+                  </div>
+
+                  <div>
+                    <div className="text-xs text-gray-600 font-medium mb-2">İlgi alanın</div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[["macera","🗺️","Macera"],["hayvan","🐾","Hayvan"],["uzay","🚀","Uzay"],["tarih","🏰","Tarih"],["spor","⚽","Spor"],["arkadaşlık","🤝","Arkadaşlık"]].map(([v,e,l]) => (
+                        <button key={v} onClick={() => setHikayeForm(f=>({...f,ilgi_alani:v}))}
+                          className={`py-3 rounded-xl text-center border-2 transition-all ${hikayeForm.ilgi_alani===v?"border-purple-500 bg-purple-50":"border-gray-100 bg-gray-50 hover:border-purple-200"}`}>
+                          <div className="text-2xl">{e}</div><div className="text-[10px] font-medium text-gray-700 mt-0.5">{l}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button onClick={async () => {
+                    setHikayeYukleniyor(true);
+                    try {
+                      const r = await axios.post(`${API}/ai/hikaye/olustur`, {
+                        ilgi_alani: hikayeForm.ilgi_alani,
+                        kahraman_ad: hikayeForm.kahraman_ad || user.ad || "Kahraman",
+                        sinif: user.sinif || profil?.sinif || 3,
+                        sure_dk: 5,
+                        ogrenci_id: ogrenciId
+                      });
+                      setHikayeData(r.data);
+                      toast({ title: "✨ Hikâyen hazır! +10 XP" });
+                    } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
+                    setHikayeYukleniyor(false);
+                  }} disabled={hikayeYukleniyor}
+                    className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-xl py-3 font-bold text-sm disabled:opacity-50 flex items-center justify-center gap-2">
+                    {hikayeYukleniyor ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Hikâye yazılıyor...</> : "✨ Hikâyemi Yaz!"}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Hikâye metni */}
+                  <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+                    <div className="bg-gradient-to-r from-pink-500 to-purple-600 p-4 text-white">
+                      <div className="text-xs opacity-70 mb-1">✨ Senin Hikâyen</div>
+                      <div className="font-bold text-base">{hikayeData.baslik}</div>
+                      <div className="flex items-center gap-3 mt-2">
+                        <span className="text-xs bg-white/20 rounded-full px-2 py-0.5">{hikayeData.ilgi_alani}</span>
+                        <span className="text-xs bg-white/20 rounded-full px-2 py-0.5">💚 {hikayeData.kazanilan_deger}</span>
+                      </div>
+                    </div>
+                    <div className="p-4">
+                      <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-line">{hikayeData.hikaye}</p>
+                    </div>
+                  </div>
+
+                  {/* MEB Kelimeler */}
+                  {hikayeData.kullanilan_meb_kelimeleri?.length > 0 && (
+                    <div className="bg-amber-50 rounded-xl p-3 border border-amber-100">
+                      <div className="text-xs font-bold text-amber-700 mb-2">📚 Hikâyedeki MEB Kelimeleri</div>
+                      <div className="flex flex-wrap gap-2">
+                        {hikayeData.kullanilan_meb_kelimeleri.map((k,i) => (
+                          <span key={i} className="bg-amber-100 text-amber-800 text-xs font-medium px-2.5 py-1 rounded-full border border-amber-200">{k}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Bloom Soruları */}
+                  {hikayeData.bloom_sorulari?.length > 0 && (
+                    <div className="bg-white rounded-2xl border shadow-sm p-4">
+                      <div className="font-bold text-sm mb-3">🎯 Düşünme Soruları</div>
+                      <div className="space-y-2">
+                        {hikayeData.bloom_sorulari.map((s,i) => (
+                          <div key={i} onClick={() => setHikayeBloom(hikayeBloom===i ? null : i)}
+                            className={`rounded-xl p-3 border cursor-pointer transition-all ${hikayeBloom===i?"border-purple-300 bg-purple-50":"border-gray-100 bg-gray-50 hover:border-purple-200"}`}>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs bg-purple-100 text-purple-700 font-bold px-2 py-0.5 rounded-full">{s.basamak}</span>
+                              </div>
+                              <span className="text-gray-400 text-xs">{hikayeBloom===i?"▲":"▼"}</span>
+                            </div>
+                            <p className="text-sm font-medium text-gray-800 mt-1.5">{s.soru}</p>
+                            {hikayeBloom===i && <p className="text-xs text-purple-600 mt-1.5 italic">💡 İpucu: {s.ipucu}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Kelime Kartları */}
+                  {hikayeData.kelime_kartlari?.length > 0 && (
+                    <div className="bg-white rounded-2xl border shadow-sm p-4">
+                      <div className="font-bold text-sm mb-3">🃏 Kelime Kartları</div>
+                      <div className="space-y-2">
+                        {hikayeData.kelime_kartlari.map((k,i) => (
+                          <div key={i} className="bg-indigo-50 rounded-xl p-3 border border-indigo-100">
+                            <div className="font-bold text-indigo-800 text-sm">{k.kelime}</div>
+                            <div className="text-xs text-gray-600 mt-0.5">{k.anlam}</div>
+                            <div className="text-xs text-indigo-600 italic mt-1">"{k.cumle}"</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <button onClick={() => { setHikayeData(null); setHikayeBloom(null); }}
+                    className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-xl py-3 font-bold text-sm">
+                    ✨ Yeni Hikâye Yaz
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ═══ MATERYAL ÜRETİCİ ═══ */}
+          {gelisimAltSekme === "materyal" && (
+            <div className="space-y-4">
+              <div className="bg-white rounded-2xl border shadow-sm p-4">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 bg-gradient-to-br from-teal-400 to-cyan-500 rounded-xl flex items-center justify-center text-xl">📋</div>
+                  <div><div className="font-bold text-sm">AI Materyal Üretici</div><div className="text-xs text-gray-500">Kitabın için çalışma materyali üret</div></div>
+                </div>
+
+                {/* Materyal tipi */}
+                <div className="grid grid-cols-2 gap-2 mb-4">
+                  {[
+                    {id:"soru_seti",e:"📝",l:"Soru Seti",a:"10 soruluk anlama testi"},
+                    {id:"kelime_listesi",e:"📖",l:"Kelime Listesi",a:"15 anahtar kelime"},
+                    {id:"etkinlik",e:"👥",l:"Sınıf Etkinliği",a:"Grup aktivitesi"},
+                    {id:"tahmin",e:"🔮",l:"Tahmin Soruları",a:"Okuma öncesi"}
+                  ].map(t => {
+                    const secili = materyalSonuc?.tur === t.id;
+                    return (
+                      <button key={t.id} onClick={async () => {
+                        if (materyalYukleniyor) return;
+                        const kitapAdi = prompt("Hangi kitap için materyal üreteyim?") || "Kitap";
+                        if (!kitapAdi) return;
+                        setMateryalYukleniyor(true); setMateryalSonuc(null);
+                        try {
+                          const r = await axios.post(`${API}/ai/materyal/uret`, {
+                            kitap_adi: kitapAdi, tur: t.id,
+                            sinif: user.sinif || profil?.sinif || 3,
+                            ogrenci_id: ogrenciId
+                          });
+                          setMateryalSonuc(r.data);
+                          toast({ title: `📋 ${t.l} hazır! +5 XP` });
+                        } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
+                        setMateryalYukleniyor(false);
+                      }} disabled={materyalYukleniyor}
+                        className={`p-3 rounded-xl border-2 text-left transition-all ${secili?"border-teal-400 bg-teal-50":"border-gray-100 bg-gray-50 hover:border-teal-300"} disabled:opacity-50`}>
+                        <div className="text-2xl mb-1">{t.e}</div>
+                        <div className="font-bold text-xs text-gray-800">{t.l}</div>
+                        <div className="text-[10px] text-gray-500 mt-0.5">{t.a}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {materyalYukleniyor && (
+                  <div className="text-center py-6"><div className="text-3xl animate-spin mb-2">⚙️</div><div className="text-sm text-gray-500">Materyal hazırlanıyor...</div></div>
+                )}
+              </div>
+
+              {/* Materyal Sonucu */}
+              {materyalSonuc && !materyalYukleniyor && (() => {
+                const m = materyalSonuc;
+                return (
+                  <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+                    <div className="bg-gradient-to-r from-teal-500 to-cyan-600 p-4 text-white">
+                      <div className="text-xs opacity-70 mb-0.5">📋 {m.kitap_adi}</div>
+                      <div className="font-bold text-base">{m.baslik}</div>
+                    </div>
+                    <div className="p-4 space-y-3">
+                      {/* SORU SETİ */}
+                      {m.tur === "soru_seti" && m.sorular?.map((s,i) => (
+                        <div key={i} className="bg-gray-50 rounded-xl p-3 border">
+                          <div className="flex items-start gap-2">
+                            <span className="text-xs bg-teal-100 text-teal-700 font-bold px-1.5 py-0.5 rounded min-w-[20px] text-center">{i+1}</span>
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-gray-800">{s.soru}</p>
+                              <div className="mt-2 grid grid-cols-2 gap-1">
+                                {(s.secenekler||[]).map((sec,j) => (
+                                  <div key={j} className={`text-xs px-2 py-1 rounded-lg border ${sec===s.dogru?"bg-green-100 border-green-300 text-green-700 font-medium":"bg-white border-gray-200 text-gray-600"}`}>{sec}</div>
+                                ))}
+                              </div>
+                              {s.bloom_basamak && <div className="text-[10px] text-purple-500 mt-1">📊 {s.bloom_basamak}</div>}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {/* KELİME LİSTESİ */}
+                      {m.tur === "kelime_listesi" && m.kelimeler?.map((k,i) => (
+                        <div key={i} className="bg-indigo-50 rounded-xl p-3 border border-indigo-100 flex items-start gap-3">
+                          <span className="font-bold text-indigo-600 text-sm min-w-[80px]">{k.kelime}</span>
+                          <div className="flex-1 text-xs"><div className="text-gray-700">{k.anlam}</div><div className="text-indigo-500 italic mt-0.5">"{k.cumle}"</div></div>
+                          <div className="flex gap-0.5">{[1,2,3,4,5].map(n => <div key={n} className={`w-1.5 h-1.5 rounded-full ${n<=k.zorluk?"bg-orange-400":"bg-gray-200"}`} />)}</div>
+                        </div>
+                      ))}
+                      {/* ETKİNLİK */}
+                      {m.tur === "etkinlik" && (<>
+                        <div className="flex gap-2 text-xs">
+                          <span className="bg-teal-100 text-teal-700 px-2 py-1 rounded-full">⏱ {m.sure_dk} dk</span>
+                          <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full">👥 {m.grup_sayisi} grup</span>
+                        </div>
+                        {m.adimlar?.map((a,i) => <div key={i} className="flex items-start gap-2 text-sm"><span className="text-teal-600 font-bold">{i+1}.</span><span>{a}</span></div>)}
+                        {m.kazanimlar?.length > 0 && <div className="mt-2"><div className="text-xs font-bold text-gray-600 mb-1">🎯 Kazanımlar</div>{m.kazanimlar.map((k,i) => <div key={i} className="text-xs text-gray-600">• {k}</div>)}</div>}
+                      </>)}
+                      {/* TAHMİN */}
+                      {m.tur === "tahmin" && (<>
+                        <p className="text-sm text-gray-600 italic">{m.giris}</p>
+                        {m.sorular?.map((s,i) => (
+                          <div key={i} className="bg-amber-50 rounded-xl p-3 border border-amber-100">
+                            <p className="text-sm font-medium">{s.soru}</p>
+                            {s.ipucu && <p className="text-xs text-amber-600 mt-1">💡 {s.ipucu}</p>}
+                          </div>
+                        ))}
+                      </>)}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
 
         </div>)}
 
