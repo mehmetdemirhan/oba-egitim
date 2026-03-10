@@ -7419,6 +7419,431 @@ function AiMerkezi({ user }) {
 }
 
 
+// ── POST-READING PANEL ──────────────────────────────────────
+function PostReadingPanel({ sonuc, aktifIcerik, user, apiBase, onGeri }) {
+  const [postReading, setPostReading] = React.useState(null);
+  const [zekaHarita, setZekaHarita] = React.useState(null);
+  const [prYukleniyor, setPrYukleniyor] = React.useState(false);
+  const [zekaYukleniyor, setZekaYukleniyor] = React.useState(false);
+  const [aktifTab, setAktifTab] = React.useState("sonuc");
+  const [oyunData, setOyunData] = React.useState(null);
+  const [oyunYukleniyor, setOyunYukleniyor] = React.useState(false);
+  const [oyunDurum, setOyunDurum] = React.useState({});
+  const [oyunSkor, setOyunSkor] = React.useState(null);
+
+  const kitapAdi = aktifIcerik?.baslik || sonuc?.icerik_baslik || "";
+  const yazar = aktifIcerik?.kitap_yazar || "";
+  const sinif = user?.sinif || 3;
+  const icerikId = aktifIcerik?.id || "";
+
+  const postReadingYukle = async () => {
+    if (prYukleniyor || postReading) return;
+    setPrYukleniyor(true);
+    try {
+      const r = await axios.post(`${apiBase}/ai/post-reading`, {
+        kitap_adi: kitapAdi, yazar, sinif, icerik_id: icerikId,
+        ogrenci_id: user?.linked_id || user?.id
+      });
+      setPostReading(r.data);
+    } catch(e) { console.error(e); }
+    setPrYukleniyor(false);
+  };
+
+  const zekaHaritaYukle = async () => {
+    if (zekaYukleniyor || zekaHarita) return;
+    setZekaYukleniyor(true);
+    try {
+      const r = await axios.post(`${apiBase}/ai/kitap-zeka-haritasi`, {
+        kitap_adi: kitapAdi, yazar, sinif, icerik_id: icerikId
+      });
+      setZekaHarita(r.data);
+    } catch(e) { console.error(e); }
+    setZekaYukleniyor(false);
+  };
+
+  const oyunBaslat = async (tur) => {
+    setOyunYukleniyor(true); setOyunData(null); setOyunDurum({}); setOyunSkor(null);
+    try {
+      const r = await axios.post(`${apiBase}/ai/kitap-oyun`, {
+        kitap_adi: kitapAdi, icerik_id: icerikId, tur, sinif
+      });
+      if (r.data.oyun) {
+        // Eşleştirme için karıştır
+        if (r.data.oyun.tur === "eslestirme" && r.data.oyun.ciftler) {
+          const ciftler = [...r.data.oyun.ciftler];
+          const saglar = ciftler.map(c => c.sag);
+          for (let i = saglar.length-1; i > 0; i--) {
+            const j = Math.floor(Math.random()*(i+1));
+            [saglar[i], saglar[j]] = [saglar[j], saglar[i]];
+          }
+          r.data.oyun.karisikSaglar = saglar;
+        }
+        setOyunData(r.data.oyun);
+      }
+    } catch(e) { console.error(e); }
+    setOyunYukleniyor(false);
+  };
+
+  React.useEffect(() => { postReadingYukle(); }, []);
+
+  const boyutRenk = (puan) => puan >= 8 ? "bg-green-500" : puan >= 5 ? "bg-blue-500" : "bg-orange-400";
+  const boyutLabel = { soyutluk: "Soyutluk", kelime_zorlugu: "Kelime Zorluğu", hayal_gucu: "Hayal Gücü",
+    felsefi_derinlik: "Felsefi Derinlik", aksiyon: "Aksiyon", duygusal_yogunluk: "Duygusal Yoğunluk",
+    hedef_kelime_yogunlugu: "Hedef Kelime" };
+
+  return (
+    <div className="max-w-lg mx-auto space-y-4">
+      {/* Tebrik başlığı */}
+      <div className="text-center py-6 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-2xl border border-yellow-200">
+        <div className="text-5xl mb-2">🏆</div>
+        <h2 className="text-3xl font-bold text-gray-900">+{sonuc.puan} Puan!</h2>
+        {sonuc.test_yapildi
+          ? <p className="text-gray-600 mt-1">{sonuc.dogru} / {sonuc.toplam} doğru cevap</p>
+          : <p className="text-gray-500 mt-1">İçerik tamamlandı</p>}
+        <p className="text-sm text-orange-600 font-medium mt-2">📚 {kitapAdi}</p>
+      </div>
+
+      {/* Tab bar */}
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+        {[["sonuc","🎯 Derinleş"],["oyun","🎮 Oyna"],["harita","🗺️ Zekâ Haritası"]].map(([k,l]) => (
+          <button key={k} onClick={() => { setAktifTab(k); if(k==="harita") zekaHaritaYukle(); }}
+            className={`flex-1 text-xs py-2 rounded-lg font-medium transition-all ${aktifTab===k ? "bg-white shadow text-orange-600" : "text-gray-500 hover:text-gray-700"}`}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {/* Derinleş tab */}
+      {aktifTab === "sonuc" && (
+        <div className="space-y-3">
+          {prYukleniyor ? (
+            <div className="text-center py-8 text-gray-400">
+              <div className="animate-spin text-3xl mb-2">🤖</div>
+              <p className="text-sm">AI derinlik analizi hazırlanıyor...</p>
+            </div>
+          ) : postReading ? (<>
+            {/* Ana fikir sorusu */}
+            <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+              <div className="text-xs font-bold text-indigo-600 mb-2">🤔 Düşün ve Yanıtla</div>
+              <p className="text-sm font-medium text-gray-800">{postReading.ana_fikir_sorusu}</p>
+            </div>
+
+            {/* MEB Erdem */}
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-lg">🌱</span>
+                <span className="text-xs font-bold text-emerald-700 uppercase">Bu Kitabın Erdemi: {postReading.meb_erdem?.erdem}</span>
+              </div>
+              <p className="text-sm text-gray-700">{postReading.meb_erdem?.aciklama}</p>
+            </div>
+
+            {/* Bloom soruları */}
+            <div className="space-y-2">
+              <div className="text-xs font-bold text-gray-500 uppercase tracking-wide">📊 Düşünme Soruları</div>
+              {(postReading.bloom_sorulari || []).map((b, i) => (
+                <div key={i} className="bg-white border rounded-xl p-3 shadow-sm">
+                  <div className="text-xs text-purple-600 font-medium mb-1">{b.emoji} {b.basamak}</div>
+                  <p className="text-sm text-gray-700">{b.soru}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Öneri kitaplar */}
+            {postReading.oneri_kitaplar?.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <div className="text-xs font-bold text-amber-700 mb-2">📚 Sıradaki Kitaplar</div>
+                <div className="space-y-2">
+                  {postReading.oneri_kitaplar.map((k, i) => (
+                    <div key={i} className="flex gap-2 text-sm">
+                      <span className="text-amber-500 font-bold">{i+1}.</span>
+                      <div><span className="font-medium">{k.baslik}</span>
+                        {k.yazar && <span className="text-gray-500"> — {k.yazar}</span>}
+                        {k.neden && <p className="text-xs text-gray-500 mt-0.5">{k.neden}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Özet cümle */}
+            {postReading.ozet_cumle && (
+              <div className="text-center text-sm text-gray-500 italic py-2">💬 "{postReading.ozet_cumle}"</div>
+            )}
+          </>) : (
+            <div className="text-center py-4 text-gray-400 text-sm">Analiz yüklenemedi</div>
+          )}
+        </div>
+      )}
+
+      {/* Oyun tab */}
+      {aktifTab === "oyun" && (
+        <div className="space-y-3">
+          {!oyunData && !oyunYukleniyor && (
+            <div className="grid grid-cols-2 gap-2">
+              {[["karakter_tahmini","🎭","Kim O?"],["hikaye_devam","📖","Hikâye Devam"],
+                ["eslestirme","🎲","Eşleştirme"],["bosluk","⬜","Boşluk Doldur"]].map(([t,e,l]) => (
+                <button key={t} onClick={() => oyunBaslat(t)}
+                  className="bg-white rounded-xl p-4 border shadow-sm text-center hover:bg-purple-50 hover:border-purple-300 transition-all active:scale-95">
+                  <div className="text-2xl mb-1">{e}</div>
+                  <div className="text-xs font-medium text-gray-700">{l}</div>
+                  <div className="text-[10px] text-gray-400 mt-0.5">Kitaptan üretildi</div>
+                </button>
+              ))}
+            </div>
+          )}
+          {oyunYukleniyor && (
+            <div className="text-center py-8 text-gray-400">
+              <div className="animate-spin text-3xl mb-2">🎮</div>
+              <p className="text-sm">Kitaba özel oyun hazırlanıyor...</p>
+            </div>
+          )}
+          {oyunData && !oyunSkor && (
+            <KitapOyunGorunum oyun={oyunData} oyunDurum={oyunDurum} setOyunDurum={setOyunDurum}
+              onBitir={(dogru, toplam) => {
+                setOyunSkor({ dogru, toplam, xp: oyunData.xp || 5 });
+                setOyunData(null);
+                axios.post(`${apiBase}/ai/mini-oyun/tamamla`, { tur: oyunData.tur, dogru, toplam }).catch(()=>{});
+              }} onKapat={() => setOyunData(null)} />
+          )}
+          {oyunSkor && (
+            <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl p-5 text-center border-2 border-purple-200">
+              <div className="text-4xl mb-2">🎉</div>
+              <div className="font-bold text-xl text-gray-800">{oyunSkor.dogru}/{oyunSkor.toplam} Doğru!</div>
+              <div className="text-purple-600 font-bold mt-1">+{oyunSkor.xp} XP</div>
+              <button onClick={() => setOyunSkor(null)} className="mt-3 text-sm text-gray-400 underline">Başka Oyun Oyna</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Zekâ Haritası tab */}
+      {aktifTab === "harita" && (
+        <div className="space-y-3">
+          {zekaYukleniyor ? (
+            <div className="text-center py-8 text-gray-400">
+              <div className="animate-spin text-3xl mb-2">🗺️</div>
+              <p className="text-sm">Kitap analiz ediliyor...</p>
+            </div>
+          ) : zekaHarita ? (
+            <div className="space-y-3">
+              <div className="text-sm font-bold text-gray-700">7 Boyutlu Kitap Profili</div>
+              {Object.entries(zekaHarita.boyutlar || {}).map(([key, val]) => (
+                <div key={key}>
+                  <div className="flex justify-between text-xs text-gray-600 mb-1">
+                    <span>{boyutLabel[key] || key}</span>
+                    <span className="font-bold">{val.puan}/10</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className={`h-2 rounded-full transition-all ${boyutRenk(val.puan)}`} style={{width:`${val.puan*10}%`}}></div>
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-0.5">{val.aciklama}</p>
+                </div>
+              ))}
+              {zekaHarita.tavsiye_profil && (
+                <div className="bg-blue-50 rounded-xl p-3 border border-blue-100 mt-3">
+                  <div className="text-xs font-bold text-blue-700 mb-1">👤 Kime Uygun?</div>
+                  <p className="text-xs text-gray-700">{zekaHarita.tavsiye_profil}</p>
+                </div>
+              )}
+              {zekaHarita.tur_etiketleri?.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {zekaHarita.tur_etiketleri.map((e,i) => (
+                    <span key={i} className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">#{e}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : <div className="text-center py-4 text-gray-400 text-sm">Harita yüklenemedi</div>}
+        </div>
+      )}
+
+      <Button onClick={onGeri} variant="outline" className="w-full mt-2">← Listeye Dön</Button>
+    </div>
+  );
+}
+
+// ── KİTAP OYUN GÖRÜNÜMÜ ──────────────────────────────────────
+function KitapOyunGorunum({ oyun, oyunDurum, setOyunDurum, onBitir, onKapat }) {
+  const sesCalDogru = () => { try { const ctx=new AudioContext(); const o=ctx.createOscillator(); const g=ctx.createGain(); o.connect(g); g.connect(ctx.destination); o.frequency.setValueAtTime(523,ctx.currentTime); o.frequency.setValueAtTime(784,ctx.currentTime+0.15); g.gain.setValueAtTime(0.3,ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+0.4); o.start(); o.stop(ctx.currentTime+0.4); } catch(e){} };
+  const sesCalYanlis = () => { try { const ctx=new AudioContext(); const o=ctx.createOscillator(); const g=ctx.createGain(); o.connect(g); g.connect(ctx.destination); o.frequency.setValueAtTime(200,ctx.currentTime); g.gain.setValueAtTime(0.3,ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+0.4); o.start(); o.stop(ctx.currentTime+0.4); } catch(e){} };
+
+  const [cevaplanmis, setCevaplanmis] = React.useState({});
+
+  const Header = () => (
+    <div className="flex items-center justify-between mb-3">
+      <h3 className="font-bold text-sm">{oyun.baslik}</h3>
+      <button onClick={onKapat} className="text-gray-400 text-xl">✕</button>
+    </div>
+  );
+
+  // Karakter tahmini ve hikâye devam — çoktan seçmeli
+  if (oyun.tur === "karakter_tahmini" || oyun.tur === "hikaye_devam") {
+    const sorular = oyun.sorular || [];
+    const tamamSayisi = Object.keys(cevaplanmis).length;
+    const dogruSayisi = Object.values(cevaplanmis).filter(Boolean).length;
+    if (tamamSayisi === sorular.length && sorular.length > 0) {
+      setTimeout(() => onBitir(dogruSayisi, sorular.length), 500);
+    }
+    return (
+      <div className="bg-white rounded-2xl border-2 border-purple-300 p-4 shadow-md">
+        <Header />
+        <p className="text-xs text-gray-500 mb-3">{oyun.aciklama}</p>
+        <div className="space-y-4">
+          {sorular.map((s, si) => {
+            const secilen = oyunDurum[`q${si}`];
+            const dogru = oyun.tur === "karakter_tahmini" ? s.dogru_karakter : s.secenekler?.[s.dogru_idx];
+            return (
+              <div key={si} className="space-y-2">
+                {oyun.tur === "karakter_tahmini" ? (
+                  <div className="space-y-1">
+                    {(s.ipuclari||[]).map((ip,ii) => <div key={ii} className="text-xs bg-yellow-50 border border-yellow-200 rounded px-2 py-1">💡 {ip}</div>)}
+                  </div>
+                ) : <p className="text-sm font-medium text-gray-800">{s.soru}</p>}
+                <div className="grid grid-cols-2 gap-1">
+                  {(s.secenekler||[]).map((sec, j) => {
+                    const secildi = secilen === sec;
+                    const dogruMu = sec === dogru;
+                    const goster = secilen !== undefined;
+                    return (
+                      <button key={j} disabled={secilen !== undefined}
+                        onClick={() => {
+                          const dogru2 = sec === dogru;
+                          dogru2 ? sesCalDogru() : sesCalYanlis();
+                          setOyunDurum(d => ({...d, [`q${si}`]: sec}));
+                          setCevaplanmis(c => ({...c, [si]: dogru2}));
+                        }}
+                        className={`text-xs px-2 py-2 rounded-lg border transition-all text-left ${
+                          goster && dogruMu ? "bg-green-100 border-green-400 text-green-800 font-bold" :
+                          goster && secildi && !dogruMu ? "bg-red-100 border-red-400 text-red-800" :
+                          "bg-gray-50 border-gray-200 hover:border-purple-400 hover:bg-purple-50"}`}>
+                        {sec}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-3 text-xs text-gray-400 text-center">{tamamSayisi}/{sorular.length} cevaplandı</div>
+      </div>
+    );
+  }
+
+  // Eşleştirme
+  if (oyun.tur === "eslestirme") {
+    const ciftler = oyun.ciftler || [];
+    const karisikSaglar = oyun.karisikSaglar || ciftler.map(c => c.sag);
+    const [secilenSol, setSecilenSol] = React.useState(null);
+    const [eslesmeler, setEslesmeler] = React.useState({});
+    const [yanlisMis, setYanlisMis] = React.useState(null);
+
+    const tamamlandi = Object.keys(eslesmeler).length === ciftler.length;
+    if (tamamlandi) {
+      const dogru = Object.entries(eslesmeler).filter(([sol, sag]) => {
+        const c = ciftler.find(c => c.sol === sol);
+        return c && c.sag === sag;
+      }).length;
+      setTimeout(() => onBitir(dogru, ciftler.length), 500);
+    }
+
+    return (
+      <div className="bg-white rounded-2xl border-2 border-purple-300 p-4 shadow-md">
+        <Header />
+        <p className="text-xs text-gray-500 mb-3">{oyun.aciklama}</p>
+        <div className="flex gap-2">
+          <div className="flex-1 space-y-2">
+            {ciftler.map((c, i) => {
+              const eslesme = eslesmeler[c.sol];
+              return (
+                <button key={i} onClick={() => !eslesme && setSecilenSol(c.sol)}
+                  className={`w-full text-left text-xs px-3 py-2 rounded-lg border transition-all ${
+                    eslesme ? "bg-green-100 border-green-400 text-green-800" :
+                    secilenSol === c.sol ? "bg-purple-100 border-purple-400 text-purple-800 font-bold" :
+                    "bg-gray-50 border-gray-200 hover:border-purple-300"}`}>
+                  {c.sol}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex-1 space-y-2">
+            {karisikSaglar.map((sag, i) => {
+              const kullanildi = Object.values(eslesmeler).includes(sag);
+              const yanlisBu = yanlisMis === sag;
+              return (
+                <button key={i} disabled={kullanildi}
+                  onClick={() => {
+                    if (!secilenSol || kullanildi) return;
+                    const dogru = ciftler.find(c => c.sol === secilenSol)?.sag === sag;
+                    if (dogru) { sesCalDogru(); setEslesmeler(e => ({...e, [secilenSol]: sag})); setSecilenSol(null); }
+                    else { sesCalYanlis(); setYanlisMis(sag); setTimeout(() => setYanlisMis(null), 600); }
+                  }}
+                  className={`w-full text-left text-xs px-3 py-2 rounded-lg border transition-all ${
+                    kullanildi ? "opacity-40 bg-gray-100" :
+                    yanlisBu ? "bg-red-100 border-red-400 text-red-800" :
+                    secilenSol ? "bg-blue-50 border-blue-300 hover:border-purple-400 cursor-pointer" :
+                    "bg-gray-50 border-gray-200"}`}>
+                  {sag}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Boşluk doldurma
+  if (oyun.tur === "bosluk_doldurma" || oyun.tur === "bosluk") {
+    const sorular = oyun.sorular || [];
+    const [cevaplanmis2, setCevaplanmis2] = React.useState({});
+    const dogruSayisi = Object.values(cevaplanmis2).filter(Boolean).length;
+    if (Object.keys(cevaplanmis2).length === sorular.length && sorular.length > 0) {
+      setTimeout(() => onBitir(dogruSayisi, sorular.length), 500);
+    }
+    return (
+      <div className="bg-white rounded-2xl border-2 border-purple-300 p-4 shadow-md">
+        <Header />
+        <div className="space-y-4">
+          {sorular.map((s, si) => {
+            const secilen = oyunDurum[`b${si}`];
+            return (
+              <div key={si} className="space-y-2">
+                <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-2">{s.cumle_bos?.replace("___", "[ ___ ]")}</p>
+                <div className="grid grid-cols-2 gap-1">
+                  {(s.secenekler||[]).map((sec, j) => {
+                    const secildi = secilen === sec;
+                    const dogruMu = sec === s.dogru;
+                    const goster = secilen !== undefined;
+                    return (
+                      <button key={j} disabled={secilen !== undefined}
+                        onClick={() => {
+                          const d = sec === s.dogru;
+                          d ? sesCalDogru() : sesCalYanlis();
+                          setOyunDurum(dn => ({...dn, [`b${si}`]: sec}));
+                          setCevaplanmis2(c => ({...c, [si]: d}));
+                        }}
+                        className={`text-xs px-2 py-2 rounded-lg border transition-all ${
+                          goster && dogruMu ? "bg-green-100 border-green-400 text-green-800 font-bold" :
+                          goster && secildi && !dogruMu ? "bg-red-100 border-red-400 text-red-800" :
+                          "bg-gray-50 border-gray-200 hover:border-purple-400 hover:bg-purple-50"}`}>
+                        {sec}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  return <div className="text-center py-4 text-gray-400 text-sm">Oyun türü desteklenmiyor</div>;
+}
+
 function GeminiDurumSatiri({ apiBase }) {
   const [durum, setDurum] = React.useState(null); // null | "kontrol" | "ok" | "hata"
   const [mesaj, setMesaj] = React.useState("");
@@ -7920,23 +8345,8 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
 
   // ── SONUÇ GÖRÜNÜMÜ ──
   if (gorunum === "sonuc" && sonuc) {
-    return (
-      <div className="max-w-md mx-auto text-center space-y-6 py-12">
-        <div className="w-24 h-24 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto">
-          <Trophy className="h-12 w-12 text-white" />
-        </div>
-        <div>
-          <h2 className="text-4xl font-bold text-gray-900">+{sonuc.puan} Puan!</h2>
-          {sonuc.test_yapildi
-            ? <p className="text-gray-600 mt-2 text-lg">{sonuc.dogru} / {sonuc.toplam} doğru cevap</p>
-            : <p className="text-gray-500 mt-2">Test çözülmeden tamamlandı</p>}
-        </div>
-        <Button onClick={() => { setGorunum("liste"); setSonuc(null); setAktifIcerik(null); }}
-          className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-8">
-          Listeye Dön
-        </Button>
-      </div>
-    );
+    return <PostReadingPanel sonuc={sonuc} aktifIcerik={aktifIcerik} user={user} apiBase={API}
+      onGeri={() => { setGorunum("liste"); setSonuc(null); setAktifIcerik(null); }} />;
   }
 
   // ── İÇERİK EKLEME GÖRÜNÜMÜ ──
