@@ -8608,6 +8608,313 @@ async def hikaye_gecmis(ogrenci_id: str, current_user=Depends(get_current_user))
     return kayitlar
 
 
+
+# ─────────────────────────────────────────────
+# POST-READING AI — Kitap Bitirme Sonrası Analiz
+# ─────────────────────────────────────────────
+
+@api_router.post("/ai/post-reading")
+async def post_reading_ai(req: Request, current_user=Depends(get_current_user)):
+    """Kitap/içerik tamamlanınca derinlik soruları + MEB Erdem değeri üretir."""
+    data = await req.json()
+    kitap_adi = data.get("kitap_adi", "")
+    yazar = data.get("yazar", "")
+    sinif = data.get("sinif", 3)
+    icerik_id = data.get("icerik_id", "")
+    ogrenci_id = data.get("ogrenci_id", current_user.get("linked_id", current_user.get("id", "")))
+
+    # Cache kontrol (24 saat)
+    cache = await db.post_reading_cache.find_one({"icerik_id": icerik_id, "ogrenci_id": ogrenci_id})
+    if cache and cache.get("tarih"):
+        import dateutil.parser
+        try:
+            sure = (datetime.utcnow() - dateutil.parser.parse(cache["tarih"])).total_seconds()
+            if sure < 86400:
+                cache.pop("_id", None)
+                return cache
+        except:
+            pass
+
+    # Kitap metnini al (varsa)
+    metin_ek = ""
+    icerik = await db.gelisim_icerik.find_one({"id": icerik_id})
+    if icerik and icerik.get("okuma_metni"):
+        metin_ek = f"\n\nKitap/metin içeriği (ilk 1500 kelime):\n{icerik['okuma_metni'][:3000]}"
+
+    prompt = f"""Sen bir Türkçe eğitim uzmanısın. "{kitap_adi}"{f" ({yazar})" if yazar else ""} adlı kitabı/metni {sinif}. sınıf öğrencisi tamamladı.{metin_ek}
+
+Aşağıdaki JSON formatında derinlik analizi üret:
+
+1. Ana fikir sorusu: Öğrenciyi düşündüren açık uçlu 1 soru
+2. MEB Erdem değeri: Bu kitaptan çıkarılabilecek 1 erdem (Erdemler: sabır, dürüstlük, merak, cesaret, sorumluluk, sevgi, saygı, adalet, yardımseverlik, vefa)
+3. Bloom soruları: 3 basamak (Kavrama, Analiz, Yaratma) için birer soru
+4. Hayat bağlantısı: "Bu kitap senin hayatında neyi değiştirir?" sorusu
+5. Öneri kitaplar: Bu kitabı seven birine 2 kitap önerisi
+
+SADECE JSON döndür:
+{{
+  "ana_fikir_sorusu": "...",
+  "meb_erdem": {{
+    "erdem": "sabır",
+    "aciklama": "Bu kitap sabırlı olmayı şöyle gösteriyor: ..."
+  }},
+  "bloom_sorulari": [
+    {{"basamak": "Kavrama", "soru": "...", "emoji": "🔍"}},
+    {{"basamak": "Analiz", "soru": "...", "emoji": "🧩"}},
+    {{"basamak": "Yaratma", "soru": "...", "emoji": "✨"}}
+  ],
+  "hayat_baglantisi": "...",
+  "oneri_kitaplar": [
+    {{"baslik": "...", "yazar": "...", "neden": "..."}},
+    {{"baslik": "...", "yazar": "...", "neden": "..."}}
+  ],
+  "ozet_cumle": "Bu kitabın özü: ..."
+}}"""
+
+    try:
+        raw = await _gemini_call(prompt, max_tokens=1500)
+        import json as _json, re as _re
+        raw = raw.strip()
+        if "```" in raw:
+            m = _re.search(r"```(?:json)?\s*([\s\S]*?)```", raw)
+            raw = m.group(1).strip() if m else _re.sub(r"```(?:json)?", "", raw).replace("```", "").strip()
+        bs = raw.find("{"); be = raw.rfind("}")
+        if bs != -1 and be != -1: raw = raw[bs:be+1]
+        raw = _re.sub(r",\s*([}\]])", r"\1", raw)
+        result = _json.loads(raw)
+    except Exception as e:
+        logging.error(f"[POST-READING] Hata: {e}")
+        result = {
+            "ana_fikir_sorusu": f"'{kitap_adi}' seni en çok hangi konuda düşündürdü? Neden?",
+            "meb_erdem": {"erdem": "merak", "aciklama": "Bu kitap merak etmenin ve soru sormanın önemini gösteriyor."},
+            "bloom_sorulari": [
+                {"basamak": "Kavrama", "soru": "Kitabın ana karakteri hangi zorluklarla karşılaştı?", "emoji": "🔍"},
+                {"basamak": "Analiz", "soru": "Kitaptaki olaylar neden bu sırayla gerçekleşti?", "emoji": "🧩"},
+                {"basamak": "Yaratma", "soru": "Kitabın sonunu farklı yazsan nasıl bitirirdin?", "emoji": "✨"}
+            ],
+            "hayat_baglantisi": "Bu kitaptaki hangi duygu veya düşünce sana tanıdık geldi?",
+            "oneri_kitaplar": [
+                {"baslik": "Pollyanna", "yazar": "Eleanor H. Porter", "neden": "Benzer temalar ve umutlu bir bakış açısı"},
+                {"baslik": "Küçük Prens", "yazar": "Antoine de Saint-Exupéry", "neden": "Derin düşünceler, çocuksu merak"}
+            ],
+            "ozet_cumle": f"'{kitap_adi}' sana yeni bir bakış açısı kazandırdı."
+        }
+
+    result["kitap_adi"] = kitap_adi
+    result["icerik_id"] = icerik_id
+    result["ogrenci_id"] = ogrenci_id
+    result["tarih"] = datetime.utcnow().isoformat()
+    await db.post_reading_cache.update_one(
+        {"icerik_id": icerik_id, "ogrenci_id": ogrenci_id},
+        {"$set": result}, upsert=True
+    )
+    return result
+
+
+# ─────────────────────────────────────────────
+# KİTAP ZEKÂ HARİTASI — 7 Boyutlu AI Profil
+# ─────────────────────────────────────────────
+
+@api_router.post("/ai/kitap-zeka-haritasi")
+async def kitap_zeka_haritasi(req: Request, current_user=Depends(get_current_user)):
+    """Her kitap için 7 boyutlu AI profil üretir."""
+    data = await req.json()
+    kitap_adi = data.get("kitap_adi", "")
+    yazar = data.get("yazar", "")
+    sinif = data.get("sinif", 3)
+    icerik_id = data.get("icerik_id", "")
+
+    # Cache (kalıcı — kitap değişmez)
+    cache = await db.kitap_zeka_haritasi.find_one({"icerik_id": icerik_id})
+    if cache:
+        cache.pop("_id", None)
+        return cache
+
+    # Metin varsa ekle
+    metin_ek = ""
+    icerik = await db.gelisim_icerik.find_one({"id": icerik_id})
+    if icerik and icerik.get("okuma_metni"):
+        metin_ek = f"\n\nMetin özeti (ilk 1000 kelime):\n{icerik['okuma_metni'][:2000]}"
+
+    prompt = f"""Sen bir çocuk edebiyatı analistisin. "{kitap_adi}"{f" - {yazar}" if yazar else ""} için 7 boyutlu profil oluştur.{metin_ek}
+
+Her boyutu 1-10 arasında puan ver. SADECE JSON döndür:
+{{
+  "kitap_adi": "{kitap_adi}",
+  "boyutlar": {{
+    "soyutluk": {{"puan": 5, "aciklama": "..."}},
+    "kelime_zorlugu": {{"puan": 5, "aciklama": "..."}},
+    "hayal_gucu": {{"puan": 5, "aciklama": "..."}},
+    "felsefi_derinlik": {{"puan": 5, "aciklama": "..."}},
+    "aksiyon": {{"puan": 5, "aciklama": "..."}},
+    "duygusal_yogunluk": {{"puan": 5, "aciklama": "..."}},
+    "hedef_kelime_yogunlugu": {{"puan": 5, "aciklama": "..."}}
+  }},
+  "sinif_uyumu": {sinif},
+  "tavsiye_profil": "Bu kitap hangi öğrenciye uygundur? (2-3 cümle)",
+  "tur_etiketleri": ["macera", "arkadaşlık"],
+  "okuma_suresi_dk": 30
+}}"""
+
+    try:
+        raw = await _gemini_call(prompt, max_tokens=1000)
+        import json as _json, re as _re
+        raw = raw.strip()
+        if "```" in raw:
+            m = _re.search(r"```(?:json)?\s*([\s\S]*?)```", raw)
+            raw = m.group(1).strip() if m else _re.sub(r"```(?:json)?", "", raw).replace("```", "").strip()
+        bs = raw.find("{"); be = raw.rfind("}")
+        if bs != -1 and be != -1: raw = raw[bs:be+1]
+        raw = _re.sub(r",\s*([}\]])", r"\1", raw)
+        result = _json.loads(raw)
+    except Exception as e:
+        logging.error(f"[ZEKA-HARITA] Hata: {e}")
+        result = {
+            "kitap_adi": kitap_adi,
+            "boyutlar": {
+                "soyutluk": {"puan": 5, "aciklama": "Orta düzey soyut kavramlar içeriyor"},
+                "kelime_zorlugu": {"puan": 5, "aciklama": "Yaş grubuna uygun kelime zenginliği"},
+                "hayal_gucu": {"puan": 6, "aciklama": "Hayal gücünü geliştiren sahneler mevcut"},
+                "felsefi_derinlik": {"puan": 4, "aciklama": "Temel değer sorgulamaları var"},
+                "aksiyon": {"puan": 6, "aciklama": "Tempolu ve heyecanlı sahneler"},
+                "duygusal_yogunluk": {"puan": 7, "aciklama": "Güçlü duygusal bağ kurduruyor"},
+                "hedef_kelime_yogunlugu": {"puan": 5, "aciklama": "MEB müfredatına uygun kelimeler"}
+            },
+            "sinif_uyumu": sinif,
+            "tavsiye_profil": "Okuma alışkanlığı kazanmaya başlayan, macera seven öğrencilere uygundur.",
+            "tur_etiketleri": ["macera", "gelişim", "arkadaşlık"],
+            "okuma_suresi_dk": sinif * 8
+        }
+
+    result["icerik_id"] = icerik_id
+    result["olusturma_tarihi"] = datetime.utcnow().isoformat()
+    await db.kitap_zeka_haritasi.update_one(
+        {"icerik_id": icerik_id}, {"$set": result}, upsert=True
+    )
+    return result
+
+
+# ─────────────────────────────────────────────
+# KİTABA ÖZGÜ MİNİ OYUN — Kitap içeriğinden üret
+# ─────────────────────────────────────────────
+
+@api_router.post("/ai/kitap-oyun")
+async def kitap_oyun_uret(req: Request, current_user=Depends(get_current_user)):
+    """Kitap/metin içeriğinden oyun soruları üretir."""
+    data = await req.json()
+    kitap_adi = data.get("kitap_adi", "")
+    icerik_id = data.get("icerik_id", "")
+    oyun_turu = data.get("tur", "karakter_tahmini")  # karakter_tahmini, hikaye_devam, bosluk, eslestirme
+    sinif = data.get("sinif", 3)
+
+    # Metni al
+    metin = ""
+    icerik = await db.gelisim_icerik.find_one({"id": icerik_id})
+    if icerik:
+        metin = icerik.get("okuma_metni", "") or icerik.get("aciklama", "")
+    if not metin:
+        return {"oyun": None, "mesaj": "İçerik metni bulunamadı"}
+
+    metin_kisalt = metin[:2500]
+
+    if oyun_turu == "karakter_tahmini":
+        prompt = f""""{kitap_adi}" metninden karakter tahmini oyunu oluştur.
+
+Metin: {metin_kisalt}
+
+SADECE JSON döndür. Metindeki gerçek karakterleri kullan:
+{{
+  "tur": "karakter_tahmini",
+  "baslik": "🎭 Kim O?",
+  "aciklama": "İpuçlarından karakteri bul!",
+  "sorular": [
+    {{
+      "ipuclari": ["İpucu 1", "İpucu 2", "İpucu 3"],
+      "dogru_karakter": "...",
+      "secenekler": ["...", "...", "...", "..."]
+    }}
+  ],
+  "xp": 8
+}}"""
+
+    elif oyun_turu == "hikaye_devam":
+        prompt = f""""{kitap_adi}" metninden hikâye devam ettirme oyunu oluştur.
+
+Metin: {metin_kisalt}
+
+SADECE JSON döndür:
+{{
+  "tur": "hikaye_devam",
+  "baslik": "📖 Hikâye Devam Ediyor",
+  "aciklama": "Doğru devamı seç!",
+  "sorular": [
+    {{
+      "metin_parcasi": "Metinden alınan bir paragraf...",
+      "soru": "Bundan sonra ne oldu?",
+      "secenekler": ["A seçeneği", "B seçeneği", "C seçeneği", "D seçeneği"],
+      "dogru_idx": 0,
+      "aciklama": "Neden bu doğru?"
+    }}
+  ],
+  "xp": 10
+}}"""
+
+    elif oyun_turu == "eslestirme":
+        prompt = f""""{kitap_adi}" metninden karakter-özellik eşleştirme oyunu oluştur.
+
+Metin: {metin_kisalt}
+
+SADECE JSON döndür:
+{{
+  "tur": "eslestirme",
+  "baslik": "🎲 Kim Nasıl?",
+  "aciklama": "Karakterleri özellikleriyle eşleştir!",
+  "ciftler": [
+    {{"sol": "Karakter adı", "sag": "Özelliği/yaptığı şey"}},
+    {{"sol": "...", "sag": "..."}},
+    {{"sol": "...", "sag": "..."}},
+    {{"sol": "...", "sag": "..."}}
+  ],
+  "xp": 6
+}}"""
+
+    else:  # bosluk
+        prompt = f""""{kitap_adi}" metninden boşluk doldurma oyunu oluştur. Metinden gerçek cümleler kullan.
+
+Metin: {metin_kisalt}
+
+SADECE JSON döndür:
+{{
+  "tur": "bosluk_doldurma",
+  "baslik": "⬜ Boşluğu Doldur",
+  "aciklama": "Metindeki eksik kelimeyi bul!",
+  "sorular": [
+    {{
+      "cumle_bos": "Metinden alınan cümle ___ kelime yerine boş",
+      "dogru": "doğru kelime",
+      "secenekler": ["doğru kelime", "yanlış1", "yanlış2", "yanlış3"]
+    }}
+  ],
+  "xp": 7
+}}"""
+
+    try:
+        raw = await _gemini_call(prompt, max_tokens=1200)
+        import json as _json, re as _re
+        raw = raw.strip()
+        if "```" in raw:
+            m = _re.search(r"```(?:json)?\s*([\s\S]*?)```", raw)
+            raw = m.group(1).strip() if m else _re.sub(r"```(?:json)?", "", raw).replace("```", "").strip()
+        bs = raw.find("{"); be = raw.rfind("}")
+        if bs != -1 and be != -1: raw = raw[bs:be+1]
+        raw = _re.sub(r",\s*([}\]])", r"\1", raw)
+        result = _json.loads(raw)
+        return {"oyun": result}
+    except Exception as e:
+        logging.error(f"[KITAP-OYUN] Hata: {e}")
+        return {"oyun": None, "mesaj": f"Oyun üretilemedi: {str(e)}"}
+
+
 # ─────────────────────────────────────────────
 # APP SETUP
 # ─────────────────────────────────────────────
