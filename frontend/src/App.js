@@ -7420,7 +7420,7 @@ function AiMerkezi({ user }) {
 
 
 // ── POST-READING PANEL ──────────────────────────────────────
-function PostReadingPanel({ sonuc, aktifIcerik, user, apiBase, onGeri }) {
+function PostReadingPanel({ sonuc, aktifIcerik, user, apiBase, onGeri, gizliBaslik = false }) {
   const [postReading, setPostReading] = React.useState(null);
   const [zekaHarita, setZekaHarita] = React.useState(null);
   const [prYukleniyor, setPrYukleniyor] = React.useState(false);
@@ -7493,7 +7493,8 @@ function PostReadingPanel({ sonuc, aktifIcerik, user, apiBase, onGeri }) {
 
   return (
     <div className="max-w-lg mx-auto space-y-4">
-      {/* Tebrik başlığı */}
+      {/* Tebrik başlığı — sadece tamamlama sonrasında */}
+      {!gizliBaslik && (
       <div className="text-center py-6 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-2xl border border-yellow-200">
         <div className="text-5xl mb-2">🏆</div>
         <h2 className="text-3xl font-bold text-gray-900">+{sonuc.puan} Puan!</h2>
@@ -7502,6 +7503,7 @@ function PostReadingPanel({ sonuc, aktifIcerik, user, apiBase, onGeri }) {
           : <p className="text-gray-500 mt-1">İçerik tamamlandı</p>}
         <p className="text-sm text-orange-600 font-medium mt-2">📚 {kitapAdi}</p>
       </div>
+      )}
 
       {/* Tab bar */}
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
@@ -7658,7 +7660,7 @@ function PostReadingPanel({ sonuc, aktifIcerik, user, apiBase, onGeri }) {
         </div>
       )}
 
-      <Button onClick={onGeri} variant="outline" className="w-full mt-2">← Listeye Dön</Button>
+      {onGeri && <Button onClick={onGeri} variant="outline" className="w-full mt-2">← Listeye Dön</Button>}
     </div>
   );
 }
@@ -8308,6 +8310,41 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
             </div>
           )}
         </div>
+
+        {/* Derinleş — metin altında her zaman görünür */}
+        <div className="border-t border-gray-100 pt-4">
+          <PostReadingPanel
+            sonuc={{ puan: 0, test_yapildi: false }}
+            aktifIcerik={aktifIcerik}
+            user={user}
+            apiBase={API}
+            onGeri={null}
+            gizliBaslik={true}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ── BAĞIMSIZ DEDERİNLEŞ GÖRÜNÜMÜ ──
+  if (gorunum === "derinles" && aktifIcerik) {
+    return (
+      <div className="max-w-lg mx-auto space-y-4">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={() => setGorunum("liste")}>← Geri</Button>
+          <div>
+            <h2 className="font-bold text-gray-900">{aktifIcerik.baslik}</h2>
+            <p className="text-xs text-gray-500">AI Derinleştirme Araçları</p>
+          </div>
+        </div>
+        <PostReadingPanel
+          sonuc={{ puan: 0, test_yapildi: false }}
+          aktifIcerik={aktifIcerik}
+          user={user}
+          apiBase={API}
+          onGeri={() => setGorunum("liste")}
+          gizliBaslik={true}
+        />
       </div>
     );
   }
@@ -9270,6 +9307,13 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                                 📖 Seviyeli Okuma
                               </Button>
                             </>)}
+                            {/* Derinleş — tüm kullanıcılar */}
+                            {(icerik.tur === "kitap" || icerik.tur === "okuma_parcasi") && (
+                              <Button size="sm" variant="outline" className="text-rose-600 border-rose-300 hover:bg-rose-50"
+                                onClick={() => { setAktifIcerik(icerik); setGorunum("derinles"); }}>
+                                🎯 Derinleş
+                              </Button>
+                            )}
                           </div>
                       </CardContent>
                     </Card>
