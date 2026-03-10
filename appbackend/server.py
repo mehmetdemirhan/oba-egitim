@@ -8268,9 +8268,10 @@ async def materyal_uret(req: Request, current_user=Depends(get_current_user)):
             f"]}}"
         ),
         "kelime_listesi": (
-            f"'{kitap_adi}'{metin_bilgi} kitabından {sinif}. sınıf için TAM 15 önemli kelime seç.{metin_odak}{metin_bağlam}\n\n"
-            f"JSON: {{\"baslik\": \"string\", \"kelimeler\": ["
-            f"{{\"kelime\": \"string\", \"anlam\": \"string\", \"cumle\": \"metinden örnek veya benzeri cümle\", \"zorluk\": 1}}"
+            f"'{kitap_adi}'{metin_bilgi} kitabından {sinif}. sınıf için 10 önemli kelime seç.{metin_odak}{metin_bağlam}\n\n"
+            f"SADECE JSON döndür:\n"
+            f"{{\"baslik\": \"string\", \"kelimeler\": ["
+            f"{{\"kelime\": \"string\", \"anlam\": \"kısa anlam\", \"cumle\": \"kısa örnek cümle\", \"zorluk\": 1}}"
             f"]}}"
         ),
         "etkinlik": (
@@ -8297,22 +8298,49 @@ async def materyal_uret(req: Request, current_user=Depends(get_current_user)):
         logging.info(f"Gemini çağrısı başlıyor: tur={tur}, kitap={kitap_adi}, metin_len={len(metin_ek)}")
 
     async def _parse_gemini_json(raw_text: str):
-        """Gemini yanıtından JSON çıkar."""
+        """Gemini yanıtından JSON çıkar — hata toleranslı."""
+        import re as _re
         raw_text = raw_text.strip()
-        # ```json ... ``` veya ``` ... ``` bloklarını temizle
+
+        # ``` bloklarını temizle
         if "```" in raw_text:
-            import re
-            match = re.search(r"```(?:json)?\s*([\s\S]*?)```", raw_text)
+            match = _re.search(r"```(?:json)?\s*([\s\S]*?)```", raw_text)
             if match:
                 raw_text = match.group(1).strip()
             else:
-                raw_text = re.sub(r"```(?:json)?", "", raw_text).replace("```", "").strip()
+                raw_text = _re.sub(r"```(?:json)?", "", raw_text).replace("```", "").strip()
+
         # { ... } içini al
         brace_start = raw_text.find("{")
         brace_end = raw_text.rfind("}")
         if brace_start != -1 and brace_end != -1:
             raw_text = raw_text[brace_start:brace_end+1]
-        return _json.loads(raw_text)
+
+        # Önce direkt parse dene
+        try:
+            return _json.loads(raw_text)
+        except _json.JSONDecodeError:
+            pass
+
+        # Trailing comma düzelt: ,] ve ,} → ] ve }
+        cleaned = _re.sub(r",\s*([}\]])", r"\1", raw_text)
+        try:
+            return _json.loads(cleaned)
+        except _json.JSONDecodeError:
+            pass
+
+        # Tek tırnak → çift tırnak
+        cleaned2 = cleaned.replace("'", '"')
+        try:
+            return _json.loads(cleaned2)
+        except _json.JSONDecodeError:
+            pass
+
+        # Kontrol karakterlerini temizle
+        cleaned3 = _re.sub(r'[\x00-\x1f\x7f]', ' ', cleaned)
+        cleaned3 = _re.sub(r',\s*([}\]])', r'\1', cleaned3)
+        return _json.loads(cleaned3)
+
 
     _debug = {
         "metin_kaynak": metin_kaynak,
