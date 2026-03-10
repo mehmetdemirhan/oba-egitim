@@ -7791,8 +7791,10 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
 
   // ── OKUMA PARÇASI GÖRÜNÜMÜ ──
   if (gorunum === "okuma" && aktifIcerik) {
-    const kelimeSayisi = aktifIcerik.okuma_metni?.trim().split(/\s+/).length || 0;
-    const tahminiSure = Math.ceil(kelimeSayisi / 200); // Ort. 200 kelime/dk
+    const metin = aktifIcerik.okuma_metni || aktifIcerik.aciklama || "";
+    const kelimeSayisi = metin.trim().split(/\s+/).length || 0;
+    const tahminiSure = Math.ceil(kelimeSayisi / 200);
+    const isTamamlandi = tamamlananlar.some(t => t.icerik_id === aktifIcerik.id);
     return (
       <div className="max-w-2xl mx-auto space-y-4">
         <div className="flex items-center gap-3">
@@ -7808,36 +7810,78 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                   {aktifIcerik.okuma_seviye==="kolay"?"🌱 Kolay":aktifIcerik.okuma_seviye==="zor"?"🌳 Zor":"🌿 Orta"}
                 </span>
               )}
-              <span>📖 {kelimeSayisi} kelime</span>
-              <span>⏱ ~{tahminiSure} dk</span>
+              {kelimeSayisi > 0 && <span>📖 {kelimeSayisi} kelime · ⏱ ~{tahminiSure} dk</span>}
             </div>
           </div>
         </div>
 
         <Card className="border-0 shadow-sm">
           <CardContent className="p-6">
-            {aktifIcerik.aciklama && (
+            {/* Kitap türü için kapak + bilgiler */}
+            {aktifIcerik.tur === "kitap" && (
+              <div className="flex gap-4 mb-5">
+                {aktifIcerik.kitap_kapak && (
+                  <img src={aktifIcerik.kitap_kapak} alt="Kapak" className="w-24 h-32 object-cover rounded-lg shadow" />
+                )}
+                <div className="flex-1 space-y-2">
+                  {aktifIcerik.kitap_yazar && <div className="text-sm text-gray-600">✍️ <strong>{aktifIcerik.kitap_yazar}</strong></div>}
+                  {aktifIcerik.kitap_isbn && <div className="text-xs text-gray-400">ISBN: {aktifIcerik.kitap_isbn}</div>}
+                  {aktifIcerik.kitap_link && <a href={aktifIcerik.kitap_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline">🔗 Kitap Linki</a>}
+                </div>
+              </div>
+            )}
+            {/* Makale linki */}
+            {aktifIcerik.tur === "makale" && aktifIcerik.makale_link && (
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 mb-4">
+                <a href={aktifIcerik.makale_link} target="_blank" rel="noreferrer" className="text-blue-700 font-medium hover:underline text-sm">
+                  🔗 Makaleyi Aç →
+                </a>
+              </div>
+            )}
+            {/* Açıklama */}
+            {aktifIcerik.aciklama && aktifIcerik.tur !== "okuma_parcasi" && (
               <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 mb-5 text-sm text-amber-800">
                 {aktifIcerik.aciklama}
               </div>
             )}
-            <div className="prose max-w-none">
-              <div className="text-base text-gray-800 leading-[1.9] whitespace-pre-wrap font-['Georgia',serif] tracking-wide">
-                {aktifIcerik.okuma_metni}
+            {/* Okuma metni */}
+            {aktifIcerik.okuma_metni ? (
+              <div className="prose max-w-none">
+                {aktifIcerik.aciklama && (
+                  <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 mb-5 text-sm text-amber-800">
+                    {aktifIcerik.aciklama}
+                  </div>
+                )}
+                <div className="text-base text-gray-800 leading-[1.9] whitespace-pre-wrap font-['Georgia',serif] tracking-wide">
+                  {aktifIcerik.okuma_metni}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <div className="text-4xl mb-3">📚</div>
+                <p className="text-sm">Bu içerik için okuma metni eklenmemiş.</p>
+                <p className="text-xs text-gray-400 mt-1">İçeriği tamamlamak için aşağıdaki butonu kullanabilirsiniz.</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
         <div className="flex gap-3">
           {aktifIcerik.sorular?.length > 0 && (
-            <Button onClick={() => setGorunum("test")} className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white">
+            <Button onClick={() => { setGorunum("test"); setTestCevaplari([]); }} className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white">
               📝 Anlama Testini Çöz (+10 puan)
             </Button>
           )}
-          <Button variant="outline" onClick={() => handleTamamla(false, aktifIcerik)} className="flex-1">
-            ✓ Okudum, Tamamlandı (+1 puan)
-          </Button>
+          {!isTamamlandi && (
+            <Button variant="outline" onClick={() => handleTamamla(false, aktifIcerik)} className="flex-1">
+              ✓ Okudum, Tamamlandı (+1 puan)
+            </Button>
+          )}
+          {isTamamlandi && (
+            <div className="flex-1 flex items-center justify-center gap-2 text-green-600 text-sm font-medium">
+              <CheckCircle className="h-5 w-5" /> Tamamlandı
+            </div>
+          )}
         </div>
       </div>
     );
@@ -8723,25 +8767,38 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                             {(user.role === "admin" || user.role === "coordinator") && <Button variant="destructive" size="sm" onClick={async () => { try { await axios.delete(`${API}/gelisim/icerik/${icerik.id}`); fetchAll(); toast({title:"Silindi"}); } catch(e){} }}><Trash2 className="h-4 w-4"/></Button>}
                           </div>
                         </div>
-                        {!tamamlandi && (
-                          <div className="flex gap-2 mt-4 flex-wrap">
+                        {/* Okuma / Test butonları — tamamlanmış olsa da göster */}
+                        <div className="flex gap-2 mt-4 flex-wrap">
                             {icerik.tur === "okuma_parcasi" && icerik.okuma_metni && (
                               <Button size="sm" onClick={() => { setAktifIcerik(icerik); setGorunum("okuma"); }}
                                 className="bg-gradient-to-r from-amber-500 to-orange-500 text-white">
-                                📖 Okumaya Başla
+                                📖 {tamamlandi ? "Tekrar Oku" : "Okumaya Başla"}
+                              </Button>
+                            )}
+                            {icerik.tur === "okuma_parcasi" && !icerik.okuma_metni && (
+                              <Button size="sm" onClick={() => { setAktifIcerik(icerik); setGorunum("okuma"); }}
+                                className="bg-gradient-to-r from-amber-500 to-orange-500 text-white">
+                                📖 {tamamlandi ? "Tekrar Oku" : "Okumaya Başla"}
+                              </Button>
+                            )}
+                            {icerik.tur === "kitap" && (
+                              <Button size="sm" onClick={() => { setAktifIcerik(icerik); setGorunum("okuma"); }}
+                                className="bg-gradient-to-r from-green-500 to-emerald-500 text-white">
+                                📚 {tamamlandi ? "Tekrar Bak" : "İçeriği Gör"}
                               </Button>
                             )}
                             {icerik.sorular?.length > 0 && (
                               <Button size="sm" onClick={() => { setAktifIcerik(icerik); setGorunum("test"); setTestCevaplari([]); }}
                                 className="bg-gradient-to-r from-orange-500 to-red-500 text-white">
-                                📝 Testi Çöz (+10 puan)
+                                📝 {tamamlandi ? "Testi Tekrar Çöz" : "Testi Çöz (+10 puan)"}
                               </Button>
                             )}
-                            <Button size="sm" variant="outline" onClick={() => handleTamamla(false, icerik)}>
-                              ✓ Tamamlandı (+1 puan)
-                            </Button>
+                            {!tamamlandi && (
+                              <Button size="sm" variant="outline" onClick={() => handleTamamla(false, icerik)}>
+                                ✓ Tamamlandı (+1 puan)
+                              </Button>
+                            )}
                           </div>
-                        )}
                         {/* Kitap türü ise bölüm bazlı soru yönetimi + AI araçları */}
                         {icerik.tur === "kitap" && (user.role === "admin" || user.role === "coordinator" || user.role === "teacher") && (
                           <div className="mt-3 space-y-2">
