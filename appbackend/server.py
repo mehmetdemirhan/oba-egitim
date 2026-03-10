@@ -3208,8 +3208,8 @@ async def create_icerik(icerik: IcerikCreate, current_user=Depends(get_current_u
     if role not in ["admin", "coordinator", "teacher"]:
         raise HTTPException(status_code=403, detail="Yetkisiz")
     
-    # Admin/Koordinatör eklerse direkt oylama, öğretmen eklerse beklemede
-    durum = "oylama" if role in ["admin", "coordinator"] else "beklemede"
+    # Admin/Koordinatör eklerse direkt yayında, öğretmen eklerse oylama
+    durum = "yayinda" if role in ["admin", "coordinator"] else "oylama"
     
     model = IcerikModel(
         **icerik.dict(),
