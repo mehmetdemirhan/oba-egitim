@@ -8707,6 +8707,17 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                         {isAcik && (
                           <div className="px-5 pb-5 space-y-3 border-t border-blue-100 pt-3">
                             {icerik.aciklama && <div className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3 whitespace-pre-wrap">{icerik.aciklama}</div>}
+                            {/* Okuma metni önizleme */}
+                            {icerik.okuma_metni && (
+                              <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
+                                <div className="text-xs font-medium text-amber-700 mb-2">📖 Okuma Metni ({icerik.okuma_metni.trim().split(/\s+/).length} kelime)</div>
+                                <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap line-clamp-6">{icerik.okuma_metni.substring(0, 600)}{icerik.okuma_metni.length > 600 ? "..." : ""}</div>
+                                <Button size="sm" className="mt-2 bg-amber-500 hover:bg-amber-600 text-white"
+                                  onClick={() => { setAktifIcerik(icerik); setGorunum("okuma"); }}>
+                                  📖 Tamamını Oku
+                                </Button>
+                              </div>
+                            )}
                             {icerik.makale_link && <a href={icerik.makale_link} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline block">📎 {icerik.makale_dosya_turu === "link" ? "Makale Linki" : "Dosya Linki"}: {icerik.makale_link}</a>}
                             {icerik.kitap_yazar && <div className="text-sm text-gray-600">📚 Yazar: {icerik.kitap_yazar}</div>}
                             {icerik.kitap_yayinevi && <div className="text-sm text-gray-600">🏢 Yayınevi: {icerik.kitap_yayinevi}</div>}
@@ -8722,6 +8733,18 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                           {kullandi ? (<div className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">✓ Oyunuzu kullandınız: <strong>{kullandi.onay ? "Onay ✅" : "Red ❌"}</strong>{!kullandi.onay && kullandi.sebep && <span className="text-gray-600"> — {kullandi.sebep}</span>}</div>
                           ) : (<div className="flex gap-2"><Button size="sm" onClick={() => oyVer(true, "", icerik)} className="bg-green-600 hover:bg-green-700 text-white flex-1">✅ Onayla (+2 puan)</Button><Button size="sm" variant="destructive" className="flex-1" onClick={() => { setRedDialogIcerik(icerik); }}>❌ Reddet</Button></div>)}
                           {icerik.tur === "kitap" && (user.role === "admin" || user.role === "coordinator") && (
+                            <div className="flex gap-2 mt-2">
+                              <Button size="sm" variant="outline" className="flex-1 text-purple-600 border-purple-300 hover:bg-purple-50"
+                                onClick={() => { setAdminAiModal({ kitap: icerik, mod: "materyal" }); setAdminAiSonuc(null); setAdminAiMateryalTur("soru_seti"); }}>
+                                🤖 AI Materyal
+                              </Button>
+                              <Button size="sm" variant="outline" className="flex-1 text-indigo-600 border-indigo-300 hover:bg-indigo-50"
+                                onClick={() => { setAdminAiModal({ kitap: icerik, mod: "scaffold" }); setAdminAiSonuc(null); }}>
+                                📖 Seviyeli Okuma
+                              </Button>
+                            </div>
+                          )}
+                          {(icerik.tur === "okuma_parcasi" || icerik.tur === "makale") && (user.role === "admin" || user.role === "coordinator") && (
                             <div className="flex gap-2 mt-2">
                               <Button size="sm" variant="outline" className="flex-1 text-purple-600 border-purple-300 hover:bg-purple-50"
                                 onClick={() => { setAdminAiModal({ kitap: icerik, mod: "materyal" }); setAdminAiSonuc(null); setAdminAiMateryalTur("soru_seti"); }}>
@@ -8750,32 +8773,51 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                 {yayindakiler.map(icerik => {
                   const tamamlandi = isTamamlandi(icerik.id);
                   const puan = getPuan(icerik.id);
+                  const isAcik = acikDetayId === "yay-" + icerik.id;
                   return (
-                    <Card key={icerik.id} className={`border-0 shadow-sm ${tamamlandi ? 'opacity-75' : ''}`}>
-                      <CardContent className="p-5">
-                        <div className="flex items-start justify-between">
+                    <Card key={icerik.id} className={`border-0 shadow-sm ${tamamlandi ? 'opacity-90' : ''}`}>
+                      <CardContent className="p-0">
+                        {/* Başlık - tıklanabilir */}
+                        <div className="flex items-start justify-between p-5 cursor-pointer hover:bg-gray-50/80 transition-colors"
+                          onClick={() => setAcikDetayId(isAcik ? null : "yay-" + icerik.id)}>
                           <div className="flex items-center gap-3">
                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${turColor(icerik.tur)}`}>{turIcon(icerik.tur)}</div>
                             <div>
                               <div className="font-semibold">{icerik.baslik}</div>
-                              <div className="text-xs text-gray-500">{turLabel(icerik.tur)} • {icerik.sorular?.length || 0} soru</div>
-                              {icerik.aciklama && <div className="text-sm text-gray-600 mt-1">{icerik.aciklama}</div>}
+                              <div className="text-xs text-gray-500">{turLabel(icerik.tur)} • {icerik.ekleyen_ad}</div>
+                              {icerik.aciklama && !isAcik && <div className="text-xs text-gray-500 mt-0.5 line-clamp-1">{icerik.aciklama}</div>}
                             </div>
                           </div>
                           <div className="flex flex-col items-end gap-2">
                             {tamamlandi && <span className="flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium"><CheckCircle className="h-4 w-4"/>+{puan} puan</span>}
-                            {(user.role === "admin" || user.role === "coordinator") && <Button variant="destructive" size="sm" onClick={async () => { try { await axios.delete(`${API}/gelisim/icerik/${icerik.id}`); fetchAll(); toast({title:"Silindi"}); } catch(e){} }}><Trash2 className="h-4 w-4"/></Button>}
+                            <div className="flex items-center gap-1">
+                              {(user.role === "admin" || user.role === "coordinator") && <Button variant="destructive" size="sm" onClick={async (e) => { e.stopPropagation(); try { await axios.delete(`${API}/gelisim/icerik/${icerik.id}`); fetchAll(); toast({title:"Silindi"}); } catch(e){} }}><Trash2 className="h-4 w-4"/></Button>}
+                              <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isAcik ? 'rotate-180' : ''}`} />
+                            </div>
                           </div>
                         </div>
-                        {/* Okuma / Test butonları — tamamlanmış olsa da göster */}
-                        <div className="flex gap-2 mt-4 flex-wrap">
-                            {icerik.tur === "okuma_parcasi" && icerik.okuma_metni && (
-                              <Button size="sm" onClick={() => { setAktifIcerik(icerik); setGorunum("okuma"); }}
-                                className="bg-gradient-to-r from-amber-500 to-orange-500 text-white">
-                                📖 {tamamlandi ? "Tekrar Oku" : "Okumaya Başla"}
-                              </Button>
+
+                        {/* Detay - açılır */}
+                        {isAcik && (
+                          <div className="px-5 pb-3 space-y-3 border-t border-gray-100 pt-3">
+                            {icerik.aciklama && <div className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3 whitespace-pre-wrap">{icerik.aciklama}</div>}
+                            {icerik.okuma_metni && (
+                              <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
+                                <div className="text-xs font-medium text-amber-700 mb-2">📖 Okuma Metni ({icerik.okuma_metni.trim().split(/\s+/).length} kelime)</div>
+                                <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{icerik.okuma_metni.substring(0, 500)}{icerik.okuma_metni.length > 500 ? "..." : ""}</div>
+                              </div>
                             )}
-                            {icerik.tur === "okuma_parcasi" && !icerik.okuma_metni && (
+                            {icerik.kitap_yazar && <div className="text-sm text-gray-600">✍️ Yazar: {icerik.kitap_yazar}</div>}
+                            {icerik.kitap_kapak && <img src={icerik.kitap_kapak} alt="Kapak" className="h-24 rounded-lg shadow" onError={e => { e.target.style.display='none'; }} />}
+                            {icerik.makale_link && <a href={icerik.makale_link} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline block">🔗 Linki Aç →</a>}
+                            {icerik.sorular?.length > 0 && <div className="text-xs text-gray-500 bg-blue-50 px-3 py-2 rounded-lg">📝 {icerik.sorular.length} test sorusu mevcut</div>}
+                            <div className="text-xs text-gray-400">Hedef: {({"hepsi":"Herkes","ogretmen":"Öğretmenler","ogrenci":"Öğrenciler"})[icerik.hedef_kitle] || icerik.hedef_kitle} • Eklenme: {new Date(icerik.olusturma_tarihi).toLocaleDateString("tr-TR")}</div>
+                          </div>
+                        )}
+
+                        {/* Aksiyon butonları */}
+                        <div className="px-5 pb-5 flex gap-2 flex-wrap mt-1">
+                            {icerik.tur === "okuma_parcasi" && (
                               <Button size="sm" onClick={() => { setAktifIcerik(icerik); setGorunum("okuma"); }}
                                 className="bg-gradient-to-r from-amber-500 to-orange-500 text-white">
                                 📖 {tamamlandi ? "Tekrar Oku" : "Okumaya Başla"}
@@ -8798,30 +8840,27 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                                 ✓ Tamamlandı (+1 puan)
                               </Button>
                             )}
-                          </div>
-                        {/* Kitap türü ise bölüm bazlı soru yönetimi + AI araçları */}
-                        {icerik.tur === "kitap" && (user.role === "admin" || user.role === "coordinator" || user.role === "teacher") && (
-                          <div className="mt-3 space-y-2">
-                            <Button size="sm" variant="outline" className="text-teal-600 border-teal-300 hover:bg-teal-50" onClick={async () => {
-                              setSoruYonetimiIcerik(icerik);
-                              try { const r = await axios.get(`${API}/kitaplar/${icerik.id}/sorular`); setKitapSorulari(Array.isArray(r.data) ? r.data : []); } catch(e) { setKitapSorulari([]); }
-                              setGorunum("soru-yonetimi");
-                            }}>📝 Bölüm Soruları ({icerik._soru_sayisi || "Ekle"})</Button>
-                            {/* AI Araçları - sadece admin/coordinator */}
-                            {(user.role === "admin" || user.role === "coordinator") && (
-                              <div className="flex gap-2 flex-wrap">
-                                <Button size="sm" variant="outline" className="text-purple-600 border-purple-300 hover:bg-purple-50"
-                                  onClick={() => { setAdminAiModal({ kitap: icerik, mod: "materyal" }); setAdminAiSonuc(null); setAdminAiMateryalTur("soru_seti"); }}>
-                                  🤖 AI Materyal Üret
-                                </Button>
-                                <Button size="sm" variant="outline" className="text-indigo-600 border-indigo-300 hover:bg-indigo-50"
-                                  onClick={() => { setAdminAiModal({ kitap: icerik, mod: "scaffold" }); setAdminAiSonuc(null); setAdminScaffoldSeviye("orta"); }}>
-                                  📖 Seviyeli Okuma Önizle
-                                </Button>
-                              </div>
+                            {/* Kitap türü bölüm soruları */}
+                            {icerik.tur === "kitap" && (user.role === "admin" || user.role === "coordinator" || user.role === "teacher") && (
+                              <Button size="sm" variant="outline" className="text-teal-600 border-teal-300 hover:bg-teal-50" onClick={async (e) => {
+                                e.stopPropagation();
+                                setSoruYonetimiIcerik(icerik);
+                                try { const r = await axios.get(`${API}/kitaplar/${icerik.id}/sorular`); setKitapSorulari(Array.isArray(r.data) ? r.data : []); } catch(e) { setKitapSorulari([]); }
+                                setGorunum("soru-yonetimi");
+                              }}>📝 Bölüm Soruları</Button>
                             )}
+                            {/* AI araçları - kitap, okuma_parcası, makale */}
+                            {(icerik.tur === "kitap" || icerik.tur === "okuma_parcasi" || icerik.tur === "makale") && (user.role === "admin" || user.role === "coordinator") && (<>
+                              <Button size="sm" variant="outline" className="text-purple-600 border-purple-300 hover:bg-purple-50"
+                                onClick={() => { setAdminAiModal({ kitap: icerik, mod: "materyal" }); setAdminAiSonuc(null); setAdminAiMateryalTur("soru_seti"); }}>
+                                🤖 AI Materyal
+                              </Button>
+                              <Button size="sm" variant="outline" className="text-indigo-600 border-indigo-300 hover:bg-indigo-50"
+                                onClick={() => { setAdminAiModal({ kitap: icerik, mod: "scaffold" }); setAdminAiSonuc(null); setAdminScaffoldSeviye("orta"); }}>
+                                📖 Seviyeli Okuma
+                              </Button>
+                            </>)}
                           </div>
-                        )}
                       </CardContent>
                     </Card>
                   );
