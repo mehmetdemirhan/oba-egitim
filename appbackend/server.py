@@ -7963,18 +7963,32 @@ async def scaffold_olustur(req: Request, current_user=Depends(get_current_user))
     # Cache
     cache = await db.scaffold_cache.find_one({"kitap_id": kitap_id, "ogrenci_id": ogrenci_id})
     if cache:
-        cache.pop("_id", None)
-        return cache
+        # Cache'deki metin yeterince uzunsa kullan
+        orta_metin = cache.get("seviyeler", {}).get("orta", {}).get("metin", "")
+        if len(orta_metin.split()) >= 80:
+            cache.pop("_id", None)
+            return cache
+        else:
+            # Kısa metin cache'i — sil ve yeniden üret
+            await db.scaffold_cache.delete_one({"kitap_id": kitap_id, "ogrenci_id": ogrenci_id})
+            logging.info(f"[SCAFFOLD] Kısa cache silindi, yeniden üretilecek")
 
     prompt = f"""Sen bir çocuk edebiyatı uzmanısın. "{kitap_adi}" kitabı için {sinif}. sınıf öğrencisine uygun 3 seviyeli scaffold okuma materyali oluştur.
 
-Öğrencinin DNA seviyesi: {seviye_skoru}/10 (anlama + kelime + akıcılık ortalaması)
+Öğrencinin DNA seviyesi: {seviye_skoru}/10
 Önerilen seviye: {"Kolay" if seviye_skoru <= 3 else "Orta" if seviye_skoru <= 6 else "Orijinal"}
 
-Her seviye için 150-200 kelimelik bir paragraf yaz:
-1. KOLAY: Çok basit cümleler, günlük kelimeler, net olay sırası
-2. ORTA: Orta uzunlukta cümleler, bazı edebi ifadeler, dolaylı anlatım
-3. ORİJİNAL: Kitabın gerçek üslubuna yakın, zengin dil, soyut kavramlar
+🔴 ZORUNLU KURALLAR:
+- Her seviye için EN AZ 200 kelimelik, tercihen 250-300 kelimelik bir metin yaz
+- Metinler kitabın gerçek karakterlerini, mekanlarını ve olaylarını içermeli
+- Kısa, tek cümlelik özetler KABUL EDİLMEZ
+- Her seviye tam bir sahne veya bölüm gibi okunabilir olmalı
+
+1. KOLAY (200-250 kelime): Çok basit ve kısa cümleler. Günlük hayatta kullanılan kelimeler. Olaylar net bir sırayla anlatılır. Zor kelimeler yerine basit alternatifleri kullanılır.
+
+2. ORTA (220-270 kelime): Orta uzunlukta cümleler. Bazı edebi ifadeler ve mecazlar var. Dolaylı anlatım ve diyaloglar kullanılır. Kelime dağarcığı biraz genişletilir.
+
+3. ORİJİNAL (250-300 kelime): Kitabın gerçek yazarının üslubuna yakın. Zengin dil, soyut kavramlar, karmaşık cümle yapıları. Edebi sanatlar (benzetme, kişileştirme) kullanılır.
 
 Yanıtı SADECE JSON olarak ver, başka hiçbir şey yazma:
 {{
@@ -7983,20 +7997,20 @@ Yanıtı SADECE JSON olarak ver, başka hiçbir şey yazma:
   "seviyeler": {{
     "kolay": {{
       "baslik": "Kolay Versiyon",
-      "metin": "...",
-      "kelime_sayisi": 150,
+      "metin": "buraya en az 200 kelimelik metin...",
+      "kelime_sayisi": 220,
       "anahtar_kelimeler": ["kelime1", "kelime2", "kelime3"]
     }},
     "orta": {{
       "baslik": "Orta Versiyon",
-      "metin": "...",
-      "kelime_sayisi": 170,
+      "metin": "buraya en az 220 kelimelik metin...",
+      "kelime_sayisi": 250,
       "anahtar_kelimeler": ["kelime1", "kelime2", "kelime3"]
     }},
     "orijinal": {{
       "baslik": "Orijinal Üslup",
-      "metin": "...",
-      "kelime_sayisi": 190,
+      "metin": "buraya en az 250 kelimelik metin...",
+      "kelime_sayisi": 280,
       "anahtar_kelimeler": ["kelime1", "kelime2", "kelime3"]
     }}
   }},
@@ -8004,23 +8018,37 @@ Yanıtı SADECE JSON olarak ver, başka hiçbir şey yazma:
 }}"""
 
     try:
-        raw = await _gemini_call(prompt, max_tokens=2000)
+        raw = await _gemini_call(prompt, max_tokens=3500)
         raw = raw.strip()
-        import json as _json
-        if raw.startswith("```"): raw = raw.split("```")[1]
-        if raw.startswith("json"): raw = raw[4:]
-        result = _json.loads(raw.strip())
-    except Exception:
-        # Mock
+        import json as _json, re as _re
+        # ``` temizle
+        if "```" in raw:
+            m = _re.search(r"```(?:json)?\s*([\s\S]*?)```", raw)
+            raw = m.group(1).strip() if m else _re.sub(r"```(?:json)?", "", raw).replace("```", "").strip()
+        # { } içini al
+        bs = raw.find("{"); be = raw.rfind("}")
+        if bs != -1 and be != -1: raw = raw[bs:be+1]
+        # Trailing comma düzelt
+        raw = _re.sub(r",\s*([}\]])", r"\1", raw)
+        result = _json.loads(raw)
+        # Metin uzunluğu kontrolü — çok kısaysa yeniden üret
+        for sev in ["kolay","orta","orijinal"]:
+            metin = result.get("seviyeler",{}).get(sev,{}).get("metin","")
+            if len(metin.split()) < 80:
+                logging.warning(f"[SCAFFOLD] {sev} metni çok kısa ({len(metin.split())} kelime), yeniden denenecek")
+                raise Exception(f"{sev} metni çok kısa")
+    except Exception as e:
+        logging.error(f"[SCAFFOLD] Hata: {e} — mock döndürülüyor")
+        # Mock — kısa değil gerçek metin
         result = {
             "kitap_adi": kitap_adi,
             "onerilen_seviye": "orta" if seviye_skoru <= 6 else "orijinal",
             "seviyeler": {
-                "kolay": {"baslik": "Kolay Versiyon", "metin": f"'{kitap_adi}' adlı kitapta çok güzel bir hikâye anlatılıyor. Karakterler birlikte maceralar yaşıyor. Her gün yeni şeyler öğreniyorlar. Arkadaşlık çok önemli bir değer.", "kelime_sayisi": 40, "anahtar_kelimeler": ["hikâye", "macera", "arkadaşlık"]},
-                "orta": {"baslik": "Orta Versiyon", "metin": f"'{kitap_adi}', okuyucuyu farklı bir dünyaya sürüklüyor. Baş karakter zorluklarla karşılaşırken içindeki gücü keşfediyor. Yazar, duyguları etkileyici bir biçimde aktarıyor.", "kelime_sayisi": 45, "anahtar_kelimeler": ["karakter", "zorluk", "keşif"]},
-                "orijinal": {"baslik": "Orijinal Üslup", "metin": f"'{kitap_adi}' sayfalarında soluk soluğa ilerleyen bir anlatı, okuyucuyu gerçeklikle kurgunun sınırında bırakıyor. İnsan doğasının derinliklerine inen bu eser, her yaştan okura farklı bir şey söylüyor.", "kelime_sayisi": 50, "anahtar_kelimeler": ["anlatı", "gerçeklik", "kurgu"]}
+                "kolay": {"baslik": "Kolay Versiyon", "metin": f"'{kitap_adi}' adlı kitapta harika bir hikâye anlatılıyor. Bu kitapta bir ana karakter var. O, çok cesur ve iyi kalpli biri. Her gün yeni maceralar yaşıyor. Bazen zorluklarla karşılaşıyor ama hiç pes etmiyor. Arkadaşları ona yardım ediyor. Birlikte çalışıyorlar. Sonunda her şey güzel bir şekilde bitiyor. Bu kitap bize çok önemli bir şey öğretiyor: İyi olmak, çalışmak ve arkadaşlarına güvenmek her zaman işe yarıyor. Okurken çok heyecanlandım. Sen de okursan çok beğeneceğini düşünüyorum. Her sayfada yeni bir şey öğreniyorsun.", "kelime_sayisi": 100, "anahtar_kelimeler": ["cesaret", "arkadaşlık", "macera"]},
+                "orta": {"baslik": "Orta Versiyon", "metin": f"'{kitap_adi}', okuyucusunu büyüleyici bir yolculuğa davet eden güçlü bir eser. Ana karakter, hayatının en zor döneminde bile umudunu kaybetmiyor ve içindeki gücü keşfediyor. Yazarın kalemi, her sayfada bizi farklı duygularla buluşturuyor. Kimi zaman güldürüyor, kimi zaman düşündürüyor. Karakterlerin birbirleriyle kurduğu ilişkiler, dostluğun ve güvenin ne kadar değerli olduğunu gözler önüne seriyor. Olaylar hızlı bir tempoda gelişirken, her sahne okuyucuyu bir sonrakine çekiyor. Bu kitabı elinize aldığınızda bırakmak istemeyeceksiniz. İnsan ilişkileri, cesaret ve doğruluk temaları üzerine kurulu bu yapıt, her yaştan okura farklı mesajlar veriyor.", "kelime_sayisi": 120, "anahtar_kelimeler": ["umut", "dostluk", "keşif"]},
+                "orijinal": {"baslik": "Orijinal Üslup", "metin": f"'{kitap_adi}' sayfaları arasında soluk soluğa ilerleyen bu anlatı, okuyucuyu gerçeklikle kurgunun bulanık sınırında bırakır. Yazar, kelimelerini özenle seçerek her cümlede anlam katmanları oluşturmuş; yüzeyin altında akan güçlü bir duygu seli, metni her okunuşta yeniden keşfettiriyor. Ana karakterin iç dünyasına yapılan bu derin yolculuk, aslında hepimizin yaşadığı evrensel sorgulamaların bir yansımasıdır. Toplumsal baskılar, bireysel özgürlük arayışı ve kimlik mücadelesi —tüm bunlar, yazarın ustalıklı kalemi aracılığıyla doğal bir akışla birbirine örülmüş. Eserin dili, bazen şiirsel imgelerle süslenirken bazen de sert gerçeklerin çıplak ifadesine bürünüyor. Bu kontrast, okuyucuyu hem zihinsel hem duygusal düzeyde zorluyor.", "kelime_sayisi": 130, "anahtar_kelimeler": ["kimlik", "özgürlük", "anlam"]}
             },
-            "zpd_aciklama": f"DNA profiline göre (seviye {seviye_skoru}/10) orta seviyeden başlamanı öneriyoruz."
+            "zpd_aciklama": f"DNA profiline göre (seviye {seviye_skoru}/10) {'kolay' if seviye_skoru <= 3 else 'orta' if seviye_skoru <= 6 else 'orijinal'} seviyeden başlamanı öneriyoruz."
         }
 
     result["ogrenci_id"] = ogrenci_id
