@@ -8915,7 +8915,482 @@ SADECE JSON döndür:
         return {"oyun": None, "mesaj": f"Oyun üretilemedi: {str(e)}"}
 
 
+
 # ─────────────────────────────────────────────
+# OKUMA EVRENİ — 5 Bölge Gamification
+# ─────────────────────────────────────────────
+
+OKUMA_EVRENI_BOLGELER = [
+    {
+        "id": "orman",
+        "ad": "Orman Kitaplığı",
+        "emoji": "🌲",
+        "renk": "#22c55e",
+        "aciklama": "Okuma yolculuğuna başladın!",
+        "kriter": "baslangic",  # Herkes başlar
+        "min_kitap": 0, "min_kelime": 0, "min_streak": 0, "min_bloom": 0,
+    },
+    {
+        "id": "kelime_dag",
+        "ad": "Kelime Dağları",
+        "emoji": "⛰️",
+        "renk": "#f59e0b",
+        "aciklama": "50 kelime öğrendin!",
+        "kriter": "kelime",
+        "min_kitap": 0, "min_kelime": 50, "min_streak": 0, "min_bloom": 0,
+    },
+    {
+        "id": "hikaye_limani",
+        "ad": "Hikâye Limanı",
+        "emoji": "⚓",
+        "renk": "#3b82f6",
+        "aciklama": "5 kitap/içerik tamamladın!",
+        "kriter": "kitap",
+        "min_kitap": 5, "min_kelime": 0, "min_streak": 0, "min_bloom": 0,
+    },
+    {
+        "id": "bilgelik_kutuphane",
+        "ad": "Bilgelik Kütüphanesi",
+        "emoji": "🏰",
+        "renk": "#8b5cf6",
+        "aciklama": "Bloom %60 anlama seviyesine ulaştın!",
+        "kriter": "bloom",
+        "min_kitap": 5, "min_kelime": 100, "min_streak": 7, "min_bloom": 60,
+    },
+    {
+        "id": "hayal_galaksisi",
+        "ad": "Hayal Galaksisi",
+        "emoji": "🚀",
+        "renk": "#ec4899",
+        "aciklama": "Tüm evrenin fethettdin! En yüksek seviye.",
+        "kriter": "tumu",
+        "min_kitap": 20, "min_kelime": 300, "min_streak": 30, "min_bloom": 80,
+    },
+]
+
+@api_router.get("/ai/okuma-evreni/{ogrenci_id}")
+async def okuma_evreni(ogrenci_id: str, current_user=Depends(get_current_user)):
+    """Öğrencinin Okuma Evreni bölgesini ve ilerleme durumunu hesapla."""
+    # İstatistikler
+    logs = await db.reading_logs.find({"ogrenci_id": ogrenci_id}).to_list(length=None)
+    tamamlananlar = await db.gelisim_tamamlananlar.find({"kullanici_id": ogrenci_id}).to_list(length=None)
+    kelime_ogrenilen = await db.kelime_tekrar.count_documents({"ogrenci_id": ogrenci_id, "kutu": {"$gte": 3}})
+    test_sonuclari = await db.kitap_test_sonuclari.find({"ogrenci_id": ogrenci_id}).to_list(length=None)
+
+    # Streak hesapla
+    from datetime import timedelta
+    simdi = datetime.utcnow()
+    tarihler = sorted(set(l.get("tarih", "")[:10] for l in logs), reverse=True)
+    streak = 0
+    for i in range(90):
+        gun = (simdi - timedelta(days=i)).strftime("%Y-%m-%d")
+        if gun in tarihler:
+            streak += 1
+        elif i > 0:
+            break
+
+    # Bloom ortalaması
+    bloom_ortalama = 0
+    if test_sonuclari:
+        bloom_ortalama = sum(t.get("basari_yuzdesi", 0) for t in test_sonuclari) / len(test_sonuclari)
+
+    # Tamamlanan içerik sayısı
+    tamamlanan_sayi = len(tamamlananlar)
+
+    # Mevcut bölgeyi hesapla
+    aktif_bolge = OKUMA_EVRENI_BOLGELER[0]
+    for bolge in reversed(OKUMA_EVRENI_BOLGELER):
+        if (tamamlanan_sayi >= bolge["min_kitap"] and
+            kelime_ogrenilen >= bolge["min_kelime"] and
+            streak >= bolge["min_streak"] and
+            bloom_ortalama >= bolge["min_bloom"]):
+            aktif_bolge = bolge
+            break
+
+    # Sıradaki bölge
+    aktif_idx = next((i for i, b in enumerate(OKUMA_EVRENI_BOLGELER) if b["id"] == aktif_bolge["id"]), 0)
+    sonraki_bolge = OKUMA_EVRENI_BOLGELER[aktif_idx + 1] if aktif_idx < len(OKUMA_EVRENI_BOLGELER) - 1 else None
+
+    # Sonraki bölgeye ilerleme yüzdesi
+    ilerleme = {}
+    if sonraki_bolge:
+        hedefler = [
+            ("kitap", tamamlanan_sayi, sonraki_bolge["min_kitap"]),
+            ("kelime", kelime_ogrenilen, sonraki_bolge["min_kelime"]),
+            ("streak", streak, sonraki_bolge["min_streak"]),
+            ("bloom", round(bloom_ortalama), sonraki_bolge["min_bloom"]),
+        ]
+        for ad, mevcut, hedef in hedefler:
+            if hedef > 0:
+                ilerleme[ad] = {"mevcut": mevcut, "hedef": hedef, "yuzde": min(100, round(mevcut / hedef * 100))}
+
+    return {
+        "ogrenci_id": ogrenci_id,
+        "aktif_bolge": aktif_bolge,
+        "aktif_bolge_idx": aktif_idx,
+        "sonraki_bolge": sonraki_bolge,
+        "ilerleme": ilerleme,
+        "tum_bolgeler": OKUMA_EVRENI_BOLGELER,
+        "istatistikler": {
+            "tamamlanan": tamamlanan_sayi,
+            "kelime": kelime_ogrenilen,
+            "streak": streak,
+            "bloom": round(bloom_ortalama),
+        }
+    }
+
+
+# ─────────────────────────────────────────────
+# AI MOTİVASYON MOTORU — Mikro Hedef + Streak Koruma
+# ─────────────────────────────────────────────
+
+@api_router.get("/ai/motivasyon/{ogrenci_id}")
+async def ai_motivasyon(ogrenci_id: str, current_user=Depends(get_current_user)):
+    """Giriş ekranı için kişiselleştirilmiş mikro hedef + motivasyon mesajı üretir."""
+    from datetime import timedelta
+    simdi = datetime.utcnow()
+
+    # Son okuma kayıtları
+    logs = await db.reading_logs.find({"ogrenci_id": ogrenci_id}).sort("tarih", -1).to_list(length=30)
+    bugun = simdi.strftime("%Y-%m-%d")
+    dun = (simdi - timedelta(days=1)).strftime("%Y-%m-%d")
+    bugun_dk = sum(l.get("sure_dakika", 0) for l in logs if l.get("tarih", "").startswith(bugun))
+    dun_dk = sum(l.get("sure_dakika", 0) for l in logs if l.get("tarih", "").startswith(dun))
+
+    # Streak
+    tarihler = sorted(set(l.get("tarih", "")[:10] for l in logs), reverse=True)
+    streak = 0
+    for i in range(60):
+        gun = (simdi - timedelta(days=i)).strftime("%Y-%m-%d")
+        if gun in tarihler:
+            streak += 1
+        elif i > 0:
+            break
+
+    # Ortalama günlük okuma (son 7 gün)
+    son7 = [(simdi - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(7)]
+    ort_dk = round(sum(
+        sum(l.get("sure_dakika", 0) for l in logs if l.get("tarih", "").startswith(g))
+        for g in son7
+    ) / 7)
+
+    # Profil belirle
+    user_data = await db.users.find_one({"id": ogrenci_id})
+    ad = user_data.get("ad", "Okuyucu") if user_data else "Okuyucu"
+
+    # Durum analizi
+    streak_risk = streak > 0 and bugun_dk == 0  # Streak var ama bugün okumamış
+    yeni_baslayanlar = streak == 0 and len(logs) < 3
+    hedef_dk = max(5, min(30, ort_dk + 5)) if ort_dk > 0 else 10
+
+    # Mikro hedef seç
+    if bugun_dk >= hedef_dk:
+        mikro_hedef = None  # Bugün tamamlandı
+        durum = "tamamlandi"
+    elif streak_risk:
+        mikro_hedef = {"dk": max(5, hedef_dk - bugun_dk), "tip": "streak_koruma", "icon": "🔥"}
+        durum = "streak_risk"
+    elif yeni_baslayanlar:
+        mikro_hedef = {"dk": 5, "tip": "baslangic", "icon": "🌱"}
+        durum = "yeni"
+    else:
+        mikro_hedef = {"dk": max(5, hedef_dk - bugun_dk), "tip": "gunluk", "icon": "📚"}
+        durum = "devam"
+
+    # Mesaj üret (Gemini değil — hızlı olmalı, sabit mesaj havuzu)
+    mesajlar = {
+        "tamamlandi": [
+            f"Harika {ad}! Bugünkü hedefinizi tamamladınız 🎉",
+            f"Mükemmel! Bugün {bugun_dk} dakika okudunuz. Devam edin! 💪",
+            f"Süpersin {ad}! Bugün harika bir okuma günüydü 📚",
+        ],
+        "streak_risk": [
+            f"🔥 {streak} günlük serinizi koruyun! Sadece {mikro_hedef['dk'] if mikro_hedef else 5} dakika daha gerekiyor.",
+            f"Dikkat {ad}! {streak} günlük seriniz tehlikede. Hemen okumaya başla! 🔥",
+            f"Bugün henüz okumadınız. {streak} günlük serinizi kırmayın! ⚡",
+        ],
+        "yeni": [
+            f"Merhaba {ad}! Okuma yolculuğuna hoş geldin 🌱",
+            f"Başlamak için en iyi zaman şimdi! Sadece 5 dakika ile başla 📖",
+            f"Her büyük okuyucu bir ilk sayfayla başladı. Seninki hangisi? 🌟",
+        ],
+        "devam": [
+            f"Bugün {hedef_dk} dakika okuma hedefin var {ad}! Hadi başlayalım 📚",
+            f"{'Dün ' + str(dun_dk) + ' dakika okudun.' if dun_dk > 0 else 'Her gün biraz daha ilerle.'} Bugün {mikro_hedef['dk'] if mikro_hedef else hedef_dk} dakika kaldı!",
+            f"{'🔥 ' + str(streak) + ' günlük serin devam ediyor!' if streak > 1 else ''} Bugünkü hedefe ulaş! 💫",
+        ],
+    }
+
+    import random as _random
+    mesaj = _random.choice(mesajlar.get(durum, mesajlar["devam"]))
+
+    return {
+        "ad": ad,
+        "durum": durum,
+        "mesaj": mesaj,
+        "mikro_hedef": mikro_hedef,
+        "streak": streak,
+        "bugun_dk": bugun_dk,
+        "hedef_dk": hedef_dk,
+        "ort_dk": ort_dk,
+    }
+
+
+# ─────────────────────────────────────────────
+
+# ─────────────────────────────────────────────
+# AI GELİŞİM SİMÜLASYONU
+# ─────────────────────────────────────────────
+
+@api_router.get("/ai/gelisim-simulasyon/{ogrenci_id}")
+async def gelisim_simulasyon(ogrenci_id: str, current_user=Depends(get_current_user)):
+    """Mevcut verilerden 6 aylık gelişim projeksiyonu üretir."""
+    v = await get_ogrenci_ai_verileri(ogrenci_id)
+    if not v:
+        return {"hata": "Öğrenci verisi bulunamadı"}
+
+    streak = v["streak"].get("mevcut", 0)
+    avg_dk = v["okuma_ozet"].get("ort_gunluk_dk", 0)
+    kelime_sayisi = await db.kelime_tekrar.count_documents({"ogrenci_id": ogrenci_id})
+    test_kayitlar = await db.kitap_test_sonuclari.find({"ogrenci_id": ogrenci_id}).sort("tarih", -1).to_list(length=20)
+    bloom_ort = 0
+    if test_kayitlar:
+        bloom_ort = round(sum(k.get("basari_yuzdesi", 0) for k in test_kayitlar) / len(test_kayitlar))
+
+    # Hedef okuma süreleri → projeksiyon
+    senaryolar = []
+    for hedef_dk in [5, 10, 15, 20]:
+        gunluk = hedef_dk
+        aylik_dk = gunluk * 22  # Haftada 5 gün
+        alti_ay_dk = aylik_dk * 6
+        mevcut = avg_dk or 1
+        artis_oran = min(80, round((hedef_dk / max(mevcut, 1) - 1) * 30 + 15))
+        kelime_kazanim = round(hedef_dk * 0.8 * 180)  # dk * kelime_hizi * gun
+        bloom_artis = min(95, bloom_ort + round(artis_oran * 0.4))
+        kitap_sayisi = round(alti_ay_dk / 90)  # Ortalama 90dk / kitap
+        senaryolar.append({
+            "hedef_dk": hedef_dk,
+            "artis_yuzdesi": artis_oran,
+            "kelime_kazanim": kelime_kazanim,
+            "tahmini_kitap": kitap_sayisi,
+            "bloom_tahmini": bloom_artis,
+            "alti_ay_toplam_dk": alti_ay_dk,
+        })
+
+    # 6 aylık aylık projeksiyon (seçili hedef = 10 dk)
+    aylik_projeksiyon = []
+    baz_bloom = bloom_ort
+    baz_kelime = kelime_sayisi
+    for ay in range(1, 7):
+        baz_bloom = min(95, baz_bloom + round((95 - baz_bloom) * 0.12))
+        baz_kelime = baz_kelime + round(10 * 0.8 * 22 * ay * 0.15)
+        aylik_projeksiyon.append({
+            "ay": ay,
+            "bloom_tahmini": baz_bloom,
+            "kelime_tahmini": baz_kelime,
+            "okunan_dk": 10 * 22 * ay,
+        })
+
+    return {
+        "mevcut": {
+            "streak": streak,
+            "avg_dk": avg_dk,
+            "kelime": kelime_sayisi,
+            "bloom_ort": bloom_ort,
+        },
+        "senaryolar": senaryolar,
+        "aylik_projeksiyon": aylik_projeksiyon,
+        "ozet_mesaj": f"Şu an günde ortalama {avg_dk} dk okuyorsun. 10 dk/gün hedefiyle 6 ayda yaklaşık %{senaryolar[1]['artis_yuzdesi']} gelişim sağlarsın!",
+    }
+
+
+# ─────────────────────────────────────────────
+# AI OKUMA TERAPİSİ — Erken Tespit
+# ─────────────────────────────────────────────
+
+@api_router.get("/ai/okuma-terapisi/{ogrenci_id}")
+async def okuma_terapisi(ogrenci_id: str, current_user=Depends(get_current_user)):
+    """Öğrenci verilerinden okuma güçlüğü sinyallerini tespit eder. TANI KOYMAZ, yönlendirir."""
+    v = await get_ogrenci_ai_verileri(ogrenci_id)
+    if not v:
+        return {"sinyaller": [], "risk_seviyesi": "belirsiz", "oneri": "Veri yetersiz"}
+
+    sinyaller = []
+    risk_puan = 0
+
+    # Streak düşüklüğü
+    streak = v["streak"].get("mevcut", 0)
+    if streak == 0:
+        sinyaller.append({"tip": "motivasyon", "mesaj": "Son günlerde okuma aktivitesi yok", "agirlik": 2})
+        risk_puan += 2
+
+    # Okuma hızı analizi
+    avg_dk = v["okuma_ozet"].get("ort_gunluk_dk", 0)
+    if 0 < avg_dk < 5:
+        sinyaller.append({"tip": "dikkat", "mesaj": "Çok kısa okuma süreleri (5 dk altı)", "agirlik": 3})
+        risk_puan += 3
+
+    # Test başarısı düşüklüğü
+    test_kayitlar = await db.kitap_test_sonuclari.find({"ogrenci_id": ogrenci_id}).sort("tarih", -1).to_list(length=10)
+    if test_kayitlar:
+        bloom_ort = sum(k.get("basari_yuzdesi", 0) for k in test_kayitlar) / len(test_kayitlar)
+        if bloom_ort < 40:
+            sinyaller.append({"tip": "anlama", "mesaj": f"Anlama testlerinde düşük başarı (ort. %{round(bloom_ort)})", "agirlik": 4})
+            risk_puan += 4
+        # Bilgi ve kavrama basamaklarında bile düşüklük → potansiyel kelime zorluğu
+        bilgi_sorulari = [k for k in test_kayitlar if k.get("taksonomi") in ["bilgi", "kavrama"]]
+        if bilgi_sorulari:
+            bilgi_ort = sum(k.get("dogru_mu", False) for k in bilgi_sorulari) / len(bilgi_sorulari) * 100
+            if bilgi_ort < 50:
+                sinyaller.append({"tip": "kelime_kacinma", "mesaj": "Temel anlama sorularında zorluk — kelime dağarcığı desteği gerekebilir", "agirlik": 3})
+                risk_puan += 3
+
+    # Kelime tekrar analizi
+    kelime_sayisi = await db.kelime_tekrar.count_documents({"ogrenci_id": ogrenci_id})
+    tekrar_yuksek = await db.kelime_tekrar.count_documents({"ogrenci_id": ogrenci_id, "tekrar_sayisi": {"$gte": 5}})
+    if kelime_sayisi > 0 and tekrar_yuksek / max(kelime_sayisi, 1) > 0.4:
+        sinyaller.append({"tip": "kelime_hafiza", "mesaj": "Kelimeleri hatırlamada tekrar eden güçlük", "agirlik": 2})
+        risk_puan += 2
+
+    # Okuma kayıtlarında geri dönüş / kısa oturum patikası
+    okuma_log = await db.reading_logs.find({"ogrenci_id": ogrenci_id}).sort("tarih", -1).to_list(length=20)
+    if len(okuma_log) >= 5:
+        kisa_oturumlar = [l for l in okuma_log if (l.get("sure_dakika", 10)) < 3]
+        if len(kisa_oturumlar) > len(okuma_log) * 0.5:
+            sinyaller.append({"tip": "dikkat_suresi", "mesaj": "Okuma oturumları çok kısa kesiyor (dikkat dağılması belirtisi)", "agirlik": 3})
+            risk_puan += 3
+
+    # Risk seviyesi hesapla
+    if risk_puan >= 8:
+        risk_seviyesi = "yuksek"
+        oneri = "Bu öğrenci için uzman yönlendirmesi düşünülebilir. Okuma güçlüğü belirtileri gözlemleniyor — lütfen bir okuma uzmanı veya rehber öğretmenle görüşün."
+    elif risk_puan >= 4:
+        risk_seviyesi = "orta"
+        oneri = "Öğrencinin okuma alışkanlıkları dikkat gerektiriyor. Birebir destek ve farklı materyaller deneyin."
+    elif risk_puan >= 1:
+        risk_seviyesi = "dusuk"
+        oneri = "Küçük sinyaller var. Düzenli takip ve teşvik yeterli olabilir."
+    else:
+        risk_seviyesi = "normal"
+        oneri = "Belirgin bir okuma güçlüğü sinyali tespit edilmedi."
+
+    return {
+        "ogrenci_id": ogrenci_id,
+        "risk_seviyesi": risk_seviyesi,
+        "risk_puan": risk_puan,
+        "sinyaller": sinyaller,
+        "oneri": oneri,
+        "uyari": "⚠️ Bu sistem TANI KOYMAZ. Sadece gözlem ve yönlendirme aracıdır.",
+        "tarih": datetime.utcnow().isoformat(),
+    }
+
+
+# ─────────────────────────────────────────────
+# HİBRİT İÇERİK ONAY — AI Skor Sistemi
+# ─────────────────────────────────────────────
+
+@api_router.post("/ai/icerik-kalite-skoru")
+async def icerik_kalite_skoru(req: Request, current_user=Depends(get_current_user)):
+    """İçeriği AI ile değerlendirir: 0-100 skor → 80+ otomatik onay, 50-79 peer review, 0-49 red."""
+    data = await req.json()
+    icerik_id = data.get("icerik_id", "")
+    baslik = data.get("baslik", "")
+    aciklama = data.get("aciklama", "")
+    tur = data.get("tur", "kitap")
+    sinif = data.get("sinif", 3)
+    metin = data.get("metin", "")
+
+    prompt = f"""Bir Türkçe eğitim içeriğini değerlendir. 0-100 arası kalite skoru ver.
+
+Başlık: {baslik}
+Tür: {tur}
+Sınıf: {sinif}
+Açıklama: {aciklama[:500] if aciklama else "Yok"}
+{f"İçerik metni (ilk 500 kelime): {metin[:1000]}" if metin else ""}
+
+Değerlendirme kriterleri:
+1. Yaş/sınıf uygunluğu (0-25 puan)
+2. Eğitimsel değer ve MEB uyumu (0-25 puan)
+3. İçerik kalitesi ve özgünlük (0-25 puan)
+4. Dil doğruluğu ve anlaşılırlık (0-25 puan)
+
+SADECE JSON döndür:
+{{
+  "toplam_skor": 75,
+  "alt_skorlar": {{
+    "yas_uygunlugu": 20,
+    "egitimsel_deger": 18,
+    "icerik_kalitesi": 17,
+    "dil_kalitesi": 20
+  }},
+  "guclu_yonler": ["..."],
+  "zayif_yonler": ["..."],
+  "red_nedeni": null,
+  "oneri": "..."
+}}"""
+
+    try:
+        raw = await _gemini_call(prompt, max_tokens=800)
+        import json as _json, re as _re
+        raw = raw.strip()
+        if "```" in raw:
+            m = _re.search(r"```(?:json)?\s*([\s\S]*?)```", raw)
+            raw = m.group(1).strip() if m else _re.sub(r"```(?:json)?", "", raw).replace("```", "").strip()
+        bs = raw.find("{"); be = raw.rfind("}")
+        if bs != -1 and be != -1: raw = raw[bs:be+1]
+        raw = _re.sub(r",\s*([}\]])", r"\1", raw)
+        result = _json.loads(raw)
+    except Exception as e:
+        logging.error(f"[HIBRIT-ONAY] AI skor hatası: {e}")
+        result = {
+            "toplam_skor": 65,
+            "alt_skorlar": {"yas_uygunlugu": 17, "egitimsel_deger": 16, "icerik_kalitesi": 16, "dil_kalitesi": 16},
+            "guclu_yonler": ["İçerik uygun görünüyor"],
+            "zayif_yonler": ["Otomatik değerlendirme yapılamadı"],
+            "red_nedeni": None,
+            "oneri": "Manuel inceleme önerilir"
+        }
+
+    skor = result.get("toplam_skor", 65)
+
+    # Karar
+    if skor >= 80:
+        karar = "otomatik_onayla"
+        karar_label = "✅ Otomatik Onay"
+        karar_renk = "green"
+    elif skor >= 50:
+        karar = "peer_review"
+        karar_label = "🔍 Peer Review Gerekli"
+        karar_renk = "orange"
+    else:
+        karar = "red"
+        karar_label = "❌ Reddedildi"
+        karar_renk = "red"
+
+    result["karar"] = karar
+    result["karar_label"] = karar_label
+    result["karar_renk"] = karar_renk
+    result["icerik_id"] = icerik_id
+
+    # Otomatik onay uygula
+    if karar == "otomatik_onayla" and icerik_id:
+        try:
+            await db.gelisim_icerik.update_one(
+                {"id": icerik_id},
+                {"$set": {"durum": "yayinda", "ai_skor": skor, "ai_karar": karar, "ai_karar_tarihi": datetime.utcnow().isoformat()}}
+            )
+        except: pass
+    elif icerik_id:
+        try:
+            await db.gelisim_icerik.update_one(
+                {"id": icerik_id},
+                {"$set": {"ai_skor": skor, "ai_karar": karar, "ai_karar_tarihi": datetime.utcnow().isoformat()}}
+            )
+        except: pass
+
+    return result
+
+
 # APP SETUP
 # ─────────────────────────────────────────────
 
