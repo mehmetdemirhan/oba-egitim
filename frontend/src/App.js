@@ -7890,6 +7890,54 @@ function KitapOyunGorunum({ oyun, oyunDurum, setOyunDurum, onBitir, onKapat }) {
   return <div className="text-center py-4 text-gray-400 text-sm">Oyun türü desteklenmiyor</div>;
 }
 
+// ── ETKİ İSTATİSTİK WIDGET ──────────────────────────────────
+function EtkiIstatistikWidget({ icerikId, apiBase }) {
+  const [etki, setEtki] = React.useState(null);
+  const [yuklendi, setYuklendi] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!icerikId || yuklendi) return;
+    setYuklendi(true);
+    axios.get(`${apiBase}/gelisim/icerik/${icerikId}/etki`)
+      .then(r => setEtki(r.data))
+      .catch(() => {});
+  }, [icerikId]);
+
+  if (!etki) return (
+    <div className="text-[10px] text-gray-300 animate-pulse">📊 Etki yükleniyor...</div>
+  );
+
+  const istatlar = [
+    { label: "Öğrenci", val: etki.tamamlayan_ogrenci, emoji: "👤", renk: "text-blue-600" },
+    { label: "Materyal", val: etki.uretilen_materyal, emoji: "📋", renk: "text-purple-600" },
+    { label: "Oyun", val: etki.oynanan_oyun, emoji: "🎮", renk: "text-pink-600" },
+    { label: "Analiz", val: etki.post_reading_analiz, emoji: "🎯", renk: "text-orange-600" },
+  ];
+
+  if (istatlar.every(s => s.val === 0)) return (
+    <div className="text-[10px] text-gray-400 italic">Henüz etkileşim yok — ilk öğrenciler bekliyor!</div>
+  );
+
+  return (
+    <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl p-3 border border-indigo-100">
+      <div className="text-[10px] font-bold text-indigo-700 mb-2">📊 İçerik Etkisi</div>
+      <div className="grid grid-cols-4 gap-1.5">
+        {istatlar.map((s, i) => (
+          <div key={i} className="bg-white rounded-lg p-1.5 text-center border border-indigo-100">
+            <div className={`font-bold text-sm ${s.renk}`}>{s.val}</div>
+            <div className="text-[9px] text-gray-500">{s.emoji} {s.label}</div>
+          </div>
+        ))}
+      </div>
+      {etki.bloom_ort > 0 && (
+        <div className="mt-1.5 text-[10px] text-indigo-600">
+          🧠 Ortalama anlama skoru: <strong>%{etki.bloom_ort}</strong>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── MİKRO HEDEF MOTORU ──────────────────────────────────────
 // ── OKUMA TERAPİSİ BUTONU (Öğretmen Paneli) ─────────────────
 function OkumaTerapisiButon({ ogrenciId, apiBase }) {
@@ -8659,7 +8707,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
   const [aiIslemDurum, setAiIslemDurum] = useState("");
   const [aiSonuc, setAiSonuc] = useState(null);
   const [aiSonucSekme, setAiSonucSekme] = useState("kelimeler");
-  const [adminForm, setAdminForm] = useState({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [], makale_link: "", makale_dosya_turu: "link", kitap_yazar: "", kitap_isbn: "", kitap_yayinevi: "", kitap_sayfa: "", kitap_yas_grubu: "", kitap_link: "", kitap_kapak: "", dosya_b64: "", dosya_adi: "", dosya_turu: "", okuma_metni: "", okuma_seviye: "orta", okuma_sure: 5 });
+  const [adminForm, setAdminForm] = useState({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [], makale_link: "", makale_dosya_turu: "link", kitap_yazar: "", kitap_isbn: "", kitap_yayinevi: "", kitap_sayfa: "", kitap_yas_grubu: "", kitap_link: "", kitap_kapak: "", dosya_b64: "", dosya_adi: "", dosya_turu: "", okuma_metni: "", okuma_seviye: "orta", okuma_sure: 5, neden_bu_icerik: "" });
   const [kitapYukleniyor, setKitapYukleniyor] = useState(false);
   const [yeniSoru, setYeniSoru] = useState({ soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0, taksonomi: "kavrama" });
   const [gelisimSekme, setGelisimSekme] = useState("icerikler");
@@ -8795,11 +8843,13 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
         okuma_metni: adminForm.okuma_metni || null,
         okuma_seviye: adminForm.okuma_seviye || null,
         okuma_sure: adminForm.okuma_sure || null,
+        neden_bu_icerik: adminForm.neden_bu_icerik || null,
       };
-      await axios.post(`${API}/gelisim/icerik`, payload);
-      setAdminForm({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [], makale_link: "", makale_dosya_turu: "link", kitap_yazar: "", kitap_isbn: "", kitap_yayinevi: "", kitap_sayfa: "", kitap_yas_grubu: "", kitap_link: "", kitap_kapak: "", dosya_b64: "", dosya_adi: "", dosya_turu: "", okuma_metni: "", okuma_seviye: "orta", okuma_sure: 5 });
+      const res = await axios.post(`${API}/gelisim/icerik`, payload);
+      const nedenBonus = res.data?.neden_bonus;
+      setAdminForm({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [], makale_link: "", makale_dosya_turu: "link", kitap_yazar: "", kitap_isbn: "", kitap_yayinevi: "", kitap_sayfa: "", kitap_yas_grubu: "", kitap_link: "", kitap_kapak: "", dosya_b64: "", dosya_adi: "", dosya_turu: "", okuma_metni: "", okuma_seviye: "orta", okuma_sure: 5, neden_bu_icerik: "" });
       setGorunum("liste"); fetchAll();
-      toast({ title: (user.role === "admin" || user.role === "coordinator") ? "İçerik oylama aşamasına alındı" : "İçerik yönetici onayına gönderildi" });
+      toast({ title: (user.role === "admin" || user.role === "coordinator") ? "İçerik yayına alındı" : `İçerik yönetici onayına gönderildi${nedenBonus ? " +3 bonus puan!" : ""}` });
     } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
   };
 
@@ -9166,6 +9216,21 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
               </div>
 
               <div><Label>Açıklama</Label><Input value={adminForm.aciklama} onChange={e => setAdminForm({...adminForm, aciklama: e.target.value})} placeholder="Kısa açıklama..." /></div>
+
+              {/* Neden bu içerik? — +3 puan bonusu */}
+              <div>
+                <Label className="flex items-center gap-2">
+                  Neden bu içerik?
+                  <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">+3 puan</span>
+                </Label>
+                <textarea value={adminForm.neden_bu_icerik} onChange={e => setAdminForm({...adminForm, neden_bu_icerik: e.target.value})}
+                  placeholder="Bu içeriği neden öneriyorsunuz? Öğrencilere nasıl katkı sağlayacak? (en az 20 karakter)"
+                  className="w-full border rounded-lg p-3 text-sm min-h-[70px] mt-1 resize-none focus:outline-none focus:ring-2 focus:ring-orange-300"
+                  maxLength={500} />
+                {adminForm.neden_bu_icerik.length >= 20 && (
+                  <p className="text-[10px] text-green-600 mt-0.5">✓ +3 puan bonusu kazanacaksınız!</p>
+                )}
+              </div>
 
               {/* Makale alanları */}
               {adminForm.tur === "makale" && (
@@ -9837,6 +9902,12 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                             {icerik.kitap_kapak && <img src={icerik.kitap_kapak} alt="Kapak" className="h-28 rounded-lg shadow" onError={e => { e.target.style.display='none'; }} />}
                             {icerik.sorular?.length > 0 && (<div className="bg-blue-50 rounded-lg p-3"><div className="text-xs font-medium text-blue-700 mb-2">📝 {icerik.sorular.length} Test Sorusu</div>{icerik.sorular.map((s, i) => (<div key={i} className="text-sm text-gray-700 mb-3 pb-3 border-b border-blue-100 last:border-0"><div className="font-medium mb-1">{i+1}. {s.soru}</div><div className="grid grid-cols-2 gap-1 ml-4">{(s.secenekler || []).map((sec, j) => (<div key={j} className={`text-xs px-2 py-1 rounded ${j === s.dogru_cevap ? 'bg-green-100 text-green-700 font-bold' : 'bg-white text-gray-600'}`}>{['A','B','C','D'][j]}) {sec}</div>))}</div></div>))}</div>)}
                             <div className="text-xs text-gray-400">Hedef: {({"hepsi":"Herkes","ogretmen":"Öğretmenler","ogrenci":"Öğrenciler"})[icerik.hedef_kitle] || icerik.hedef_kitle}</div>
+                            {icerik.neden_bu_icerik && (
+                              <div className="bg-green-50 border border-green-200 rounded-lg p-2">
+                                <div className="text-[10px] font-bold text-green-700 mb-0.5">💡 Neden Bu İçerik?</div>
+                                <p className="text-xs text-gray-700">{icerik.neden_bu_icerik}</p>
+                              </div>
+                            )}
                           </div>
                         )}
                         <div className="px-5 pb-5 flex gap-2 flex-wrap">
@@ -9911,6 +9982,13 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                             {icerik.kitap_kapak && <img src={icerik.kitap_kapak} alt="Kapak" className="h-28 rounded-lg shadow" onError={e => { e.target.style.display='none'; }} />}
                             {icerik.sorular?.length > 0 && (<div className="bg-blue-50 rounded-lg p-3"><div className="text-xs font-medium text-blue-700 mb-2">📝 {icerik.sorular.length} Test Sorusu</div>{icerik.sorular.map((s, i) => (<div key={i} className="text-sm text-gray-700 mb-3 pb-3 border-b border-blue-100 last:border-0"><div className="font-medium mb-1">{i+1}. {s.soru}</div><div className="grid grid-cols-2 gap-1 ml-4">{(s.secenekler || []).map((sec, j) => (<div key={j} className={`text-xs px-2 py-1 rounded ${j === s.dogru_cevap ? 'bg-green-100 text-green-700 font-bold' : 'bg-white text-gray-600'}`}>{['A','B','C','D'][j]}) {sec}</div>))}</div></div>))}</div>)}
                             <div className="text-xs text-gray-400">Hedef: {({"hepsi":"Herkes","ogretmen":"Öğretmenler","ogrenci":"Öğrenciler"})[icerik.hedef_kitle] || icerik.hedef_kitle} • Eklenme: {new Date(icerik.olusturma_tarihi).toLocaleDateString("tr-TR")}</div>
+                            {icerik.neden_bu_icerik && (
+                              <div className="bg-green-50 border border-green-200 rounded-lg p-2">
+                                <div className="text-[10px] font-bold text-green-700 mb-0.5">💡 Neden Bu İçerik?</div>
+                                <p className="text-xs text-gray-700">{icerik.neden_bu_icerik}</p>
+                              </div>
+                            )}
+                            <EtkiIstatistikWidget icerikId={icerik.id} apiBase={API} />
                           </div>
                         )}
 
@@ -9999,6 +10077,15 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                             {icerik.makale_link && <a href={icerik.makale_link} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline block">🔗 Linki Aç →</a>}
                             {icerik.sorular?.length > 0 && <div className="text-xs text-gray-500 bg-blue-50 px-3 py-2 rounded-lg">📝 {icerik.sorular.length} test sorusu mevcut</div>}
                             <div className="text-xs text-gray-400">Hedef: {({"hepsi":"Herkes","ogretmen":"Öğretmenler","ogrenci":"Öğrenciler"})[icerik.hedef_kitle] || icerik.hedef_kitle} • Eklenme: {new Date(icerik.olusturma_tarihi).toLocaleDateString("tr-TR")}</div>
+                            {/* Neden bu içerik? */}
+                            {icerik.neden_bu_icerik && (
+                              <div className="bg-green-50 border border-green-200 rounded-lg p-2">
+                                <div className="text-[10px] font-bold text-green-700 mb-0.5">💡 Neden Bu İçerik?</div>
+                                <p className="text-xs text-gray-700">{icerik.neden_bu_icerik}</p>
+                              </div>
+                            )}
+                            {/* ETKİ İSTATİSTİKLERİ */}
+                            <EtkiIstatistikWidget icerikId={icerik.id} apiBase={API} />
                           </div>
                         )}
 
