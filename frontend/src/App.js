@@ -3853,14 +3853,18 @@ function OgretmenPaneli({ user, logout }) {
               const dnaRenk = (v) => v >= 70 ? "bg-green-500" : v >= 40 ? "bg-yellow-500" : "bg-red-500";
 
               return (<div className="space-y-3">
+                {/* Buton grubu */}
                 {!aiRapor && (
-                  <button onClick={aiKoclukAl} disabled={aiYukleniyor}
-                    className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-2xl p-4 shadow-md hover:shadow-lg transition-all disabled:opacity-60">
-                    <div className="flex items-center justify-center gap-2">
-                      {aiYukleniyor ? (<><div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" /><span className="text-sm">AI analiz ediyor...</span></>) : (<><span className="text-xl">🤖</span><span className="font-bold">AI Koçluk Önerisi Al</span></>)}
-                    </div>
-                    {!aiYukleniyor && <div className="text-xs opacity-80 mt-1">7 boyutlu DNA profili + kişiselleştirilmiş müdahale planı</div>}
-                  </button>
+                  <div className="flex gap-2">
+                    <button onClick={aiKoclukAl} disabled={aiYukleniyor}
+                      className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-2xl p-4 shadow-md hover:shadow-lg transition-all disabled:opacity-60">
+                      <div className="flex items-center justify-center gap-2">
+                        {aiYukleniyor ? (<><div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" /><span className="text-sm">AI analiz ediyor...</span></>) : (<><span className="text-xl">🤖</span><span className="font-bold">AI Koçluk</span></>)}
+                      </div>
+                      {!aiYukleniyor && <div className="text-xs opacity-80 mt-1">7 boyutlu DNA profili</div>}
+                    </button>
+                    <OkumaTerapisiButon ogrenciId={seciliOgrenci.id} apiBase={API} />
+                  </div>
                 )}
 
                 {aiDna && (<div className="bg-white rounded-2xl p-4 shadow-sm border">
@@ -7265,7 +7269,7 @@ function AiMerkezi({ user }) {
 
       {/* Sekme butonları */}
       <div className="flex gap-1 flex-wrap">
-        {[["genel","📊 Genel"],["dna","🧬 DNA Profilleri"],["kocluk","🤖 Koçluk"],["kelimeler","📚 Kelime Haritası"],["yuklemeler","📁 Yüklemeler"],["socratic","💬 Socratic"],["maliyet","💰 Maliyet"]].map(([k,l]) => (
+        {[["genel","📊 Genel"],["dna","🧬 DNA Profilleri"],["kocluk","🤖 Koçluk"],["kelimeler","📚 Kelime Haritası"],["yuklemeler","📁 Yüklemeler"],["socratic","💬 Socratic"],["simulasyon","📈 Simülasyon"],["hibrit","🛡️ Hibrit Onay"],["maliyet","💰 Maliyet"]].map(([k,l]) => (
           <button key={k} onClick={() => setAiSekme(k)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${aiSekme === k ? 'bg-cyan-600 text-white shadow' : 'bg-white text-gray-600 border hover:bg-gray-50'}`}>{l}</button>
         ))}
       </div>
@@ -7431,6 +7435,12 @@ function AiMerkezi({ user }) {
         })}</div>
         {socraticListesi.length === 0 && <div className="text-center py-8 text-gray-400">Henüz Socratic log yok. "Demo Verileri Yükle" butonuna tıklayın.</div>}
       </>)}
+
+      {/* SİMÜLASYON */}
+      {aiSekme === "simulasyon" && <GelisimSimulasyonSekme apiBase={API} user={user} dnaListesi={dnaListesi} />}
+
+      {/* HİBRİT ONAY */}
+      {aiSekme === "hibrit" && <HibritOnayYonetimi apiBase={API} user={user} />}
 
       {/* MALİYET */}
       {aiSekme === "maliyet" && (<>
@@ -7881,6 +7891,361 @@ function KitapOyunGorunum({ oyun, oyunDurum, setOyunDurum, onBitir, onKapat }) {
 }
 
 // ── MİKRO HEDEF MOTORU ──────────────────────────────────────
+// ── OKUMA TERAPİSİ BUTONU (Öğretmen Paneli) ─────────────────
+function OkumaTerapisiButon({ ogrenciId, apiBase }) {
+  const [acik, setAcik] = React.useState(false);
+  const [data, setData] = React.useState(null);
+  const [yukleniyor, setYukleniyor] = React.useState(false);
+
+  const calistir = async () => {
+    setYukleniyor(true);
+    try {
+      const r = await axios.get(`${apiBase}/ai/okuma-terapisi/${ogrenciId}`);
+      setData(r.data); setAcik(true);
+    } catch(e) { console.error(e); }
+    setYukleniyor(false);
+  };
+
+  const riskEmoji = { normal: "✅", dusuk: "🟡", orta: "🟠", yuksek: "🔴", belirsiz: "⚪" };
+  const riskRenk = { normal: "bg-green-50 border-green-200", dusuk: "bg-yellow-50 border-yellow-200", orta: "bg-orange-50 border-orange-200", yuksek: "bg-red-50 border-red-300", belirsiz: "bg-gray-50 border-gray-200" };
+
+  return (
+    <div className="flex-shrink-0">
+      <button onClick={calistir} disabled={yukleniyor}
+        className="bg-gradient-to-r from-rose-500 to-orange-500 text-white rounded-2xl p-4 shadow-md hover:shadow-lg transition-all disabled:opacity-60 flex flex-col items-center gap-1 min-w-[80px]">
+        {yukleniyor ? <div className="animate-spin text-xl">🔍</div> : <span className="text-xl">🩺</span>}
+        <span className="text-xs font-bold">Terapi</span>
+        <span className="text-[9px] opacity-80">Tarama</span>
+      </button>
+
+      {acik && data && (
+        <div className={`fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4`} onClick={() => setAcik(false)}>
+          <div className={`bg-white rounded-2xl max-w-sm w-full p-5 border-2 ${riskRenk[data.risk_seviyesi]} space-y-3`} onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">{riskEmoji[data.risk_seviyesi]}</span>
+                <div>
+                  <div className="font-bold text-sm">Okuma Terapisi Taraması</div>
+                  <div className="text-xs text-gray-500">Risk: {data.risk_seviyesi?.toUpperCase()} • Puan: {data.risk_puan}/12</div>
+                </div>
+              </div>
+              <button onClick={() => setAcik(false)} className="text-gray-400 text-xl">✕</button>
+            </div>
+
+            {data.sinyaller?.length > 0 ? (
+              <div className="space-y-1">
+                {data.sinyaller.map((s, i) => (
+                  <div key={i} className="text-xs bg-white rounded-lg px-3 py-1.5 border flex items-start gap-2 shadow-sm">
+                    <span className="text-orange-500 mt-0.5 flex-shrink-0">⚠</span>
+                    <span className="text-gray-700">{s.mesaj}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-sm text-green-700 bg-green-50 rounded-xl p-3">Belirgin okuma güçlüğü sinyali tespit edilmedi.</div>
+            )}
+
+            <div className="bg-white rounded-xl p-3 text-xs text-gray-700 border shadow-sm">
+              <div className="font-bold mb-1">💡 Öğretmen Önerisi</div>
+              {data.oneri}
+            </div>
+            <div className="text-[10px] text-gray-400 italic text-center">{data.uyari}</div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── GELİŞİM SİMÜLASYON SEKMESİ ─────────────────────────────
+function GelisimSimulasyonSekme({ apiBase, user, dnaListesi }) {
+  const [secilenOgrenci, setSecilenOgrenci] = React.useState(null);
+  const [simData, setSimData] = React.useState(null);
+  const [yukleniyor, setYukleniyor] = React.useState(false);
+  const [terapiData, setTerapiData] = React.useState(null);
+  const [terapiYukleniyor, setTerapiYukleniyor] = React.useState(false);
+
+  const simulasyonCalistir = async (ogrenciId) => {
+    setYukleniyor(true); setSimData(null); setTerapiData(null);
+    try {
+      const r = await axios.get(`${apiBase}/ai/gelisim-simulasyon/${ogrenciId}`);
+      setSimData(r.data);
+    } catch(e) { console.error(e); }
+    setYukleniyor(false);
+  };
+
+  const terapiCalistir = async (ogrenciId) => {
+    setTerapiYukleniyor(true); setTerapiData(null);
+    try {
+      const r = await axios.get(`${apiBase}/ai/okuma-terapisi/${ogrenciId}`);
+      setTerapiData(r.data);
+    } catch(e) { console.error(e); }
+    setTerapiYukleniyor(false);
+  };
+
+  const riskRenk = { normal: "green", dusuk: "yellow", orta: "orange", yuksek: "red", belirsiz: "gray" };
+  const riskEmoji = { normal: "✅", dusuk: "🟡", orta: "🟠", yuksek: "🔴", belirsiz: "⚪" };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-4 text-white">
+        <div className="font-bold text-base mb-1">📈 Gelişim Simülasyonu & Okuma Terapisi</div>
+        <p className="text-xs opacity-80">Öğrenci seç → 6 aylık projeksiyon + okuma güçlüğü taraması</p>
+      </div>
+
+      {/* Öğrenci seçimi */}
+      <div>
+        <div className="text-xs font-bold text-gray-600 mb-2">Öğrenci Seç</div>
+        <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+          {dnaListesi.map((d, i) => (
+            <button key={i} onClick={() => { setSecilenOgrenci(d); simulasyonCalistir(d.ogrenci_id); }}
+              className={`text-left px-3 py-2 rounded-xl border text-xs transition-all
+                ${secilenOgrenci?.ogrenci_id === d.ogrenci_id ? "bg-indigo-50 border-indigo-400 font-bold" : "bg-white border-gray-200 hover:border-indigo-300"}`}>
+              <div className="font-medium">{d.ad} {d.soyad}</div>
+              <div className="text-gray-400">{d.profil_label || "📖 Okuyucu"}</div>
+            </button>
+          ))}
+        </div>
+        {dnaListesi.length === 0 && <p className="text-sm text-gray-400 text-center py-4">DNA verisi yükleyin</p>}
+      </div>
+
+      {yukleniyor && (
+        <div className="text-center py-6 text-gray-400">
+          <div className="animate-spin text-3xl mb-2">📈</div>
+          <p className="text-sm">Projeksiyon hesaplanıyor...</p>
+        </div>
+      )}
+
+      {simData && !yukleniyor && (<>
+        {/* Özet mesaj */}
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-800">
+          💬 {simData.ozet_mesaj}
+        </div>
+
+        {/* Mevcut durum */}
+        <div className="grid grid-cols-4 gap-2">
+          {[
+            { label: "Streak", val: simData.mevcut?.streak + " gün", emoji: "🔥" },
+            { label: "Günlük", val: simData.mevcut?.avg_dk + " dk", emoji: "⏱" },
+            { label: "Kelime", val: simData.mevcut?.kelime, emoji: "📚" },
+            { label: "Anlama", val: "%" + simData.mevcut?.bloom_ort, emoji: "🧠" },
+          ].map((s, i) => (
+            <div key={i} className="bg-white rounded-xl p-2 text-center border">
+              <div className="text-lg">{s.emoji}</div>
+              <div className="font-bold text-sm text-gray-800">{s.val}</div>
+              <div className="text-[9px] text-gray-500">{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* 4 senaryo */}
+        <div className="space-y-2">
+          <div className="text-xs font-bold text-gray-600">6 Aylık Senaryo Karşılaştırması</div>
+          {(simData.senaryolar || []).map((s, i) => (
+            <div key={i} className="bg-white rounded-xl p-3 border flex items-center gap-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                {s.hedef_dk} dk
+              </div>
+              <div className="flex-1 grid grid-cols-3 gap-2 text-center">
+                <div><div className="text-sm font-bold text-green-600">+%{s.artis_yuzdesi}</div><div className="text-[9px] text-gray-500">Gelişim</div></div>
+                <div><div className="text-sm font-bold text-blue-600">{s.kelime_kazanim}</div><div className="text-[9px] text-gray-500">Yeni Kelime</div></div>
+                <div><div className="text-sm font-bold text-orange-600">{s.tahmini_kitap} kitap</div><div className="text-[9px] text-gray-500">Hedef</div></div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Aylık projeksiyon grafiği (basit) */}
+        <div className="bg-white rounded-xl p-3 border">
+          <div className="text-xs font-bold text-gray-600 mb-2">📊 Anlama Trendi (10 dk/gün senaryosu)</div>
+          <div className="flex items-end gap-1 h-16">
+            {(simData.aylik_projeksiyon || []).map((ay, i) => (
+              <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
+                <div className="text-[8px] text-gray-500">{ay.bloom_tahmini}%</div>
+                <div className="w-full bg-gradient-to-t from-indigo-500 to-purple-400 rounded-t"
+                  style={{ height: `${(ay.bloom_tahmini / 100) * 48}px` }} />
+                <div className="text-[8px] text-gray-400">{ay.ay}.ay</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Okuma Terapisi butonu */}
+        <button onClick={() => terapiCalistir(secilenOgrenci?.ogrenci_id)}
+          disabled={terapiYukleniyor}
+          className="w-full bg-gradient-to-r from-rose-500 to-orange-500 text-white rounded-xl py-2.5 text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
+          {terapiYukleniyor ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>Tarama yapılıyor...</> : "🔍 Okuma Güçlüğü Taraması"}
+        </button>
+      </>)}
+
+      {terapiData && (
+        <div className={`rounded-2xl border-2 p-4 space-y-3 ${
+          terapiData.risk_seviyesi === "yuksek" ? "bg-red-50 border-red-300" :
+          terapiData.risk_seviyesi === "orta" ? "bg-orange-50 border-orange-300" :
+          terapiData.risk_seviyesi === "dusuk" ? "bg-yellow-50 border-yellow-300" :
+          "bg-green-50 border-green-300"}`}>
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">{riskEmoji[terapiData.risk_seviyesi]}</span>
+            <div>
+              <div className="font-bold text-sm">Risk Seviyesi: {terapiData.risk_seviyesi?.toUpperCase()}</div>
+              <div className="text-xs text-gray-600">Puan: {terapiData.risk_puan}/12</div>
+            </div>
+          </div>
+          {terapiData.sinyaller?.length > 0 && (
+            <div className="space-y-1">
+              {terapiData.sinyaller.map((s, i) => (
+                <div key={i} className="text-xs bg-white rounded-lg px-3 py-1.5 border flex items-start gap-2">
+                  <span className="text-orange-500 mt-0.5">⚠</span>
+                  <span className="text-gray-700">{s.mesaj}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="bg-white rounded-xl p-3 text-xs text-gray-700 border">
+            <div className="font-bold mb-1">💡 Öneri</div>
+            {terapiData.oneri}
+          </div>
+          <div className="text-[10px] text-gray-400 italic">{terapiData.uyari}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── HİBRİT ONAY YÖNETİMİ ────────────────────────────────────
+function HibritOnayYonetimi({ apiBase, user }) {
+  const [icerikler, setIcerikler] = React.useState([]);
+  const [yukleniyor, setYukleniyor] = React.useState(true);
+  const [skorlanan, setSkorlanan] = React.useState({});
+  const [skorYukleniyor, setSkorYukleniyor] = React.useState({});
+
+  React.useEffect(() => {
+    (async () => {
+      setYukleniyor(true);
+      try {
+        const r = await axios.get(`${apiBase}/gelisim/icerik?durum=oylama&limit=50`);
+        setIcerikler(Array.isArray(r.data) ? r.data : []);
+      } catch(e) { console.error(e); }
+      setYukleniyor(false);
+    })();
+  }, []);
+
+  const aiSkorla = async (icerik) => {
+    setSkorYukleniyor(s => ({...s, [icerik.id]: true}));
+    try {
+      const r = await axios.post(`${apiBase}/ai/icerik-kalite-skoru`, {
+        icerik_id: icerik.id,
+        baslik: icerik.baslik,
+        aciklama: icerik.aciklama,
+        tur: icerik.tur,
+        sinif: icerik.sinif || 3,
+        metin: icerik.okuma_metni || "",
+      });
+      setSkorlanan(s => ({...s, [icerik.id]: r.data}));
+      if (r.data.karar === "otomatik_onayla") {
+        setIcerikler(l => l.filter(i => i.id !== icerik.id));
+      }
+    } catch(e) { console.error(e); }
+    setSkorYukleniyor(s => ({...s, [icerik.id]: false}));
+  };
+
+  const hepsiniSkora = async () => {
+    for (const ic of icerikler.slice(0, 10)) {
+      await aiSkorla(ic);
+      await new Promise(r => setTimeout(r, 500));
+    }
+  };
+
+  if (yukleniyor) return <div className="text-center py-8 text-gray-400"><div className="animate-spin text-3xl mb-2">🛡️</div><p className="text-sm">Yükleniyor...</p></div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="font-bold text-sm">🛡️ Hibrit İçerik Onay</div>
+          <div className="text-xs text-gray-500">AI skor → 80+ otomatik onay, 50-79 peer review, 0-49 red</div>
+        </div>
+        {icerikler.length > 0 && (
+          <button onClick={hepsiniSkora} className="bg-indigo-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-indigo-700">
+            🤖 Tümünü Skorla
+          </button>
+        )}
+      </div>
+
+      {icerikler.length === 0 && (
+        <div className="text-center py-8 text-gray-400 text-sm">Onay bekleyen içerik yok ✅</div>
+      )}
+
+      <div className="space-y-3">
+        {icerikler.map(ic => {
+          const skor = skorlanan[ic.id];
+          const yukleniyor2 = skorYukleniyor[ic.id];
+          const skorRenk = skor ? (skor.toplam_skor >= 80 ? "text-green-600" : skor.toplam_skor >= 50 ? "text-orange-500" : "text-red-500") : "";
+          return (
+            <div key={ic.id} className="bg-white rounded-2xl border shadow-sm p-4 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="font-bold text-sm">{ic.baslik}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">{ic.tur} • {ic.ekleyen_ad || "Bilinmeyen"} • {new Date(ic.eklenme_tarihi||"").toLocaleDateString("tr-TR")}</div>
+                </div>
+                {!skor && (
+                  <button onClick={() => aiSkorla(ic)} disabled={yukleniyor2}
+                    className="bg-indigo-100 text-indigo-700 text-xs px-3 py-1.5 rounded-lg hover:bg-indigo-200 disabled:opacity-50 flex-shrink-0">
+                    {yukleniyor2 ? "⏳" : "🤖 Skorla"}
+                  </button>
+                )}
+              </div>
+
+              {skor && (
+                <div className="space-y-2">
+                  {/* Skor */}
+                  <div className="flex items-center gap-3">
+                    <div className={`text-3xl font-bold ${skorRenk}`}>{skor.toplam_skor}</div>
+                    <div>
+                      <div className={`text-sm font-bold ${skorRenk}`}>{skor.karar_label}</div>
+                      <div className="text-xs text-gray-500">AI Kalite Skoru</div>
+                    </div>
+                    <div className="flex-1">
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div className={`h-2 rounded-full ${skor.toplam_skor >= 80 ? "bg-green-500" : skor.toplam_skor >= 50 ? "bg-orange-500" : "bg-red-500"}`}
+                          style={{ width: `${skor.toplam_skor}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                  {/* Alt skorlar */}
+                  <div className="grid grid-cols-2 gap-1">
+                    {Object.entries(skor.alt_skorlar || {}).map(([k, v]) => (
+                      <div key={k} className="flex items-center gap-1 text-[10px] text-gray-600">
+                        <div className="w-8 text-right font-bold">{v}/25</div>
+                        <div className="flex-1 bg-gray-100 rounded h-1">
+                          <div className="h-1 bg-blue-400 rounded" style={{ width: `${(v/25)*100}%` }} />
+                        </div>
+                        <div className="truncate">{k.replace(/_/g, " ")}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Güçlü/zayıf */}
+                  {skor.guclu_yonler?.length > 0 && (
+                    <div className="text-[10px] text-green-700 bg-green-50 rounded-lg p-2">
+                      ✅ {skor.guclu_yonler.join(" • ")}
+                    </div>
+                  )}
+                  {skor.zayif_yonler?.length > 0 && (
+                    <div className="text-[10px] text-orange-700 bg-orange-50 rounded-lg p-2">
+                      ⚠️ {skor.zayif_yonler.join(" • ")}
+                    </div>
+                  )}
+                  {skor.oneri && <div className="text-[10px] text-gray-600 italic">💡 {skor.oneri}</div>}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function MikroHedefMotor({ user, aiMotMesaj, apiBase }) {
   const bugunKey = `mikro_hedef_${user?.id}_${new Date().toDateString()}`;
   const [secilenDk, setSecilenDk] = React.useState(() => {
