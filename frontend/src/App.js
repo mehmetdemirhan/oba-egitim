@@ -5309,6 +5309,11 @@ function OgrenciPaneli({ user, logout }) {
           {/* 🤖 AI Günlük Motivasyon + Mikro Hedef */}
           <MikroHedefMotor user={user} aiMotMesaj={aiMotMesaj} apiBase={API} />
 
+          {/* 🇹🇷 İl seçimi — Türkiye Haritası için */}
+          {!user.il && (
+            <IlSecimBanneri user={user} apiBase={API} />
+          )}
+
           {/* Haftalık hedef */}
           {istatistik && (<div className="bg-white rounded-2xl p-4 shadow-sm border"><div className="flex items-center justify-between mb-2"><div className="text-sm font-medium text-gray-700">Haftalık Hedef</div><span className="text-sm font-bold text-gray-700">{istatistik.aktif_gunler_7}/4 gün</span></div><div className="flex gap-1">{[0,1,2,3].map(i => (<div key={i} className={`flex-1 h-3 rounded-full ${i < istatistik.aktif_gunler_7 ? 'bg-gradient-to-r from-orange-400 to-red-500' : 'bg-gray-100'}`} />))}</div><p className="text-xs text-gray-400 mt-2">Haftada en az 4 gün okuma 📖</p></div>)}
 
@@ -7269,7 +7274,7 @@ function AiMerkezi({ user }) {
 
       {/* Sekme butonları */}
       <div className="flex gap-1 flex-wrap">
-        {[["genel","📊 Genel"],["dna","🧬 DNA Profilleri"],["kocluk","🤖 Koçluk"],["kelimeler","📚 Kelime Haritası"],["yuklemeler","📁 Yüklemeler"],["socratic","💬 Socratic"],["simulasyon","📈 Simülasyon"],["hibrit","🛡️ Hibrit Onay"],["maliyet","💰 Maliyet"]].map(([k,l]) => (
+        {[["genel","📊 Genel"],["dna","🧬 DNA Profilleri"],["kocluk","🤖 Koçluk"],["kelimeler","📚 Kelime Haritası"],["yuklemeler","📁 Yüklemeler"],["socratic","💬 Socratic"],["simulasyon","📈 Simülasyon"],["hibrit","🛡️ Hibrit Onay"],["harita","🇹🇷 TR Haritası"],["maliyet","💰 Maliyet"]].map(([k,l]) => (
           <button key={k} onClick={() => setAiSekme(k)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${aiSekme === k ? 'bg-cyan-600 text-white shadow' : 'bg-white text-gray-600 border hover:bg-gray-50'}`}>{l}</button>
         ))}
       </div>
@@ -7441,6 +7446,11 @@ function AiMerkezi({ user }) {
 
       {/* HİBRİT ONAY */}
       {aiSekme === "hibrit" && <HibritOnayYonetimi apiBase={API} user={user} />}
+
+      {/* TÜRKİYE OKUMA HARİTASI */}
+      {aiSekme === "harita" && (
+        <TurkiyeOkumaHaritasi apiBase={apiBase} />
+      )}
 
       {/* MALİYET */}
       {aiSekme === "maliyet" && (<>
@@ -7889,6 +7899,286 @@ function KitapOyunGorunum({ oyun, oyunDurum, setOyunDurum, onBitir, onKapat }) {
 
   return <div className="text-center py-4 text-gray-400 text-sm">Oyun türü desteklenmiyor</div>;
 }
+
+// ── İL SEÇİM BANNERİ ────────────────────────────────────────
+function IlSecimBanneri({ user, apiBase }) {
+  const [secilen, setSecilen] = React.useState("");
+  const [kaydedildi, setKaydedildi] = React.useState(false);
+  const [gizle, setGizle] = React.useState(false);
+
+  const ILLER = ["Adana","Adıyaman","Afyonkarahisar","Ağrı","Amasya","Ankara","Antalya",
+    "Artvin","Aydın","Balıkesir","Bilecik","Bingöl","Bitlis","Bolu","Burdur","Bursa",
+    "Çanakkale","Çankırı","Çorum","Denizli","Diyarbakır","Edirne","Elazığ","Erzincan",
+    "Erzurum","Eskişehir","Gaziantep","Giresun","Gümüşhane","Hakkari","Hatay","Isparta",
+    "Mersin","İstanbul","İzmir","Kars","Kastamonu","Kayseri","Kırklareli","Kırşehir",
+    "Kocaeli","Konya","Kütahya","Malatya","Manisa","Kahramanmaraş","Mardin","Muğla",
+    "Muş","Nevşehir","Niğde","Ordu","Rize","Sakarya","Samsun","Siirt","Sinop","Sivas",
+    "Tekirdağ","Tokat","Trabzon","Tunceli","Şanlıurfa","Uşak","Van","Yozgat","Zonguldak",
+    "Aksaray","Bayburt","Karaman","Kırıkkale","Batman","Şırnak","Bartın","Ardahan",
+    "Iğdır","Yalova","Karabük","Kilis","Osmaniye","Düzce"];
+
+  if (gizle || kaydedildi) return null;
+
+  const kaydet = async () => {
+    if (!secilen) return;
+    try {
+      await axios.put(`${apiBase}/kullanici/il-guncelle`, { il: secilen });
+      setKaydedildi(true);
+      user.il = secilen; // local güncelle
+    } catch(e) {}
+  };
+
+  return (
+    <div className="bg-gradient-to-r from-red-50 to-red-100 border border-red-200 rounded-2xl p-4">
+      <div className="flex items-start justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xl">🇹🇷</span>
+          <div>
+            <div className="text-sm font-bold text-red-800">Türkiye Okuma Haritası'na katıl!</div>
+            <div className="text-[10px] text-red-600">İlini seç — anonim katkı, KVKK uyumlu</div>
+          </div>
+        </div>
+        <button onClick={() => setGizle(true)} className="text-red-300 hover:text-red-500 text-sm">✕</button>
+      </div>
+      <div className="flex gap-2">
+        <select value={secilen} onChange={e => setSecilen(e.target.value)}
+          className="flex-1 border border-red-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-300">
+          <option value="">İl seç...</option>
+          {ILLER.map(il => <option key={il} value={il}>{il}</option>)}
+        </select>
+        <button onClick={kaydet} disabled={!secilen}
+          className="bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-40 hover:bg-red-700 transition-colors">
+          Kaydet
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
+// ── DİKKAT ANALİZ METİN COMPONENT ──────────────────────────
+// Okuma sırasında scroll hızı, süre ve geri dönüş takibi
+function DikkatAnalizMetin({ metin, kelimeSayisi, onDikkatUyari }) {
+  const metinRef = React.useRef(null);
+  const baslangicRef = React.useRef(Date.now());
+  const geriDonusSayisiRef = React.useRef(0);
+  const sonScrollYRef = React.useRef(0);
+  const scrollHizlariRef = React.useRef([]);
+  const uyariVerildiRef = React.useRef(false);
+  const sonUyariZamanRef = React.useRef(0);
+
+  React.useEffect(() => {
+    const el = metinRef.current;
+    if (!el) return;
+    baslangicRef.current = Date.now();
+    uyariVerildiRef.current = false;
+
+    const handleScroll = () => {
+      const scrollY = window.scrollY;
+      const now = Date.now();
+      const delta = Math.abs(scrollY - sonScrollYRef.current);
+      scrollHizlariRef.current.push(delta);
+      if (scrollHizlariRef.current.length > 10) scrollHizlariRef.current.shift();
+
+      // Geri dönüş: yukarı scroll
+      if (scrollY < sonScrollYRef.current - 80) {
+        geriDonusSayisiRef.current += 1;
+      }
+      sonScrollYRef.current = scrollY;
+
+      // Analiz: uyarı zamanı geldiyse kontrol et
+      if (now - sonUyariZamanRef.current < 30000) return; // 30 sn cooldown
+
+      const gecenSure = (now - baslangicRef.current) / 1000; // saniye
+      const beklenenSure = (kelimeSayisi / 200) * 60; // dakika → saniye
+      const ortHiz = scrollHizlariRef.current.reduce((a, b) => a + b, 0) / (scrollHizlariRef.current.length || 1);
+
+      let uyari = null;
+
+      // Çok hızlı okuma (scroll hızı yüksek, beklenen sürenin %30'undan az geçti)
+      if (ortHiz > 200 && gecenSure < beklenenSure * 0.3 && kelimeSayisi > 100) {
+        uyari = {
+          baslik: "Biraz yavaşla! 🐢",
+          mesaj: "Çok hızlı ilerliyorsun. Anlamak için metni daha dikkatli okumayı dene.",
+        };
+      }
+      // Çok fazla geri dönüş
+      else if (geriDonusSayisiRef.current >= 3) {
+        uyari = {
+          baslik: "Bu bölümü anlamadın mı? 🤔",
+          mesaj: "Birkaç kez geri döndüğünü fark ettim. Bu kısmı bir kez daha okumak ister misin?",
+        };
+        geriDonusSayisiRef.current = 0;
+      }
+
+      if (uyari && !uyariVerildiRef.current) {
+        onDikkatUyari(uyari);
+        sonUyariZamanRef.current = now;
+        uyariVerildiRef.current = true;
+        // 60 saniye sonra tekrar uyarı verebilir
+        setTimeout(() => { uyariVerildiRef.current = false; }, 60000);
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [metin, kelimeSayisi, onDikkatUyari]);
+
+  return (
+    <div ref={metinRef} className="text-base text-gray-800 leading-[1.9] whitespace-pre-wrap font-['Georgia',serif] tracking-wide">
+      {metin}
+    </div>
+  );
+}
+
+
+// ── TÜRKİYE OKUMA HARİTASI ──────────────────────────────────
+function TurkiyeOkumaHaritasi({ apiBase }) {
+  const [haritaData, setHaritaData] = React.useState(null);
+  const [yukleniyor, setYukleniyor] = React.useState(false);
+  const [siralama, setSiralama] = React.useState("kitap"); // kitap | kelime | streak
+
+  React.useEffect(() => {
+    setYukleniyor(true);
+    axios.get(`${apiBase}/istatistik/turkiye-harita`)
+      .then(r => setHaritaData(r.data))
+      .catch(() => {})
+      .finally(() => setYukleniyor(false));
+  }, []);
+
+  const ILLER = [
+    "Adana","Adıyaman","Afyonkarahisar","Ağrı","Amasya","Ankara","Antalya","Artvin",
+    "Aydın","Balıkesir","Bilecik","Bingöl","Bitlis","Bolu","Burdur","Bursa","Çanakkale",
+    "Çankırı","Çorum","Denizli","Diyarbakır","Edirne","Elazığ","Erzincan","Erzurum",
+    "Eskişehir","Gaziantep","Giresun","Gümüşhane","Hakkari","Hatay","Isparta","Mersin",
+    "İstanbul","İzmir","Kars","Kastamonu","Kayseri","Kırklareli","Kırşehir","Kocaeli",
+    "Konya","Kütahya","Malatya","Manisa","Kahramanmaraş","Mardin","Muğla","Muş",
+    "Nevşehir","Niğde","Ordu","Rize","Sakarya","Samsun","Siirt","Sinop","Sivas",
+    "Tekirdağ","Tokat","Trabzon","Tunceli","Şanlıurfa","Uşak","Van","Yozgat","Zonguldak",
+    "Aksaray","Bayburt","Karaman","Kırıkkale","Batman","Şırnak","Bartın","Ardahan",
+    "Iğdır","Yalova","Karabük","Kilis","Osmaniye","Düzce"
+  ];
+
+  const getSkorRenk = (skor) => {
+    if (!skor || skor === 0) return "bg-gray-100 text-gray-400";
+    if (skor >= 80) return "bg-green-500 text-white";
+    if (skor >= 50) return "bg-green-300 text-green-900";
+    if (skor >= 20) return "bg-yellow-200 text-yellow-900";
+    return "bg-orange-100 text-orange-700";
+  };
+
+  const ilData = (il) => {
+    if (!haritaData?.iller) return null;
+    return haritaData.iller.find(i => i.il === il);
+  };
+
+  const toplamOkuyan = haritaData?.toplam_okuyucu || 0;
+  const toplamKelime = haritaData?.toplam_kelime || 0;
+
+  return (
+    <div className="space-y-4">
+      {/* Başlık */}
+      <div className="bg-gradient-to-r from-red-600 to-red-800 rounded-2xl p-4 text-white relative overflow-hidden">
+        <div className="absolute inset-0 opacity-10 text-8xl flex items-center justify-end pr-4">🗺️</div>
+        <div className="relative">
+          <div className="font-bold text-lg mb-0.5">🇹🇷 Türkiye Okuma Haritası</div>
+          <p className="text-xs opacity-80">İl bazında anonim okuma verileri — KVKK uyumlu</p>
+          <div className="flex gap-4 mt-3">
+            <div className="bg-white/20 rounded-xl px-3 py-1.5 text-center">
+              <div className="font-bold text-base">{toplamOkuyan.toLocaleString("tr-TR")}</div>
+              <div className="text-[10px] opacity-80">Okuyucu</div>
+            </div>
+            <div className="bg-white/20 rounded-xl px-3 py-1.5 text-center">
+              <div className="font-bold text-base">{toplamKelime.toLocaleString("tr-TR")}</div>
+              <div className="text-[10px] opacity-80">Kelime öğrenildi</div>
+            </div>
+            <div className="bg-white/20 rounded-xl px-3 py-1.5 text-center">
+              <div className="font-bold text-base">{haritaData?.aktif_il || 0}</div>
+              <div className="text-[10px] opacity-80">Aktif il</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Sıralama seçimi */}
+      <div className="flex gap-2">
+        {[["kitap","📚 Kitap"],["kelime","🧠 Kelime"],["streak","🔥 Streak"]].map(([k,l]) => (
+          <button key={k} onClick={() => setSiralama(k)}
+            className={`flex-1 py-2 rounded-xl text-xs font-medium transition-all ${siralama===k?"bg-red-600 text-white shadow":"bg-white border border-gray-200 text-gray-600 hover:border-red-300"}`}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {yukleniyor ? (
+        <div className="text-center py-8 text-gray-400">
+          <div className="animate-spin text-3xl mb-2">🗺️</div>
+          <p className="text-sm">Harita yükleniyor...</p>
+        </div>
+      ) : (
+        <>
+          {/* İl grid */}
+          <div className="bg-white rounded-2xl border shadow-sm p-4">
+            <div className="text-xs font-bold text-gray-600 mb-3">
+              {siralama === "kitap" ? "📚 İl bazında okunan kitap" : siralama === "kelime" ? "🧠 İl bazında öğrenilen kelime" : "🔥 İl bazında ortalama streak"}
+            </div>
+            <div className="grid grid-cols-4 gap-1.5 max-h-80 overflow-y-auto">
+              {ILLER.map(il => {
+                const d = ilData(il);
+                const deger = d ? (siralama === "kitap" ? d.kitap_sayisi : siralama === "kelime" ? d.kelime_sayisi : d.avg_streak) : 0;
+                return (
+                  <div key={il} className={`rounded-lg px-2 py-1.5 text-center ${getSkorRenk(deger)}`}
+                    title={`${il}: ${deger} ${siralama === "kitap" ? "kitap" : siralama === "kelime" ? "kelime" : "gün"}`}>
+                    <div className="text-[9px] font-medium truncate">{il}</div>
+                    <div className="text-[10px] font-bold">{deger || "—"}</div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-2 mt-3 text-[10px] text-gray-500">
+              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-gray-100"></div>Veri yok</div>
+              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-orange-100"></div>Az</div>
+              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-yellow-200"></div>Orta</div>
+              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-green-300"></div>İyi</div>
+              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-green-500"></div>Mükemmel</div>
+            </div>
+          </div>
+
+          {/* Top 5 il */}
+          {haritaData?.iller?.length > 0 && (
+            <div className="bg-white rounded-2xl border shadow-sm p-4">
+              <div className="text-xs font-bold text-gray-700 mb-3">🏆 En Aktif 5 İl</div>
+              <div className="space-y-2">
+                {[...haritaData.iller]
+                  .sort((a,b) => (siralama==="kitap"?b.kitap_sayisi-a.kitap_sayisi:siralama==="kelime"?b.kelime_sayisi-a.kelime_sayisi:b.avg_streak-a.avg_streak))
+                  .slice(0,5)
+                  .map((il, i) => {
+                    const deger = siralama==="kitap"?il.kitap_sayisi:siralama==="kelime"?il.kelime_sayisi:il.avg_streak;
+                    const max = haritaData.iller[0] ? Math.max(...haritaData.iller.map(x => siralama==="kitap"?x.kitap_sayisi:siralama==="kelime"?x.kelime_sayisi:x.avg_streak)) : 1;
+                    return (
+                      <div key={il.il} className="flex items-center gap-3">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${i===0?"bg-yellow-400 text-white":i===1?"bg-gray-300 text-gray-700":i===2?"bg-amber-500 text-white":"bg-gray-100 text-gray-500"}`}>{i+1}</div>
+                        <div className="flex-1">
+                          <div className="text-xs font-medium text-gray-800">{il.il}</div>
+                          <div className="h-1.5 bg-gray-100 rounded-full mt-0.5 overflow-hidden">
+                            <div className="h-full bg-red-500 rounded-full transition-all" style={{width:`${max>0?(deger/max*100):0}%`}}></div>
+                          </div>
+                        </div>
+                        <div className="text-xs font-bold text-red-600 w-12 text-right">{deger}</div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+
+          <p className="text-[10px] text-gray-400 text-center">🔒 Tüm veriler anonim · KVKK madde 4 uyumlu · Bireysel bilgi işlenmez</p>
+        </>
+      )}
+    </div>
+  );
+}
+
 
 // ── ETKİ İSTATİSTİK WIDGET ──────────────────────────────────
 function EtkiIstatistikWidget({ icerikId, apiBase }) {
@@ -8701,6 +8991,8 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
   const [redSebep, setRedSebep] = useState("");
   const [acikDetayId, setAcikDetayId] = useState(null);
   const [redDialogIcerik, setRedDialogIcerik] = useState(null);
+  // Dikkat Analizi state
+  const [dikkatUyari, setDikkatUyari] = useState(null);
   // Bölüm bazlı soru yönetimi
   const [soruYonetimiIcerik, setSoruYonetimiIcerik] = useState(null);
   const [kitapSorulari, setKitapSorulari] = useState([]);
@@ -9024,8 +9316,19 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
     const isTamamlandi = tamamlananlar.some(t => t.icerik_id === aktifIcerik.id);
     return (
       <div className="max-w-2xl mx-auto space-y-4">
+        {/* Dikkat Uyarısı */}
+        {dikkatUyari && (
+          <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 flex items-start gap-3">
+            <div className="text-2xl flex-shrink-0">🧠</div>
+            <div className="flex-1">
+              <div className="font-bold text-amber-800 text-sm">{dikkatUyari.baslik}</div>
+              <p className="text-xs text-amber-700 mt-0.5">{dikkatUyari.mesaj}</p>
+            </div>
+            <button onClick={() => setDikkatUyari(null)} className="text-amber-400 hover:text-amber-600 text-lg leading-none">✕</button>
+          </div>
+        )}
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => setGorunum("liste")}>← Geri</Button>
+          <Button variant="outline" size="sm" onClick={() => { setGorunum("liste"); setDikkatUyari(null); }}>← Geri</Button>
           <div>
             <h2 className="text-lg font-bold">{aktifIcerik.baslik}</h2>
             <div className="flex items-center gap-3 text-xs text-gray-500">
@@ -9079,9 +9382,11 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                     {aktifIcerik.aciklama}
                   </div>
                 )}
-                <div className="text-base text-gray-800 leading-[1.9] whitespace-pre-wrap font-['Georgia',serif] tracking-wide">
-                  {aktifIcerik.okuma_metni}
-                </div>
+                <DikkatAnalizMetin
+                  metin={aktifIcerik.okuma_metni}
+                  kelimeSayisi={kelimeSayisi}
+                  onDikkatUyari={setDikkatUyari}
+                />
               </div>
             ) : (
               <div className="text-center py-8 text-gray-500">
