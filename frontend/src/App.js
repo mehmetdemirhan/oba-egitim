@@ -7449,7 +7449,7 @@ function AiMerkezi({ user }) {
 
       {/* TÜRKİYE OKUMA HARİTASI */}
       {aiSekme === "harita" && (
-        <TurkiyeOkumaHaritasi apiBase={apiBase} />
+        <TurkiyeOkumaHaritasi apiBase={API} />
       )}
 
       {/* MALİYET */}
