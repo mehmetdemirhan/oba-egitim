@@ -7893,6 +7893,7 @@ function KitapOyunGorunum({ oyun, oyunDurum, setOyunDurum, onBitir, onKapat }) {
 // ── ETKİ İSTATİSTİK WIDGET ──────────────────────────────────
 function EtkiIstatistikWidget({ icerikId, apiBase }) {
   const [etki, setEtki] = React.useState(null);
+  const [hata, setHata] = React.useState(false);
   const [yuklendi, setYuklendi] = React.useState(false);
 
   React.useEffect(() => {
@@ -7900,11 +7901,17 @@ function EtkiIstatistikWidget({ icerikId, apiBase }) {
     setYuklendi(true);
     axios.get(`${apiBase}/gelisim/icerik/${icerikId}/etki`)
       .then(r => setEtki(r.data))
-      .catch(() => {});
+      .catch(() => setHata(true));
   }, [icerikId]);
 
+  // API henüz deploy edilmemişse sessizce gizle
+  if (hata) return null;
+
   if (!etki) return (
-    <div className="text-[10px] text-gray-300 animate-pulse">📊 Etki yükleniyor...</div>
+    <div className="flex items-center gap-1.5 text-[10px] text-gray-400 py-1">
+      <div className="w-3 h-3 border border-gray-300 border-t-indigo-400 rounded-full animate-spin" />
+      Etki istatistikleri yükleniyor...
+    </div>
   );
 
   const istatlar = [
@@ -7915,7 +7922,10 @@ function EtkiIstatistikWidget({ icerikId, apiBase }) {
   ];
 
   if (istatlar.every(s => s.val === 0)) return (
-    <div className="text-[10px] text-gray-400 italic">Henüz etkileşim yok — ilk öğrenciler bekliyor!</div>
+    <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-100">
+      <div className="text-[10px] font-bold text-gray-500 mb-1">📊 İçerik Etkisi</div>
+      <div className="text-[10px] text-gray-400 italic">Henüz etkileşim yok — ilk öğrenciler bekliyor!</div>
+    </div>
   );
 
   return (
