@@ -8036,7 +8036,9 @@ function DikkatAnalizMetin({ metin, kelimeSayisi, onDikkatUyari }) {
 function TurkiyeOkumaHaritasi({ apiBase }) {
   const [haritaData, setHaritaData] = React.useState(null);
   const [yukleniyor, setYukleniyor] = React.useState(false);
-  const [siralama, setSiralama] = React.useState("kitap"); // kitap | kelime | streak
+  const [siralama, setSiralama] = React.useState("kitap");
+  const [secilen, setSecilen] = React.useState(null);
+  const [tooltip, setTooltip] = React.useState(null);
 
   React.useEffect(() => {
     setYukleniyor(true);
@@ -8046,64 +8048,93 @@ function TurkiyeOkumaHaritasi({ apiBase }) {
       .finally(() => setYukleniyor(false));
   }, []);
 
-  const ILLER = [
-    "Adana","Adıyaman","Afyonkarahisar","Ağrı","Amasya","Ankara","Antalya","Artvin",
-    "Aydın","Balıkesir","Bilecik","Bingöl","Bitlis","Bolu","Burdur","Bursa","Çanakkale",
-    "Çankırı","Çorum","Denizli","Diyarbakır","Edirne","Elazığ","Erzincan","Erzurum",
-    "Eskişehir","Gaziantep","Giresun","Gümüşhane","Hakkari","Hatay","Isparta","Mersin",
-    "İstanbul","İzmir","Kars","Kastamonu","Kayseri","Kırklareli","Kırşehir","Kocaeli",
-    "Konya","Kütahya","Malatya","Manisa","Kahramanmaraş","Mardin","Muğla","Muş",
-    "Nevşehir","Niğde","Ordu","Rize","Sakarya","Samsun","Siirt","Sinop","Sivas",
-    "Tekirdağ","Tokat","Trabzon","Tunceli","Şanlıurfa","Uşak","Van","Yozgat","Zonguldak",
-    "Aksaray","Bayburt","Karaman","Kırıkkale","Batman","Şırnak","Bartın","Ardahan",
-    "Iğdır","Yalova","Karabük","Kilis","Osmaniye","Düzce"
-  ];
-
-  const getSkorRenk = (skor) => {
-    if (!skor || skor === 0) return "bg-gray-100 text-gray-400";
-    if (skor >= 80) return "bg-green-500 text-white";
-    if (skor >= 50) return "bg-green-300 text-green-900";
-    if (skor >= 20) return "bg-yellow-200 text-yellow-900";
-    return "bg-orange-100 text-orange-700";
+  // İl koordinatları (SVG viewBox 0 0 800 500 — Türkiye coğrafi merkez)
+  const IL_KOORDINAT = {
+    "Edirne":     [42, 68],  "Kırklareli": [75, 52],  "Tekirdağ":   [82, 88],
+    "İstanbul":   [115, 82], "Kocaeli":    [148, 92], "Sakarya":    [170, 98],
+    "Düzce":      [192, 88], "Zonguldak":  [218, 68], "Bartın":     [248, 58],
+    "Karabük":    [270, 72], "Kastamonu":  [305, 55], "Sinop":      [345, 45],
+    "Samsun":     [395, 52], "Ordu":       [440, 58], "Giresun":    [472, 65],
+    "Trabzon":    [510, 55], "Rize":       [542, 50], "Artvin":     [568, 48],
+    "Ardahan":    [580, 38], "Kars":       [600, 58], "Iğdır":      [622, 78],
+    "Ağrı":       [598, 95], "Muş":        [572, 118],"Bitlis":     [558, 132],
+    "Van":        [592, 145],"Hakkari":    [572, 168],"Şırnak":     [538, 175],
+    "Siirt":      [518, 162],"Batman":     [498, 152],"Mardin":     [472, 168],
+    "Şanlıurfa":  [440, 175],"Diyarbakır": [480, 142],"Elazığ":     [498, 118],
+    "Tunceli":    [518, 112],"Bingöl":     [542, 105],"Erzurum":    [560, 82],
+    "Erzincan":   [528, 92], "Gümüşhane":  [498, 78], "Bayburt":    [518, 68],
+    "Rize":       [542, 50], "Malatya":    [462, 128],"Kahramanmaraş":[420,148],
+    "Gaziantep":  [398, 168],"Kilis":      [380, 178],"Hatay":      [368, 195],
+    "Adana":      [340, 185],"Osmaniye":   [355, 172],"Adıyaman":   [442, 158],
+    "Sivas":      [448, 108],"Yozgat":     [390, 112],"Tokat":      [418, 88],
+    "Amasya":     [390, 78], "Çorum":      [355, 72], "Ankara":     [298, 118],
+    "Kırıkkale":  [322, 112],"Kırşehir":   [352, 128],"Nevşehir":   [360, 148],
+    "Niğde":      [348, 162],"Aksaray":    [330, 155],"Konya":      [295, 168],
+    "Karaman":    [310, 188],"İçel":       [318, 205],"Mersin":     [318, 205],
+    "Isparta":    [248, 178],"Burdur":     [238, 192],"Antalya":    [248, 212],
+    "Muğla":      [205, 215],"Aydın":      [172, 202],"İzmir":      [145, 178],
+    "Manisa":     [162, 162],"Balıkesir":  [152, 138],"Çanakkale":  [108, 115],
+    "Bursa":      [175, 118],"Yalova":     [158, 105],"Bilecik":    [192, 115],
+    "Eskişehir":  [225, 128],"Kütahya":    [208, 148],"Uşak":       [195, 168],
+    "Denizli":    [210, 185],"Afyonkarahisar":[238,152],"Çankırı":  [318, 90],
+    "Bolu":       [218, 102],"Karabük":    [270, 72]
   };
 
-  const ilData = (il) => {
-    if (!haritaData?.iller) return null;
-    return haritaData.iller.find(i => i.il === il);
+  const getDeger = (ilAdi) => {
+    if (!haritaData?.iller) return 0;
+    const d = haritaData.iller.find(i => i.il === ilAdi);
+    if (!d) return 0;
+    return siralama === "kitap" ? d.kitap_sayisi : siralama === "kelime" ? d.kelime_sayisi : d.avg_streak;
+  };
+
+  const maxDeger = React.useMemo(() => {
+    if (!haritaData?.iller) return 1;
+    return Math.max(1, ...haritaData.iller.map(i =>
+      siralama === "kitap" ? i.kitap_sayisi : siralama === "kelime" ? i.kelime_sayisi : i.avg_streak
+    ));
+  }, [haritaData, siralama]);
+
+  const getBubbleRenk = (deger) => {
+    if (!deger || deger === 0) return { fill: "#e5e7eb", stroke: "#d1d5db", text: "#9ca3af" };
+    const oran = deger / maxDeger;
+    if (oran >= 0.7) return { fill: "#16a34a", stroke: "#15803d", text: "white" };
+    if (oran >= 0.4) return { fill: "#22c55e", stroke: "#16a34a", text: "white" };
+    if (oran >= 0.2) return { fill: "#fbbf24", stroke: "#f59e0b", text: "#78350f" };
+    return { fill: "#fed7aa", stroke: "#fb923c", text: "#9a3412" };
+  };
+
+  const getBubbleR = (deger) => {
+    if (!deger) return 8;
+    const oran = deger / maxDeger;
+    return Math.max(8, Math.min(22, 8 + oran * 14));
   };
 
   const toplamOkuyan = haritaData?.toplam_okuyucu || 0;
   const toplamKelime = haritaData?.toplam_kelime || 0;
 
+  const birim = siralama === "kitap" ? "kitap" : siralama === "kelime" ? "kelime" : "gün ort.";
+
   return (
     <div className="space-y-4">
       {/* Başlık */}
       <div className="bg-gradient-to-r from-red-600 to-red-800 rounded-2xl p-4 text-white relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10 text-8xl flex items-center justify-end pr-4">🗺️</div>
-        <div className="relative">
-          <div className="font-bold text-lg mb-0.5">🇹🇷 Türkiye Okuma Haritası</div>
-          <p className="text-xs opacity-80">İl bazında anonim okuma verileri — KVKK uyumlu</p>
-          <div className="flex gap-4 mt-3">
-            <div className="bg-white/20 rounded-xl px-3 py-1.5 text-center">
-              <div className="font-bold text-base">{toplamOkuyan.toLocaleString("tr-TR")}</div>
-              <div className="text-[10px] opacity-80">Okuyucu</div>
+        <div className="absolute right-4 top-2 text-6xl opacity-10">🗺️</div>
+        <div className="font-bold text-lg">🇹🇷 Türkiye Okuma Haritası</div>
+        <p className="text-xs opacity-80 mb-3">İl bazında anonim okuma verileri — KVKK uyumlu</p>
+        <div className="flex gap-3">
+          {[["toplamOkuyan", toplamOkuyan, "Okuyucu"], ["toplamKelime", toplamKelime, "Kelime"], ["aktif_il", haritaData?.aktif_il||0, "Aktif İl"]].map(([k,v,l]) => (
+            <div key={k} className="bg-white/20 rounded-xl px-3 py-1.5 text-center">
+              <div className="font-bold text-sm">{Number(v).toLocaleString("tr-TR")}</div>
+              <div className="text-[10px] opacity-80">{l}</div>
             </div>
-            <div className="bg-white/20 rounded-xl px-3 py-1.5 text-center">
-              <div className="font-bold text-base">{toplamKelime.toLocaleString("tr-TR")}</div>
-              <div className="text-[10px] opacity-80">Kelime öğrenildi</div>
-            </div>
-            <div className="bg-white/20 rounded-xl px-3 py-1.5 text-center">
-              <div className="font-bold text-base">{haritaData?.aktif_il || 0}</div>
-              <div className="text-[10px] opacity-80">Aktif il</div>
-            </div>
-          </div>
+          ))}
         </div>
       </div>
 
-      {/* Sıralama seçimi */}
+      {/* Sıralama */}
       <div className="flex gap-2">
         {[["kitap","📚 Kitap"],["kelime","🧠 Kelime"],["streak","🔥 Streak"]].map(([k,l]) => (
-          <button key={k} onClick={() => setSiralama(k)}
+          <button key={k} onClick={() => { setSiralama(k); setSecilen(null); setTooltip(null); }}
             className={`flex-1 py-2 rounded-xl text-xs font-medium transition-all ${siralama===k?"bg-red-600 text-white shadow":"bg-white border border-gray-200 text-gray-600 hover:border-red-300"}`}>
             {l}
           </button>
@@ -8111,70 +8142,122 @@ function TurkiyeOkumaHaritasi({ apiBase }) {
       </div>
 
       {yukleniyor ? (
-        <div className="text-center py-8 text-gray-400">
-          <div className="animate-spin text-3xl mb-2">🗺️</div>
+        <div className="text-center py-12 text-gray-400">
+          <div className="animate-spin text-4xl mb-3">🗺️</div>
           <p className="text-sm">Harita yükleniyor...</p>
         </div>
       ) : (
-        <>
-          {/* İl grid */}
-          <div className="bg-white rounded-2xl border shadow-sm p-4">
-            <div className="text-xs font-bold text-gray-600 mb-3">
-              {siralama === "kitap" ? "📚 İl bazında okunan kitap" : siralama === "kelime" ? "🧠 İl bazında öğrenilen kelime" : "🔥 İl bazında ortalama streak"}
-            </div>
-            <div className="grid grid-cols-4 gap-1.5 max-h-80 overflow-y-auto">
-              {ILLER.map(il => {
-                const d = ilData(il);
-                const deger = d ? (siralama === "kitap" ? d.kitap_sayisi : siralama === "kelime" ? d.kelime_sayisi : d.avg_streak) : 0;
+        <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+          {/* SVG Bubble Harita */}
+          <div className="relative">
+            <svg viewBox="0 0 660 280" className="w-full" style={{background:"linear-gradient(135deg,#eff6ff 0%,#f0fdf4 100%)"}}>
+              {/* Deniz arka planı ipucu */}
+              <text x="20" y="240" fontSize="9" fill="#93c5fd" opacity="0.6">KARADENİZ</text>
+              <text x="20" y="260" fontSize="9" fill="#93c5fd" opacity="0.6">EGE</text>
+              <text x="550" y="260" fontSize="9" fill="#93c5fd" opacity="0.6">AKDENİZ</text>
+
+              {Object.entries(IL_KOORDINAT).map(([il, [cx, cy]]) => {
+                const deger = getDeger(il);
+                const renk = getBubbleRenk(deger);
+                const r = getBubbleR(deger);
+                const isSecili = secilen === il;
+
                 return (
-                  <div key={il} className={`rounded-lg px-2 py-1.5 text-center ${getSkorRenk(deger)}`}
-                    title={`${il}: ${deger} ${siralama === "kitap" ? "kitap" : siralama === "kelime" ? "kelime" : "gün"}`}>
-                    <div className="text-[9px] font-medium truncate">{il}</div>
-                    <div className="text-[10px] font-bold">{deger || "—"}</div>
-                  </div>
+                  <g key={il}
+                    className="cursor-pointer"
+                    onClick={(e) => {
+                      const rect = e.currentTarget.closest("svg").getBoundingClientRect();
+                      setSecilen(isSecili ? null : il);
+                      setTooltip(isSecili ? null : { il, deger, x: cx, y: cy });
+                    }}
+                    style={{transition: "all 0.2s"}}>
+                    <circle
+                      cx={cx} cy={cy} r={isSecili ? r+3 : r}
+                      fill={renk.fill}
+                      stroke={isSecili ? "#dc2626" : renk.stroke}
+                      strokeWidth={isSecili ? 2.5 : 1}
+                      opacity={0.9}
+                    />
+                    {r >= 12 && (
+                      <text x={cx} y={cy+1} textAnchor="middle" dominantBaseline="middle"
+                        fontSize={r >= 16 ? "7" : "6"} fill={renk.text} fontWeight="600"
+                        style={{pointerEvents:"none", userSelect:"none"}}>
+                        {il.length > 6 ? il.substring(0,5)+"." : il}
+                      </text>
+                    )}
+                  </g>
                 );
               })}
-            </div>
-            <div className="flex items-center gap-2 mt-3 text-[10px] text-gray-500">
-              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-gray-100"></div>Veri yok</div>
-              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-orange-100"></div>Az</div>
-              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-yellow-200"></div>Orta</div>
-              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-green-300"></div>İyi</div>
-              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-green-500"></div>Mükemmel</div>
+
+              {/* Tooltip */}
+              {tooltip && (() => {
+                const tx = tooltip.x > 500 ? tooltip.x - 110 : tooltip.x + 5;
+                const ty = tooltip.y > 220 ? tooltip.y - 55 : tooltip.y + 5;
+                const ilData = haritaData?.iller?.find(i => i.il === tooltip.il);
+                return (
+                  <g>
+                    <rect x={tx} y={ty} width={105} height={52} rx={6}
+                      fill="white" stroke="#dc2626" strokeWidth={1.5} filter="url(#shadow)" />
+                    <text x={tx+8} y={ty+14} fontSize="8" fontWeight="700" fill="#dc2626">{tooltip.il}</text>
+                    <text x={tx+8} y={ty+26} fontSize="7" fill="#374151">📚 {ilData?.kitap_sayisi||0} kitap</text>
+                    <text x={tx+8} y={ty+36} fontSize="7" fill="#374151">🧠 {ilData?.kelime_sayisi||0} kelime</text>
+                    <text x={tx+8} y={ty+46} fontSize="7" fill="#374151">🔥 {ilData?.avg_streak||0} gün streak ort.</text>
+                    <defs>
+                      <filter id="shadow">
+                        <feDropShadow dx="1" dy="1" stdDeviation="2" floodOpacity="0.15"/>
+                      </filter>
+                    </defs>
+                  </g>
+                );
+              })()}
+            </svg>
+
+            {/* Lejant */}
+            <div className="absolute bottom-2 right-3 flex items-center gap-2 bg-white/80 rounded-lg px-2 py-1 backdrop-blur-sm">
+              {[["#e5e7eb","Veri yok"],["#fed7aa","Az"],["#fbbf24","Orta"],["#22c55e","İyi"],["#16a34a","Yüksek"]].map(([c,l]) => (
+                <div key={l} className="flex items-center gap-0.5">
+                  <div className="w-3 h-3 rounded-full" style={{background:c,border:"1px solid #d1d5db"}}></div>
+                  <span className="text-[8px] text-gray-500">{l}</span>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Top 5 il */}
-          {haritaData?.iller?.length > 0 && (
-            <div className="bg-white rounded-2xl border shadow-sm p-4">
-              <div className="text-xs font-bold text-gray-700 mb-3">🏆 En Aktif 5 İl</div>
-              <div className="space-y-2">
-                {[...haritaData.iller]
-                  .sort((a,b) => (siralama==="kitap"?b.kitap_sayisi-a.kitap_sayisi:siralama==="kelime"?b.kelime_sayisi-a.kelime_sayisi:b.avg_streak-a.avg_streak))
-                  .slice(0,5)
-                  .map((il, i) => {
-                    const deger = siralama==="kitap"?il.kitap_sayisi:siralama==="kelime"?il.kelime_sayisi:il.avg_streak;
-                    const max = haritaData.iller[0] ? Math.max(...haritaData.iller.map(x => siralama==="kitap"?x.kitap_sayisi:siralama==="kelime"?x.kelime_sayisi:x.avg_streak)) : 1;
-                    return (
-                      <div key={il.il} className="flex items-center gap-3">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${i===0?"bg-yellow-400 text-white":i===1?"bg-gray-300 text-gray-700":i===2?"bg-amber-500 text-white":"bg-gray-100 text-gray-500"}`}>{i+1}</div>
-                        <div className="flex-1">
-                          <div className="text-xs font-medium text-gray-800">{il.il}</div>
-                          <div className="h-1.5 bg-gray-100 rounded-full mt-0.5 overflow-hidden">
-                            <div className="h-full bg-red-500 rounded-full transition-all" style={{width:`${max>0?(deger/max*100):0}%`}}></div>
-                          </div>
-                        </div>
-                        <div className="text-xs font-bold text-red-600 w-12 text-right">{deger}</div>
-                      </div>
-                    );
-                  })}
-              </div>
-            </div>
-          )}
-
-          <p className="text-[10px] text-gray-400 text-center">🔒 Tüm veriler anonim · KVKK madde 4 uyumlu · Bireysel bilgi işlenmez</p>
-        </>
+          <div className="px-4 py-2 text-[10px] text-gray-400 text-center border-t">
+            İl üzerine tıklayın → detay · Renk: {siralama === "kitap" ? "okunan kitap" : siralama === "kelime" ? "öğrenilen kelime" : "streak ortalaması"}
+          </div>
+        </div>
       )}
+
+      {/* Top 5 */}
+      {haritaData?.iller?.length > 0 && (
+        <div className="bg-white rounded-2xl border shadow-sm p-4">
+          <div className="text-xs font-bold text-gray-700 mb-3">🏆 En Aktif 5 İl — {siralama === "kitap" ? "Kitap" : siralama === "kelime" ? "Kelime" : "Streak"}</div>
+          <div className="space-y-2">
+            {[...haritaData.iller]
+              .sort((a,b) => getDeger(b.il) - getDeger(a.il))
+              .slice(0,5)
+              .map((ilObj, i) => {
+                const deger = getDeger(ilObj.il);
+                return (
+                  <div key={ilObj.il} className="flex items-center gap-3">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0
+                      ${i===0?"bg-yellow-400 text-white":i===1?"bg-gray-300 text-gray-700":i===2?"bg-amber-500 text-white":"bg-gray-100 text-gray-500"}`}>{i+1}</div>
+                    <div className="flex-1">
+                      <div className="text-xs font-medium text-gray-800">{ilObj.il}</div>
+                      <div className="h-1.5 bg-gray-100 rounded-full mt-0.5 overflow-hidden">
+                        <div className="h-full bg-red-500 rounded-full" style={{width:`${maxDeger>0?Math.round(deger/maxDeger*100):0}%`,transition:"width 0.5s"}}></div>
+                      </div>
+                    </div>
+                    <div className="text-xs font-bold text-red-600 w-16 text-right">{deger} {birim}</div>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      )}
+
+      <p className="text-[10px] text-gray-400 text-center">🔒 Tüm veriler anonim · KVKK madde 4 uyumlu · Bireysel bilgi işlenmez</p>
     </div>
   );
 }
