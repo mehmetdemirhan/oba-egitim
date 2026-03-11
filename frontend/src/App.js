@@ -8038,7 +8038,6 @@ function TurkiyeOkumaHaritasi({ apiBase }) {
   const [yukleniyor, setYukleniyor] = React.useState(false);
   const [siralama, setSiralama] = React.useState("kitap");
   const [secilen, setSecilen] = React.useState(null);
-  const [tooltip, setTooltip] = React.useState(null);
 
   React.useEffect(() => {
     setYukleniyor(true);
@@ -8048,41 +8047,104 @@ function TurkiyeOkumaHaritasi({ apiBase }) {
       .finally(() => setYukleniyor(false));
   }, []);
 
-  // İl koordinatları (SVG viewBox 0 0 800 500 — Türkiye coğrafi merkez)
-  const IL_KOORDINAT = {
-    "Edirne":     [42, 68],  "Kırklareli": [75, 52],  "Tekirdağ":   [82, 88],
-    "İstanbul":   [115, 82], "Kocaeli":    [148, 92], "Sakarya":    [170, 98],
-    "Düzce":      [192, 88], "Zonguldak":  [218, 68], "Bartın":     [248, 58],
-    "Karabük":    [270, 72], "Kastamonu":  [305, 55], "Sinop":      [345, 45],
-    "Samsun":     [395, 52], "Ordu":       [440, 58], "Giresun":    [472, 65],
-    "Trabzon":    [510, 55], "Rize":       [542, 50], "Artvin":     [568, 48],
-    "Ardahan":    [580, 38], "Kars":       [600, 58], "Iğdır":      [622, 78],
-    "Ağrı":       [598, 95], "Muş":        [572, 118],"Bitlis":     [558, 132],
-    "Van":        [592, 145],"Hakkari":    [572, 168],"Şırnak":     [538, 175],
-    "Siirt":      [518, 162],"Batman":     [498, 152],"Mardin":     [472, 168],
-    "Şanlıurfa":  [440, 175],"Diyarbakır": [480, 142],"Elazığ":     [498, 118],
-    "Tunceli":    [518, 112],"Bingöl":     [542, 105],"Erzurum":    [560, 82],
-    "Erzincan":   [528, 92], "Gümüşhane":  [498, 78], "Bayburt":    [518, 68],
-    "Rize":       [542, 50], "Malatya":    [462, 128],"Kahramanmaraş":[420,148],
-    "Gaziantep":  [398, 168],"Kilis":      [380, 178],"Hatay":      [368, 195],
-    "Adana":      [340, 185],"Osmaniye":   [355, 172],"Adıyaman":   [442, 158],
-    "Sivas":      [448, 108],"Yozgat":     [390, 112],"Tokat":      [418, 88],
-    "Amasya":     [390, 78], "Çorum":      [355, 72], "Ankara":     [298, 118],
-    "Kırıkkale":  [322, 112],"Kırşehir":   [352, 128],"Nevşehir":   [360, 148],
-    "Niğde":      [348, 162],"Aksaray":    [330, 155],"Konya":      [295, 168],
-    "Karaman":    [310, 188],"İçel":       [318, 205],"Mersin":     [318, 205],
-    "Isparta":    [248, 178],"Burdur":     [238, 192],"Antalya":    [248, 212],
-    "Muğla":      [205, 215],"Aydın":      [172, 202],"İzmir":      [145, 178],
-    "Manisa":     [162, 162],"Balıkesir":  [152, 138],"Çanakkale":  [108, 115],
-    "Bursa":      [175, 118],"Yalova":     [158, 105],"Bilecik":    [192, 115],
-    "Eskişehir":  [225, 128],"Kütahya":    [208, 148],"Uşak":       [195, 168],
-    "Denizli":    [210, 185],"Afyonkarahisar":[238,152],"Çankırı":  [318, 90],
-    "Bolu":       [218, 102],"Karabük":    [270, 72]
+  const IL_PATH = {
+    "Edirne":     "M42,95 L55,78 L75,72 L82,85 L78,105 L60,112 Z",
+    "Kirklareli": "M55,78 L78,58 L98,65 L95,82 L82,85 L75,72 Z",
+    "Tekirdag":   "M78,105 L82,85 L95,82 L115,90 L118,108 L95,118 Z",
+    "Istanbul":   "M95,82 L115,78 L138,85 L135,100 L118,108 L115,90 Z",
+    "Kocaeli":    "M135,100 L155,92 L168,102 L162,118 L148,120 L135,112 Z",
+    "Sakarya":    "M168,102 L185,98 L198,108 L192,122 L178,125 L162,118 Z",
+    "Duzce":      "M198,108 L215,100 L228,110 L222,125 L208,128 L192,122 Z",
+    "Bolu":       "M215,100 L245,95 L262,108 L255,128 L235,132 L222,125 L228,110 Z",
+    "Zonguldak":  "M228,88 L255,78 L272,88 L268,102 L248,108 L235,98 Z",
+    "Bartin":     "M255,78 L278,70 L292,80 L285,95 L272,88 Z",
+    "Karabuk":    "M272,88 L292,80 L312,88 L308,108 L288,115 L268,102 Z",
+    "Kastamonu":  "M292,72 L338,62 L358,75 L352,100 L325,108 L308,100 L312,88 L292,80 Z",
+    "Sinop":      "M338,52 L375,45 L392,58 L385,72 L358,75 L338,62 Z",
+    "Samsun":     "M375,45 L425,40 L448,52 L442,68 L415,75 L392,72 L385,72 L392,58 Z",
+    "Amasya":     "M358,75 L392,72 L415,75 L408,98 L382,102 L362,95 Z",
+    "Tokat":      "M392,72 L442,68 L458,82 L452,108 L428,115 L408,102 L415,75 Z",
+    "Ordu":       "M425,40 L462,38 L478,52 L472,65 L448,68 L442,52 Z",
+    "Giresun":    "M462,38 L498,35 L512,48 L505,62 L482,65 L478,52 Z",
+    "Trabzon":    "M498,35 L535,30 L548,42 L542,58 L518,62 L512,48 Z",
+    "Rize":       "M535,30 L562,28 L572,40 L565,52 L548,52 L548,42 Z",
+    "Artvin":     "M562,28 L588,25 L598,38 L590,52 L572,52 L572,40 Z",
+    "Ardahan":    "M588,25 L618,22 L628,38 L615,50 L598,48 L598,38 Z",
+    "Kars":       "M618,22 L652,25 L658,48 L642,62 L625,58 L615,50 L628,38 Z",
+    "Igdir":      "M642,62 L660,55 L672,68 L665,82 L648,85 L638,75 Z",
+    "Agri":       "M625,58 L642,62 L652,72 L648,98 L625,105 L608,95 L610,75 Z",
+    "Erzurum":    "M558,68 L600,62 L615,72 L612,95 L590,108 L565,102 L552,88 Z",
+    "Erzincan":   "M505,88 L542,82 L558,92 L552,115 L528,122 L508,112 Z",
+    "Bayburt":    "M542,58 L568,55 L578,68 L568,82 L552,82 L548,68 Z",
+    "Gumushane":  "M505,62 L542,58 L552,68 L545,82 L522,88 L508,78 Z",
+    "Mus":        "M578,112 L608,105 L618,122 L608,138 L585,142 L572,130 Z",
+    "Bitlis":     "M565,125 L590,118 L602,132 L598,148 L578,152 L562,142 Z",
+    "Van":        "M618,115 L652,108 L668,128 L660,155 L638,162 L618,152 L610,135 Z",
+    "Hakkari":    "M638,162 L660,158 L668,178 L652,188 L632,182 Z",
+    "Siirt":      "M575,152 L602,145 L618,158 L610,175 L590,178 L575,168 Z",
+    "Batman":     "M548,142 L578,138 L588,152 L580,168 L558,172 L545,158 Z",
+    "Sirnak":     "M575,168 L598,162 L618,172 L612,192 L592,198 L572,188 Z",
+    "Mardin":     "M520,168 L552,162 L562,178 L552,192 L528,198 L515,182 Z",
+    "Diyarbakir": "M510,138 L548,132 L558,148 L548,168 L525,172 L508,158 Z",
+    "Sanliurfa":  "M462,168 L510,162 L522,178 L515,200 L488,205 L462,198 Z",
+    "Adiyaman":   "M468,148 L505,142 L515,158 L508,172 L482,175 L465,162 Z",
+    "Malatya":    "M455,118 L495,112 L508,128 L502,148 L475,152 L458,138 Z",
+    "Elazig":     "M505,108 L535,102 L548,118 L542,138 L518,142 L505,128 Z",
+    "Tunceli":    "M522,100 L548,95 L558,108 L552,125 L530,128 L518,115 Z",
+    "Bingol":     "M548,95 L578,88 L590,102 L582,118 L558,122 L552,108 Z",
+    "Kahramanmaras": "M422,155 L458,148 L468,165 L462,185 L438,188 L422,175 Z",
+    "Gaziantep":  "M408,178 L440,172 L448,188 L440,202 L418,205 L405,192 Z",
+    "Kilis":      "M392,188 L415,182 L422,198 L412,208 L395,205 Z",
+    "Hatay":      "M388,195 L415,188 L425,208 L418,232 L398,238 L382,222 Z",
+    "Adana":      "M352,185 L392,178 L408,195 L402,218 L375,225 L352,212 Z",
+    "Osmaniye":   "M392,178 L418,172 L428,188 L420,205 L398,208 L388,195 Z",
+    "Mersin":     "M308,195 L355,188 L368,208 L358,235 L328,242 L305,225 Z",
+    "Nigde":      "M348,162 L378,158 L388,175 L380,195 L355,198 L342,182 Z",
+    "Nevsehir":   "M348,148 L375,142 L385,158 L378,172 L352,175 L342,162 Z",
+    "Aksaray":    "M322,155 L352,150 L358,165 L350,182 L325,185 L315,170 Z",
+    "Konya":      "M278,162 L325,155 L338,175 L328,205 L298,212 L272,198 Z",
+    "Karaman":    "M312,192 L342,185 L352,205 L342,225 L318,228 L305,212 Z",
+    "Kirsehir":   "M352,128 L382,122 L392,138 L385,158 L358,162 L348,148 Z",
+    "Yozgat":     "M382,108 L418,102 L428,118 L422,142 L395,148 L378,135 Z",
+    "Sivas":      "M418,102 L458,95 L472,112 L465,142 L438,148 L422,132 Z",
+    "Kayseri":    "M382,138 L418,132 L428,148 L422,168 L395,172 L378,158 Z",
+    "Ankara":     "M278,118 L322,112 L335,128 L328,152 L298,158 L275,142 Z",
+    "Kirikkale":  "M322,108 L348,105 L358,118 L352,132 L328,135 L318,122 Z",
+    "Cankiri":    "M305,92 L338,88 L352,102 L345,118 L318,122 L305,108 Z",
+    "Corum":      "M338,75 L375,72 L388,88 L382,108 L355,112 L338,98 Z",
+    "Kutahya":    "M205,148 L238,142 L252,158 L245,178 L218,182 L205,165 Z",
+    "Afyonkarahisar": "M235,148 L268,142 L282,158 L275,182 L248,188 L232,172 Z",
+    "Eskisehir":  "M235,118 L272,112 L285,128 L278,148 L248,152 L232,138 Z",
+    "Bilecik":    "M192,115 L218,108 L232,122 L225,138 L202,142 L188,128 Z",
+    "Bursa":      "M155,112 L192,105 L205,118 L198,142 L172,148 L152,132 Z",
+    "Yalova":     "M148,105 L165,100 L175,112 L168,125 L152,128 L142,118 Z",
+    "Canakkale":  "M105,115 L138,108 L152,122 L145,145 L118,150 L105,135 Z",
+    "Balikesir":  "M138,138 L175,132 L188,148 L182,172 L155,178 L135,162 Z",
+    "Izmir":      "M138,172 L168,165 L182,180 L175,208 L148,215 L132,198 Z",
+    "Manisa":     "M162,152 L198,145 L212,162 L205,185 L178,190 L162,172 Z",
+    "Usak":       "M195,175 L222,168 L235,182 L228,202 L202,205 L192,190 Z",
+    "Denizli":    "M205,192 L238,185 L252,202 L245,222 L218,228 L205,212 Z",
+    "Aydin":      "M168,205 L202,198 L215,215 L208,238 L182,242 L165,225 Z",
+    "Mugla":      "M192,222 L225,215 L238,235 L228,258 L202,262 L188,245 Z",
+    "Burdur":     "M232,195 L262,188 L275,205 L268,228 L242,232 L228,215 Z",
+    "Isparta":    "M248,178 L278,172 L292,188 L285,212 L258,215 L245,198 Z",
+    "Antalya":    "M245,218 L285,212 L312,228 L305,258 L272,265 L245,248 Z",
   };
 
-  const getDeger = (ilAdi) => {
-    if (!haritaData?.iller) return 0;
-    const d = haritaData.iller.find(i => i.il === ilAdi);
+  // Türkçe karakter normalize
+  const normalize = (s) => s.normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .replace("ı","i").replace("ş","s").replace("ğ","g")
+    .replace("ü","u").replace("ö","o").replace("ç","c")
+    .replace("İ","I").replace("Ş","S").replace("Ğ","G")
+    .replace("Ü","U").replace("Ö","O").replace("Ç","C");
+
+  const getIlData = (normalAd) => {
+    if (!haritaData?.iller) return null;
+    return haritaData.iller.find(i => normalize(i.il) === normalAd);
+  };
+
+  const getDeger = (normalAd) => {
+    const d = getIlData(normalAd);
     if (!d) return 0;
     return siralama === "kitap" ? d.kitap_sayisi : siralama === "kelime" ? d.kelime_sayisi : d.avg_streak;
   };
@@ -8094,36 +8156,62 @@ function TurkiyeOkumaHaritasi({ apiBase }) {
     ));
   }, [haritaData, siralama]);
 
-  const getBubbleRenk = (deger) => {
-    if (!deger || deger === 0) return { fill: "#e5e7eb", stroke: "#d1d5db", text: "#9ca3af" };
+  const getRenk = (deger) => {
+    if (!deger || deger === 0) return "#e2e8f0";
     const oran = deger / maxDeger;
-    if (oran >= 0.7) return { fill: "#16a34a", stroke: "#15803d", text: "white" };
-    if (oran >= 0.4) return { fill: "#22c55e", stroke: "#16a34a", text: "white" };
-    if (oran >= 0.2) return { fill: "#fbbf24", stroke: "#f59e0b", text: "#78350f" };
-    return { fill: "#fed7aa", stroke: "#fb923c", text: "#9a3412" };
+    if (oran >= 0.75) return "#15803d";
+    if (oran >= 0.5)  return "#22c55e";
+    if (oran >= 0.25) return "#fbbf24";
+    return "#fdba74";
   };
 
-  const getBubbleR = (deger) => {
-    if (!deger) return 8;
+  const getStroke = (deger) => {
+    if (!deger || deger === 0) return "#cbd5e1";
     const oran = deger / maxDeger;
-    return Math.max(8, Math.min(22, 8 + oran * 14));
+    if (oran >= 0.75) return "#14532d";
+    if (oran >= 0.5)  return "#16a34a";
+    if (oran >= 0.25) return "#d97706";
+    return "#ea580c";
+  };
+
+  // İl merkezleri (tooltip için)
+  const IL_MERKEZ = {
+    "Edirne":[62,95],"Kirklareli":[75,70],"Tekirdag":[100,102],"Istanbul":[118,90],
+    "Kocaeli":[152,106],"Sakarya":[178,112],"Duzce":[208,115],"Bolu":[238,112],
+    "Zonguldak":[250,94],"Bartin":[272,82],"Karabuk":[292,98],"Kastamonu":[325,88],
+    "Sinop":[362,58],"Samsun":[408,56],"Amasya":[385,88],"Tokat":[428,92],
+    "Ordu":[452,52],"Giresun":[488,48],"Trabzon":[522,46],"Rize":[552,40],
+    "Artvin":[578,38],"Ardahan":[608,34],"Kars":[638,38],"Igdir":[655,70],
+    "Agri":[632,82],"Erzurum":[582,84],"Erzincan":[528,104],"Bayburt":[558,68],
+    "Gumushane":[528,72],"Mus":[595,124],"Bitlis":[582,138],"Van":[642,135],
+    "Hakkari":[650,172],"Siirt":[595,162],"Batman":[565,157],"Sirnak":[595,178],
+    "Mardin":[538,178],"Diyarbakir":[528,153],"Sanliurfa":[488,182],"Adiyaman":[488,158],
+    "Malatya":[478,132],"Elazig":[525,122],"Tunceli":[538,112],"Bingol":[565,108],
+    "Kahramanmaras":[445,168],"Gaziantep":[425,188],"Kilis":[406,196],"Hatay":[405,212],
+    "Adana":[375,200],"Osmaniye":[408,190],"Mersin":[332,215],"Nigde":[362,178],
+    "Nevsehir":[362,158],"Aksaray":[335,168],"Konya":[302,182],"Karaman":[325,208],
+    "Kirsehir":[368,142],"Yozgat":[402,122],"Sivas":[445,122],"Kayseri":[402,152],
+    "Ankara":[302,135],"Kirikkale":[335,118],"Cankiri":[325,104],"Corum":[358,92],
+    "Kutahya":[225,162],"Afyonkarahisar":[255,162],"Eskisehir":[255,132],
+    "Bilecik":[208,128],"Bursa":[175,128],"Yalova":[158,115],"Canakkale":[128,128],
+    "Balikesir":[158,155],"Izmir":[155,188],"Manisa":[182,168],"Usak":[212,188],
+    "Denizli":[225,208],"Aydin":[188,218],"Mugla":[212,238],"Burdur":[252,212],
+    "Isparta":[268,195],"Antalya":[278,238],
   };
 
   const toplamOkuyan = haritaData?.toplam_okuyucu || 0;
   const toplamKelime = haritaData?.toplam_kelime || 0;
-
-  const birim = siralama === "kitap" ? "kitap" : siralama === "kelime" ? "kelime" : "gün ort.";
+  const secilenData = secilen ? getIlData(secilen) : null;
 
   return (
     <div className="space-y-4">
-      {/* Başlık */}
       <div className="bg-gradient-to-r from-red-600 to-red-800 rounded-2xl p-4 text-white relative overflow-hidden">
-        <div className="absolute right-4 top-2 text-6xl opacity-10">🗺️</div>
-        <div className="font-bold text-lg">🇹🇷 Türkiye Okuma Haritası</div>
-        <p className="text-xs opacity-80 mb-3">İl bazında anonim okuma verileri — KVKK uyumlu</p>
+        <div className="absolute right-3 top-2 text-5xl opacity-10">🗺️</div>
+        <div className="font-bold text-base">🇹🇷 Türkiye Okuma Haritası</div>
+        <p className="text-xs opacity-80 mb-3">İl bazında anonim · KVKK uyumlu</p>
         <div className="flex gap-3">
-          {[["toplamOkuyan", toplamOkuyan, "Okuyucu"], ["toplamKelime", toplamKelime, "Kelime"], ["aktif_il", haritaData?.aktif_il||0, "Aktif İl"]].map(([k,v,l]) => (
-            <div key={k} className="bg-white/20 rounded-xl px-3 py-1.5 text-center">
+          {[[toplamOkuyan,"Okuyucu"],[toplamKelime,"Kelime"],[haritaData?.aktif_il||0,"Aktif İl"]].map(([v,l],i) => (
+            <div key={i} className="bg-white/20 rounded-xl px-3 py-1.5 text-center">
               <div className="font-bold text-sm">{Number(v).toLocaleString("tr-TR")}</div>
               <div className="text-[10px] opacity-80">{l}</div>
             </div>
@@ -8131,11 +8219,10 @@ function TurkiyeOkumaHaritasi({ apiBase }) {
         </div>
       </div>
 
-      {/* Sıralama */}
       <div className="flex gap-2">
         {[["kitap","📚 Kitap"],["kelime","🧠 Kelime"],["streak","🔥 Streak"]].map(([k,l]) => (
-          <button key={k} onClick={() => { setSiralama(k); setSecilen(null); setTooltip(null); }}
-            className={`flex-1 py-2 rounded-xl text-xs font-medium transition-all ${siralama===k?"bg-red-600 text-white shadow":"bg-white border border-gray-200 text-gray-600 hover:border-red-300"}`}>
+          <button key={k} onClick={() => { setSiralama(k); setSecilen(null); }}
+            className={"flex-1 py-2 rounded-xl text-xs font-medium transition-all " + (siralama===k?"bg-red-600 text-white shadow":"bg-white border border-gray-200 text-gray-600 hover:border-red-300")}>
             {l}
           </button>
         ))}
@@ -8148,83 +8235,71 @@ function TurkiyeOkumaHaritasi({ apiBase }) {
         </div>
       ) : (
         <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
-          {/* SVG Bubble Harita */}
-          <div className="relative">
-            <svg viewBox="0 0 660 280" className="w-full" style={{background:"linear-gradient(135deg,#eff6ff 0%,#f0fdf4 100%)"}}>
-              {/* Deniz arka planı ipucu */}
-              <text x="20" y="240" fontSize="9" fill="#93c5fd" opacity="0.6">KARADENİZ</text>
-              <text x="20" y="260" fontSize="9" fill="#93c5fd" opacity="0.6">EGE</text>
-              <text x="550" y="260" fontSize="9" fill="#93c5fd" opacity="0.6">AKDENİZ</text>
+          <svg viewBox="0 30 690 245" className="w-full" style={{background:"linear-gradient(160deg,#e0f2fe 0%,#f0fdf4 60%,#fef9c3 100%)"}}>
+            <defs>
+              <filter id="ilShadow">
+                <feDropShadow dx="0.5" dy="0.5" stdDeviation="1" floodOpacity="0.2"/>
+              </filter>
+            </defs>
 
-              {Object.entries(IL_KOORDINAT).map(([il, [cx, cy]]) => {
-                const deger = getDeger(il);
-                const renk = getBubbleRenk(deger);
-                const r = getBubbleR(deger);
-                const isSecili = secilen === il;
+            {/* Deniz etiketleri */}
+            <text x="30" y="60" fontSize="7" fill="#7dd3fc" opacity="0.8" fontStyle="italic">KARADENİZ</text>
+            <text x="55" y="240" fontSize="7" fill="#7dd3fc" opacity="0.8" fontStyle="italic">EGE DENİZİ</text>
+            <text x="500" y="270" fontSize="7" fill="#7dd3fc" opacity="0.8" fontStyle="italic">AKDENİZ</text>
 
-                return (
-                  <g key={il}
-                    className="cursor-pointer"
-                    onClick={(e) => {
-                      const rect = e.currentTarget.closest("svg").getBoundingClientRect();
-                      setSecilen(isSecili ? null : il);
-                      setTooltip(isSecili ? null : { il, deger, x: cx, y: cy });
-                    }}
-                    style={{transition: "all 0.2s"}}>
-                    <circle
-                      cx={cx} cy={cy} r={isSecili ? r+3 : r}
-                      fill={renk.fill}
-                      stroke={isSecili ? "#dc2626" : renk.stroke}
-                      strokeWidth={isSecili ? 2.5 : 1}
-                      opacity={0.9}
-                    />
-                    {r >= 12 && (
-                      <text x={cx} y={cy+1} textAnchor="middle" dominantBaseline="middle"
-                        fontSize={r >= 16 ? "7" : "6"} fill={renk.text} fontWeight="600"
-                        style={{pointerEvents:"none", userSelect:"none"}}>
-                        {il.length > 6 ? il.substring(0,5)+"." : il}
-                      </text>
-                    )}
-                  </g>
-                );
-              })}
+            {Object.entries(IL_PATH).map(([normalAd, path]) => {
+              const deger = getDeger(normalAd);
+              const fill = getRenk(deger);
+              const stroke = getStroke(deger);
+              const isSecili = secilen === normalAd;
+              return (
+                <path
+                  key={normalAd}
+                  d={path}
+                  fill={isSecili ? "#fca5a5" : fill}
+                  stroke={isSecili ? "#dc2626" : stroke}
+                  strokeWidth={isSecili ? 1.8 : 0.8}
+                  filter={isSecili ? "url(#ilShadow)" : undefined}
+                  style={{cursor:"pointer", transition:"fill 0.2s"}}
+                  onClick={() => setSecilen(isSecili ? null : normalAd)}
+                />
+              );
+            })}
 
-              {/* Tooltip */}
-              {tooltip && (() => {
-                const tx = tooltip.x > 500 ? tooltip.x - 110 : tooltip.x + 5;
-                const ty = tooltip.y > 220 ? tooltip.y - 55 : tooltip.y + 5;
-                const ilData = haritaData?.iller?.find(i => i.il === tooltip.il);
-                return (
-                  <g>
-                    <rect x={tx} y={ty} width={105} height={52} rx={6}
-                      fill="white" stroke="#dc2626" strokeWidth={1.5} filter="url(#shadow)" />
-                    <text x={tx+8} y={ty+14} fontSize="8" fontWeight="700" fill="#dc2626">{tooltip.il}</text>
-                    <text x={tx+8} y={ty+26} fontSize="7" fill="#374151">📚 {ilData?.kitap_sayisi||0} kitap</text>
-                    <text x={tx+8} y={ty+36} fontSize="7" fill="#374151">🧠 {ilData?.kelime_sayisi||0} kelime</text>
-                    <text x={tx+8} y={ty+46} fontSize="7" fill="#374151">🔥 {ilData?.avg_streak||0} gün streak ort.</text>
-                    <defs>
-                      <filter id="shadow">
-                        <feDropShadow dx="1" dy="1" stdDeviation="2" floodOpacity="0.15"/>
-                      </filter>
-                    </defs>
-                  </g>
-                );
-              })()}
-            </svg>
+            {/* Seçilen il tooltip */}
+            {secilen && (() => {
+              const m = IL_MERKEZ[secilen];
+              if (!m) return null;
+              const [mx, my] = m;
+              const tx = mx > 500 ? mx - 115 : mx + 8;
+              const ty = my > 220 ? my - 62 : my + 5;
+              const d = secilenData;
+              return (
+                <g>
+                  <rect x={tx} y={ty} width={110} height={58} rx={5} fill="white" stroke="#dc2626" strokeWidth={1.2} filter="url(#ilShadow)" />
+                  <text x={tx+6} y={ty+14} fontSize="7.5" fontWeight="800" fill="#dc2626">
+                    {d?.il || secilen}
+                  </text>
+                  <text x={tx+6} y={ty+26} fontSize="6.5" fill="#374151">📚 {d?.kitap_sayisi||0} kitap okundu</text>
+                  <text x={tx+6} y={ty+36} fontSize="6.5" fill="#374151">🧠 {d?.kelime_sayisi||0} kelime öğrenildi</text>
+                  <text x={tx+6} y={ty+46} fontSize="6.5" fill="#374151">🔥 {d?.avg_streak||0} gün streak ort.</text>
+                  <text x={tx+6} y={ty+55} fontSize="5.5" fill="#9ca3af">👤 {d?.okuyucu_sayisi||0} okuyucu</text>
+                </g>
+              );
+            })()}
+          </svg>
 
-            {/* Lejant */}
-            <div className="absolute bottom-2 right-3 flex items-center gap-2 bg-white/80 rounded-lg px-2 py-1 backdrop-blur-sm">
-              {[["#e5e7eb","Veri yok"],["#fed7aa","Az"],["#fbbf24","Orta"],["#22c55e","İyi"],["#16a34a","Yüksek"]].map(([c,l]) => (
-                <div key={l} className="flex items-center gap-0.5">
-                  <div className="w-3 h-3 rounded-full" style={{background:c,border:"1px solid #d1d5db"}}></div>
-                  <span className="text-[8px] text-gray-500">{l}</span>
+          {/* Lejant */}
+          <div className="flex items-center justify-between px-4 py-2 border-t bg-gray-50">
+            <div className="flex items-center gap-3">
+              {[["#e2e8f0","Veri yok"],["#fdba74","Az"],["#fbbf24","Orta"],["#22c55e","İyi"],["#15803d","Yüksek"]].map(([c,l]) => (
+                <div key={l} className="flex items-center gap-1">
+                  <div className="w-3.5 h-3.5 rounded-sm border" style={{background:c}}></div>
+                  <span className="text-[9px] text-gray-500">{l}</span>
                 </div>
               ))}
             </div>
-          </div>
-
-          <div className="px-4 py-2 text-[10px] text-gray-400 text-center border-t">
-            İl üzerine tıklayın → detay · Renk: {siralama === "kitap" ? "okunan kitap" : siralama === "kelime" ? "öğrenilen kelime" : "streak ortalaması"}
+            <span className="text-[9px] text-gray-400">İle tıkla → detay</span>
           </div>
         </div>
       )}
@@ -8232,24 +8307,27 @@ function TurkiyeOkumaHaritasi({ apiBase }) {
       {/* Top 5 */}
       {haritaData?.iller?.length > 0 && (
         <div className="bg-white rounded-2xl border shadow-sm p-4">
-          <div className="text-xs font-bold text-gray-700 mb-3">🏆 En Aktif 5 İl — {siralama === "kitap" ? "Kitap" : siralama === "kelime" ? "Kelime" : "Streak"}</div>
-          <div className="space-y-2">
+          <div className="text-xs font-bold text-gray-700 mb-3">🏆 En Aktif 5 İl</div>
+          <div className="space-y-2.5">
             {[...haritaData.iller]
-              .sort((a,b) => getDeger(b.il) - getDeger(a.il))
+              .sort((a,b) => {
+                const va = siralama==="kitap"?a.kitap_sayisi:siralama==="kelime"?a.kelime_sayisi:a.avg_streak;
+                const vb = siralama==="kitap"?b.kitap_sayisi:siralama==="kelime"?b.kelime_sayisi:b.avg_streak;
+                return vb-va;
+              })
               .slice(0,5)
               .map((ilObj, i) => {
-                const deger = getDeger(ilObj.il);
+                const deger = siralama==="kitap"?ilObj.kitap_sayisi:siralama==="kelime"?ilObj.kelime_sayisi:ilObj.avg_streak;
                 return (
                   <div key={ilObj.il} className="flex items-center gap-3">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0
-                      ${i===0?"bg-yellow-400 text-white":i===1?"bg-gray-300 text-gray-700":i===2?"bg-amber-500 text-white":"bg-gray-100 text-gray-500"}`}>{i+1}</div>
+                    <div className={"w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 " + (i===0?"bg-yellow-400 text-white":i===1?"bg-gray-300 text-gray-700":i===2?"bg-amber-500 text-white":"bg-gray-100 text-gray-500")}>{i+1}</div>
                     <div className="flex-1">
-                      <div className="text-xs font-medium text-gray-800">{ilObj.il}</div>
+                      <div className="text-xs font-semibold text-gray-800">{ilObj.il}</div>
                       <div className="h-1.5 bg-gray-100 rounded-full mt-0.5 overflow-hidden">
-                        <div className="h-full bg-red-500 rounded-full" style={{width:`${maxDeger>0?Math.round(deger/maxDeger*100):0}%`,transition:"width 0.5s"}}></div>
+                        <div className="h-full bg-gradient-to-r from-red-500 to-orange-400 rounded-full" style={{width:(maxDeger>0?Math.round(deger/maxDeger*100):0)+"%",transition:"width 0.6s ease"}}></div>
                       </div>
                     </div>
-                    <div className="text-xs font-bold text-red-600 w-16 text-right">{deger} {birim}</div>
+                    <div className="text-xs font-bold text-red-600 w-20 text-right">{deger} {siralama==="kitap"?"kitap":siralama==="kelime"?"kelime":"gün"}</div>
                   </div>
                 );
               })}
@@ -8257,7 +8335,7 @@ function TurkiyeOkumaHaritasi({ apiBase }) {
         </div>
       )}
 
-      <p className="text-[10px] text-gray-400 text-center">🔒 Tüm veriler anonim · KVKK madde 4 uyumlu · Bireysel bilgi işlenmez</p>
+      <p className="text-[10px] text-gray-400 text-center pb-2">🔒 Tüm veriler anonim · KVKK madde 4 uyumlu</p>
     </div>
   );
 }
