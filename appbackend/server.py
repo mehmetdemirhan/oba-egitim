@@ -3221,6 +3221,15 @@ async def create_icerik(icerik: IcerikCreate, current_user=Depends(get_current_u
     data["olusturma_tarihi"] = data["olusturma_tarihi"].isoformat()
     if data.get("yayin_tarihi"):
         data["yayin_tarihi"] = data["yayin_tarihi"].isoformat()
+
+    # "Neden bu kitap?" alanı → +3 puan bonusu
+    neden = data.get("neden_bu_icerik", "")
+    if neden and len(neden.strip()) >= 20:
+        data["neden_bonus"] = True
+        try:
+            await db.users.update_one({"id": current_user["id"]}, {"$inc": {"toplam_puan": 3}})
+        except: pass
+
     await db.gelisim_icerik.insert_one(data)
 
     # Kitap türünde içerik eklendiyse kitap havuzuna da kaydet (bölüm bazlı soru için)
@@ -9389,6 +9398,70 @@ SADECE JSON döndür:
         except: pass
 
     return result
+
+
+# ─────────────────────────────────────────────
+# ETKİ İSTATİSTİKLERİ
+# ─────────────────────────────────────────────
+
+@api_router.get("/gelisim/icerik/{icerik_id}/etki")
+async def icerik_etki_istatistikleri(icerik_id: str, current_user=Depends(get_current_user)):
+    """Bir içeriğin etkisini göster: kaç öğrenci tamamladı, materyal, oyun, post-reading."""
+    tamamlayan = await db.gelisim_tamamlama.count_documents({"icerik_id": icerik_id})
+    materyal_sayisi = await db.ai_materyal_log.count_documents({"icerik_id": icerik_id})
+    oyun_sayisi = await db.ai_oyun_log.count_documents({"icerik_id": icerik_id})
+    post_reading = await db.post_reading_cache.count_documents({"icerik_id": icerik_id})
+    zeka_harita = await db.kitap_zeka_haritasi.count_documents({"icerik_id": icerik_id})
+
+    # Bloom ortalaması
+    testler = await db.kitap_test_sonuclari.find({"icerik_id": icerik_id}).to_list(length=100)
+    bloom_ort = 0
+    if testler:
+        dogru_list = [t.get("dogru", 0) for t in testler if t.get("toplam", 0) > 0]
+        if dogru_list:
+            toplam_list = [t.get("toplam", 1) for t in testler if t.get("toplam", 0) > 0]
+            bloom_ort = round(sum(d/t for d,t in zip(dogru_list, toplam_list)) / len(dogru_list) * 100)
+
+    return {
+        "icerik_id": icerik_id,
+        "tamamlayan_ogrenci": tamamlayan,
+        "uretilen_materyal": materyal_sayisi,
+        "oynanan_oyun": oyun_sayisi,
+        "post_reading_analiz": post_reading,
+        "zeka_harita": 1 if zeka_harita > 0 else 0,
+        "bloom_ort": bloom_ort,
+    }
+
+
+@api_router.get("/gelisim/etki-ozet")
+async def etki_ozet(current_user=Depends(get_current_user)):
+    """Öğretmenin eklediği tüm içeriklerin toplam etkisi."""
+    user_id = current_user.get("id", "")
+    icerikler = await db.gelisim_icerik.find({"ekleyen_id": user_id}).to_list(length=None)
+    icerik_idler = [i["id"] for i in icerikler if i.get("id")]
+
+    toplam_tamamlayan = 0
+    toplam_materyal = 0
+    en_cok = None
+    en_cok_sayi = 0
+
+    for ic in icerikler:
+        iid = ic.get("id", "")
+        sayi = await db.gelisim_tamamlama.count_documents({"icerik_id": iid})
+        toplam_tamamlayan += sayi
+        mat = await db.ai_materyal_log.count_documents({"icerik_id": iid})
+        toplam_materyal += mat
+        if sayi > en_cok_sayi:
+            en_cok_sayi = sayi
+            en_cok = ic.get("baslik", "")
+
+    return {
+        "toplam_icerik": len(icerikler),
+        "toplam_tamamlayan": toplam_tamamlayan,
+        "toplam_materyal": toplam_materyal,
+        "en_populer_icerik": en_cok,
+        "en_populer_tamamlayan": en_cok_sayi,
+    }
 
 
 # APP SETUP
