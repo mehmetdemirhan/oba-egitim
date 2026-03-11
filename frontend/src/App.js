@@ -5302,15 +5302,8 @@ function OgrenciPaneli({ user, logout }) {
             <div className="bg-white rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-teal-600">{tamamlananGorevSayisi + tamamlananGelisim}</div><div className="text-[10px] text-gray-500">✅ Tamamlanan</div></div>
           </div>
 
-          {/* 🤖 AI Günlük Motivasyon Mesajı */}
-          {aiMotMesaj && (
-              <div className="bg-gradient-to-r from-cyan-50 to-blue-50 rounded-2xl p-4 border border-cyan-200 relative">
-                <div className="flex items-start gap-3">
-                  <div className="text-2xl">🤖</div>
-                  <div className="flex-1"><div className="text-xs font-medium text-cyan-700 mb-1">AI Koçun Diyor ki:</div><p className="text-sm text-gray-700">{aiMotMesaj}</p></div>
-                </div>
-              </div>
-          )}
+          {/* 🤖 AI Günlük Motivasyon + Mikro Hedef */}
+          <MikroHedefMotor user={user} aiMotMesaj={aiMotMesaj} apiBase={API} />
 
           {/* Haftalık hedef */}
           {istatistik && (<div className="bg-white rounded-2xl p-4 shadow-sm border"><div className="flex items-center justify-between mb-2"><div className="text-sm font-medium text-gray-700">Haftalık Hedef</div><span className="text-sm font-bold text-gray-700">{istatistik.aktif_gunler_7}/4 gün</span></div><div className="flex gap-1">{[0,1,2,3].map(i => (<div key={i} className={`flex-1 h-3 rounded-full ${i < istatistik.aktif_gunler_7 ? 'bg-gradient-to-r from-orange-400 to-red-500' : 'bg-gray-100'}`} />))}</div><p className="text-xs text-gray-400 mt-2">Haftada en az 4 gün okuma 📖</p></div>)}
@@ -5497,7 +5490,7 @@ function OgrenciPaneli({ user, logout }) {
           <h2 className="text-lg font-bold">🎯 Gelişim</h2>
           {/* Alt sekmeler */}
           <div className="flex gap-1 bg-gray-100 p-1 rounded-xl overflow-x-auto">
-            {[{id:"icerikler",l:"📚 İçerik"},{id:"egzersizler",l:"👁️ Egzersiz"},{id:"okumalarim",l:"📖 Okuma"},{id:"kelime_evrimi",l:"🧠 Kelime"},{id:"hikayem",l:"✨ Hikâye"},{id:"materyal",l:"📋 Materyal"}].map(s => (
+            {[{id:"icerikler",l:"📚 İçerik"},{id:"egzersizler",l:"👁️ Egzersiz"},{id:"okumalarim",l:"📖 Okuma"},{id:"kelime_evrimi",l:"🧠 Kelime"},{id:"hikayem",l:"✨ Hikâye"},{id:"materyal",l:"📋 Materyal"},{id:"arkadas",l:"🦉 Arkadaş"},{id:"evren",l:"🌌 Evren"}].map(s => (
               <button key={s.id} onClick={() => setGelisimAltSekme(s.id)}
                 className={`flex-shrink-0 px-3 py-2 rounded-lg text-xs font-medium transition-all ${gelisimAltSekme === s.id ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}>{s.l}</button>
             ))}
@@ -5525,6 +5518,16 @@ function OgrenciPaneli({ user, logout }) {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* ── AI OKUMA ARKADAŞI ── */}
+          {gelisimAltSekme === "arkadas" && (
+            <AiArkadasSekme apiBase={API} user={user} />
+          )}
+
+          {/* ── OKUMA EVRENİ ── */}
+          {gelisimAltSekme === "evren" && (
+            <OkumaEvreniSekme apiBase={API} user={user} />
           )}
           {gelisimAltSekme === "icerikler" && (
             <div className="bg-gradient-to-r from-indigo-500 to-blue-600 rounded-2xl p-4 text-white">
@@ -7844,6 +7847,347 @@ function KitapOyunGorunum({ oyun, oyunDurum, setOyunDurum, onBitir, onKapat }) {
   }
 
   return <div className="text-center py-4 text-gray-400 text-sm">Oyun türü desteklenmiyor</div>;
+}
+
+// ── MİKRO HEDEF MOTORU ──────────────────────────────────────
+function MikroHedefMotor({ user, aiMotMesaj, apiBase }) {
+  const bugunKey = `mikro_hedef_${user?.id}_${new Date().toDateString()}`;
+  const [secilenDk, setSecilenDk] = React.useState(() => {
+    try { return parseInt(localStorage.getItem(bugunKey) || "0"); } catch { return 0; }
+  });
+  const [okunanDk, setOkunanDk] = React.useState(0);
+  const [sayacAktif, setSayacAktif] = React.useState(false);
+  const sayacRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (sayacAktif) {
+      sayacRef.current = setInterval(() => setOkunanDk(d => d + 1), 60000);
+    } else {
+      clearInterval(sayacRef.current);
+    }
+    return () => clearInterval(sayacRef.current);
+  }, [sayacAktif]);
+
+  const hedefSec = (dk) => {
+    setSecilenDk(dk);
+    try { localStorage.setItem(bugunKey, dk); } catch {}
+    setSayacAktif(true);
+  };
+
+  const tamamlandi = secilenDk > 0 && okunanDk >= secilenDk;
+  const ilerleme = secilenDk > 0 ? Math.min(100, Math.round(okunanDk / secilenDk * 100)) : 0;
+
+  return (
+    <div className="bg-gradient-to-r from-cyan-50 to-blue-50 rounded-2xl p-4 border border-cyan-200">
+      {/* AI Koç mesajı */}
+      {aiMotMesaj && (
+        <div className="flex items-start gap-2 mb-3">
+          <span className="text-xl">🤖</span>
+          <div>
+            <div className="text-[10px] font-bold text-cyan-700 uppercase tracking-wide">AI Koçun Diyor ki</div>
+            <p className="text-sm text-gray-700 mt-0.5">{aiMotMesaj}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Mikro hedef seçimi */}
+      <div className="border-t border-cyan-100 pt-3">
+        <div className="text-xs font-bold text-gray-700 mb-2">⏱ Bugün ne kadar okuyacaksın?</div>
+        {!secilenDk ? (
+          <div className="flex gap-2">
+            {[5, 10, 15, 20].map(dk => (
+              <button key={dk} onClick={() => hedefSec(dk)}
+                className="flex-1 bg-white border-2 border-cyan-300 hover:border-cyan-500 hover:bg-cyan-50 rounded-xl py-2 text-sm font-bold text-cyan-700 transition-all active:scale-95">
+                {dk} dk
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs text-gray-600">
+              <span>{tamamlandi ? "🎉 Hedef tamamlandı!" : sayacAktif ? "⏱ Okuma devam ediyor..." : "⏸ Duraklatıldı"}</span>
+              <span className="font-bold">{okunanDk} / {secilenDk} dk</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className={`h-2 rounded-full transition-all ${tamamlandi ? "bg-green-500" : "bg-gradient-to-r from-cyan-400 to-blue-500"}`}
+                style={{ width: `${ilerleme}%` }} />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setSayacAktif(a => !a)}
+                className={`flex-1 text-xs py-1.5 rounded-lg border font-medium transition-all
+                  ${sayacAktif ? "bg-orange-50 border-orange-300 text-orange-600" : "bg-green-50 border-green-300 text-green-600"}`}>
+                {sayacAktif ? "⏸ Duraklat" : "▶ Devam Et"}
+              </button>
+              <button onClick={() => { setSecilenDk(0); setOkunanDk(0); setSayacAktif(false); try { localStorage.removeItem(bugunKey); } catch {} }}
+                className="text-xs py-1.5 px-3 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-600">
+                ↺
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── AI OKUMA ARKADAŞI SEKMESİ ───────────────────────────────
+function AiArkadasSekme({ apiBase, user }) {
+  const KARAKTERLER = [
+    { id: "baykus", emoji: "🦉", ad: "Bilge Baykuş", tanim: "Derin sorular sorar", renk: "from-purple-500 to-indigo-600", bg: "bg-purple-50", border: "border-purple-300" },
+    { id: "robot",  emoji: "🤖", ad: "Robot Kaptan",  tanim: "Heyecanla anlatır",  renk: "from-blue-500 to-cyan-500",   bg: "bg-blue-50",   border: "border-blue-300"   },
+    { id: "dede",   emoji: "📖", ad: "Kütüphane Dedesi", tanim: "Hikâye paylaşır", renk: "from-amber-500 to-orange-500", bg: "bg-amber-50", border: "border-amber-300" },
+    { id: "kedi",   emoji: "🐱", ad: "Gezgin Kedi",  tanim: "Hayale davet eder", renk: "from-pink-500 to-rose-500",    bg: "bg-pink-50",   border: "border-pink-300"   },
+  ];
+
+  const [secilenKarakter, setSecilenKarakter] = React.useState(null);
+  const [mesajlar, setMesajlar] = React.useState([]);
+  const [yeniMesaj, setYeniMesaj] = React.useState("");
+  const [gonderiyor, setGonderiyor] = React.useState(false);
+  const [gunlukKalan, setGunlukKalan] = React.useState(20);
+  const [kitapBaglami, setKitapBaglami] = React.useState("");
+  const mesajSonuRef = React.useRef(null);
+
+  React.useEffect(() => {
+    mesajSonuRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [mesajlar]);
+
+  const karakterSec = (kar) => {
+    setSecilenKarakter(kar);
+    setMesajlar([{ rol: "assistant", icerik: karselamla(kar) }]);
+    setYeniMesaj("");
+  };
+
+  const karselamla = (kar) => {
+    const selamlar = {
+      baykus: "Huu huu! 🦉 Merhaba! Ben Bilge Baykuş. Bir kitap hakkında konuşmak ister misin? Sana derin sorular sormak için sabırsızlanıyorum!",
+      robot: "BİP BOP! 🤖 Selamlar, kahraman! Ben Robot Kaptan. Okuma macerana hazır mısın? SÜPER!",
+      dede: "Ah, hoş geldin evlat. 📖 Ben Kütüphane Dedesi. Hangi kitabı okudun? Dinlemek için sabırsızlanıyorum...",
+      kedi: "Miyav! 🐱 Ben Gezgin Kedi! Kitaplarla dünyalarca gezdim. Sen hangi dünyaya gitmek istersin?",
+    };
+    return selamlar[kar.id] || "Merhaba!";
+  };
+
+  const gonder = async () => {
+    if (!yeniMesaj.trim() || gonderiyor) return;
+    const kullanicıMesaj = yeniMesaj.trim();
+    setYeniMesaj("");
+    setMesajlar(m => [...m, { rol: "user", icerik: kullanicıMesaj }]);
+    setGonderiyor(true);
+    try {
+      const r = await axios.post(`${apiBase}/ai/arkadas/sohbet`, {
+        karakter_id: secilenKarakter.id,
+        mesaj: kullanicıMesaj,
+        gecmis: mesajlar.slice(-6),
+        kitap_baglami: kitapBaglami,
+      });
+      setMesajlar(m => [...m, { rol: "assistant", icerik: r.data.yanit }]);
+      setGunlukKalan(r.data.gunluk_kalan ?? 0);
+    } catch(e) {
+      const hata = e.response?.data?.detail || "Bir hata oluştu";
+      setMesajlar(m => [...m, { rol: "assistant", icerik: `❌ ${hata}` }]);
+    }
+    setGonderiyor(false);
+  };
+
+  if (!secilenKarakter) return (
+    <div className="space-y-4">
+      <div className="text-center">
+        <div className="text-3xl mb-1">🌟</div>
+        <h3 className="font-bold text-gray-800">AI Okuma Arkadaşın</h3>
+        <p className="text-xs text-gray-500 mt-1">Kitaplar hakkında konuşmak için bir karakter seç</p>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {KARAKTERLER.map(kar => (
+          <button key={kar.id} onClick={() => karakterSec(kar)}
+            className={`${kar.bg} ${kar.border} border-2 rounded-2xl p-4 text-center hover:shadow-md transition-all active:scale-95`}>
+            <div className="text-4xl mb-2">{kar.emoji}</div>
+            <div className="font-bold text-sm text-gray-800">{kar.ad}</div>
+            <div className="text-[10px] text-gray-500 mt-0.5">{kar.tanim}</div>
+          </button>
+        ))}
+      </div>
+      <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-xs text-orange-700">
+        💡 Günde 20 mesaj hakkın var. Kişisel bilgilerini (adres, telefon) paylaşma!
+      </div>
+    </div>
+  );
+
+  const kar = secilenKarakter;
+  return (
+    <div className="flex flex-col h-[500px]">
+      {/* Karakter başlığı */}
+      <div className={`bg-gradient-to-r ${kar.renk} rounded-xl p-3 text-white flex items-center justify-between mb-3`}>
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">{kar.emoji}</span>
+          <div>
+            <div className="font-bold text-sm">{kar.ad}</div>
+            <div className="text-[10px] opacity-80">{kar.tanim}</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] opacity-80">{gunlukKalan} mesaj kaldı</span>
+          <button onClick={() => setSecilenKarakter(null)}
+            className="text-white opacity-70 hover:opacity-100 text-lg leading-none">✕</button>
+        </div>
+      </div>
+
+      {/* Kitap bağlamı */}
+      <input value={kitapBaglami} onChange={e => setKitapBaglami(e.target.value)}
+        className="border rounded-lg px-3 py-1.5 text-xs text-gray-600 mb-2 w-full"
+        placeholder="📚 Hangi kitap hakkında konuşuyoruz? (isteğe bağlı)" />
+
+      {/* Mesajlar */}
+      <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+        {mesajlar.map((m, i) => (
+          <div key={i} className={`flex ${m.rol === "user" ? "justify-end" : "justify-start"}`}>
+            {m.rol === "assistant" && <span className="text-xl mr-1 mt-0.5">{kar.emoji}</span>}
+            <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${
+              m.rol === "user"
+                ? "bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-br-sm"
+                : `${kar.bg} ${kar.border} border text-gray-800 rounded-bl-sm`}`}>
+              {m.icerik}
+            </div>
+          </div>
+        ))}
+        {gonderiyor && (
+          <div className="flex justify-start">
+            <span className="text-xl mr-1">{kar.emoji}</span>
+            <div className={`${kar.bg} ${kar.border} border rounded-2xl rounded-bl-sm px-4 py-2`}>
+              <span className="flex gap-1">{[0,1,2].map(i => (
+                <span key={i} className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{animationDelay:`${i*0.15}s`}}></span>
+              ))}</span>
+            </div>
+          </div>
+        )}
+        <div ref={mesajSonuRef} />
+      </div>
+
+      {/* Giriş */}
+      <div className="flex gap-2 mt-2">
+        <input value={yeniMesaj} onChange={e => setYeniMesaj(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && !e.shiftKey && gonder()}
+          disabled={gunlukKalan <= 0}
+          className="flex-1 border rounded-xl px-3 py-2 text-sm disabled:opacity-50"
+          placeholder={gunlukKalan <= 0 ? "Bugünkü hakkın bitti 😴" : "Bir şey sor veya düşünceni paylaş..."} />
+        <button onClick={gonder} disabled={!yeniMesaj.trim() || gonderiyor || gunlukKalan <= 0}
+          className={`bg-gradient-to-r ${kar.renk} text-white rounded-xl px-4 py-2 text-sm font-bold disabled:opacity-40 transition-all`}>
+          ➤
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── OKUMA EVRENİ SEKMESİ ─────────────────────────────────────
+function OkumaEvreniSekme({ apiBase, user }) {
+  const [evrenData, setEvrenData] = React.useState(null);
+  const [yukleniyor, setYukleniyor] = React.useState(true);
+
+  const BOLGE_RENK = {
+    orman:     { gradient: "from-green-400 to-emerald-500",  bg: "bg-green-50",   border: "border-green-300",  kilit: "bg-green-100" },
+    daglar:    { gradient: "from-stone-400 to-slate-500",    bg: "bg-stone-50",   border: "border-stone-300",  kilit: "bg-stone-100" },
+    liman:     { gradient: "from-blue-400 to-cyan-500",      bg: "bg-blue-50",    border: "border-blue-300",   kilit: "bg-blue-100"  },
+    kutuphane: { gradient: "from-amber-400 to-orange-500",   bg: "bg-amber-50",   border: "border-amber-300",  kilit: "bg-amber-100" },
+    galaksi:   { gradient: "from-purple-500 to-indigo-600",  bg: "bg-purple-50",  border: "border-purple-300", kilit: "bg-purple-100"},
+  };
+
+  React.useEffect(() => {
+    (async () => {
+      setYukleniyor(true);
+      try {
+        const r = await axios.get(`${apiBase}/ai/evren/durum-me`);
+        setEvrenData(r.data);
+      } catch(e) { console.error(e); }
+      setYukleniyor(false);
+    })();
+  }, []);
+
+  if (yukleniyor) return (
+    <div className="text-center py-10 text-gray-400">
+      <div className="text-4xl animate-spin mb-2">🌍</div>
+      <p className="text-sm">Evrenin yükleniyor...</p>
+    </div>
+  );
+
+  if (!evrenData) return (
+    <div className="text-center py-8 text-gray-400 text-sm">Veri alınamadı</div>
+  );
+
+  const { bolgeler = [], aktif_bolge, istatistikler = {} } = evrenData;
+
+  return (
+    <div className="space-y-4">
+      {/* Üst istatistikler */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="bg-green-50 rounded-xl p-3 text-center border border-green-200">
+          <div className="text-2xl font-bold text-green-600">{istatistikler.kelime_sayisi || 0}</div>
+          <div className="text-[9px] text-green-700">📚 Kelime</div>
+        </div>
+        <div className="bg-blue-50 rounded-xl p-3 text-center border border-blue-200">
+          <div className="text-2xl font-bold text-blue-600">{istatistikler.kitap_sayisi || 0}</div>
+          <div className="text-[9px] text-blue-700">📖 Kitap</div>
+        </div>
+        <div className="bg-purple-50 rounded-xl p-3 text-center border border-purple-200">
+          <div className="text-2xl font-bold text-purple-600">%{istatistikler.bloom_skoru || 0}</div>
+          <div className="text-[9px] text-purple-700">🧠 Anlama</div>
+        </div>
+      </div>
+
+      {/* Bölgeler */}
+      <div className="space-y-3">
+        {bolgeler.map((bolge, i) => {
+          const renkler = BOLGE_RENK[bolge.id] || BOLGE_RENK.orman;
+          const aktif = bolge.id === aktif_bolge;
+          return (
+            <div key={bolge.id} className={`rounded-2xl border-2 overflow-hidden transition-all
+              ${bolge.acik ? renkler.border : "border-gray-200"}
+              ${aktif ? "shadow-md" : ""}`}>
+              <div className={`p-3 ${bolge.acik ? renkler.bg : "bg-gray-50"}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-2xl ${!bolge.acik ? "grayscale opacity-50" : ""}`}>{bolge.emoji}</span>
+                    <div>
+                      <div className={`font-bold text-sm ${bolge.acik ? "text-gray-800" : "text-gray-400"}`}>
+                        {bolge.ad}
+                        {aktif && <span className="ml-1 text-[10px] bg-orange-500 text-white rounded-full px-1.5 py-0.5">Aktif</span>}
+                      </div>
+                      <div className="text-[10px] text-gray-500">{bolge.aciklama}</div>
+                    </div>
+                  </div>
+                  {!bolge.acik && <span className="text-gray-300 text-xl">🔒</span>}
+                  {bolge.acik && <span className="text-green-500 text-lg">✓</span>}
+                </div>
+
+                {/* İlerleme çubuğu */}
+                <div className="mt-2">
+                  <div className="flex justify-between text-[10px] text-gray-500 mb-1">
+                    <span>{bolge.acik ? "Tamamlandı" : bolge.kac_kaldi || "Kilit"}</span>
+                    <span>%{bolge.ilerleme || 0}</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-1.5">
+                    <div className={`h-1.5 rounded-full bg-gradient-to-r ${renkler.gradient} transition-all`}
+                      style={{ width: `${bolge.ilerleme || 0}%` }} />
+                  </div>
+                </div>
+
+                {/* Ödül */}
+                {bolge.odul && bolge.acik && (
+                  <div className="mt-2 text-[10px] text-gray-500">
+                    🎁 Ödül: <span className="font-medium">{bolge.odul}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Yol açıklaması */}
+      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-3 border border-indigo-200 text-xs text-indigo-700">
+        🚀 <strong>Okuma Evreni</strong> — Kelime öğren, kitap bitir, anlama testlerini çöz ve yeni bölgelerin kilidini aç!
+      </div>
+    </div>
+  );
 }
 
 function GeminiDurumSatiri({ apiBase }) {
