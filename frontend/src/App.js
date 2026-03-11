@@ -5488,11 +5488,26 @@ function OgrenciPaneli({ user, logout }) {
         {/* ═══ GELİŞİM (İçerikler + Egzersizler + Okumalarım alt sekmeli) ═══ */}
         {aktifSekme === "gelisim" && (<div className="space-y-4">
           <h2 className="text-lg font-bold">🎯 Gelişim</h2>
-          {/* Alt sekmeler */}
-          <div className="flex gap-1 bg-gray-100 p-1 rounded-xl overflow-x-auto">
-            {[{id:"icerikler",l:"📚 İçerik"},{id:"egzersizler",l:"👁️ Egzersiz"},{id:"okumalarim",l:"📖 Okuma"},{id:"kelime_evrimi",l:"🧠 Kelime"},{id:"hikayem",l:"✨ Hikâye"},{id:"materyal",l:"📋 Materyal"},{id:"arkadas",l:"🦉 Arkadaş"},{id:"evren",l:"🌌 Evren"}].map(s => (
+          {/* Alt sekmeler — 2 satır */}
+          <div className="grid grid-cols-4 gap-1">
+            {[
+              {id:"icerikler",  emoji:"📚", l:"İçerik"},
+              {id:"egzersizler",emoji:"👁️",  l:"Egzersiz"},
+              {id:"okumalarim", emoji:"📖", l:"Okumalarım"},
+              {id:"kelime_evrimi",emoji:"🧠",l:"Kelime"},
+              {id:"hikayem",   emoji:"✨", l:"Hikâyem"},
+              {id:"materyal",  emoji:"📋", l:"Materyal"},
+              {id:"arkadas",   emoji:"🦉", l:"Arkadaş"},
+              {id:"evren",     emoji:"🌌", l:"Evren"},
+            ].map(s => (
               <button key={s.id} onClick={() => setGelisimAltSekme(s.id)}
-                className={`flex-shrink-0 px-3 py-2 rounded-lg text-xs font-medium transition-all ${gelisimAltSekme === s.id ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}>{s.l}</button>
+                className={`flex flex-col items-center gap-0.5 py-2 px-1 rounded-xl text-[10px] font-medium transition-all
+                  ${gelisimAltSekme === s.id
+                    ? 'bg-orange-500 text-white shadow-md'
+                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                <span className="text-base">{s.emoji}</span>
+                <span className="leading-none">{s.l}</span>
+              </button>
             ))}
           </div>
 
@@ -5530,13 +5545,29 @@ function OgrenciPaneli({ user, logout }) {
             <OkumaEvreniSekme apiBase={API} user={user} />
           )}
           {gelisimAltSekme === "icerikler" && (
-            <div className="bg-gradient-to-r from-indigo-500 to-blue-600 rounded-2xl p-4 text-white">
-              <div className="flex items-center gap-3">
-                <div className="text-3xl">📖</div>
-                <div>
-                  <div className="font-bold text-base">Kitaplar & İçerikler</div>
-                  <div className="text-xs opacity-80">Kitap kartlarında 📖 Seviyeli Oku ve 🧠 Zekâ Haritası butonlarını dene!</div>
+            <div className="space-y-2">
+              <div className="bg-gradient-to-r from-indigo-500 to-blue-600 rounded-2xl p-4 text-white">
+                <div className="flex items-center gap-3">
+                  <div className="text-3xl">📖</div>
+                  <div>
+                    <div className="font-bold text-base">Kitaplar & İçerikler</div>
+                    <div className="text-xs opacity-80">Bir kitabı aç → oku → metnin altında AI özellikleri seni bekliyor!</div>
+                  </div>
                 </div>
+              </div>
+              {/* Yeni AI özellikler rehberi */}
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  {emoji:"🎯", baslik:"Derinleş", aciklama:"Her kitap kartında"},
+                  {emoji:"🎮", baslik:"Oyunlar", aciklama:"Kitabı okuyunca"},
+                  {emoji:"🗺️", baslik:"Zekâ Haritası", aciklama:"7 boyutlu profil"},
+                ].map((f,i) => (
+                  <div key={i} className="bg-orange-50 border border-orange-200 rounded-xl p-2 text-center">
+                    <div className="text-2xl mb-1">{f.emoji}</div>
+                    <div className="text-[10px] font-bold text-orange-700">{f.baslik}</div>
+                    <div className="text-[9px] text-gray-500 mt-0.5">{f.aciklama}</div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
