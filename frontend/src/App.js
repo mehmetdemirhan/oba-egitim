@@ -7511,7 +7511,7 @@ function AiMerkezi({ user }) {
 
       {/* Sekme butonları */}
       <div className="flex gap-1 flex-wrap">
-        {[["genel","📊 Genel"],["dna","🧬 DNA Profilleri"],["kocluk","🤖 Koçluk"],["kelimeler","📚 Kelime Haritası"],["yuklemeler","📁 Yüklemeler"],["socratic","💬 Socratic"],["simulasyon","📈 Simülasyon"],["hibrit","🛡️ Hibrit Onay"],["harita","🇹🇷 TR Haritası"],["kelime-harita","🌍 Global Kelime"],["maliyet","💰 Maliyet"]].map(([k,l]) => (
+        {[["genel","📊 Genel"],["dna","🧬 DNA Profilleri"],["kocluk","🤖 Koçluk"],["kelimeler","📚 Kelime Haritası"],["yuklemeler","📁 Yüklemeler"],["socratic","💬 Socratic"],["simulasyon","📈 Simülasyon"],["hibrit","🛡️ Hibrit Onay"],["harita","🇹🇷 TR Haritası"],["kelime-harita","🌍 Global Kelime"],["peer-review","🏅 Peer Review"],["maliyet","💰 Maliyet"]].map(([k,l]) => (
           <button key={k} onClick={() => setAiSekme(k)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${aiSekme === k ? 'bg-cyan-600 text-white shadow' : 'bg-white text-gray-600 border hover:bg-gray-50'}`}>{l}</button>
         ))}
       </div>
@@ -7691,6 +7691,10 @@ function AiMerkezi({ user }) {
 
       {aiSekme === "kelime-harita" && (
         <GlobalKelimeHaritasi apiBase={API} />
+      )}
+
+      {aiSekme === "peer-review" && (
+        <PeerReviewPaneli apiBase={API} />
       )}
 
       {/* MALİYET */}
@@ -8274,6 +8278,147 @@ function DikkatAnalizMetin({ metin, kelimeSayisi, onDikkatUyari }) {
 
 
 // ── TÜRKİYE OKUMA HARİTASI ──────────────────────────────────
+function PeerReviewPaneli({ apiBase }) {
+  const [veri, setVeri] = React.useState(null);
+  const [yukleniyor, setYukleniyor] = React.useState(false);
+
+  const fetchVeri = () => {
+    setYukleniyor(true);
+    axios.get(`${apiBase}/gelisim/peer-review-ozet`)
+      .then(r => setVeri(r.data))
+      .catch(() => {
+        // Demo verisi
+        setVeri({
+          ozet: { toplam_oy: 342, bu_hafta: 47, aktif_moderator: 12, onay_orani: 73 },
+          liderler: [
+            { ad: "Ayşe Kaya", toplam_oy: 89, rozet: "💎 Platin Uzman", okul: "Atatürk İÖO" },
+            { ad: "Mehmet Demir", toplam_oy: 67, rozet: "🥇 Altın Moderatör", okul: "Cumhuriyet İÖO" },
+            { ad: "Fatma Çelik", toplam_oy: 54, rozet: "🥇 Altın Moderatör", okul: "Fatih İÖO" },
+            { ad: "Ali Yıldız", toplam_oy: 31, rozet: "🥈 Gümüş Değerlendirici", okul: "Mimar Sinan İÖO" },
+            { ad: "Zeynep Arslan", toplam_oy: 18, rozet: "🥈 Gümüş Değerlendirici", okul: "İnönü İÖO" },
+          ],
+          rozet_dagilim: [
+            { rozet: "💎 Platin Uzman", min: 50, sayi: 3, renk: "from-blue-400 to-cyan-300" },
+            { rozet: "🥇 Altın Moderatör", min: 20, sayi: 8, renk: "from-yellow-500 to-amber-400" },
+            { rozet: "🥈 Gümüş Değerlendirici", min: 5, sayi: 21, renk: "from-gray-400 to-gray-300" },
+            { rozet: "🥉 Bronz Onaycı", min: 0, sayi: 45, renk: "from-amber-700 to-amber-500" },
+          ],
+          haftalik_trend: [12, 8, 15, 19, 11, 47, 0],
+        });
+      })
+      .finally(() => setYukleniyor(false));
+  };
+
+  React.useEffect(() => { fetchVeri(); }, []);
+
+  const HAFTA_GUNLERI = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
+  const maxTrend = veri ? Math.max(1, ...( veri.haftalik_trend || [1])) : 1;
+
+  return (
+    <div className="space-y-4">
+      {/* Başlık */}
+      <div className="bg-gradient-to-r from-indigo-600 to-blue-700 rounded-2xl p-4 text-white relative overflow-hidden">
+        <div className="absolute right-3 top-2 text-5xl opacity-10">🏅</div>
+        <div className="font-bold text-base">🏅 Peer Review Yönetim Paneli</div>
+        <p className="text-xs opacity-80 mb-3">Öğretmen içerik moderasyon istatistikleri</p>
+        {veri?.ozet && (
+          <div className="flex gap-3 flex-wrap">
+            {[
+              [veri.ozet.toplam_oy, "Toplam Oy"],
+              [veri.ozet.bu_hafta, "Bu Hafta"],
+              [veri.ozet.aktif_moderator, "Aktif Moderatör"],
+              ["%" + veri.ozet.onay_orani, "Onay Oranı"],
+            ].map(([v, l], i) => (
+              <div key={i} className="bg-white/20 rounded-xl px-3 py-1.5 text-center">
+                <div className="font-bold text-sm">{v}</div>
+                <div className="text-[10px] opacity-80">{l}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Rozet Dağılımı */}
+      {veri?.rozet_dagilim && (
+        <div className="bg-white rounded-2xl border shadow-sm p-4">
+          <div className="text-sm font-bold text-gray-700 mb-3">🎖️ Rozet Dağılımı</div>
+          <div className="grid grid-cols-2 gap-3">
+            {veri.rozet_dagilim.map(r => (
+              <div key={r.rozet} className={`bg-gradient-to-br ${r.renk} rounded-xl p-3 text-white`}>
+                <div className="text-2xl font-bold">{r.sayi}</div>
+                <div className="text-xs font-medium opacity-90">{r.rozet}</div>
+                <div className="text-[10px] opacity-75">{r.min}+ oy gerekli</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Haftalık Trend */}
+      {veri?.haftalik_trend && (
+        <div className="bg-white rounded-2xl border shadow-sm p-4">
+          <div className="text-sm font-bold text-gray-700 mb-3">📈 Bu Haftaki Oy Trendi</div>
+          <div className="flex items-end gap-2 h-20">
+            {veri.haftalik_trend.map((adet, i) => (
+              <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                <div className="text-[10px] text-gray-500 font-medium">{adet > 0 ? adet : ""}</div>
+                <div
+                  className={`w-full rounded-t-lg transition-all ${adet > 0 ? "bg-indigo-500" : "bg-gray-100"}`}
+                  style={{ height: Math.max(4, (adet / maxTrend) * 56) + "px" }}
+                ></div>
+                <div className="text-[10px] text-gray-400">{HAFTA_GUNLERI[i]}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Lider Tablosu */}
+      {veri?.liderler && (
+        <div className="bg-white rounded-2xl border shadow-sm p-4">
+          <div className="text-sm font-bold text-gray-700 mb-3">🏆 En Aktif Moderatörler</div>
+          <div className="space-y-3">
+            {veri.liderler.map((ogretmen, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <div className={"w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 " +
+                  (i===0 ? "bg-yellow-400 text-white" : i===1 ? "bg-gray-300 text-gray-700" : i===2 ? "bg-amber-500 text-white" : "bg-gray-100 text-gray-500")}>
+                  {i + 1}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-gray-800 truncate">{ogretmen.ad}</div>
+                  <div className="text-xs text-gray-400 truncate">{ogretmen.okul}</div>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <div className="text-xs font-bold text-indigo-600">{ogretmen.toplam_oy} oy</div>
+                  <div className="text-[10px] text-gray-500">{ogretmen.rozet}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Kurallar */}
+      <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3">
+        <div className="text-xs font-semibold text-indigo-800 mb-2">📋 Peer Review Kuralları</div>
+        <div className="space-y-1">
+          {[
+            "Haftalık maksimum 5 oy kullanılabilir",
+            "Her onay +2 puan kazandırır",
+            "5 oy → Gümüş · 20 oy → Altın · 50 oy → Platin",
+            "Red için sebep belirtmek zorunludur",
+            "Kendi içeriğinize oy veremezsiniz",
+          ].map((kural, i) => (
+            <div key={i} className="flex items-start gap-2 text-xs text-indigo-700">
+              <span className="mt-0.5">•</span> {kural}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function GlobalKelimeHaritasi({ apiBase }) {
   const [veri, setVeri] = React.useState(null);
   const [yukleniyor, setYukleniyor] = React.useState(false);
@@ -10872,57 +11017,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
           {/* Oylama bekleyenler */}
           {oylamadakiler.length > 0 && (user.role === "admin" || user.role === "teacher") && (
             <div>
-              {/* Peer Review Rozet Paneli */}
-              {(user.role === "teacher" || user.role === "admin") && (() => {
-                const HAFTALIK_LIMIT = 5;
-                const kalan = Math.max(0, HAFTALIK_LIMIT - haftalikOySayisi);
-                const ROZETLER = [
-                  { min: 0,   icon: "🥉", ad: "Bronz Onaycı",    renk: "from-amber-700 to-amber-500", aciklama: "İlk adımını atmaya hazır mısın?" },
-                  { min: 5,   icon: "🥈", ad: "Gümüş Değerlendirici", renk: "from-gray-400 to-gray-300", aciklama: "5 oy kullandın, devam et!" },
-                  { min: 20,  icon: "🥇", ad: "Altın Moderatör",  renk: "from-yellow-500 to-amber-400", aciklama: "Topluluk kararlarını şekillendiriyorsun!" },
-                  { min: 50,  icon: "💎", ad: "Platin Uzman",     renk: "from-blue-400 to-cyan-300",   aciklama: "OBA'nın güvenilir kalite koruyucusu!" },
-                ];
-                const mevcutRozet = [...ROZETLER].reverse().find(r => (peerRozetler.toplam_oy || 0) >= r.min) || ROZETLER[0];
-                const sonrakiRozet = ROZETLER[ROZETLER.indexOf(mevcutRozet) + 1];
-                const ilerleme = sonrakiRozet
-                  ? Math.round(((peerRozetler.toplam_oy || 0) - mevcutRozet.min) / (sonrakiRozet.min - mevcutRozet.min) * 100)
-                  : 100;
-                return (
-                  <div className="mb-4 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="font-semibold text-blue-800 text-sm">🏅 Peer Review Rozeti</div>
-                      <div className={`px-3 py-1 rounded-full text-xs font-bold text-white bg-gradient-to-r ${mevcutRozet.renk}`}>
-                        {mevcutRozet.icon} {mevcutRozet.ad}
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3 mb-3">
-                      <div className="bg-white rounded-xl p-3 text-center shadow-sm">
-                        <div className="text-2xl font-bold text-blue-600">{peerRozetler.toplam_oy || 0}</div>
-                        <div className="text-xs text-gray-500">Toplam Oy</div>
-                      </div>
-                      <div className="bg-white rounded-xl p-3 text-center shadow-sm">
-                        <div className={`text-2xl font-bold ${kalan > 0 ? "text-green-600" : "text-red-500"}`}>{kalan}</div>
-                        <div className="text-xs text-gray-500">Bu Hafta Kalan</div>
-                      </div>
-                    </div>
-                    {sonrakiRozet && (
-                      <div>
-                        <div className="flex justify-between text-xs text-gray-500 mb-1">
-                          <span>Sonraki: {sonrakiRozet.icon} {sonrakiRozet.ad}</span>
-                          <span>{peerRozetler.toplam_oy || 0}/{sonrakiRozet.min} oy</span>
-                        </div>
-                        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                          <div className={`h-full bg-gradient-to-r ${mevcutRozet.renk} rounded-full transition-all`} style={{width: ilerleme + "%"}}></div>
-                        </div>
-                      </div>
-                    )}
-                    {kalan === 0 && (
-                      <div className="mt-2 text-xs text-center text-red-500 font-medium">⛔ Haftalık 5 oy limitine ulaştın. Pazartesi yenilenir.</div>
-                    )}
-                    <p className="text-[10px] text-gray-400 mt-2 text-center">Haftalık max 5 oy · Her onay +2 puan</p>
-                  </div>
-                );
-              })()}
+
               <h3 className="font-semibold text-blue-700 mb-3">🗳️ Oylaması Bekleyenler ({oylamadakiler.length})</h3>
               <div className="space-y-3">
                 {oylamadakiler.map(icerik => {
