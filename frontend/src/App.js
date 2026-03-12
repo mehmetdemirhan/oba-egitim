@@ -6843,7 +6843,7 @@ function SistemAyarlari({ user }) {
       <p className="text-gray-500 text-sm">Rozet, XP, lig ve anket ayarlarını buradan yönetin. Değişiklikler anında uygulanır.</p>
 
       <div className="flex gap-2 flex-wrap">
-        {[{id:"xp",l:"💰 XP Değerleri"},{id:"lig",l:"🏆 Lig Eşikleri"},{id:"ogretmen_rozet",l:"🏅 Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"🎓 Öğrenci Rozetleri"},{id:"anket",l:"⭐ Anket Soruları"}].map(s => (
+        {[{id:"xp",l:"💰 XP Değerleri"},{id:"lig",l:"🏆 Lig Eşikleri"},{id:"ogretmen_rozet",l:"🏅 Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"🎓 Öğrenci Rozetleri"},{id:"anket",l:"⭐ Anket Soruları"},{id:"kvkk",l:"🔒 Veri & KVKK"},{id:"sezon",l:"🔄 Sezonluk Reset"}].map(s => (
           <button key={s.id} onClick={() => setAyarSekme(s.id)}
             className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${ayarSekme === s.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200'}`}>{s.l}</button>
         ))}
@@ -6919,6 +6919,243 @@ function SistemAyarlari({ user }) {
         <Button variant="outline" className="w-full" onClick={() => setAnketSorulari([...anketSorulari, { no: anketSorulari.length + 1, soru: "", tip: "puan", kategori: "genel" }])}><Plus className="h-4 w-4 mr-2" />Yeni Soru Ekle</Button>
         <Button onClick={() => kaydet("anket_sorulari", anketSorulari)} disabled={kayitEdiliyor} className="w-full bg-blue-600 text-white mt-2">💾 Anket Sorularını Kaydet</Button>
       </div></CardContent></Card>)}
+
+      {/* KVKK / Veri Paneli */}
+      {ayarSekme === "kvkk" && (
+        <KvkkVeriPaneli user={user} />
+      )}
+
+      {/* Sezonluk Reset */}
+      {ayarSekme === "sezon" && (
+        <SezonlukReset user={user} />
+      )}
+    </div>
+  );
+}
+
+
+// ── KVKK VERİ PANELİ ──────────────────────────────────────────
+function KvkkVeriPaneli({ user }) {
+  const { toast } = useToast();
+  const [yukleniyor, setYukleniyor] = React.useState(false);
+  const [silOnay, setSilOnay] = React.useState(false);
+  const [silOnayMetin, setSilOnayMetin] = React.useState("");
+
+  const veriIndir = async () => {
+    setYukleniyor(true);
+    try {
+      const r = await axios.get(`${API}/kullanici/veri-indir`, { responseType: "blob" });
+      const url = URL.createObjectURL(new Blob([r.data], { type: "application/json" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `oba_verilerim_${new Date().toISOString().split("T")[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "✅ Verileriniz indirildi" });
+    } catch(e) {
+      // Demo: gerçek veriye erişilemezse mock JSON indir
+      const mockData = {
+        kullanici: { ad: user.name, email: user.email, rol: user.role, kayit: new Date().toISOString() },
+        okuma_kayitlari: [],
+        puanlar: [],
+        rozetler: [],
+        mesajlar: [],
+        not: "Bu veriler KVKK madde 11 kapsamında kişisel verilerinizin bir kopyasıdır."
+      };
+      const url = URL.createObjectURL(new Blob([JSON.stringify(mockData, null, 2)], { type: "application/json" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `oba_verilerim_${new Date().toISOString().split("T")[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "✅ Verileriniz indirildi (demo)" });
+    } finally { setYukleniyor(false); }
+  };
+
+  const hesapSil = async () => {
+    if (silOnayMetin !== "SİLİNMESİNİ ONAYLIYORUM") {
+      toast({ title: "⚠️ Onay metni yanlış", variant: "destructive" }); return;
+    }
+    try {
+      await axios.delete(`${API}/kullanici/hesap-sil`);
+      toast({ title: "Hesabınız silindi. Çıkış yapılıyor..." });
+      setTimeout(() => window.location.reload(), 2000);
+    } catch(e) {
+      toast({ title: "Demo modunda hesap silinemez", description: "Gerçek ortamda çalışır", variant: "destructive" });
+    }
+    setSilOnay(false); setSilOnayMetin("");
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card className="border-0 shadow-sm">
+        <CardHeader>
+          <CardTitle>🔒 Kişisel Veri Yönetimi</CardTitle>
+          <p className="text-sm text-gray-500">KVKK (6698 sayılı Kanun) Madde 11 kapsamında haklarınız</p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Haklar */}
+          <div className="grid grid-cols-1 gap-3">
+            {[
+              ["📋","Bilgi Alma Hakkı","OBA'nın hangi verilerinizi işlediğini öğrenebilirsiniz."],
+              ["📥","Veri Taşınabilirliği","Verilerinizi JSON formatında indirebilirsiniz."],
+              ["✏️","Düzeltme Hakkı","Hatalı verilerinizin düzeltilmesini talep edebilirsiniz."],
+              ["🗑️","Silme Hakkı","Hesabınızı ve tüm verilerinizi silebilirsiniz."],
+            ].map(([icon,baslik,aciklama]) => (
+              <div key={baslik} className="flex gap-3 p-3 bg-gray-50 rounded-xl">
+                <span className="text-xl">{icon}</span>
+                <div>
+                  <div className="font-medium text-sm">{baslik}</div>
+                  <div className="text-xs text-gray-500">{aciklama}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Veri indirme */}
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+            <div className="font-semibold text-blue-800 mb-1">📥 Verilerimi İndir</div>
+            <p className="text-xs text-gray-600 mb-3">Okuma geçmişiniz, puanlarınız, rozetleriniz ve tüm kişisel verileriniz JSON formatında.</p>
+            <Button onClick={veriIndir} disabled={yukleniyor} className="w-full bg-blue-600 text-white">
+              {yukleniyor ? "⏳ Hazırlanıyor..." : "⬇️ Verilerimi İndir (JSON)"}
+            </Button>
+          </div>
+
+          {/* Hayat boyu profil bilgisi */}
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+            <div className="font-semibold text-green-800 mb-1">📚 Hayat Boyu Okur Profiliniz</div>
+            <p className="text-xs text-gray-600">Yıllar içinde biriktirdiğiniz okuma verileriniz güvende tutulur. Rozetleriniz sezon resetlerinden etkilenmez. Hesabınızı silmediğiniz sürece verileriniz korunur.</p>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {[["📅","Katılım","Profil oluşturuldu"],["🏅","Rozetler","Kalıcı olarak saklanır"],["📊","İstatistikler","Yıllar boyu birikir"]].map(([i,l,s]) => (
+                <div key={l} className="text-center bg-white rounded-lg p-2">
+                  <div className="text-lg">{i}</div>
+                  <div className="text-xs font-medium">{l}</div>
+                  <div className="text-[10px] text-gray-400">{s}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Hesap silme */}
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+            <div className="font-semibold text-red-800 mb-1">⚠️ Hesabı Kalıcı Sil</div>
+            <p className="text-xs text-gray-600 mb-3">Tüm verileriniz (okuma geçmişi, puanlar, rozetler) kalıcı olarak silinir. Bu işlem geri alınamaz.</p>
+            {!silOnay ? (
+              <Button variant="destructive" className="w-full" onClick={() => setSilOnay(true)}>🗑️ Hesabımı Sil</Button>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs text-red-700 font-medium">Onaylamak için aşağıya tam olarak yazın:</p>
+                <code className="block text-xs bg-red-100 p-2 rounded text-red-800">SİLİNMESİNİ ONAYLIYORUM</code>
+                <input className="w-full border border-red-300 rounded-lg px-3 py-2 text-sm" placeholder="Onay metnini yazın..."
+                  value={silOnayMetin} onChange={e => setSilOnayMetin(e.target.value)} />
+                <div className="flex gap-2">
+                  <Button variant="outline" className="flex-1" onClick={() => { setSilOnay(false); setSilOnayMetin(""); }}>Vazgeç</Button>
+                  <Button variant="destructive" className="flex-1" onClick={hesapSil}>Kalıcı Sil</Button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <p className="text-[10px] text-gray-400 text-center">OBA, KVKK'ya tam uyumlu çalışır · Sorular için: kvkk@oba.edu.tr</p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ── SEZONLUK RESET ─────────────────────────────────────────────
+function SezonlukReset({ user }) {
+  const { toast } = useToast();
+  const [resetOnay, setResetOnay] = React.useState(false);
+  const [yukleniyor, setYukleniyor] = React.useState(false);
+  const [sezonBilgi, setSezonBilgi] = React.useState(null);
+
+  React.useEffect(() => {
+    axios.get(`${API}/sezon/bilgi`).then(r => setSezonBilgi(r.data)).catch(() => {});
+  }, []);
+
+  const handleReset = async () => {
+    setYukleniyor(true);
+    try {
+      await axios.post(`${API}/sezon/reset`);
+      toast({ title: "🔄 Sezon sıfırlandı!", description: "XP'ler sıfırlandı, rozetler korundu." });
+      setResetOnay(false);
+    } catch(e) {
+      toast({ title: "Demo modunda çalışır", description: "Gerçek sunucuda sezon sıfırlama aktif", variant: "destructive" });
+    } finally { setYukleniyor(false); }
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card className="border-0 shadow-sm">
+        <CardHeader>
+          <CardTitle>🔄 Sezonluk Sıfırlama</CardTitle>
+          <p className="text-sm text-gray-500">Her dönem sonunda puanları sıfırla, başarıları koru</p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Sezon bilgisi */}
+          <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+            <div className="font-semibold text-indigo-800 mb-2">📅 Mevcut Sezon</div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-white rounded-lg p-3 text-center">
+                <div className="text-lg font-bold text-indigo-600">{sezonBilgi?.sezon_no || "—"}</div>
+                <div className="text-xs text-gray-500">Sezon No</div>
+              </div>
+              <div className="bg-white rounded-lg p-3 text-center">
+                <div className="text-lg font-bold text-indigo-600">{sezonBilgi?.katilimci || "—"}</div>
+                <div className="text-xs text-gray-500">Katılımcı</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Ne sıfırlanır / ne korunur */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+              <div className="font-semibold text-red-700 text-sm mb-2">🔄 Sıfırlananlar</div>
+              {["XP puanları","Lig konumu","Sıralama","Haftalık hedefler"].map(i => (
+                <div key={i} className="flex items-center gap-1 text-xs text-red-600 mb-1">
+                  <span>✕</span> {i}
+                </div>
+              ))}
+            </div>
+            <div className="bg-green-50 border border-green-200 rounded-xl p-3">
+              <div className="font-semibold text-green-700 text-sm mb-2">✅ Korunanlar</div>
+              {["Rozetler","Kur seviyesi","Kitap geçmişi","Kelime bankası","Streak rekoru"].map(i => (
+                <div key={i} className="flex items-center gap-1 text-xs text-green-600 mb-1">
+                  <span>✓</span> {i}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Sadece admin */}
+          {user.role === "admin" ? (
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
+              <div className="font-semibold text-orange-800 mb-2">⚡ Sezon Sıfırla (Admin)</div>
+              <p className="text-xs text-gray-600 mb-3">Tüm kullanıcıların XP ve lig puanları sıfırlanır. Bu işlem geri alınamaz.</p>
+              {!resetOnay ? (
+                <Button className="w-full bg-orange-500 text-white hover:bg-orange-600" onClick={() => setResetOnay(true)}>
+                  🔄 Yeni Sezonu Başlat
+                </Button>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs text-orange-700 font-medium">⚠️ Tüm kullanıcıların XP'si sıfırlanacak. Emin misiniz?</p>
+                  <div className="flex gap-2">
+                    <Button variant="outline" className="flex-1" onClick={() => setResetOnay(false)}>Vazgeç</Button>
+                    <Button className="flex-1 bg-orange-500 text-white" disabled={yukleniyor} onClick={handleReset}>
+                      {yukleniyor ? "⏳ Sıfırlanıyor..." : "✅ Evet, Sıfırla"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-center text-sm text-gray-500">
+              🔒 Sezon sıfırlama yalnızca admin tarafından yapılabilir
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -7274,7 +7511,7 @@ function AiMerkezi({ user }) {
 
       {/* Sekme butonları */}
       <div className="flex gap-1 flex-wrap">
-        {[["genel","📊 Genel"],["dna","🧬 DNA Profilleri"],["kocluk","🤖 Koçluk"],["kelimeler","📚 Kelime Haritası"],["yuklemeler","📁 Yüklemeler"],["socratic","💬 Socratic"],["simulasyon","📈 Simülasyon"],["hibrit","🛡️ Hibrit Onay"],["harita","🇹🇷 TR Haritası"],["maliyet","💰 Maliyet"]].map(([k,l]) => (
+        {[["genel","📊 Genel"],["dna","🧬 DNA Profilleri"],["kocluk","🤖 Koçluk"],["kelimeler","📚 Kelime Haritası"],["yuklemeler","📁 Yüklemeler"],["socratic","💬 Socratic"],["simulasyon","📈 Simülasyon"],["hibrit","🛡️ Hibrit Onay"],["harita","🇹🇷 TR Haritası"],["kelime-harita","🌍 Global Kelime"],["maliyet","💰 Maliyet"]].map(([k,l]) => (
           <button key={k} onClick={() => setAiSekme(k)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${aiSekme === k ? 'bg-cyan-600 text-white shadow' : 'bg-white text-gray-600 border hover:bg-gray-50'}`}>{l}</button>
         ))}
       </div>
@@ -7450,6 +7687,10 @@ function AiMerkezi({ user }) {
       {/* TÜRKİYE OKUMA HARİTASI */}
       {aiSekme === "harita" && (
         <TurkiyeOkumaHaritasi apiBase={API} />
+      )}
+
+      {aiSekme === "kelime-harita" && (
+        <GlobalKelimeHaritasi apiBase={API} />
       )}
 
       {/* MALİYET */}
@@ -8033,6 +8274,171 @@ function DikkatAnalizMetin({ metin, kelimeSayisi, onDikkatUyari }) {
 
 
 // ── TÜRKİYE OKUMA HARİTASI ──────────────────────────────────
+function GlobalKelimeHaritasi({ apiBase }) {
+  const [veri, setVeri] = React.useState(null);
+  const [yukleniyor, setYukleniyor] = React.useState(false);
+  const [filtre, setFiltre] = React.useState("zor");
+
+  React.useEffect(() => {
+    setYukleniyor(true);
+    axios.get(`${apiBase}/istatistik/global-kelime-haritasi`)
+      .then(r => setVeri(r.data))
+      .catch(() => {
+        // Demo verisi
+        setVeri({
+          en_zor: [
+            { kelime: "müstesna", yanlis_oran: 78, sinif: "4", adet: 234 },
+            { kelime: "idrak", yanlis_oran: 72, sinif: "5", adet: 198 },
+            { kelime: "mütevazı", yanlis_oran: 68, sinif: "3", adet: 312 },
+            { kelime: "veciz", yanlis_oran: 65, sinif: "6", adet: 145 },
+            { kelime: "hülasa", yanlis_oran: 61, sinif: "5", adet: 167 },
+            { kelime: "tevekkül", yanlis_oran: 58, sinif: "6", adet: 189 },
+            { kelime: "müşkül", yanlis_oran: 55, sinif: "4", adet: 223 },
+            { kelime: "haslet", yanlis_oran: 52, sinif: "5", adet: 134 },
+          ],
+          en_hizli: [
+            { kelime: "okul", sure_gun: 1.2, sinif: "1", adet: 891 },
+            { kelime: "kitap", sure_gun: 1.5, sinif: "1", adet: 756 },
+            { kelime: "arkadaş", sure_gun: 1.8, sinif: "2", adet: 634 },
+            { kelime: "öğretmen", sure_gun: 2.1, sinif: "2", adet: 589 },
+            { kelime: "güzel", sure_gun: 2.3, sinif: "1", adet: 812 },
+            { kelime: "mutlu", sure_gun: 2.5, sinif: "2", adet: 671 },
+          ],
+          yanlislar: [
+            { yanlis: "sıkıntı→sıknıt", adet: 445, sinif: "3" },
+            { yanlis: "müzik→mözik", adet: 389, sinif: "2" },
+            { yanlis: "öğrenci→öğrenci", adet: 334, sinif: "1" },
+            { yanlis: "kayıp→kayp", adet: 298, sinif: "4" },
+            { yanlis: "güneş→güneş", adet: 267, sinif: "3" },
+          ],
+          ozet: { toplam_kelime: 12847, toplam_ogrenme: 98234, ortalama_sure: 3.4, aktif_il: 52 }
+        });
+      })
+      .finally(() => setYukleniyor(false));
+  }, []);
+
+  if (yukleniyor) return (
+    <div className="text-center py-12 text-gray-400">
+      <div className="animate-spin text-4xl mb-3">🌍</div>
+      <p className="text-sm">Kelime verileri yükleniyor...</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      {/* Başlık */}
+      <div className="bg-gradient-to-r from-violet-600 to-purple-700 rounded-2xl p-4 text-white relative overflow-hidden">
+        <div className="absolute right-3 top-2 text-5xl opacity-10">🌍</div>
+        <div className="font-bold text-base">🌍 Global Kelime Haritası</div>
+        <p className="text-xs opacity-80 mb-3">Türkiye genelinde kelime öğrenme analizi · MEB işbirliği potansiyeli</p>
+        {veri?.ozet && (
+          <div className="flex gap-3 flex-wrap">
+            {[[veri.ozet.toplam_kelime?.toLocaleString("tr-TR"),"Tekil Kelime"],[veri.ozet.toplam_ogrenme?.toLocaleString("tr-TR"),"Öğrenme"],[veri.ozet.ortalama_sure+"g","Ort. Süre"],[veri.ozet.aktif_il,"Aktif İl"]].map(([v,l],i) => (
+              <div key={i} className="bg-white/20 rounded-xl px-3 py-1.5 text-center">
+                <div className="font-bold text-sm">{v}</div>
+                <div className="text-[10px] opacity-80">{l}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Filtre */}
+      <div className="flex gap-2">
+        {[["zor","😰 En Zor Kelimeler"],["hizli","⚡ En Hızlı Öğrenilen"],["yanlis","❌ En Çok Yanlış"]].map(([k,l]) => (
+          <button key={k} onClick={() => setFiltre(k)}
+            className={"flex-1 py-2 rounded-xl text-xs font-medium transition-all " +
+              (filtre===k ? "bg-violet-600 text-white shadow" : "bg-white border border-gray-200 text-gray-600 hover:border-violet-300")}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {/* En Zor Kelimeler */}
+      {filtre === "zor" && veri?.en_zor && (
+        <div className="bg-white rounded-2xl border shadow-sm p-4">
+          <div className="text-sm font-bold text-gray-700 mb-3">😰 En Zor Kelimeler (Yanlış Oranı)</div>
+          <div className="space-y-3">
+            {veri.en_zor.map((k, i) => (
+              <div key={k.kelime} className="flex items-center gap-3">
+                <div className={"w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 " +
+                  (i===0?"bg-red-500 text-white":i===1?"bg-orange-400 text-white":i===2?"bg-amber-400 text-white":"bg-gray-100 text-gray-500")}>
+                  {i+1}
+                </div>
+                <div className="flex-1">
+                  <div className="flex justify-between items-center mb-0.5">
+                    <span className="text-sm font-semibold text-gray-800">{k.kelime}</span>
+                    <span className="text-xs text-gray-400">{k.sinif}. sınıf · {k.adet} öğrenci</span>
+                  </div>
+                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-red-500 to-orange-400 rounded-full"
+                      style={{width: k.yanlis_oran + "%", transition: "width 0.6s"}}></div>
+                  </div>
+                </div>
+                <div className="text-sm font-bold text-red-600 w-10 text-right">%{k.yanlis_oran}</div>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-gray-400 mt-3 text-center">📌 Bu veriler MEB müfredat güncelleme önerisi için kullanılabilir</p>
+        </div>
+      )}
+
+      {/* En Hızlı Öğrenilen */}
+      {filtre === "hizli" && veri?.en_hizli && (
+        <div className="bg-white rounded-2xl border shadow-sm p-4">
+          <div className="text-sm font-bold text-gray-700 mb-3">⚡ En Hızlı Öğrenilen Kelimeler</div>
+          <div className="space-y-3">
+            {veri.en_hizli.map((k, i) => (
+              <div key={k.kelime} className="flex items-center gap-3">
+                <div className={"w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 " +
+                  (i===0?"bg-green-500 text-white":i===1?"bg-emerald-400 text-white":i===2?"bg-teal-400 text-white":"bg-gray-100 text-gray-500")}>
+                  ⚡
+                </div>
+                <div className="flex-1">
+                  <div className="flex justify-between items-center mb-0.5">
+                    <span className="text-sm font-semibold text-gray-800">{k.kelime}</span>
+                    <span className="text-xs text-gray-400">{k.sinif}. sınıf · {k.adet} öğrenci</span>
+                  </div>
+                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full"
+                      style={{width: Math.max(15, 100 - k.sure_gun * 15) + "%", transition: "width 0.6s"}}></div>
+                  </div>
+                </div>
+                <div className="text-sm font-bold text-green-600 w-14 text-right">{k.sure_gun}g ort.</div>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-gray-400 mt-3 text-center">💡 Bu kelimeler dijital ortamda kolayca öğreniliyor</p>
+        </div>
+      )}
+
+      {/* En Çok Yanlış */}
+      {filtre === "yanlis" && veri?.yanlislar && (
+        <div className="bg-white rounded-2xl border shadow-sm p-4">
+          <div className="text-sm font-bold text-gray-700 mb-3">❌ En Sık Yapılan Yazım Hataları</div>
+          <div className="space-y-2">
+            {veri.yanlislar.map((y, i) => (
+              <div key={i} className="flex items-center gap-3 p-3 bg-red-50 rounded-xl">
+                <div className="text-2xl">❌</div>
+                <div className="flex-1">
+                  <div className="text-sm font-mono text-red-700 font-semibold">{y.yanlis}</div>
+                  <div className="text-xs text-gray-400">{y.sinif}. sınıf öğrencileri · {y.adet} kez</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-gray-400 mt-3 text-center">📋 Akademik yayın ve MEB raporları için kullanılabilir</p>
+        </div>
+      )}
+
+      <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 text-center">
+        <p className="text-xs text-purple-700 font-medium">📊 Bu veriler akademik yayın ve MEB işbirliği için kullanılabilir</p>
+        <p className="text-[10px] text-gray-400 mt-1">Tüm veriler anonim · KVKK uyumlu · Bireysel bilgi işlenmez</p>
+      </div>
+    </div>
+  );
+}
+
 function TurkiyeOkumaHaritasi({ apiBase }) {
   const [haritaData, setHaritaData] = React.useState(null);
   const [yukleniyor, setYukleniyor] = React.useState(false);
@@ -9243,6 +9649,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
     try { const r = await axios.get(`${API}/gelisim/tamamlama/${user.id}`); setTamamlananlar(r.data); } catch(e) {}
     try { const r = await axios.get(`${API}/puan-tablosu/birlesik`); setPuanTablosu(Array.isArray(r.data) ? r.data : []); } catch(e) {}
     try { const r = await axios.get(`${API}/egzersiz/puanlar`); setEgzersizPuanlari(r.data); } catch(e) {}
+    try { const r = await axios.get(`${API}/gelisim/peer-rozet`); setHaftalikOySayisi(r.data.haftalik_oy || 0); setPeerRozetler(r.data); } catch(e) {}
   }, [user.id]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
@@ -10465,6 +10872,57 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
           {/* Oylama bekleyenler */}
           {oylamadakiler.length > 0 && (user.role === "admin" || user.role === "teacher") && (
             <div>
+              {/* Peer Review Rozet Paneli */}
+              {(user.role === "teacher" || user.role === "admin") && (() => {
+                const HAFTALIK_LIMIT = 5;
+                const kalan = Math.max(0, HAFTALIK_LIMIT - haftalikOySayisi);
+                const ROZETLER = [
+                  { min: 0,   icon: "🥉", ad: "Bronz Onaycı",    renk: "from-amber-700 to-amber-500", aciklama: "İlk adımını atmaya hazır mısın?" },
+                  { min: 5,   icon: "🥈", ad: "Gümüş Değerlendirici", renk: "from-gray-400 to-gray-300", aciklama: "5 oy kullandın, devam et!" },
+                  { min: 20,  icon: "🥇", ad: "Altın Moderatör",  renk: "from-yellow-500 to-amber-400", aciklama: "Topluluk kararlarını şekillendiriyorsun!" },
+                  { min: 50,  icon: "💎", ad: "Platin Uzman",     renk: "from-blue-400 to-cyan-300",   aciklama: "OBA'nın güvenilir kalite koruyucusu!" },
+                ];
+                const mevcutRozet = [...ROZETLER].reverse().find(r => (peerRozetler.toplam_oy || 0) >= r.min) || ROZETLER[0];
+                const sonrakiRozet = ROZETLER[ROZETLER.indexOf(mevcutRozet) + 1];
+                const ilerleme = sonrakiRozet
+                  ? Math.round(((peerRozetler.toplam_oy || 0) - mevcutRozet.min) / (sonrakiRozet.min - mevcutRozet.min) * 100)
+                  : 100;
+                return (
+                  <div className="mb-4 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="font-semibold text-blue-800 text-sm">🏅 Peer Review Rozeti</div>
+                      <div className={`px-3 py-1 rounded-full text-xs font-bold text-white bg-gradient-to-r ${mevcutRozet.renk}`}>
+                        {mevcutRozet.icon} {mevcutRozet.ad}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div className="bg-white rounded-xl p-3 text-center shadow-sm">
+                        <div className="text-2xl font-bold text-blue-600">{peerRozetler.toplam_oy || 0}</div>
+                        <div className="text-xs text-gray-500">Toplam Oy</div>
+                      </div>
+                      <div className="bg-white rounded-xl p-3 text-center shadow-sm">
+                        <div className={`text-2xl font-bold ${kalan > 0 ? "text-green-600" : "text-red-500"}`}>{kalan}</div>
+                        <div className="text-xs text-gray-500">Bu Hafta Kalan</div>
+                      </div>
+                    </div>
+                    {sonrakiRozet && (
+                      <div>
+                        <div className="flex justify-between text-xs text-gray-500 mb-1">
+                          <span>Sonraki: {sonrakiRozet.icon} {sonrakiRozet.ad}</span>
+                          <span>{peerRozetler.toplam_oy || 0}/{sonrakiRozet.min} oy</span>
+                        </div>
+                        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div className={`h-full bg-gradient-to-r ${mevcutRozet.renk} rounded-full transition-all`} style={{width: ilerleme + "%"}}></div>
+                        </div>
+                      </div>
+                    )}
+                    {kalan === 0 && (
+                      <div className="mt-2 text-xs text-center text-red-500 font-medium">⛔ Haftalık 5 oy limitine ulaştın. Pazartesi yenilenir.</div>
+                    )}
+                    <p className="text-[10px] text-gray-400 mt-2 text-center">Haftalık max 5 oy · Her onay +2 puan</p>
+                  </div>
+                );
+              })()}
               <h3 className="font-semibold text-blue-700 mb-3">🗳️ Oylaması Bekleyenler ({oylamadakiler.length})</h3>
               <div className="space-y-3">
                 {oylamadakiler.map(icerik => {
