@@ -9807,3 +9807,57 @@ async def sezon_reset(current_user=Depends(get_current_user)):
     except Exception as e:
         logging.error(f"[SEZON-RESET] {e}")
         raise HTTPException(status_code=500, detail="Sezon sıfırlanamadı")
+
+
+@api_router.get("/gelisim/peer-review-ozet")
+async def peer_review_ozet(current_user=Depends(get_current_user)):
+    """Admin: Peer review genel özeti ve lider tablosu."""
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403)
+    try:
+        from datetime import timedelta
+        haftanin_basi = datetime.utcnow() - timedelta(days=datetime.utcnow().weekday())
+        haftanin_basi = haftanin_basi.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        toplam = await db.gelisim_oylar.count_documents({})
+        bu_hafta = await db.gelisim_oylar.count_documents({"tarih": {"$gte": haftanin_basi}})
+
+        # Onay oranı
+        onay_count = await db.gelisim_oylar.count_documents({"onay": True})
+        onay_orani = round(onay_count / toplam * 100) if toplam > 0 else 0
+
+        # Kullanıcı başına oy sayısı
+        pipeline = [
+            {"$group": {"_id": "$kullanici_id", "toplam_oy": {"$sum": 1}}},
+            {"$sort": {"toplam_oy": -1}},
+            {"$limit": 5}
+        ]
+        lider_ids = await db.gelisim_oylar.aggregate(pipeline).to_list(5)
+
+        liderler = []
+        for l in lider_ids:
+            u = await db.users.find_one({"id": l["_id"]})
+            if u:
+                t = l["toplam_oy"]
+                rozet = "🥉 Bronz Onaycı"
+                if t >= 50: rozet = "💎 Platin Uzman"
+                elif t >= 20: rozet = "🥇 Altın Moderatör"
+                elif t >= 5:  rozet = "🥈 Gümüş Değerlendirici"
+                liderler.append({"ad": u.get("name",""), "toplam_oy": t, "rozet": rozet, "okul": u.get("school","")})
+
+        aktif = await db.gelisim_oylar.distinct("kullanici_id", {"tarih": {"$gte": haftanin_basi}})
+
+        return {
+            "ozet": {"toplam_oy": toplam, "bu_hafta": bu_hafta, "aktif_moderator": len(aktif), "onay_orani": onay_orani},
+            "liderler": liderler,
+            "rozet_dagilim": [
+                {"rozet": "💎 Platin Uzman", "min": 50, "sayi": 0, "renk": "from-blue-400 to-cyan-300"},
+                {"rozet": "🥇 Altın Moderatör", "min": 20, "sayi": 0, "renk": "from-yellow-500 to-amber-400"},
+                {"rozet": "🥈 Gümüş Değerlendirici", "min": 5, "sayi": 0, "renk": "from-gray-400 to-gray-300"},
+                {"rozet": "🥉 Bronz Onaycı", "min": 0, "sayi": 0, "renk": "from-amber-700 to-amber-500"},
+            ],
+            "haftalik_trend": [0]*7
+        }
+    except Exception as e:
+        logging.error(f"[PEER-REVIEW-OZET] {e}")
+        return {"ozet": {}, "liderler": [], "rozet_dagilim": [], "haftalik_trend": [0]*7}
