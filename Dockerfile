@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ["python311", "gcc"]
+
+[phases.install]
+cmds = ["python3 -m pip install -r requirements.txt"]
+
+[start]
+cmd = "uvicorn server:app --host 0.0.0.0 --port $PORT"
