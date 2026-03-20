@@ -3688,6 +3688,16 @@ function OgretmenPaneli({ user, logout }) {
   const { toast } = useToast();
   const [aktifSekme, setAktifSekme] = useState("dashboard");
   const [ogrenciler, setOgrenciler] = useState([]);
+  // ── Özellik Yönetimi ──
+  const [ozellikAyarlari, setOzellikAyarlari] = useState({});
+  useEffect(() => {
+    axios.get(`${API}/ayarlar/ozellikler`).then(r => setOzellikAyarlari(r.data.ayarlar || {})).catch(() => {});
+  }, []);
+  const ozellikAktif = (id) => {
+    const a = ozellikAyarlari[id];
+    if (!a) return true;
+    return a.aktif !== false && a.roller?.ogretmen !== false;
+  };
   const [riskler, setRiskler] = useState([]);
   const [gorevler, setGorevler] = useState([]);
   const [mesajlar, setMesajlar] = useState([]);
@@ -3803,13 +3813,13 @@ function OgretmenPaneli({ user, logout }) {
   const riskIcon = (s) => s === "yuksek" ? "🔴" : s === "orta" ? "🟡" : "🟢";
 
   const sekmeler = [
-    { id: "dashboard", label: "Dashboard", icon: "📊" },
-    { id: "ogrencilerim", label: "Öğrencilerim", icon: "👥" },
-    { id: "gorevler", label: "Görevler", icon: "📌", badge: benimGorevlerim.filter(g => g.durum !== "tamamlandi").length || null },
-    { id: "giris-analizi", label: "Analiz", icon: "🔬" },
-    { id: "gelisim", label: "Gelişim", icon: "🎓" },
-    { id: "mesajlar", label: "Mesajlar", icon: "✉️", badge: okunmamisSayisi || null },
-  ];
+    ozellikAktif("ogretmen_dashboard")     && { id: "dashboard",    label: "Dashboard",    icon: "📊" },
+    ozellikAktif("ogretmen_gorevler")      && { id: "ogrencilerim", label: "Öğrencilerim", icon: "👥" },
+    ozellikAktif("ogretmen_gorevler")      && { id: "gorevler",     label: "Görevler",     icon: "📌", badge: benimGorevlerim.filter(g => g.durum !== "tamamlandi").length || null },
+    ozellikAktif("ogretmen_giris_analizi") && { id: "giris-analizi",label: "Analiz",       icon: "🔬" },
+    ozellikAktif("ogretmen_gelisim")       && { id: "gelisim",      label: "Gelişim",      icon: "🎓" },
+    ozellikAktif("ogretmen_mesajlar")      && { id: "mesajlar",     label: "Mesajlar",     icon: "✉️", badge: okunmamisSayisi || null },
+  ].filter(Boolean);
 
   // ── ÖĞRENCİ DETAY ──
   if (aktifSekme === "ogrenci-detay" && seciliOgrenci) {
@@ -4567,10 +4577,12 @@ function OgretmenPaneli({ user, logout }) {
         </div>)}
 
         {/* ═══ GİRİŞ ANALİZİ ═══ */}
-        {aktifSekme === "giris-analizi" && (<GirisAnaliziModul user={user} students={ogrenciler} teachers={[]} />)}
+        {aktifSekme === "giris-analizi" && ozellikAktif("ogretmen_giris_analizi") && (<GirisAnaliziModul user={user} students={ogrenciler} teachers={[]} />)}
+        {aktifSekme === "giris-analizi" && !ozellikAktif("ogretmen_giris_analizi") && (<div className="text-center py-16 text-gray-400"><div className="text-4xl mb-3">🔒</div><p className="font-medium">Bu özellik şu an devre dışı</p><p className="text-sm mt-1">Sistem yöneticisi bu modülü kapatmıştır.</p></div>)}
 
         {/* ═══ GELİŞİM ═══ */}
-        {aktifSekme === "gelisim" && (<GelisimAlani user={user} />)}
+        {aktifSekme === "gelisim" && ozellikAktif("ogretmen_gelisim") && (<GelisimAlani user={user} />)}
+        {aktifSekme === "gelisim" && !ozellikAktif("ogretmen_gelisim") && (<div className="text-center py-16 text-gray-400"><div className="text-4xl mb-3">🔒</div><p className="font-medium">Bu özellik şu an devre dışı</p><p className="text-sm mt-1">Sistem yöneticisi bu modülü kapatmıştır.</p></div>)}
 
         {/* ═══ MESAJLAR ═══ */}
         {aktifSekme === "mesajlar" && (<div className="space-y-4">
@@ -4608,6 +4620,16 @@ function OgretmenPaneli({ user, logout }) {
 function OgrenciPaneli({ user, logout }) {
   const { toast } = useToast();
   const [profil, setProfil] = useState(null);
+  // ── Özellik Yönetimi ──
+  const [ozellikAyarlari, setOzellikAyarlari] = useState({});
+  useEffect(() => {
+    axios.get(`${API}/ayarlar/ozellikler`).then(r => setOzellikAyarlari(r.data.ayarlar || {})).catch(() => {});
+  }, []);
+  const ozellikAktif = (id) => {
+    const a = ozellikAyarlari[id];
+    if (!a) return true;
+    return a.aktif !== false && a.roller?.ogrenci !== false;
+  };
   const [gorevler, setGorevler] = useState([]);
   const [okumaKayitlari, setOkumaKayitlari] = useState([]);
   const [istatistik, setIstatistik] = useState(null);
@@ -4843,6 +4865,16 @@ function OgrenciPaneli({ user, logout }) {
   // ── OKUMA RİTÜELİ ──
   // ── SPEECH AI EKRANI ──
   if (aktifEkran === "speech") {
+    if (!ozellikAktif("ogrenci_speech_ai")) return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center p-8 max-w-sm">
+          <div className="text-5xl mb-4">🔒</div>
+          <h3 className="font-bold text-gray-900 text-lg">Bu özellik devre dışı</h3>
+          <p className="text-gray-500 text-sm mt-2">Sistem yöneticisi sesli okuma analizini kapatmıştır.</p>
+          <button onClick={() => setAktifEkran(null)} className="mt-4 px-4 py-2 bg-gray-200 rounded-xl text-sm font-medium">← Geri Dön</button>
+        </div>
+      </div>
+    );
     const skorRenk = (s) => s >= 80 ? "text-green-600" : s >= 60 ? "text-yellow-600" : "text-red-500";
     const skorBg = (s) => s >= 80 ? "bg-green-50 border-green-200" : s >= 60 ? "bg-yellow-50 border-yellow-200" : "bg-red-50 border-red-200";
 
@@ -5030,6 +5062,16 @@ function OgrenciPaneli({ user, logout }) {
 
   // ── NE OKUDUN? ──
   if (aktifEkran === "scaffold" && !scaffoldData) {
+    if (!ozellikAktif("ogrenci_scaffold")) return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center p-8 max-w-sm">
+          <div className="text-5xl mb-4">🔒</div>
+          <h3 className="font-bold text-gray-900 text-lg">Bu özellik devre dışı</h3>
+          <p className="text-gray-500 text-sm mt-2">Sistem yöneticisi seviyeli okumayı kapatmıştır.</p>
+          <button onClick={() => setAktifEkran(null)} className="mt-4 px-4 py-2 bg-gray-200 rounded-xl text-sm font-medium">← Geri Dön</button>
+        </div>
+      </div>
+    );
     const havuzKitaplar = gelisimIcerikleri.filter(i => i.tur === "kitap");
     return (
       <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-purple-50">
@@ -5234,11 +5276,11 @@ function OgrenciPaneli({ user, logout }) {
   // ── ANA PANEL — Sadeleştirilmiş 4 Tab ──
   const sekmeler = [
     { id: "ana", label: "Ana Sayfa", icon: "🏠" },
-    { id: "gorevler", label: "Görevlerim", icon: "📌", badge: bekleyenGorevler.length || null },
-    { id: "gelisim", label: "Gelişim", icon: "🎯" },
-    { id: "siralama", label: "Sıralama", icon: "🏆" },
-    { id: "mesajlar", label: "Mesajlar", icon: "✉️", badge: okunmamisSayisi || null },
-  ];
+    ozellikAktif("ogrenci_gorevler")  && { id: "gorevler",  label: "Görevlerim", icon: "📌", badge: bekleyenGorevler.length || null },
+    ozellikAktif("ogrenci_gelisim")   && { id: "gelisim",   label: "Gelişim",    icon: "🎯" },
+    ozellikAktif("ogrenci_siralama")  && { id: "siralama",  label: "Sıralama",   icon: "🏆" },
+    ozellikAktif("ogrenci_mesajlar")  && { id: "mesajlar",  label: "Mesajlar",   icon: "✉️", badge: okunmamisSayisi || null },
+  ].filter(Boolean);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -5410,41 +5452,53 @@ function OgrenciPaneli({ user, logout }) {
 
           {/* Okumaya Başla + Sesli Okuma */}
           <div className="grid grid-cols-2 gap-3">
+            {ozellikAktif("ogrenci_okuma_kaydi") && (
             <button onClick={okumaBaslat} className="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all active:scale-[0.98]">
               <div className="text-2xl mb-1">🌳</div><div className="text-sm font-bold">Sessiz Oku</div><div className="text-[10px] opacity-80">Ormanını büyüt</div>
             </button>
+            )}
+            {ozellikAktif("ogrenci_speech_ai") && (
             <button onClick={() => setAktifEkran("speech")} className="bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all active:scale-[0.98]">
               <div className="text-2xl mb-1">🎤</div><div className="text-sm font-bold">Sesli Oku</div><div className="text-[10px] opacity-80">AI analiz eder</div>
             </button>
+            )}
           </div>
 
           {/* ═══ AI ÖZELLİKLERİ KISAYOLLAR ═══ */}
+          {(ozellikAktif("ogrenci_scaffold") || ozellikAktif("ogrenci_hikaye") || ozellikAktif("ogrenci_materyal")) && (
           <div>
             <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 px-1">🤖 AI Araçları</div>
             <div className="grid grid-cols-3 gap-2">
               {/* Scaffold Reading */}
+              {ozellikAktif("ogrenci_scaffold") && (
               <button onClick={() => { setScaffoldData(null); setAktifEkran("scaffold"); }}
                 className="bg-white rounded-2xl p-3 border shadow-sm text-center hover:border-indigo-400 hover:bg-indigo-50 transition-all active:scale-95 group">
                 <div className="text-2xl mb-1.5">📖</div>
                 <div className="text-[11px] font-bold text-gray-800 group-hover:text-indigo-700">Seviyeli Okuma</div>
                 <div className="text-[9px] text-gray-400 mt-0.5">Kolay → Orta → Zor</div>
               </button>
+              )}
               {/* Adaptive Story */}
+              {ozellikAktif("ogrenci_hikaye") && (
               <button onClick={() => { setAktifSekme("gelisim"); setGelisimAltSekme("hikayem"); }}
                 className="bg-white rounded-2xl p-3 border shadow-sm text-center hover:border-pink-400 hover:bg-pink-50 transition-all active:scale-95 group">
                 <div className="text-2xl mb-1.5">✨</div>
                 <div className="text-[11px] font-bold text-gray-800 group-hover:text-pink-700">Bana Özel Hikâye</div>
                 <div className="text-[9px] text-gray-400 mt-0.5">AI hikâye yazar</div>
               </button>
+              )}
               {/* Materyal Üretici */}
+              {ozellikAktif("ogrenci_materyal") && (
               <button onClick={() => { setAktifSekme("gelisim"); setGelisimAltSekme("materyal"); }}
                 className="bg-white rounded-2xl p-3 border shadow-sm text-center hover:border-teal-400 hover:bg-teal-50 transition-all active:scale-95 group">
                 <div className="text-2xl mb-1.5">📋</div>
                 <div className="text-[11px] font-bold text-gray-800 group-hover:text-teal-700">Materyal Üret</div>
                 <div className="text-[9px] text-gray-400 mt-0.5">Soru seti, kelime</div>
               </button>
+              )}
             </div>
           </div>
+          )}
 
           {/* Bekleyen görevler kısa */}
           {bekleyenGorevler.length > 0 && (<div className="bg-white rounded-2xl p-4 shadow-sm border">
@@ -5500,15 +5554,15 @@ function OgrenciPaneli({ user, logout }) {
           {/* Alt sekmeler — 2 satır */}
           <div className="grid grid-cols-4 gap-1">
             {[
-              {id:"icerikler",  emoji:"📚", l:"İçerik"},
-              {id:"egzersizler",emoji:"👁️",  l:"Egzersiz"},
-              {id:"okumalarim", emoji:"📖", l:"Okumalarım"},
-              {id:"kelime_evrimi",emoji:"🧠",l:"Kelime"},
-              {id:"hikayem",   emoji:"✨", l:"Hikâyem"},
-              {id:"materyal",  emoji:"📋", l:"Materyal"},
-              {id:"arkadas",   emoji:"🦉", l:"Arkadaş"},
-              {id:"evren",     emoji:"🌌", l:"Evren"},
-            ].map(s => (
+              {id:"icerikler",   emoji:"📚", l:"İçerik",    ozellik:"ogrenci_gelisim"},
+              {id:"egzersizler", emoji:"👁️",  l:"Egzersiz",  ozellik:"ogrenci_egzersizler"},
+              {id:"okumalarim",  emoji:"📖", l:"Okumalarım",ozellik:"ogrenci_okuma_kaydi"},
+              {id:"kelime_evrimi",emoji:"🧠",l:"Kelime",    ozellik:"ogrenci_kelime_evrimi"},
+              {id:"hikayem",    emoji:"✨", l:"Hikâyem",   ozellik:"ogrenci_hikaye"},
+              {id:"materyal",   emoji:"📋", l:"Materyal",  ozellik:"ogrenci_materyal"},
+              {id:"arkadas",    emoji:"🦉", l:"Arkadaş",   ozellik:"ogrenci_ai_arkadas"},
+              {id:"evren",      emoji:"🌌", l:"Evren",     ozellik:"ogrenci_xp_lig"},
+            ].filter(s => ozellikAktif(s.ozellik)).map(s => (
               <button key={s.id} onClick={() => setGelisimAltSekme(s.id)}
                 className={`flex flex-col items-center gap-0.5 py-2 px-1 rounded-xl text-[10px] font-medium transition-all
                   ${gelisimAltSekme === s.id
@@ -6437,6 +6491,16 @@ function MesajlarPanel({ user }) {
 function VeliPaneli({ user, logout }) {
   const { toast } = useToast();
   const [cocuklar, setCocuklar] = useState([]);
+  // ── Özellik Yönetimi ──
+  const [ozellikAyarlari, setOzellikAyarlari] = useState({});
+  useEffect(() => {
+    axios.get(`${API}/ayarlar/ozellikler`).then(r => setOzellikAyarlari(r.data.ayarlar || {})).catch(() => {});
+  }, []);
+  const ozellikAktif = (id) => {
+    const a = ozellikAyarlari[id];
+    if (!a) return true;
+    return a.aktif !== false && a.roller?.veli !== false;
+  };
   const [seciliCocuk, setSeciliCocuk] = useState(null);
   const [okumaKayitlari, setOkumaKayitlari] = useState([]);
   const [istatistik, setIstatistik] = useState(null);
@@ -6516,12 +6580,12 @@ function VeliPaneli({ user, logout }) {
   const gidenMesajlar = mesajlar.filter(m => m.gonderen_id === user.id);
 
   const sekmeler = [
-    { id: "ozet", label: "Özet", icon: "📊" },
-    { id: "okumalar", label: "Okumalar", icon: "📖" },
-    { id: "gorevler", label: "Görevler", icon: "📌" },
-    { id: "anket", label: "Değerlendir", icon: "⭐" },
-    { id: "mesajlar", label: "Mesajlar", icon: "✉️", badge: okunmamisSayisi || null },
-  ];
+    ozellikAktif("veli_dashboard")    && { id: "ozet",     label: "Özet",        icon: "📊" },
+    ozellikAktif("veli_okuma_gecmisi")&& { id: "okumalar", label: "Okumalar",    icon: "📖" },
+    ozellikAktif("veli_gorev_takip")  && { id: "gorevler", label: "Görevler",    icon: "📌" },
+    ozellikAktif("veli_anket")        && { id: "anket",    label: "Değerlendir", icon: "⭐" },
+    ozellikAktif("veli_mesajlar")     && { id: "mesajlar", label: "Mesajlar",    icon: "✉️", badge: okunmamisSayisi || null },
+  ].filter(Boolean);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -6601,14 +6665,14 @@ function VeliPaneli({ user, logout }) {
           </>)}
 
           {/* OKUMALAR */}
-          {aktifSekme === "okumalar" && (<div className="space-y-3"><h2 className="text-xl font-bold">📖 Okuma Geçmişi</h2>
+          {aktifSekme === "okumalar" && ozellikAktif("veli_okuma_gecmisi") && (<div className="space-y-3"><h2 className="text-xl font-bold">📖 Okuma Geçmişi</h2>
             {okumaKayitlari.length === 0 ? <p className="text-center text-gray-500 py-8">Henüz okuma kaydı yok</p> : (
               okumaKayitlari.map(k => (<div key={k.id} className="bg-white rounded-xl p-3 shadow-sm border flex items-center justify-between"><div><div className="font-medium text-sm">{k.kitap_adi || "—"}</div><div className="text-xs text-gray-400">{k.bolum && `${k.bolum} • `}⏱ {k.sure_dakika} dk</div></div><div className="text-xs text-gray-400">{new Date(k.tarih).toLocaleDateString('tr-TR')}</div></div>))
             )}
           </div>)}
 
           {/* GÖREVLER */}
-          {aktifSekme === "gorevler" && (<div className="space-y-3"><h2 className="text-xl font-bold">📌 Görevler</h2>
+          {aktifSekme === "gorevler" && ozellikAktif("veli_gorev_takip") && (<div className="space-y-3"><h2 className="text-xl font-bold">📌 Görevler</h2>
             {gorevler.length === 0 ? <p className="text-center text-gray-500 py-8">Görev yok</p> : (
               gorevler.map(g => (<div key={g.id} className={`bg-white rounded-xl p-3 shadow-sm border ${g.durum === "tamamlandi" ? "opacity-60" : ""}`}>
                 <div className="flex items-center justify-between"><div className="font-medium text-sm">{g.durum === "tamamlandi" ? "✅ " : ""}{g.baslik}</div><span className={`text-xs px-2 py-0.5 rounded-full ${g.durum === "tamamlandi" ? "bg-green-100 text-green-700" : g.durum === "bekliyor" ? "bg-yellow-100 text-yellow-700" : "bg-blue-100 text-blue-700"}`}>{g.durum === "tamamlandi" ? "Tamamlandı" : g.durum === "bekliyor" ? "Bekliyor" : "Devam"}</span></div>
@@ -6619,7 +6683,7 @@ function VeliPaneli({ user, logout }) {
 
           {/* MESAJLAR */}
           {/* ANKET */}
-          {aktifSekme === "anket" && (<div className="space-y-4">
+          {aktifSekme === "anket" && ozellikAktif("veli_anket") && (<div className="space-y-4">
             <h2 className="text-xl font-bold">⭐ Öğretmen Değerlendirmesi</h2>
             {seciliCocuk ? (<>
               {(() => {
@@ -6689,7 +6753,7 @@ function VeliPaneli({ user, logout }) {
             </div>)}
           </div>)}
 
-          {aktifSekme === "mesajlar" && (<div className="space-y-4">
+          {aktifSekme === "mesajlar" && ozellikAktif("veli_mesajlar") && (<div className="space-y-4">
             <h2 className="text-xl font-bold">✉️ Mesajlar</h2>
             <div className="flex gap-2">
               {[{v:"gelen",l:`Gelen (${gelenMesajlar.length})`},{v:"giden",l:"Gönderilen"},{v:"yeni",l:"Yeni Mesaj"}].map(t => (
@@ -6843,7 +6907,7 @@ function SistemAyarlari({ user }) {
       <p className="text-gray-500 text-sm">Rozet, XP, lig ve anket ayarlarını buradan yönetin. Değişiklikler anında uygulanır.</p>
 
       <div className="flex gap-2 flex-wrap">
-        {[{id:"xp",l:"💰 XP Değerleri"},{id:"lig",l:"🏆 Lig Eşikleri"},{id:"ogretmen_rozet",l:"🏅 Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"🎓 Öğrenci Rozetleri"},{id:"anket",l:"⭐ Anket Soruları"},{id:"kvkk",l:"🔒 Veri & KVKK"},{id:"sezon",l:"🔄 Sezonluk Reset"}].map(s => (
+        {[{id:"ozellikler",l:"🎛️ Özellik Yönetimi"},{id:"xp",l:"💰 XP Değerleri"},{id:"lig",l:"🏆 Lig Eşikleri"},{id:"ogretmen_rozet",l:"🏅 Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"🎓 Öğrenci Rozetleri"},{id:"anket",l:"⭐ Anket Soruları"},{id:"kvkk",l:"🔒 Veri & KVKK"},{id:"sezon",l:"🔄 Sezonluk Reset"}].map(s => (
           <button key={s.id} onClick={() => setAyarSekme(s.id)}
             className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${ayarSekme === s.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200'}`}>{s.l}</button>
         ))}
@@ -6921,6 +6985,15 @@ function SistemAyarlari({ user }) {
       </div></CardContent></Card>)}
 
       {/* KVKK / Veri Paneli */}
+      {/* Özellik Yönetimi */}
+      {ayarSekme === "ozellikler" && (
+        <Card className="border-0 shadow-sm">
+          <CardContent className="pt-6">
+            <OzellikYonetimi />
+          </CardContent>
+        </Card>
+      )}
+
       {ayarSekme === "kvkk" && (
         <KvkkVeriPaneli user={user} />
       )}
@@ -6933,6 +7006,226 @@ function SistemAyarlari({ user }) {
   );
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+// OzellikYonetimi — Sistem Ayarları > Özellik Yönetimi sekmesi
+// ═══════════════════════════════════════════════════════════════════
+function OzellikYonetimi() {
+  const { toast } = useToast();
+  const [yukleniyor, setYukleniyor] = useState(true);
+  const [kayitEdiliyor, setKayitEdiliyor] = useState(false);
+  const [tanimlar, setTanimlar] = useState([]);
+  const [ayarlar, setAyarlar] = useState({});
+  const [aktifKategori, setAktifKategori] = useState("ogretmen");
+  const [arama, setArama] = useState("");
+  const [degistiMi, setDegistiMi] = useState(false);
+
+  const ROL_ETIKETLER = {
+    ogretmen: { label: "Öğretmen", ikon: "👩‍🏫" },
+    ogrenci:  { label: "Öğrenci",  ikon: "🎓" },
+    veli:     { label: "Veli",     ikon: "👪" },
+  };
+
+  const KATEGORI_ETIKETLER = {
+    ogretmen: { label: "Öğretmen Paneli", ikon: "👩‍🏫" },
+    ogrenci:  { label: "Öğrenci Paneli",  ikon: "🎓" },
+    veli:     { label: "Veli Paneli",     ikon: "👪" },
+  };
+
+  useEffect(() => { fetchAyarlar(); }, []);
+
+  const fetchAyarlar = async () => {
+    setYukleniyor(true);
+    try {
+      const r = await axios.get(`${API}/ayarlar/ozellikler`);
+      setTanimlar(r.data.tanimlar || []);
+      setAyarlar(r.data.ayarlar || {});
+    } catch (e) {
+      toast({ title: "Veri yüklenemedi", variant: "destructive" });
+    }
+    setYukleniyor(false);
+  };
+
+  const kaydet = async () => {
+    setKayitEdiliyor(true);
+    try {
+      await axios.put(`${API}/ayarlar/ozellikler`, { ayarlar });
+      toast({ title: "✅ Özellik ayarları kaydedildi!", description: "Değişiklikler anında uygulanır." });
+      setDegistiMi(false);
+    } catch (e) {
+      toast({ title: "Kayıt hatası", variant: "destructive" });
+    }
+    setKayitEdiliyor(false);
+  };
+
+  const getAyar = (id) => ayarlar[id] || { aktif: true, roller: { ogretmen: true, ogrenci: true, veli: true } };
+
+  const setTamAktif = (id, aktif) => {
+    setAyarlar(prev => ({ ...prev, [id]: { ...getAyar(id), aktif } }));
+    setDegistiMi(true);
+  };
+
+  const setRolAktif = (id, rol, aktif) => {
+    const mevcut = getAyar(id);
+    setAyarlar(prev => ({ ...prev, [id]: { ...mevcut, roller: { ...mevcut.roller, [rol]: aktif } } }));
+    setDegistiMi(true);
+  };
+
+  const kategoriTumunuAyarla = (kategori, aktif) => {
+    const guncelleme = {};
+    tanimlar.filter(t => t.kategori === kategori).forEach(t => {
+      guncelleme[t.id] = { ...getAyar(t.id), aktif };
+    });
+    setAyarlar(prev => ({ ...prev, ...guncelleme }));
+    setDegistiMi(true);
+    toast({ title: aktif ? `✅ ${KATEGORI_ETIKETLER[kategori].label} tümü açıldı` : `🚫 ${KATEGORI_ETIKETLER[kategori].label} tümü kapatıldı` });
+  };
+
+  const filtrelenmis = tanimlar.filter(t => {
+    if (t.kategori !== aktifKategori) return false;
+    if (arama && !t.label.toLowerCase().includes(arama.toLowerCase()) && !t.aciklama.toLowerCase().includes(arama.toLowerCase())) return false;
+    return true;
+  });
+
+  const istatistik = {
+    toplamAktif: tanimlar.filter(t => getAyar(t.id).aktif).length,
+    toplamPasif: tanimlar.filter(t => !getAyar(t.id).aktif).length,
+  };
+
+  if (yukleniyor) return (
+    <div className="flex items-center justify-center py-16">
+      <div className="text-center space-y-3">
+        <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
+        <p className="text-gray-500 text-sm">Özellik ayarları yükleniyor...</p>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-5">
+      {/* Başlık + istatistik + kaydet butonu */}
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+        <div>
+          <p className="text-sm text-gray-500 mt-0.5">Her panelde hangi modüllerin görüneceğini yönetin. Değişiklikler anında uygulanır.</p>
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="flex gap-2 text-xs">
+            <span className="px-2.5 py-1 bg-green-100 text-green-700 rounded-full font-semibold">{istatistik.toplamAktif} Aktif</span>
+            <span className="px-2.5 py-1 bg-red-100 text-red-700 rounded-full font-semibold">{istatistik.toplamPasif} Pasif</span>
+          </div>
+          {degistiMi && (
+            <button onClick={kaydet} disabled={kayitEdiliyor}
+              className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-all disabled:opacity-60 shadow">
+              {kayitEdiliyor
+                ? <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Kaydediliyor...</>
+                : <>💾 Kaydet</>}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Panel seçim sekmeleri */}
+      <div className="flex gap-2 flex-wrap">
+        {Object.entries(KATEGORI_ETIKETLER).map(([k, v]) => {
+          const aktifSayi = tanimlar.filter(t => t.kategori === k && getAyar(t.id).aktif).length;
+          const toplamSayi = tanimlar.filter(t => t.kategori === k).length;
+          return (
+            <button key={k} onClick={() => { setAktifKategori(k); setArama(""); }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
+                aktifKategori === k ? "bg-blue-600 text-white border-blue-600 shadow-sm" : "bg-white text-gray-600 border-gray-200 hover:border-blue-300"
+              }`}>
+              <span>{v.ikon}</span><span>{v.label}</span>
+              <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${aktifKategori === k ? "bg-white/20" : "bg-gray-100 text-gray-500"}`}>
+                {aktifSayi}/{toplamSayi}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Arama + toplu işlem */}
+      <div className="flex gap-2 items-center flex-wrap">
+        <div className="relative flex-1 min-w-[160px] max-w-xs">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+          <input type="text" placeholder="Özellik ara..." value={arama} onChange={e => setArama(e.target.value)}
+            className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white" />
+        </div>
+        <button onClick={() => kategoriTumunuAyarla(aktifKategori, true)}
+          className="px-3 py-2 text-xs bg-green-50 text-green-700 border border-green-200 rounded-xl hover:bg-green-100 transition-all font-medium">✅ Tümünü Aç</button>
+        <button onClick={() => kategoriTumunuAyarla(aktifKategori, false)}
+          className="px-3 py-2 text-xs bg-red-50 text-red-700 border border-red-200 rounded-xl hover:bg-red-100 transition-all font-medium">🚫 Tümünü Kapat</button>
+      </div>
+
+      {/* Özellik listesi */}
+      <div className="space-y-2">
+        {filtrelenmis.length === 0 && (
+          <div className="text-center py-12 text-gray-400">
+            <p className="text-3xl mb-2">🔍</p>
+            <p className="text-sm">"{arama}" ile eşleşen özellik bulunamadı</p>
+          </div>
+        )}
+        {filtrelenmis.map(ozellik => {
+          const ayar = getAyar(ozellik.id);
+          const tamAktif = ayar.aktif !== false;
+          return (
+            <div key={ozellik.id}
+              className={`border rounded-xl p-4 transition-all ${tamAktif ? "bg-white border-gray-200 hover:border-blue-200 hover:shadow-sm" : "bg-gray-50 border-gray-200 opacity-60"}`}>
+              <div className="flex items-start gap-3">
+                {/* Ana toggle */}
+                <button onClick={() => setTamAktif(ozellik.id, !tamAktif)}
+                  className={`flex-shrink-0 mt-0.5 w-11 h-6 rounded-full transition-all duration-200 relative ${tamAktif ? "bg-blue-500" : "bg-gray-300"}`}>
+                  <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all duration-200 ${tamAktif ? "left-5" : "left-0.5"}`} />
+                </button>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-base">{ozellik.ikon}</span>
+                    <span className={`font-semibold text-sm ${tamAktif ? "text-gray-900" : "text-gray-400 line-through"}`}>{ozellik.label}</span>
+                    {!tamAktif && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">Kapalı</span>}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{ozellik.aciklama}</p>
+                  {/* Rol bazlı kontroller — sadece özellik aktifse */}
+                  {tamAktif && (
+                    <div className="flex gap-2 mt-2.5 flex-wrap">
+                      {Object.entries(ROL_ETIKETLER).map(([rol, info]) => {
+                        const rolAktif = ayar.roller?.[rol] !== false;
+                        const renkAktif = rol === "ogretmen" ? "bg-blue-50 text-blue-700 border-blue-200"
+                          : rol === "ogrenci" ? "bg-green-50 text-green-700 border-green-200"
+                          : "bg-purple-50 text-purple-700 border-purple-200";
+                        const buKategori = ozellik.kategori === rol;
+                        return (
+                          <button key={rol} onClick={() => setRolAktif(ozellik.id, rol, !rolAktif)}
+                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all
+                              ${rolAktif ? renkAktif : "bg-white text-gray-300 border-gray-200"}
+                              ${buKategori ? "ring-1 ring-offset-1 " + (rol === "ogretmen" ? "ring-blue-300" : rol === "ogrenci" ? "ring-green-300" : "ring-purple-300") : ""}`}>
+                            <span>{info.ikon}</span>
+                            <span>{info.label}</span>
+                            <span className="opacity-50">{rolAktif ? "✓" : "✗"}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Sticky kaydet butonu — değişiklik varsa */}
+      {degistiMi && (
+        <div className="sticky bottom-4 flex justify-end pt-2">
+          <button onClick={kaydet} disabled={kayitEdiliyor}
+            className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-lg transition-all disabled:opacity-60">
+            {kayitEdiliyor
+              ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Kaydediliyor...</>
+              : <>💾 Değişiklikleri Kaydet</>}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── KVKK VERİ PANELİ ──────────────────────────────────────────
 function KvkkVeriPaneli({ user }) {
