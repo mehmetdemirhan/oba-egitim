@@ -310,6 +310,8 @@ app = FastAPI(title="Okuma Becerileri Akademisi API")
 
 ALLOWED_ORIGINS = {
     "https://oba-egitim-frontend.onrender.com",
+    "https://oba-egitim.vercel.app",
+    "https://oba-egitim-git-main-mehmetdemirhans-projects.vercel.app",
     "http://localhost:3000",
     "http://localhost:3001",
 }
@@ -321,7 +323,7 @@ from starlette.responses import Response
 class CustomCORSMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         origin = request.headers.get("origin", "")
-        is_allowed = origin in ALLOWED_ORIGINS or origin.endswith(".onrender.com")
+       is_allowed = origin in ALLOWED_ORIGINS or origin.endswith(".onrender.com") or origin.endswith(".vercel.app")
 
         # OPTIONS preflight — hemen yanıtla
         if request.method == "OPTIONS":
