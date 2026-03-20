@@ -324,7 +324,6 @@ class CustomCORSMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         origin = request.headers.get("origin", "")
       is_allowed = origin in ALLOWED_ORIGINS or origin.endswith(".onrender.com") or origin.endswith(".vercel.app")
-
         # OPTIONS preflight — hemen yanıtla
         if request.method == "OPTIONS":
             response = Response(status_code=200)
