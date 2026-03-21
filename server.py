@@ -9619,7 +9619,7 @@ async def get_ozellik_ayarlari() -> dict:
 
 
 @api_router.get("/ayarlar/ozellikler")
-async def get_ozellik_ayarlari_endpoint(current_user=Depends(get_current_user)):
+async def get_ozellik_ayarlari_endpoint():
     ayarlar = await get_ozellik_ayarlari()
     return {"tanimlar": OZELLIK_TANIMLARI, "ayarlar": ayarlar}
 
