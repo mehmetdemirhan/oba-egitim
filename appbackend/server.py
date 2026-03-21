@@ -9619,10 +9619,14 @@ async def get_ozellik_ayarlari() -> dict:
 
 
 @api_router.get("/ayarlar/ozellikler")
-async def get_ozellik_ayarlari_endpoint():  # public 
-    ayarlar = await get_ozellik_ayarlari()
+async def get_ozellik_ayarlari_endpoint():
+    doc = await db.sistem_ayarlari.find_one({"tip": "ozellik_ayarlari"})
+    varsayilan = {f["id"]: {"aktif": True, "roller": {"ogretmen": True, "ogrenci": True, "veli": True}} for f in OZELLIK_TANIMLARI}
+    ayarlar = doc.get("degerler", varsayilan) if doc else varsayilan
+    for f in OZELLIK_TANIMLARI:
+        if f["id"] not in ayarlar:
+            ayarlar[f["id"]] = {"aktif": True, "roller": {"ogretmen": True, "ogrenci": True, "veli": True}}
     return {"tanimlar": OZELLIK_TANIMLARI, "ayarlar": ayarlar}
-
 
 @api_router.put("/ayarlar/ozellikler")
 async def update_ozellik_ayarlari(
