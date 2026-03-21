@@ -9960,3 +9960,58 @@ async def peer_review_ozet(current_user=Depends(get_current_user)):
     except Exception as e:
         logging.error(f"[PEER-REVIEW-OZET] {e}")
         return {"ozet": {}, "liderler": [], "rozet_dagilim": [], "haftalik_trend": [0]*7}
+# Özellik Yönetimi endpoint'leri
+@api_router.get("/ayarlar/ozellikler")
+async def get_ozellik_ayarlari_endpoint(current_user=Depends(get_current_user)):
+    doc = await db.sistem_ayarlari.find_one({"tip": "ozellik_ayarlari"})
+    tanimlar = [
+        {"id":"ogretmen_dashboard","label":"Öğretmen Dashboard","kategori":"ogretmen","ikon":"📊","aciklama":"Risk skorları ve özet"},
+        {"id":"ogretmen_giris_analizi","label":"Giriş Analizi","kategori":"ogretmen","ikon":"🔬","aciklama":"Sesli okuma ve rapor"},
+        {"id":"ogretmen_gelisim","label":"Gelişim Alanı","kategori":"ogretmen","ikon":"🎓","aciklama":"İçerik ve materyal"},
+        {"id":"ogretmen_gorevler","label":"Görev Atama","kategori":"ogretmen","ikon":"📌","aciklama":"Görev sistemi"},
+        {"id":"ogretmen_mesajlar","label":"Mesajlaşma","kategori":"ogretmen","ikon":"✉️","aciklama":"Mesaj sistemi"},
+        {"id":"ogretmen_ai_kocluk","label":"AI Koçluk","kategori":"ogretmen","ikon":"🧠","aciklama":"AI analiz"},
+        {"id":"ogretmen_ai_bilgi","label":"AI Bilgi Tabanı","kategori":"ogretmen","ikon":"📚","aciklama":"PDF yükleme"},
+        {"id":"ogretmen_rozetler","label":"Rozetler","kategori":"ogretmen","ikon":"🏅","aciklama":"Rozet sistemi"},
+        {"id":"ogretmen_hedefler","label":"Hedef Sistemi","kategori":"ogretmen","ikon":"🎯","aciklama":"Hedef takibi"},
+        {"id":"ogretmen_veli_anket","label":"Veli Anketi","kategori":"ogretmen","ikon":"⭐","aciklama":"Anket sonuçları"},
+        {"id":"ogrenci_okuma_kaydi","label":"Okuma Kaydı","kategori":"ogrenci","ikon":"📖","aciklama":"Okuma takibi"},
+        {"id":"ogrenci_gorevler","label":"Görevler","kategori":"ogrenci","ikon":"✅","aciklama":"Görev listesi"},
+        {"id":"ogrenci_gelisim","label":"Gelişim Alanı","kategori":"ogrenci","ikon":"🎓","aciklama":"İçerik okuma"},
+        {"id":"ogrenci_egzersizler","label":"Egzersizler","kategori":"ogrenci","ikon":"👁️","aciklama":"Egzersiz modülleri"},
+        {"id":"ogrenci_xp_lig","label":"XP & Lig","kategori":"ogrenci","ikon":"🏆","aciklama":"Puan sistemi"},
+        {"id":"ogrenci_rozetler","label":"Rozetler","kategori":"ogrenci","ikon":"🎖️","aciklama":"Başarı rozetleri"},
+        {"id":"ogrenci_speech_ai","label":"Sesli Okuma AI","kategori":"ogrenci","ikon":"🎤","aciklama":"Sesli okuma analizi"},
+        {"id":"ogrenci_kelime_evrimi","label":"Kelime Evrimi","kategori":"ogrenci","ikon":"🔤","aciklama":"Kelime kartları"},
+        {"id":"ogrenci_mini_oyunlar","label":"Mini Oyunlar","kategori":"ogrenci","ikon":"🎮","aciklama":"Kelime oyunları"},
+        {"id":"ogrenci_scaffold","label":"Seviyeli Okuma","kategori":"ogrenci","ikon":"📐","aciklama":"Scaffold okuma"},
+        {"id":"ogrenci_materyal","label":"AI Materyal","kategori":"ogrenci","ikon":"🛠️","aciklama":"Materyal üretici"},
+        {"id":"ogrenci_hikaye","label":"Kişisel Hikaye","kategori":"ogrenci","ikon":"✨","aciklama":"AI hikaye"},
+        {"id":"ogrenci_ai_arkadas","label":"AI Arkadaş","kategori":"ogrenci","ikon":"🤖","aciklama":"AI sohbet"},
+        {"id":"ogrenci_orman","label":"Okuma Ormanı","kategori":"ogrenci","ikon":"🌲","aciklama":"Orman oyunu"},
+        {"id":"ogrenci_mesajlar","label":"Mesajlaşma","kategori":"ogrenci","ikon":"💬","aciklama":"Mesaj sistemi"},
+        {"id":"ogrenci_siralama","label":"Sıralama","kategori":"ogrenci","ikon":"📈","aciklama":"Sıralama tablosu"},
+        {"id":"veli_dashboard","label":"Veli Dashboard","kategori":"veli","ikon":"🏠","aciklama":"Genel durum"},
+        {"id":"veli_gorev_takip","label":"Görev Takibi","kategori":"veli","ikon":"📋","aciklama":"Görev görüntüleme"},
+        {"id":"veli_okuma_gecmisi","label":"Okuma Geçmişi","kategori":"veli","ikon":"📅","aciklama":"İstatistikler"},
+        {"id":"veli_bildirimler","label":"Bildirimler","kategori":"veli","ikon":"🔔","aciklama":"Uyarılar"},
+        {"id":"veli_anket","label":"Öğretmen Değerlendirme","kategori":"veli","ikon":"⭐","aciklama":"Anket"},
+        {"id":"veli_mesajlar","label":"Mesajlaşma","kategori":"veli","ikon":"💬","aciklama":"Mesaj sistemi"},
+        {"id":"veli_rapor","label":"Raporlar","kategori":"veli","ikon":"📄","aciklama":"Giriş analizi raporları"},
+    ]
+    varsayilan = {f["id"]: {"aktif": True, "roller": {"ogretmen": True, "ogrenci": True, "veli": True}} for f in tanimlar}
+    ayarlar = doc.get("degerler", varsayilan) if doc else varsayilan
+    for f in tanimlar:
+        if f["id"] not in ayarlar:
+            ayarlar[f["id"]] = {"aktif": True, "roller": {"ogretmen": True, "ogrenci": True, "veli": True}}
+    return {"tanimlar": tanimlar, "ayarlar": ayarlar}
+
+@api_router.put("/ayarlar/ozellikler")
+async def update_ozellik_ayarlari_endpoint(payload: dict = Body(...), current_user=Depends(require_role(UserRole.ADMIN))):
+    ayarlar = payload.get("ayarlar", {})
+    await db.sistem_ayarlari.update_one(
+        {"tip": "ozellik_ayarlari"},
+        {"$set": {"tip": "ozellik_ayarlari", "degerler": ayarlar, "guncelleme_tarihi": datetime.utcnow().isoformat()}},
+        upsert=True
+    )
+    return {"ok": True}
