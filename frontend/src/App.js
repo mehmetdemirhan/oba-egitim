@@ -7032,7 +7032,6 @@ function OzellikYonetimi() {
     veli:     { label: "Veli Paneli",     ikon: "👪" },
   };
 
-  useEffect(() => { fetchAyarlar(); }, []);
 
   const fetchAyarlar = async () => {
     setYukleniyor(true);
@@ -7049,6 +7048,8 @@ function OzellikYonetimi() {
     }
     setYukleniyor(false);
   };
+
+  useEffect(() => { fetchAyarlar(); }, []);
 
   const kaydet = async () => {
     setKayitEdiliyor(true);
