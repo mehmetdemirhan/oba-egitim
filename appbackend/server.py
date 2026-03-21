@@ -4043,6 +4043,17 @@ async def kur_atla(payload: dict, current_user=Depends(get_current_user)):
 # SİSTEM AYARLARI YÖNETİMİ (Admin CRUD)
 # ─────────────────────────────────────────────
 
+# ÖNEMLİ: /ayarlar/ozellikler, /ayarlar/{tip}'den ÖNCE tanımlanmalı
+@api_router.get("/ayarlar/ozellikler")
+async def get_ozellik_ayarlari_public():
+    doc = await db.sistem_ayarlari.find_one({"tip": "ozellik_ayarlari"})
+    varsayilan = {f["id"]: {"aktif": True, "roller": {"ogretmen": True, "ogrenci": True, "veli": True}} for f in OZELLIK_TANIMLARI}
+    ayarlar = doc.get("degerler", varsayilan) if doc else varsayilan
+    for f in OZELLIK_TANIMLARI:
+        if f["id"] not in ayarlar:
+            ayarlar[f["id"]] = {"aktif": True, "roller": {"ogretmen": True, "ogrenci": True, "veli": True}}
+    return {"tanimlar": OZELLIK_TANIMLARI, "ayarlar": ayarlar}
+
 @api_router.get("/ayarlar/{tip}")
 async def get_ayar(tip: str, current_user=Depends(get_current_user)):
     doc = await db.sistem_ayarlari.find_one({"tip": tip})
@@ -9620,13 +9631,9 @@ async def get_ozellik_ayarlari() -> dict:
 
 @api_router.get("/ayarlar/ozellikler")
 async def get_ozellik_ayarlari_endpoint():
-    doc = await db.sistem_ayarlari.find_one({"tip": "ozellik_ayarlari"})
-    varsayilan = {f["id"]: {"aktif": True, "roller": {"ogretmen": True, "ogrenci": True, "veli": True}} for f in OZELLIK_TANIMLARI}
-    ayarlar = doc.get("degerler", varsayilan) if doc else varsayilan
-    for f in OZELLIK_TANIMLARI:
-        if f["id"] not in ayarlar:
-            ayarlar[f["id"]] = {"aktif": True, "roller": {"ogretmen": True, "ogrenci": True, "veli": True}}
+    ayarlar = await get_ozellik_ayarlari()
     return {"tanimlar": OZELLIK_TANIMLARI, "ayarlar": ayarlar}
+
 
 @api_router.put("/ayarlar/ozellikler")
 async def update_ozellik_ayarlari(
