@@ -9557,6 +9557,103 @@ async def etki_ozet(current_user=Depends(get_current_user)):
     }
 
 
+# ─────────────────────────────────────────────
+# ÖZELLİK YÖNETİMİ — Admin Panel Feature Flags
+# ─────────────────────────────────────────────
+
+OZELLIK_TANIMLARI = [
+    # ── ÖĞRETMEN PANELİ ──
+    {"id":"ogretmen_dashboard",     "label":"Öğretmen Dashboard",        "kategori":"ogretmen","ikon":"📊","aciklama":"Risk skorları, öğrenci özeti, genel istatistikler"},
+    {"id":"ogretmen_giris_analizi", "label":"Giriş Analizi (Okuma)",      "kategori":"ogretmen","ikon":"🔬","aciklama":"Sesli okuma analizi, WPM, prozodik okuma ve rapor üretimi"},
+    {"id":"ogretmen_gelisim",       "label":"Gelişim Alanı",              "kategori":"ogretmen","ikon":"🎓","aciklama":"İçerik ekleme, oylama, materyal yönetimi"},
+    {"id":"ogretmen_gorevler",      "label":"Görev Atama",                "kategori":"ogretmen","ikon":"📌","aciklama":"Öğrencilere görev ve ödev atama sistemi"},
+    {"id":"ogretmen_mesajlar",      "label":"Mesajlaşma",                 "kategori":"ogretmen","ikon":"✉️","aciklama":"Öğrenci ve velilerle mesajlaşma"},
+    {"id":"ogretmen_ai_kocluk",     "label":"AI Koçluk Raporu",           "kategori":"ogretmen","ikon":"🧠","aciklama":"AI ile öğrenci analizi, DNA profili ve kişisel öneriler"},
+    {"id":"ogretmen_ai_soru",       "label":"AI Soru Üretici",            "kategori":"ogretmen","ikon":"❓","aciklama":"Metin yükleyerek Bloom taksonomili soru üretme"},
+    {"id":"ogretmen_ai_bilgi",      "label":"AI Bilgi Tabanı (PDF/Word)", "kategori":"ogretmen","ikon":"📚","aciklama":"Ders kitabı yükleme ve AI ile kelime/soru çıkarma"},
+    {"id":"ogretmen_rozetler",      "label":"Rozet & Başarılar",          "kategori":"ogretmen","ikon":"🏅","aciklama":"Öğretmen rozet ve başarı sistemi"},
+    {"id":"ogretmen_hedefler",      "label":"Hedef Sistemi",              "kategori":"ogretmen","ikon":"🎯","aciklama":"Öğretmenin kişisel hedef koyma ve takip sistemi"},
+    {"id":"ogretmen_veli_anket",    "label":"Veli Anket Sonuçları",       "kategori":"ogretmen","ikon":"⭐","aciklama":"Velilerin öğretmeni değerlendirdiği anket sonuçları"},
+    # ── ÖĞRENCİ PANELİ ──
+    {"id":"ogrenci_okuma_kaydi",    "label":"Okuma Kaydı",                "kategori":"ogrenci","ikon":"📖","aciklama":"Ne okudum, okuma süresi ve sayfa takibi"},
+    {"id":"ogrenci_gorevler",       "label":"Görevler",                   "kategori":"ogrenci","ikon":"✅","aciklama":"Öğretmenden gelen görevleri görme ve tamamlama"},
+    {"id":"ogrenci_gelisim",        "label":"Gelişim Alanı",              "kategori":"ogrenci","ikon":"🎓","aciklama":"İçerik okuma, video izleme, egzersizler"},
+    {"id":"ogrenci_egzersizler",    "label":"Göz ve Beyin Egzersizleri",  "kategori":"ogrenci","ikon":"👁️","aciklama":"Odak ve algı geliştirici egzersiz modülleri"},
+    {"id":"ogrenci_xp_lig",         "label":"XP & Lig Sistemi",           "kategori":"ogrenci","ikon":"🏆","aciklama":"Puan kazanma, lig yükselme ve sıralama"},
+    {"id":"ogrenci_rozetler",       "label":"Rozetler",                   "kategori":"ogrenci","ikon":"🎖️","aciklama":"Öğrenci başarı rozetleri"},
+    {"id":"ogrenci_speech_ai",      "label":"Sesli Okuma Analizi (AI)",   "kategori":"ogrenci","ikon":"🎤","aciklama":"Mikrofona sesli okuma ve AI analizi"},
+    {"id":"ogrenci_kelime_evrimi",  "label":"Kelime Evrimi (Kartlar)",    "kategori":"ogrenci","ikon":"🔤","aciklama":"Spaced repetition ile kelime öğrenme"},
+    {"id":"ogrenci_mini_oyunlar",   "label":"Mini Oyunlar",               "kategori":"ogrenci","ikon":"🎮","aciklama":"Kelime avı, eşleştirme ve boşluk doldurma oyunları"},
+    {"id":"ogrenci_scaffold",       "label":"Scaffold Okuma (Seviyeleme)","kategori":"ogrenci","ikon":"📐","aciklama":"DNA'ya göre kolay/orta/orijinal metin seviyeleme"},
+    {"id":"ogrenci_materyal",       "label":"AI Materyal Üretici",        "kategori":"ogrenci","ikon":"🛠️","aciklama":"Kitaptan soru seti, kelime listesi, etkinlik üretme"},
+    {"id":"ogrenci_hikaye",         "label":"Kişisel Hikaye (AI)",        "kategori":"ogrenci","ikon":"✨","aciklama":"İlgi alanına göre AI tarafından yazılan özel hikaye"},
+    {"id":"ogrenci_ai_arkadas",     "label":"AI Okuma Arkadaşı",          "kategori":"ogrenci","ikon":"🤖","aciklama":"4 karakterli AI sohbet asistanı"},
+    {"id":"ogrenci_orman",          "label":"Okuma Ormanı",               "kategori":"ogrenci","ikon":"🌲","aciklama":"Okuduğun dakika = Diktiğin ağaç gamification"},
+    {"id":"ogrenci_mesajlar",       "label":"Mesajlaşma",                 "kategori":"ogrenci","ikon":"💬","aciklama":"Öğretmenle mesajlaşma"},
+    {"id":"ogrenci_siralama",       "label":"Sıralama Tablosu",           "kategori":"ogrenci","ikon":"📈","aciklama":"Anonim okuma dakikası sıralaması"},
+    # ── VELİ PANELİ ──
+    {"id":"veli_dashboard",         "label":"Veli Dashboard",             "kategori":"veli","ikon":"🏠","aciklama":"Çocuğun okuma istatistikleri ve genel durumu"},
+    {"id":"veli_gorev_takip",       "label":"Görev Takibi",               "kategori":"veli","ikon":"📋","aciklama":"Çocuğa atanan görevleri görme"},
+    {"id":"veli_okuma_gecmisi",     "label":"Okuma Geçmişi",              "kategori":"veli","ikon":"📅","aciklama":"Haftalık/aylık okuma istatistikleri"},
+    {"id":"veli_bildirimler",       "label":"Bildirimler",                "kategori":"veli","ikon":"🔔","aciklama":"Streak uyarısı, rapor bildirimleri"},
+    {"id":"veli_anket",             "label":"Öğretmen Değerlendirme",     "kategori":"veli","ikon":"⭐","aciklama":"Öğretmeni değerlendirme anketi"},
+    {"id":"veli_mesajlar",          "label":"Mesajlaşma",                 "kategori":"veli","ikon":"💬","aciklama":"Öğretmenle mesajlaşma"},
+    {"id":"veli_rapor",             "label":"Giriş Analizi Raporları",    "kategori":"veli","ikon":"📄","aciklama":"Öğretmenin hazırladığı raporları görme"},
+]
+
+OZELLIK_VARSAYILAN = {
+    f["id"]: {"aktif": True, "roller": {"ogretmen": True, "ogrenci": True, "veli": True}}
+    for f in OZELLIK_TANIMLARI
+}
+
+
+async def get_ozellik_ayarlari() -> dict:
+    doc = await db.sistem_ayarlari.find_one({"tip": "ozellik_ayarlari"})
+    if doc and doc.get("degerler"):
+        mevcut = doc["degerler"]
+        for f in OZELLIK_TANIMLARI:
+            if f["id"] not in mevcut:
+                mevcut[f["id"]] = {"aktif": True, "roller": {"ogretmen": True, "ogrenci": True, "veli": True}}
+        return mevcut
+    return dict(OZELLIK_VARSAYILAN)
+
+
+@api_router.get("/ayarlar/ozellikler")
+async def get_ozellik_ayarlari_endpoint():
+    ayarlar = await get_ozellik_ayarlari()
+    return {"tanimlar": OZELLIK_TANIMLARI, "ayarlar": ayarlar}
+
+
+@api_router.put("/ayarlar/ozellikler")
+async def update_ozellik_ayarlari(
+    payload: dict = Body(...),
+    current_user=Depends(require_role(UserRole.ADMIN))
+):
+    ayarlar = payload.get("ayarlar", {})
+    gecerli_idler = {f["id"] for f in OZELLIK_TANIMLARI}
+    temiz = {k: v for k, v in ayarlar.items() if k in gecerli_idler}
+    await db.sistem_ayarlari.update_one(
+        {"tip": "ozellik_ayarlari"},
+        {"$set": {
+            "tip": "ozellik_ayarlari",
+            "degerler": temiz,
+            "guncelleme_tarihi": datetime.utcnow().isoformat(),
+            "guncelleyen": f"{current_user.get('ad', '')} {current_user.get('soyad', '')}".strip()
+        }},
+        upsert=True
+    )
+    return {"ok": True, "guncellenen": len(temiz)}
+
+
+async def ozellik_aktif_mi(ozellik_id: str, rol: str) -> bool:
+    """Verilen özelliğin belirtilen rol için aktif olup olmadığını döner."""
+    ayarlar = await get_ozellik_ayarlari()
+    ozellik = ayarlar.get(ozellik_id, {"aktif": True, "roller": {}})
+    if not ozellik.get("aktif", True):
+        return False
+    return ozellik.get("roller", {}).get(rol, True)
+
+
 # APP SETUP
 # ─────────────────────────────────────────────
 
