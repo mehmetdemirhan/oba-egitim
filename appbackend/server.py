@@ -5349,8 +5349,10 @@ async def ai_bilgi_tabani_yukle(
     if benzer:
         duplicate_uyari = f"⚠️ Benzer yükleme mevcut: '{benzer.get('kitap_adi')}' ({benzer.get('tarih', '')[:10]}). Yine de yüklendi."
 
-    import base64
-    dosya_b64 = base64.b64encode(icerik).decode("utf-8")
+    import base64, gzip
+    # Sıkıştır ve base64'e çevir — MongoDB 16MB limitini aşmamak için
+    icerik_gz = gzip.compress(icerik, compresslevel=9)
+    dosya_b64 = base64.b64encode(icerik_gz).decode("utf-8")
 
     yukleme = {
         "id": str(uuid.uuid4()),
@@ -5359,6 +5361,7 @@ async def ai_bilgi_tabani_yukle(
         "dosya_format": ext,
         "dosya_hash": dosya_hash,
         "dosya_b64": dosya_b64,
+        "dosya_gzip": True,
         "sinif": sinif,
         "tur": tur,
         "kitap_adi": kitap_adi or dosya.filename.replace(ext, ""),
@@ -5410,8 +5413,13 @@ async def ai_bilgi_tabani_isle(yukleme_id: str, current_user=Depends(get_current
     if not yukleme.get("dosya_b64"):
         raise HTTPException(status_code=400, detail="Dosya verisi bulunamadı")
 
-    import base64
-    dosya_bytes = base64.b64decode(yukleme["dosya_b64"])
+    import base64, gzip
+    dosya_raw = base64.b64decode(yukleme["dosya_b64"])
+    # Sıkıştırılmış veriyi aç
+    if yukleme.get("dosya_gzip"):
+        dosya_bytes = gzip.decompress(dosya_raw)
+    else:
+        dosya_bytes = dosya_raw
     ext = yukleme.get("dosya_format", ".pdf")
     sinif = yukleme.get("sinif", 3)
     kitap_adi = yukleme.get("kitap_adi", "Bilinmeyen")
@@ -5706,8 +5714,9 @@ async def ai_bilgi_tabani_yukle_url(payload: dict, current_user=Depends(get_curr
     if mevcut:
         raise HTTPException(status_code=409, detail=f"Bu dosya daha önce yüklenmiş: '{mevcut.get('kitap_adi', '')}'")
 
-    import base64
-    dosya_b64 = base64.b64encode(icerik).decode("utf-8")
+    import base64, gzip
+    icerik_gz = gzip.compress(icerik, compresslevel=9)
+    dosya_b64 = base64.b64encode(icerik_gz).decode("utf-8")
 
     yukleme = {
         "id": str(uuid.uuid4()),
@@ -5715,6 +5724,7 @@ async def ai_bilgi_tabani_yukle_url(payload: dict, current_user=Depends(get_curr
         "dosya_boyut": len(icerik),
         "dosya_format": ext,
         "dosya_hash": dosya_hash,
+        "dosya_gzip": True,
         "dosya_b64": dosya_b64,
         "kaynak_url": url,
         "sinif": sinif,
