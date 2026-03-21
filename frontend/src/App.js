@@ -7037,11 +7037,15 @@ function OzellikYonetimi() {
   const fetchAyarlar = async () => {
     setYukleniyor(true);
     try {
-      const r = await axios.get(`${API}/ayarlar/ozellikler`);
+      const token = localStorage.getItem("oba_token");
+      const r = await axios.get(`${API}/ayarlar/ozellikler`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
       setTanimlar(r.data.tanimlar || []);
       setAyarlar(r.data.ayarlar || {});
     } catch (e) {
-      toast({ title: "Veri yüklenemedi", variant: "destructive" });
+      console.error("Ozellik fetch error:", e?.response?.status, JSON.stringify(e?.response?.data));
+      toast({ title: "Veri yuklenemedi: " + (e?.response?.status || e?.message), variant: "destructive" });
     }
     setYukleniyor(false);
   };
