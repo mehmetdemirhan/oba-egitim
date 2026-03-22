@@ -9903,11 +9903,14 @@ function AdminKitapParcalari() {
   const [acikParca, setAcikParca] = useState(null);
   const [yukleniyor, setYukleniyor] = useState(false);
   const [istatistik, setIstatistik] = useState({ toplamParca: 0, toplamSoru: 0, toplamKitap: 0 });
+  const [duzenlemeParca, setDuzenlemeParca] = useState(null);
+  const [duzenlemeSoru, setDuzenlemeSoru] = useState(null);
+  const [yeniSoruForm, setYeniSoruForm] = useState(null);
+  const [yeniParcaForm, setYeniParcaForm] = useState(false);
+  const [yeniParca, setYeniParca] = useState({ baslik: "", ozet: "", metin_kesit: "", tema: "" });
+  const taksLabel = { "bilgi": "Bilgi", "kavrama": "Kavrama", "uygulama": "Uygulama", "analiz": "Analiz", "sentez": "Sentez", "degerlendirme": "Yaratma" };
 
-  useEffect(() => {
-    fetchIstatistik();
-    fetchSiniflar();
-  }, []);
+  useEffect(() => { fetchIstatistik(); fetchSiniflar(); }, []);
 
   const fetchIstatistik = async () => {
     try {
@@ -9917,157 +9920,258 @@ function AdminKitapParcalari() {
       ]);
       const parcaData = Array.isArray(parcaR.data) ? parcaR.data : [];
       const soruData = Array.isArray(soruR.data) ? soruR.data : [];
-      const kitapSet = new Set(parcaData.map(p => p.kitap_adi));
-      setIstatistik({ toplamParca: parcaData.length, toplamSoru: soruData.length, toplamKitap: kitapSet.size });
+      setIstatistik({ toplamParca: parcaData.length, toplamSoru: soruData.length, toplamKitap: new Set(parcaData.map(p => p.kitap_adi)).size });
     } catch(e) {}
   };
 
   const fetchSiniflar = async () => {
-    try {
-      const r = await axios.get(`${API}/kitap-dersleri/siniflar`);
-      setSiniflar(r.data || []);
-    } catch(e) {}
+    try { const r = await axios.get(`${API}/kitap-dersleri/siniflar`); setSiniflar(r.data || []); } catch(e) {}
   };
 
   const sinifSec = async (s) => {
     setSeciliSinif(s); setSeciliKitap(null); setParcalar([]); setYukleniyor(true);
-    try {
-      const r = await axios.get(`${API}/kitap-dersleri/kitaplar/${s}`);
-      setKitaplar(r.data || []);
-    } catch(e) {}
+    try { const r = await axios.get(`${API}/kitap-dersleri/kitaplar/${s}`); setKitaplar(r.data || []); } catch(e) {}
     setYukleniyor(false);
   };
 
   const kitapSec = async (k) => {
-    setSeciliKitap(k); setYukleniyor(true);
-    try {
-      const r = await axios.get(`${API}/kitap-dersleri/parcalar/${seciliSinif}/${encodeURIComponent(k.kitap_adi)}`);
-      setParcalar(r.data || []);
-    } catch(e) {}
+    setSeciliKitap(k); setYukleniyor(true); setAcikParca(null);
+    try { const r = await axios.get(`${API}/kitap-dersleri/parcalar/${seciliSinif}/${encodeURIComponent(k.kitap_adi)}`); setParcalar(r.data || []); } catch(e) {}
     setYukleniyor(false);
   };
 
-  const parcaSil = async (parca) => {
-    if (!window.confirm(`"${parca.baslik}" parçasını sil?`)) return;
+  const yenile = async () => { if (seciliKitap) await kitapSec(seciliKitap); };
+
+  const parcaKaydet = async (p) => {
     try {
-      await axios.delete(`${API}/ai/bilgi-tabani/${parca.yukleme_id}`);
-      setParcalar(prev => prev.filter(p => p.id !== parca.id));
-      toast({ title: "✅ Parça silindi" });
-      fetchIstatistik();
-    } catch(e) {
-      toast({ title: "Silme hatası", variant: "destructive" });
-    }
+      await axios.put(`${API}/kitap-dersleri/parca/${p.id}`, { baslik: p.baslik, ozet: p.ozet, metin_kesit: p.metin_kesit, tema: p.tema });
+      toast({ title: "✅ Parça güncellendi" });
+      setDuzenlemeParca(null); yenile();
+    } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
+  };
+
+  const parcaSil = async (parcaId, baslik) => {
+    if (!window.confirm(`"${baslik}" parçasını sil?`)) return;
+    try {
+      await axios.delete(`${API}/kitap-dersleri/parca/${parcaId}`);
+      toast({ title: "🗑️ Parça silindi" });
+      yenile(); fetchIstatistik();
+    } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
+  };
+
+  const soruKaydet = async (s) => {
+    try {
+      await axios.put(`${API}/kitap-dersleri/soru/${s.id}`, { soru: s.soru, secenekler: s.secenekler, dogru_cevap: s.dogru_cevap, taksonomi: s.taksonomi });
+      toast({ title: "✅ Soru güncellendi" });
+      setDuzenlemeSoru(null); yenile();
+    } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
+  };
+
+  const soruSil = async (soruId) => {
+    if (!window.confirm("Bu soruyu sil?")) return;
+    try { await axios.delete(`${API}/kitap-dersleri/soru/${soruId}`); toast({ title: "🗑️ Soru silindi" }); yenile(); }
+    catch(e) { toast({ title: "Hata", variant: "destructive" }); }
+  };
+
+  const soruEkle = async (parca) => {
+    if (!yeniSoruForm || !yeniSoruForm.soru) return;
+    try {
+      await axios.post(`${API}/kitap-dersleri/soru-ekle`, { yukleme_id: parca.yukleme_id, kitap_adi: parca.kitap_adi, sinif: parca.sinif, bolum: parca.bolum, ...yeniSoruForm });
+      toast({ title: "✅ Soru eklendi" }); setYeniSoruForm(null); yenile();
+    } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
+  };
+
+  const parcaEkle = async () => {
+    if (!yeniParca.baslik || !seciliKitap) return;
+    try {
+      await axios.post(`${API}/kitap-dersleri/parca-ekle`, { kitap_adi: seciliKitap.kitap_adi, sinif: seciliSinif, bolum: parcalar.length + 1, ...yeniParca });
+      toast({ title: "✅ Parça eklendi" });
+      setYeniParcaForm(false); setYeniParca({ baslik: "", ozet: "", metin_kesit: "", tema: "" });
+      yenile(); fetchIstatistik();
+    } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
   };
 
   return (
     <div className="space-y-5">
-      {/* İstatistik kartları */}
+      {/* İstatistik */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4 text-center">
-          <div className="text-2xl font-bold text-teal-700">{istatistik.toplamKitap}</div>
-          <div className="text-xs text-teal-600 mt-0.5">📚 Kitap</div>
-        </div>
-        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-center">
-          <div className="text-2xl font-bold text-blue-700">{istatistik.toplamParca}</div>
-          <div className="text-xs text-blue-600 mt-0.5">📄 Okuma Parçası</div>
-        </div>
-        <div className="bg-green-50 border border-green-200 rounded-2xl p-4 text-center">
-          <div className="text-2xl font-bold text-green-700">{istatistik.toplamSoru}</div>
-          <div className="text-xs text-green-600 mt-0.5">❓ Soru</div>
-        </div>
+        {[{ n: istatistik.toplamKitap, l: "📚 Kitap", bg: "bg-teal-50", border: "border-teal-200", txt: "text-teal-700", sub: "text-teal-600" },
+          { n: istatistik.toplamParca, l: "📄 Parça", bg: "bg-blue-50", border: "border-blue-200", txt: "text-blue-700", sub: "text-blue-600" },
+          { n: istatistik.toplamSoru, l: "❓ Soru", bg: "bg-green-50", border: "border-green-200", txt: "text-green-700", sub: "text-green-600" }
+        ].map(s => (
+          <div key={s.l} className={`${s.bg} border ${s.border} rounded-2xl p-4 text-center`}>
+            <div className={`text-2xl font-bold ${s.txt}`}>{s.n}</div>
+            <div className={`text-xs ${s.sub} mt-0.5`}>{s.l}</div>
+          </div>
+        ))}
       </div>
 
-      {/* Sınıf filtreleri */}
+      {/* Sınıf */}
       <div>
-        <div className="text-xs font-semibold text-gray-500 mb-2">SINIF FİLTRESİ</div>
+        <div className="text-xs font-semibold text-gray-500 mb-2">SINIF</div>
         <div className="flex gap-2 flex-wrap">
-          <button onClick={() => { setSeciliSinif(null); setSeciliKitap(null); setKitaplar([]); setParcalar([]); }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${!seciliSinif ? 'bg-teal-500 text-white border-teal-500' : 'bg-white text-gray-600 border-gray-200'}`}>
-            Tümü
-          </button>
           {siniflar.map(s => (
             <button key={s} onClick={() => sinifSec(s)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${seciliSinif === s ? 'bg-teal-500 text-white border-teal-500' : 'bg-white text-gray-600 border-gray-200'}`}>
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${seciliSinif === s ? "bg-teal-500 text-white border-teal-500" : "bg-white text-gray-600 border-gray-200"}`}>
               {s}. Sınıf
             </button>
           ))}
+          {siniflar.length === 0 && <span className="text-sm text-gray-400">Henüz kitap yüklenmemiş</span>}
         </div>
       </div>
 
-      {/* Kitap listesi */}
+      {/* Kitaplar */}
       {seciliSinif && kitaplar.length > 0 && (
         <div>
-          <div className="text-xs font-semibold text-gray-500 mb-2">KİTAPLAR</div>
+          <div className="text-xs font-semibold text-gray-500 mb-2">KİTAP</div>
           <div className="flex gap-2 flex-wrap">
             {kitaplar.map(k => (
               <button key={k.kitap_adi} onClick={() => kitapSec(k)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${seciliKitap?.kitap_adi === k.kitap_adi ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-600 border-gray-200'}`}>
-                📗 {k.kitap_adi} <span className="opacity-60">({k.parca_sayisi} parça)</span>
+                className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${seciliKitap?.kitap_adi === k.kitap_adi ? "bg-blue-500 text-white border-blue-500" : "bg-white text-gray-600 border-gray-200"}`}>
+                📗 {k.kitap_adi} <span className="opacity-60">({k.parca_sayisi})</span>
               </button>
             ))}
           </div>
         </div>
       )}
 
-      {/* Parça listesi */}
+      {/* Parçalar */}
       {yukleniyor ? (
         <div className="text-center py-8"><div className="w-6 h-6 border-4 border-teal-400 border-t-transparent rounded-full animate-spin mx-auto" /></div>
       ) : seciliKitap ? (
-        <div className="space-y-2">
-          <div className="text-xs font-semibold text-gray-500 mb-2">
-            📄 {seciliKitap.kitap_adi} — {parcalar.length} Parça
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-semibold text-gray-700">📄 {seciliKitap.kitap_adi} — {parcalar.length} Parça</div>
+            <button onClick={() => setYeniParcaForm(!yeniParcaForm)} className="text-xs bg-teal-500 text-white px-3 py-1.5 rounded-xl hover:bg-teal-600">+ Parça Ekle</button>
           </div>
-          {parcalar.length === 0 ? (
-            <div className="text-center py-8 text-gray-400 text-sm">Bu kitap için parça bulunamadı</div>
-          ) : parcalar.map((p, i) => (
-            <div key={p.id || i} className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-              <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50"
-                onClick={() => setAcikParca(acikParca === i ? null : i)}>
+
+          {/* Yeni parça formu */}
+          {yeniParcaForm && (
+            <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4 space-y-3">
+              <div className="text-sm font-semibold text-teal-800">➕ Yeni Parça</div>
+              <input className="w-full border rounded-xl px-3 py-2 text-sm bg-white" placeholder="Başlık *" value={yeniParca.baslik} onChange={e => setYeniParca({...yeniParca, baslik: e.target.value})} />
+              <input className="w-full border rounded-xl px-3 py-2 text-sm bg-white" placeholder="Tema (MEB)" value={yeniParca.tema} onChange={e => setYeniParca({...yeniParca, tema: e.target.value})} />
+              <textarea className="w-full border rounded-xl px-3 py-2 text-sm bg-white" rows={3} placeholder="Özet (2-3 cümle)" value={yeniParca.ozet} onChange={e => setYeniParca({...yeniParca, ozet: e.target.value})} />
+              <textarea className="w-full border rounded-xl px-3 py-2 text-sm bg-white" rows={5} placeholder="Metin kesiti (öğrencinin okuyacağı metin)" value={yeniParca.metin_kesit} onChange={e => setYeniParca({...yeniParca, metin_kesit: e.target.value})} />
+              <div className="flex gap-2">
+                <button onClick={parcaEkle} className="flex-1 bg-teal-500 text-white py-2 rounded-xl text-sm font-medium">✅ Ekle</button>
+                <button onClick={() => setYeniParcaForm(false)} className="flex-1 bg-gray-100 text-gray-600 py-2 rounded-xl text-sm">İptal</button>
+              </div>
+            </div>
+          )}
+
+          {parcalar.length === 0 && <div className="text-center py-8 text-gray-400 text-sm">Bu kitap için parça bulunamadı</div>}
+
+          {parcalar.map((p, i) => (
+            <div key={p.id || i} className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50" onClick={() => setAcikParca(acikParca === i ? null : i)}>
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-sm text-gray-900">Bölüm {p.bolum}: {p.baslik || "—"}</div>
-                  <div className="text-xs text-gray-500 mt-0.5 flex gap-2">
+                  <div className="text-xs text-gray-500 mt-0.5 flex gap-2 flex-wrap">
                     {p.tema && <span className="bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded">{p.tema}</span>}
                     <span className="bg-green-100 text-green-600 px-1.5 py-0.5 rounded">{p.sorular?.length || 0} soru</span>
-                    {p.kelime_sayisi > 0 && <span className="bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded">{p.kelime_sayisi} kelime</span>}
+                    {p.metin_kesit && <span className="bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded">{p.metin_kesit.split(" ").length} kelime</span>}
                   </div>
                 </div>
-                <span className="text-gray-400 text-sm ml-2">{acikParca === i ? '▲' : '▼'}</span>
+                <div className="flex gap-1 ml-2" onClick={e => e.stopPropagation()}>
+                  <button onClick={() => setDuzenlemeParca(duzenlemeParca?.id === p.id ? null : {...p})} className="text-xs bg-blue-50 text-blue-600 border border-blue-200 px-2 py-1 rounded-lg hover:bg-blue-100">✏️</button>
+                  <button onClick={() => parcaSil(p.id, p.baslik)} className="text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-1 rounded-lg hover:bg-red-100">🗑️</button>
+                  <span className="text-gray-400 text-sm px-1">{acikParca === i ? "▲" : "▼"}</span>
+                </div>
               </div>
 
+              {/* Düzenleme formu */}
+              {duzenlemeParca?.id === p.id && (
+                <div className="border-t border-blue-100 bg-blue-50 p-4 space-y-3">
+                  <div className="text-xs font-semibold text-blue-700">✏️ Düzenle</div>
+                  <input className="w-full border rounded-xl px-3 py-2 text-sm bg-white" placeholder="Başlık" value={duzenlemeParca.baslik || ""} onChange={e => setDuzenlemeParca({...duzenlemeParca, baslik: e.target.value})} />
+                  <input className="w-full border rounded-xl px-3 py-2 text-sm bg-white" placeholder="Tema" value={duzenlemeParca.tema || ""} onChange={e => setDuzenlemeParca({...duzenlemeParca, tema: e.target.value})} />
+                  <textarea className="w-full border rounded-xl px-3 py-2 text-sm bg-white" rows={3} placeholder="Özet" value={duzenlemeParca.ozet || ""} onChange={e => setDuzenlemeParca({...duzenlemeParca, ozet: e.target.value})} />
+                  <textarea className="w-full border rounded-xl px-3 py-2 text-sm bg-white" rows={6} placeholder="Metin kesiti" value={duzenlemeParca.metin_kesit || ""} onChange={e => setDuzenlemeParca({...duzenlemeParca, metin_kesit: e.target.value})} />
+                  <div className="flex gap-2">
+                    <button onClick={() => parcaKaydet(duzenlemeParca)} className="flex-1 bg-blue-500 text-white py-2 rounded-xl text-sm font-medium">💾 Kaydet</button>
+                    <button onClick={() => setDuzenlemeParca(null)} className="flex-1 bg-gray-100 text-gray-600 py-2 rounded-xl text-sm">İptal</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Detay */}
               {acikParca === i && (
-                <div className="border-t border-gray-100 p-4 space-y-3 bg-gray-50">
-                  {p.ozet && (
-                    <div>
-                      <div className="text-xs font-semibold text-gray-500 mb-1">📝 ÖZET</div>
-                      <p className="text-sm text-gray-700">{p.ozet}</p>
+                <div className="border-t border-gray-100 p-4 space-y-4 bg-gray-50">
+                  {p.ozet && <div><div className="text-xs font-semibold text-gray-500 mb-1">📝 ÖZET</div><p className="text-sm text-gray-700">{p.ozet}</p></div>}
+                  {p.metin_kesit && <div><div className="text-xs font-semibold text-gray-500 mb-1">📖 METİN</div><p className="text-xs text-gray-600 bg-white border rounded-xl p-3 leading-relaxed whitespace-pre-wrap">{p.metin_kesit}</p></div>}
+
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-xs font-semibold text-gray-500">❓ SORULAR ({p.sorular?.length || 0})</div>
+                      <button onClick={() => setYeniSoruForm(yeniSoruForm?.parcaId === p.id ? null : { parcaId: p.id, soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0, taksonomi: "bilgi" })}
+                        className="text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-1 rounded-lg hover:bg-green-100">+ Soru Ekle</button>
                     </div>
-                  )}
-                  {p.metin_kesit && (
-                    <div>
-                      <div className="text-xs font-semibold text-gray-500 mb-1">📖 METİN KESİTİ</div>
-                      <p className="text-xs text-gray-600 bg-white border rounded-xl p-3 leading-relaxed">{p.metin_kesit}</p>
-                    </div>
-                  )}
-                  {p.sorular?.length > 0 && (
-                    <div>
-                      <div className="text-xs font-semibold text-gray-500 mb-2">❓ SORULAR ({p.sorular.length})</div>
-                      <div className="space-y-2">
-                        {p.sorular.map((s, si) => (
-                          <div key={si} className="bg-white border border-gray-200 rounded-xl p-3">
-                            <div className="text-xs font-medium text-gray-800">{si+1}. {s.soru}</div>
-                            <div className="grid grid-cols-2 gap-1 mt-2">
-                              {(s.secenekler || []).map((opt, oi) => (
-                                <div key={oi} className={`text-[10px] px-2 py-1 rounded-lg ${oi === s.dogru_cevap ? 'bg-green-100 text-green-700 font-semibold' : 'bg-gray-100 text-gray-600'}`}>
-                                  {String.fromCharCode(65+oi)}) {opt}
-                                </div>
-                              ))}
-                            </div>
-                            {s.taksonomi && <div className="text-[10px] text-gray-400 mt-1">Bloom: {s.taksonomi}</div>}
+
+                    {yeniSoruForm?.parcaId === p.id && (
+                      <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-3 space-y-2">
+                        <input className="w-full border rounded-lg px-3 py-2 text-xs bg-white" placeholder="Soru metni *" value={yeniSoruForm.soru} onChange={e => setYeniSoruForm({...yeniSoruForm, soru: e.target.value})} />
+                        {[0,1,2,3].map(idx => (
+                          <div key={idx} className="flex gap-2 items-center">
+                            <span className="text-xs font-bold w-5">{String.fromCharCode(65+idx)})</span>
+                            <input className="flex-1 border rounded-lg px-2 py-1.5 text-xs bg-white" placeholder={`${String.fromCharCode(65+idx)} seçeneği`} value={yeniSoruForm.secenekler[idx] || ""} onChange={e => { const s=[...yeniSoruForm.secenekler]; s[idx]=e.target.value; setYeniSoruForm({...yeniSoruForm, secenekler:s}); }} />
+                            <input type="radio" checked={yeniSoruForm.dogru_cevap===idx} onChange={() => setYeniSoruForm({...yeniSoruForm, dogru_cevap:idx})} className="w-4 h-4 accent-green-500" />
                           </div>
                         ))}
+                        <select className="w-full border rounded-lg px-2 py-1.5 text-xs bg-white" value={yeniSoruForm.taksonomi} onChange={e => setYeniSoruForm({...yeniSoruForm, taksonomi:e.target.value})}>
+                          {Object.entries(taksLabel).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
+                        </select>
+                        <div className="flex gap-2">
+                          <button onClick={() => soruEkle(p)} className="flex-1 bg-green-500 text-white py-1.5 rounded-lg text-xs font-medium">✅ Ekle</button>
+                          <button onClick={() => setYeniSoruForm(null)} className="flex-1 bg-gray-100 text-gray-600 py-1.5 rounded-lg text-xs">İptal</button>
+                        </div>
                       </div>
+                    )}
+
+                    <div className="space-y-2">
+                      {(p.sorular || []).map((s, si) => (
+                        <div key={s.id || si} className="bg-white border border-gray-200 rounded-xl p-3">
+                          {duzenlemeSoru?.id === s.id ? (
+                            <div className="space-y-2">
+                              <textarea className="w-full border rounded-lg px-2 py-1.5 text-xs" rows={2} value={duzenlemeSoru.soru} onChange={e => setDuzenlemeSoru({...duzenlemeSoru, soru:e.target.value})} />
+                              {[0,1,2,3].map(idx => (
+                                <div key={idx} className="flex gap-2 items-center">
+                                  <span className="text-xs font-bold w-5">{String.fromCharCode(65+idx)})</span>
+                                  <input className="flex-1 border rounded-lg px-2 py-1 text-xs" value={duzenlemeSoru.secenekler[idx]||""} onChange={e => { const sec=[...duzenlemeSoru.secenekler]; sec[idx]=e.target.value; setDuzenlemeSoru({...duzenlemeSoru,secenekler:sec}); }} />
+                                  <input type="radio" checked={duzenlemeSoru.dogru_cevap===idx} onChange={() => setDuzenlemeSoru({...duzenlemeSoru,dogru_cevap:idx})} className="w-4 h-4 accent-blue-500" />
+                                </div>
+                              ))}
+                              <select className="w-full border rounded-lg px-2 py-1.5 text-xs" value={duzenlemeSoru.taksonomi} onChange={e => setDuzenlemeSoru({...duzenlemeSoru,taksonomi:e.target.value})}>
+                                {Object.entries(taksLabel).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
+                              </select>
+                              <div className="flex gap-2">
+                                <button onClick={() => soruKaydet(duzenlemeSoru)} className="flex-1 bg-blue-500 text-white py-1.5 rounded-lg text-xs">💾 Kaydet</button>
+                                <button onClick={() => setDuzenlemeSoru(null)} className="flex-1 bg-gray-100 text-gray-600 py-1.5 rounded-lg text-xs">İptal</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="text-xs font-medium text-gray-800 flex-1">{si+1}. {s.soru}</div>
+                                <div className="flex gap-1 shrink-0">
+                                  <button onClick={() => setDuzenlemeSoru({...s})} className="text-[10px] bg-blue-50 text-blue-600 border border-blue-200 px-1.5 py-0.5 rounded hover:bg-blue-100">✏️</button>
+                                  <button onClick={() => soruSil(s.id)} className="text-[10px] bg-red-50 text-red-600 border border-red-200 px-1.5 py-0.5 rounded hover:bg-red-100">🗑️</button>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-1 mt-2">
+                                {(s.secenekler||[]).map((opt,oi) => (
+                                  <div key={oi} className={`text-[10px] px-2 py-1 rounded-lg ${oi===s.dogru_cevap?"bg-green-100 text-green-700 font-semibold":"bg-gray-100 text-gray-600"}`}>
+                                    {String.fromCharCode(65+oi)}) {opt}
+                                  </div>
+                                ))}
+                              </div>
+                              {s.taksonomi && <div className="text-[10px] text-gray-400 mt-1">Bloom: {taksLabel[s.taksonomi]}</div>}
+                            </>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                  )}
+                  </div>
                 </div>
               )}
             </div>
@@ -10083,7 +10187,6 @@ function AdminKitapParcalari() {
     </div>
   );
 }
-
 // ── KİTAP DERSİ MODÜLÜ ───────────────────────────────────────
 function KitapDersiModul({ user, apiBase }) {
   const { toast } = useToast();
