@@ -9891,6 +9891,199 @@ function AiArkadasSekme({ apiBase, user }) {
   );
 }
 
+
+// ── ADMİN KİTAP PARÇALARI YÖNETİMİ ──────────────────────────
+function AdminKitapParcalari() {
+  const { toast } = useToast();
+  const [siniflar, setSiniflar] = useState([]);
+  const [seciliSinif, setSeciliSinif] = useState(null);
+  const [kitaplar, setKitaplar] = useState([]);
+  const [seciliKitap, setSeciliKitap] = useState(null);
+  const [parcalar, setParcalar] = useState([]);
+  const [acikParca, setAcikParca] = useState(null);
+  const [yukleniyor, setYukleniyor] = useState(false);
+  const [istatistik, setIstatistik] = useState({ toplamParca: 0, toplamSoru: 0, toplamKitap: 0 });
+
+  useEffect(() => {
+    fetchIstatistik();
+    fetchSiniflar();
+  }, []);
+
+  const fetchIstatistik = async () => {
+    try {
+      const [parcaR, soruR] = await Promise.all([
+        axios.get(`${API}/ai/okuma-parcalari`),
+        axios.get(`${API}/ai/sorular`),
+      ]);
+      const parcaData = Array.isArray(parcaR.data) ? parcaR.data : [];
+      const soruData = Array.isArray(soruR.data) ? soruR.data : [];
+      const kitapSet = new Set(parcaData.map(p => p.kitap_adi));
+      setIstatistik({ toplamParca: parcaData.length, toplamSoru: soruData.length, toplamKitap: kitapSet.size });
+    } catch(e) {}
+  };
+
+  const fetchSiniflar = async () => {
+    try {
+      const r = await axios.get(`${API}/kitap-dersleri/siniflar`);
+      setSiniflar(r.data || []);
+    } catch(e) {}
+  };
+
+  const sinifSec = async (s) => {
+    setSeciliSinif(s); setSeciliKitap(null); setParcalar([]); setYukleniyor(true);
+    try {
+      const r = await axios.get(`${API}/kitap-dersleri/kitaplar/${s}`);
+      setKitaplar(r.data || []);
+    } catch(e) {}
+    setYukleniyor(false);
+  };
+
+  const kitapSec = async (k) => {
+    setSeciliKitap(k); setYukleniyor(true);
+    try {
+      const r = await axios.get(`${API}/kitap-dersleri/parcalar/${seciliSinif}/${encodeURIComponent(k.kitap_adi)}`);
+      setParcalar(r.data || []);
+    } catch(e) {}
+    setYukleniyor(false);
+  };
+
+  const parcaSil = async (parca) => {
+    if (!window.confirm(`"${parca.baslik}" parçasını sil?`)) return;
+    try {
+      await axios.delete(`${API}/ai/bilgi-tabani/${parca.yukleme_id}`);
+      setParcalar(prev => prev.filter(p => p.id !== parca.id));
+      toast({ title: "✅ Parça silindi" });
+      fetchIstatistik();
+    } catch(e) {
+      toast({ title: "Silme hatası", variant: "destructive" });
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* İstatistik kartları */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4 text-center">
+          <div className="text-2xl font-bold text-teal-700">{istatistik.toplamKitap}</div>
+          <div className="text-xs text-teal-600 mt-0.5">📚 Kitap</div>
+        </div>
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-center">
+          <div className="text-2xl font-bold text-blue-700">{istatistik.toplamParca}</div>
+          <div className="text-xs text-blue-600 mt-0.5">📄 Okuma Parçası</div>
+        </div>
+        <div className="bg-green-50 border border-green-200 rounded-2xl p-4 text-center">
+          <div className="text-2xl font-bold text-green-700">{istatistik.toplamSoru}</div>
+          <div className="text-xs text-green-600 mt-0.5">❓ Soru</div>
+        </div>
+      </div>
+
+      {/* Sınıf filtreleri */}
+      <div>
+        <div className="text-xs font-semibold text-gray-500 mb-2">SINIF FİLTRESİ</div>
+        <div className="flex gap-2 flex-wrap">
+          <button onClick={() => { setSeciliSinif(null); setSeciliKitap(null); setKitaplar([]); setParcalar([]); }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${!seciliSinif ? 'bg-teal-500 text-white border-teal-500' : 'bg-white text-gray-600 border-gray-200'}`}>
+            Tümü
+          </button>
+          {siniflar.map(s => (
+            <button key={s} onClick={() => sinifSec(s)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${seciliSinif === s ? 'bg-teal-500 text-white border-teal-500' : 'bg-white text-gray-600 border-gray-200'}`}>
+              {s}. Sınıf
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Kitap listesi */}
+      {seciliSinif && kitaplar.length > 0 && (
+        <div>
+          <div className="text-xs font-semibold text-gray-500 mb-2">KİTAPLAR</div>
+          <div className="flex gap-2 flex-wrap">
+            {kitaplar.map(k => (
+              <button key={k.kitap_adi} onClick={() => kitapSec(k)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${seciliKitap?.kitap_adi === k.kitap_adi ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-600 border-gray-200'}`}>
+                📗 {k.kitap_adi} <span className="opacity-60">({k.parca_sayisi} parça)</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Parça listesi */}
+      {yukleniyor ? (
+        <div className="text-center py-8"><div className="w-6 h-6 border-4 border-teal-400 border-t-transparent rounded-full animate-spin mx-auto" /></div>
+      ) : seciliKitap ? (
+        <div className="space-y-2">
+          <div className="text-xs font-semibold text-gray-500 mb-2">
+            📄 {seciliKitap.kitap_adi} — {parcalar.length} Parça
+          </div>
+          {parcalar.length === 0 ? (
+            <div className="text-center py-8 text-gray-400 text-sm">Bu kitap için parça bulunamadı</div>
+          ) : parcalar.map((p, i) => (
+            <div key={p.id || i} className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+              <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50"
+                onClick={() => setAcikParca(acikParca === i ? null : i)}>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-sm text-gray-900">Bölüm {p.bolum}: {p.baslik || "—"}</div>
+                  <div className="text-xs text-gray-500 mt-0.5 flex gap-2">
+                    {p.tema && <span className="bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded">{p.tema}</span>}
+                    <span className="bg-green-100 text-green-600 px-1.5 py-0.5 rounded">{p.sorular?.length || 0} soru</span>
+                    {p.kelime_sayisi > 0 && <span className="bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded">{p.kelime_sayisi} kelime</span>}
+                  </div>
+                </div>
+                <span className="text-gray-400 text-sm ml-2">{acikParca === i ? '▲' : '▼'}</span>
+              </div>
+
+              {acikParca === i && (
+                <div className="border-t border-gray-100 p-4 space-y-3 bg-gray-50">
+                  {p.ozet && (
+                    <div>
+                      <div className="text-xs font-semibold text-gray-500 mb-1">📝 ÖZET</div>
+                      <p className="text-sm text-gray-700">{p.ozet}</p>
+                    </div>
+                  )}
+                  {p.metin_kesit && (
+                    <div>
+                      <div className="text-xs font-semibold text-gray-500 mb-1">📖 METİN KESİTİ</div>
+                      <p className="text-xs text-gray-600 bg-white border rounded-xl p-3 leading-relaxed">{p.metin_kesit}</p>
+                    </div>
+                  )}
+                  {p.sorular?.length > 0 && (
+                    <div>
+                      <div className="text-xs font-semibold text-gray-500 mb-2">❓ SORULAR ({p.sorular.length})</div>
+                      <div className="space-y-2">
+                        {p.sorular.map((s, si) => (
+                          <div key={si} className="bg-white border border-gray-200 rounded-xl p-3">
+                            <div className="text-xs font-medium text-gray-800">{si+1}. {s.soru}</div>
+                            <div className="grid grid-cols-2 gap-1 mt-2">
+                              {(s.secenekler || []).map((opt, oi) => (
+                                <div key={oi} className={`text-[10px] px-2 py-1 rounded-lg ${oi === s.dogru_cevap ? 'bg-green-100 text-green-700 font-semibold' : 'bg-gray-100 text-gray-600'}`}>
+                                  {String.fromCharCode(65+oi)}) {opt}
+                                </div>
+                              ))}
+                            </div>
+                            {s.taksonomi && <div className="text-[10px] text-gray-400 mt-1">Bloom: {s.taksonomi}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : !seciliSinif ? (
+        <div className="text-center py-10 text-gray-400">
+          <div className="text-4xl mb-2">📚</div>
+          <p className="text-sm">Görüntülemek için sınıf seçin</p>
+          {siniflar.length === 0 && <p className="text-xs mt-1">Henüz kitap yüklenmemiş</p>}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 // ── KİTAP DERSİ MODÜLÜ ───────────────────────────────────────
 function KitapDersiModul({ user, apiBase }) {
   const { toast } = useToast();
@@ -11122,6 +11315,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
         <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'gorevler' ? 'bg-green-500 text-white shadow' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`} onClick={() => setGelisimSekme('gorevler')}>📌 Görevler</button>
         <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'kurslar' ? 'bg-indigo-500 text-white shadow' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`} onClick={() => { if (onTabChange) onTabChange('courses'); }}>📖 Kurslar</button>
         <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'ai-bilgi' ? 'bg-cyan-500 text-white shadow' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`} onClick={() => setGelisimSekme('ai-bilgi')}>🧠 AI Eğit</button>
+        <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'kitap-parcalari' ? 'bg-teal-500 text-white shadow' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`} onClick={() => setGelisimSekme('kitap-parcalari')}>📖 Kitap Parçaları</button>
         {user.role === 'admin' && (
           <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'puan-ayar' ? 'bg-purple-500 text-white shadow' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`} onClick={() => setGelisimSekme('puan-ayar')}>⚙️ Egzersiz Puanları</button>
         )}
@@ -11426,6 +11620,10 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
           </div>)}
         </div>);
       })()}
+
+      {gelisimSekme === 'kitap-parcalari' && (
+        <AdminKitapParcalari />
+      )}
 
       {gelisimSekme === 'gorevler' && (
         <GorevYonetimi user={user} students={students} teachers={teachers} />
