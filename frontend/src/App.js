@@ -11428,150 +11428,116 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
       {/* Görevler alt sekmesi */}
 
       {/* KİTAP OKUYUCU MODALI */}
-      {kitapOkuyucu && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center pt-4 pb-4 px-2 overflow-y-auto">
-          <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl">
-            {/* Header */}
-            <div className="sticky top-0 bg-white border-b rounded-t-2xl px-6 py-4 flex items-center justify-between z-10">
-              <div>
-                <div className="font-bold text-lg text-gray-900">📗 {kitapOkuyucu.yukleme?.kitap_adi}</div>
-                <div className="text-xs text-gray-500 flex gap-3 mt-0.5">
-                  <span>{kitapOkuyucu.yukleme?.sinif}. Sınıf</span>
-                  {kitapOkuyucu.yukleme?.ders_adi && <span>• {kitapOkuyucu.yukleme.ders_adi}</span>}
-                  {kitapOkuyucu.yukleme?.yazar && <span>• {kitapOkuyucu.yukleme.yazar}</span>}
-                  {kitapOkuyucu.yukleme?.basim_yili && <span>• {kitapOkuyucu.yukleme.basim_yili}</span>}
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex gap-3 text-center text-xs">
-                  <div className="bg-blue-50 rounded-xl px-3 py-2"><div className="font-bold text-blue-700 text-lg">{kitapOkuyucu.toplam_parca}</div><div className="text-blue-600">Parça</div></div>
-                  <div className="bg-green-50 rounded-xl px-3 py-2"><div className="font-bold text-green-700 text-lg">{kitapOkuyucu.toplam_soru}</div><div className="text-green-600">Soru</div></div>
-                  <div className="bg-orange-50 rounded-xl px-3 py-2"><div className="font-bold text-orange-700 text-lg">{kitapOkuyucu.toplam_kelime}</div><div className="text-orange-600">Kelime</div></div>
-                </div>
-                <button onClick={() => setKitapOkuyucu(null)} className="w-9 h-9 bg-gray-100 hover:bg-red-100 rounded-xl flex items-center justify-center text-gray-500 hover:text-red-600 transition-all">✕</button>
-              </div>
-            </div>
+      {kitapOkuyucu && (() => {
+        const mod = kitapOkuyucu.mod || "parca";
+        const bolumler = kitapOkuyucu.bolumler || [];
+        const [aktifBolum, setAktifBolum] = React.useState(0);
+        const [aramaMetni, setAramaMetni] = React.useState("");
 
-            {/* İçerik */}
-            <div className="p-6 space-y-6">
-              {/* Kelimeler */}
-              {kitapOkuyucu.kelimeler?.length > 0 && (
-                <div>
-                  <div className="font-semibold text-gray-800 mb-3">📚 Kelime Listesi ({kitapOkuyucu.kelimeler.length} kelime)</div>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                    {kitapOkuyucu.kelimeler.map((k, i) => (
-                      <div key={i} className="bg-orange-50 border border-orange-100 rounded-xl p-3">
-                        <div className="font-bold text-sm text-orange-800">{k.kelime}</div>
-                        <div className="text-xs text-gray-600 mt-0.5">{k.anlam}</div>
-                        {k.ornek_cumle && <div className="text-[10px] text-gray-400 mt-1 italic">"{k.ornek_cumle}"</div>}
-                        <div className="flex items-center gap-1 mt-1">
-                          {[1,2,3,4,5].map(n => <div key={n} className={`w-2 h-2 rounded-full ${n <= Math.ceil(k.zorluk/2) ? 'bg-orange-400' : 'bg-gray-200'}`} />)}
+        const filtreliBolumler = aramaMetni.trim()
+          ? bolumler.filter(b => b.baslik?.toLowerCase().includes(aramaMetni.toLowerCase()) || b.metin?.toLowerCase().includes(aramaMetni.toLowerCase()))
+          : bolumler;
+
+        return (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-stretch justify-center">
+            <div className="bg-white w-full max-w-5xl flex flex-col shadow-2xl">
+
+              {/* Header */}
+              <div className="bg-gray-900 text-white px-5 py-3 flex items-center gap-3 shrink-0">
+                <span className="text-xl">{kitapOkuyucu.ext === ".pdf" ? "📕" : "📘"}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-sm truncate">{kitapOkuyucu.yukleme?.kitap_adi || kitapOkuyucu.dosya_adi}</div>
+                  <div className="text-xs text-gray-400 flex gap-3">
+                    {kitapOkuyucu.yukleme?.sinif && <span>{kitapOkuyucu.yukleme.sinif}. Sınıf</span>}
+                    {kitapOkuyucu.yukleme?.ders_adi && <span>• {kitapOkuyucu.yukleme.ders_adi}</span>}
+                    {kitapOkuyucu.yukleme?.yazar && <span>• {kitapOkuyucu.yukleme.yazar}</span>}
+                    <span>• {kitapOkuyucu.toplam_bolum} bölüm</span>
+                    <span>• {kitapOkuyucu.toplam_kelime?.toLocaleString()} kelime</span>
+                  </div>
+                </div>
+                <button onClick={() => setKitapOkuyucu(null)} className="w-8 h-8 bg-white/10 hover:bg-red-500 rounded-lg flex items-center justify-center transition-all text-sm">✕</button>
+              </div>
+
+              {/* Ana layout — sidebar + içerik */}
+              <div className="flex flex-1 overflow-hidden">
+
+                {/* Sol sidebar — bölüm listesi */}
+                <div className="w-56 bg-gray-50 border-r flex flex-col shrink-0">
+                  <div className="p-2 border-b">
+                    <input
+                      value={aramaMetni}
+                      onChange={e => setAramaMetni(e.target.value)}
+                      placeholder="🔍 Bölüm ara..."
+                      className="w-full text-xs border rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:border-teal-400"
+                    />
+                  </div>
+                  <div className="overflow-y-auto flex-1 py-1">
+                    {filtreliBolumler.map((b, i) => {
+                      const gercekIdx = bolumler.indexOf(b);
+                      return (
+                        <button key={i} onClick={() => { setAktifBolum(gercekIdx); setAramaMetni(""); }}
+                          className={`w-full text-left px-3 py-2 text-xs transition-all border-l-2 ${aktifBolum === gercekIdx ? "bg-teal-50 border-teal-500 text-teal-800 font-medium" : "border-transparent text-gray-600 hover:bg-gray-100"}`}>
+                          <div className="truncate">{b.baslik || `Bölüm ${gercekIdx+1}`}</div>
+                          {b.sayfa && <div className="text-[10px] text-gray-400">Sayfa {b.sayfa}</div>}
+                        </button>
+                      );
+                    })}
+                    {filtreliBolumler.length === 0 && <div className="text-center py-6 text-xs text-gray-400">Sonuç yok</div>}
+                  </div>
+                  <div className="p-2 border-t text-[10px] text-gray-400 text-center">
+                    {bolumler.length} bölüm
+                  </div>
+                </div>
+
+                {/* Sağ — metin içeriği */}
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  {bolumler.length > 0 ? (
+                    <>
+                      {/* Bölüm başlığı + navigasyon */}
+                      <div className="px-6 py-3 border-b bg-white flex items-center justify-between shrink-0">
+                        <div>
+                          <div className="font-bold text-gray-900">{bolumler[aktifBolum]?.baslik || `Bölüm ${aktifBolum+1}`}</div>
+                          <div className="text-xs text-gray-400">{bolumler[aktifBolum]?.metin?.split(" ").length || 0} kelime • {bolumler[aktifBolum]?.sayfa ? `Sayfa ${bolumler[aktifBolum].sayfa}` : `${aktifBolum+1}/${bolumler.length}`}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => setAktifBolum(Math.max(0, aktifBolum-1))} disabled={aktifBolum === 0}
+                            className="w-8 h-8 rounded-lg border flex items-center justify-center text-sm disabled:opacity-30 hover:bg-gray-100">←</button>
+                          <span className="text-xs text-gray-500">{aktifBolum+1} / {bolumler.length}</span>
+                          <button onClick={() => setAktifBolum(Math.min(bolumler.length-1, aktifBolum+1))} disabled={aktifBolum === bolumler.length-1}
+                            className="w-8 h-8 rounded-lg border flex items-center justify-center text-sm disabled:opacity-30 hover:bg-gray-100">→</button>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
 
-              {/* Parçalar */}
-              {kitapOkuyucu.parcalar?.length > 0 ? (
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="font-semibold text-gray-800">📖 Okuma Parçaları ve Sorular</div>
-                    <button onClick={async () => {
-                      let eklenen = 0, atlailan = 0;
-                      for (const p of kitapOkuyucu.parcalar) {
-                        try { await axios.post(`${API}/kitap-dersleri/havuza-ekle/${p.id}`); eklenen++; }
-                        catch(e) { if (e.response?.status === 409) atlailan++; }
-                      }
-                      toast({ title: `✅ ${eklenen} parça eklendi${atlailan > 0 ? `, ${atlailan} zaten vardı` : ''}` });
-                    }} className="text-xs bg-teal-500 text-white px-3 py-1.5 rounded-xl hover:bg-teal-600 transition-all font-medium">
-                      📥 Tümünü Havuza Ekle
-                    </button>
-                  </div>
-                  <div className="space-y-4">
-                    {kitapOkuyucu.parcalar.map((p, i) => (
-                      <div key={i} className="border border-gray-200 rounded-2xl overflow-hidden">
-                        {/* Parça başlığı */}
-                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b border-blue-100">
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <div className="font-bold text-sm text-blue-900">Bölüm {p.bolum}: {p.baslik}</div>
-                              <div className="flex gap-2 mt-1">
-                                {p.tema && <span className="text-[10px] bg-blue-200 text-blue-700 px-2 py-0.5 rounded-full">{p.tema}</span>}
-                                {p.sorular?.length > 0 && <span className="text-[10px] bg-green-200 text-green-700 px-2 py-0.5 rounded-full">{p.sorular.length} soru</span>}
-                              </div>
-                            </div>
-                            <button onClick={async () => {
-                              try {
-                                await axios.post(`${API}/kitap-dersleri/havuza-ekle/${p.id}`);
-                                toast({ title: "✅ İçerik havuzuna eklendi!" });
-                              } catch(e) {
-                                toast({ title: e.response?.data?.detail || "Hata", variant: e.response?.status === 409 ? "default" : "destructive" });
-                              }
-                            }} className="text-[10px] bg-teal-500 text-white px-2.5 py-1.5 rounded-lg hover:bg-teal-600 transition-all shrink-0 font-medium">
-                              📥 Havuza Ekle
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="p-4 space-y-4">
-                          {/* Özet */}
-                          {p.ozet && (
-                            <div className="bg-yellow-50 border border-yellow-100 rounded-xl p-3">
-                              <div className="text-[10px] font-bold text-yellow-700 mb-1">📝 ÖZET</div>
-                              <p className="text-sm text-gray-700 leading-relaxed">{p.ozet}</p>
-                            </div>
-                          )}
-
-                          {/* Tam metin */}
-                          {p.metin_kesit && (
-                            <div>
-                              <div className="text-[10px] font-bold text-gray-500 mb-2">📖 METİN KESİTİ</div>
-                              <div className="bg-white border border-gray-200 rounded-xl p-4 text-sm text-gray-800 leading-loose whitespace-pre-wrap font-serif">
-                                {p.metin_kesit}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Sorular */}
-                          {p.sorular?.length > 0 && (
-                            <div>
-                              <div className="text-[10px] font-bold text-gray-500 mb-2">❓ SORULAR</div>
-                              <div className="space-y-3">
-                                {p.sorular.map((s, si) => (
-                                  <div key={si} className="bg-gray-50 rounded-xl p-3 border border-gray-200">
-                                    <div className="text-sm font-medium text-gray-800 mb-2">{si+1}. {s.soru}</div>
-                                    <div className="grid grid-cols-2 gap-1.5">
-                                      {(s.secenekler||[]).map((opt, oi) => (
-                                        <div key={oi} className={`text-xs px-3 py-2 rounded-lg border ${oi===s.dogru_cevap ? 'bg-green-100 border-green-300 text-green-800 font-semibold' : 'bg-white border-gray-200 text-gray-600'}`}>
-                                          <span className="font-bold mr-1">{String.fromCharCode(65+oi)})</span>{opt}
-                                          {oi===s.dogru_cevap && <span className="ml-1">✓</span>}
-                                        </div>
-                                      ))}
-                                    </div>
-                                    {s.taksonomi && <div className="text-[10px] text-gray-400 mt-1.5">Bloom: {{"bilgi":"Bilgi","kavrama":"Kavrama","uygulama":"Uygulama","analiz":"Analiz","sentez":"Sentez","degerlendirme":"Yaratma"}[s.taksonomi]}</div>}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
+                      {/* Metin */}
+                      <div className="flex-1 overflow-y-auto p-6 md:p-10">
+                        <div className="max-w-2xl mx-auto">
+                          <p className="text-gray-800 leading-loose text-base font-serif whitespace-pre-wrap">
+                            {bolumler[aktifBolum]?.metin || "Bu bölümde içerik bulunamadı."}
+                          </p>
                         </div>
                       </div>
-                    ))}
-                  </div>
+
+                      {/* Alt navigasyon */}
+                      <div className="border-t px-6 py-2 flex justify-between items-center shrink-0 bg-white">
+                        <button onClick={() => setAktifBolum(Math.max(0, aktifBolum-1))} disabled={aktifBolum === 0}
+                          className="text-xs text-teal-600 disabled:opacity-30 hover:underline">← Önceki</button>
+                        <div className="text-xs text-gray-400">{aktifBolum+1} / {bolumler.length}</div>
+                        <button onClick={() => setAktifBolum(Math.min(bolumler.length-1, aktifBolum+1))} disabled={aktifBolum === bolumler.length-1}
+                          className="text-xs text-teal-600 disabled:opacity-30 hover:underline">Sonraki →</button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center text-gray-400">
+                      <div className="text-center"><div className="text-4xl mb-3">📭</div><p>İçerik bulunamadı</p></div>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="text-center py-12 text-gray-400">
-                  <div className="text-4xl mb-3">📭</div>
-                  <p className="font-medium">Bu kitap için henüz parça oluşturulmamış</p>
-                  <p className="text-sm mt-1">AI Eğit sekmesinden işleme başlatın</p>
-                </div>
-              )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
+
 
       {/* AI Bilgi Tabanı — PDF/Word yükleme */}
       {gelisimSekme === 'ai-bilgi' && (() => {
@@ -11866,12 +11832,31 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                 <div className="flex gap-1.5 mt-2 pt-2 border-t border-gray-100 flex-wrap">
                   {y.durum === 'tamamlandi' && <button onClick={() => sonucGoruntule(y.id)} className="text-[10px] bg-cyan-50 text-cyan-700 border border-cyan-200 px-2.5 py-1 rounded-lg hover:bg-cyan-100 transition-all">📊 Sonuçlar</button>}
                   {y.durum === 'tamamlandi' && (
-                    <button onClick={async () => {
-                      try {
-                        const r = await axios.get(`${API}/ai/bilgi-tabani/tam-metin/${y.id}`);
-                        setKitapOkuyucu(r.data);
-                      } catch(e) { toast({ title: e.response?.data?.detail || "Hata", variant: "destructive" }); }
-                    }} className="text-[10px] bg-teal-50 text-teal-700 border border-teal-200 px-2.5 py-1 rounded-lg hover:bg-teal-100 transition-all">📖 Kitabı Aç</button>
+                    y.yandex_url ? (
+                      <button onClick={async () => {
+                        toast({ title: "📖 Kitap yükleniyor..." });
+                        try {
+                          const r = await axios.get(`${API}/ai/bilgi-tabani/kitabi-ac/${y.id}`);
+                          setKitapOkuyucu({ ...r.data, yukleme: y });
+                        } catch(e) { toast({ title: e.response?.data?.detail || "Hata", variant: "destructive" }); }
+                      }} className="text-[10px] bg-teal-50 text-teal-700 border border-teal-200 px-2.5 py-1 rounded-lg hover:bg-teal-100 transition-all">📖 Kitabı Aç</button>
+                    ) : (
+                      <label className="text-[10px] bg-teal-50 text-teal-700 border border-teal-200 px-2.5 py-1 rounded-lg hover:bg-teal-100 transition-all cursor-pointer" title="Yandex kaydı yok — dosyayı tekrar seç">
+                        📖 Kitabı Aç
+                        <input type="file" accept=".pdf,.docx,.doc,.txt" className="hidden" onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          toast({ title: "📖 Dosya okunuyor..." });
+                          try {
+                            const fd = new FormData();
+                            fd.append("dosya", file);
+                            const r = await axios.post(`${API}/ai/bilgi-tabani/dosya-onizle`, fd, { headers: { "Content-Type": "multipart/form-data" } });
+                            setKitapOkuyucu({ ...r.data, yukleme: y, mod: "dosya" });
+                          } catch(e) { toast({ title: e.response?.data?.detail || "Dosya okunamadı", variant: "destructive" }); }
+                          e.target.value = "";
+                        }} />
+                      </label>
+                    )
                   )}
                   {y.durum === 'yuklendi' && <button onClick={async () => { try { toast({ title: "🧠 AI işleme başlatılıyor..." }); await axios.post(`${API}/ai/bilgi-tabani/isle/${y.id}`); toast({ title: "✅ İşleme tamamlandı!" }); const r2 = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setAiYuklemeler(Array.isArray(r2.data)?r2.data:[]); } catch(e) { toast({ title: "İşleme hatası", variant: "destructive" }); } }} className="text-[10px] bg-orange-50 text-orange-700 border border-orange-200 px-2.5 py-1 rounded-lg hover:bg-orange-100 transition-all">🧠 AI ile İşle</button>}
                   {!y.onayli && y.durum !== 'hata' && <button onClick={async () => { try { await axios.put(`${API}/ai/bilgi-tabani/onayla/${y.id}`); toast({ title: "✅ Onaylandı!" }); const r = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setAiYuklemeler(Array.isArray(r.data)?r.data:[]); } catch(e) {} }} className="text-[10px] bg-green-50 text-green-700 border border-green-200 px-2.5 py-1 rounded-lg hover:bg-green-100 transition-all">✅ Onayla</button>}
