@@ -10624,6 +10624,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
   const [aiIslemDurum, setAiIslemDurum] = useState("");
   const [aiSonuc, setAiSonuc] = useState(null);
   const [aiSonucSekme, setAiSonucSekme] = useState("kelimeler");
+  const [kitapOkuyucu, setKitapOkuyucu] = useState(null); // tam metin görüntüleyici
   const [adminForm, setAdminForm] = useState({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [], makale_link: "", makale_dosya_turu: "link", kitap_yazar: "", kitap_isbn: "", kitap_yayinevi: "", kitap_sayfa: "", kitap_yas_grubu: "", kitap_link: "", kitap_kapak: "", dosya_b64: "", dosya_adi: "", dosya_turu: "", okuma_metni: "", okuma_seviye: "orta", okuma_sure: 5, neden_bu_icerik: "" });
   const [kitapYukleniyor, setKitapYukleniyor] = useState(false);
   const [yeniSoru, setYeniSoru] = useState({ soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0, taksonomi: "kavrama" });
@@ -11425,6 +11426,127 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
       </div>
 
       {/* Görevler alt sekmesi */}
+
+      {/* KİTAP OKUYUCU MODALI */}
+      {kitapOkuyucu && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center pt-4 pb-4 px-2 overflow-y-auto">
+          <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl">
+            {/* Header */}
+            <div className="sticky top-0 bg-white border-b rounded-t-2xl px-6 py-4 flex items-center justify-between z-10">
+              <div>
+                <div className="font-bold text-lg text-gray-900">📗 {kitapOkuyucu.yukleme?.kitap_adi}</div>
+                <div className="text-xs text-gray-500 flex gap-3 mt-0.5">
+                  <span>{kitapOkuyucu.yukleme?.sinif}. Sınıf</span>
+                  {kitapOkuyucu.yukleme?.ders_adi && <span>• {kitapOkuyucu.yukleme.ders_adi}</span>}
+                  {kitapOkuyucu.yukleme?.yazar && <span>• {kitapOkuyucu.yukleme.yazar}</span>}
+                  {kitapOkuyucu.yukleme?.basim_yili && <span>• {kitapOkuyucu.yukleme.basim_yili}</span>}
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex gap-3 text-center text-xs">
+                  <div className="bg-blue-50 rounded-xl px-3 py-2"><div className="font-bold text-blue-700 text-lg">{kitapOkuyucu.toplam_parca}</div><div className="text-blue-600">Parça</div></div>
+                  <div className="bg-green-50 rounded-xl px-3 py-2"><div className="font-bold text-green-700 text-lg">{kitapOkuyucu.toplam_soru}</div><div className="text-green-600">Soru</div></div>
+                  <div className="bg-orange-50 rounded-xl px-3 py-2"><div className="font-bold text-orange-700 text-lg">{kitapOkuyucu.toplam_kelime}</div><div className="text-orange-600">Kelime</div></div>
+                </div>
+                <button onClick={() => setKitapOkuyucu(null)} className="w-9 h-9 bg-gray-100 hover:bg-red-100 rounded-xl flex items-center justify-center text-gray-500 hover:text-red-600 transition-all">✕</button>
+              </div>
+            </div>
+
+            {/* İçerik */}
+            <div className="p-6 space-y-6">
+              {/* Kelimeler */}
+              {kitapOkuyucu.kelimeler?.length > 0 && (
+                <div>
+                  <div className="font-semibold text-gray-800 mb-3">📚 Kelime Listesi ({kitapOkuyucu.kelimeler.length} kelime)</div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    {kitapOkuyucu.kelimeler.map((k, i) => (
+                      <div key={i} className="bg-orange-50 border border-orange-100 rounded-xl p-3">
+                        <div className="font-bold text-sm text-orange-800">{k.kelime}</div>
+                        <div className="text-xs text-gray-600 mt-0.5">{k.anlam}</div>
+                        {k.ornek_cumle && <div className="text-[10px] text-gray-400 mt-1 italic">"{k.ornek_cumle}"</div>}
+                        <div className="flex items-center gap-1 mt-1">
+                          {[1,2,3,4,5].map(n => <div key={n} className={`w-2 h-2 rounded-full ${n <= Math.ceil(k.zorluk/2) ? 'bg-orange-400' : 'bg-gray-200'}`} />)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Parçalar */}
+              {kitapOkuyucu.parcalar?.length > 0 ? (
+                <div>
+                  <div className="font-semibold text-gray-800 mb-3">📖 Okuma Parçaları ve Sorular</div>
+                  <div className="space-y-4">
+                    {kitapOkuyucu.parcalar.map((p, i) => (
+                      <div key={i} className="border border-gray-200 rounded-2xl overflow-hidden">
+                        {/* Parça başlığı */}
+                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b border-blue-100">
+                          <div className="font-bold text-sm text-blue-900">Bölüm {p.bolum}: {p.baslik}</div>
+                          <div className="flex gap-2 mt-1">
+                            {p.tema && <span className="text-[10px] bg-blue-200 text-blue-700 px-2 py-0.5 rounded-full">{p.tema}</span>}
+                            {p.sorular?.length > 0 && <span className="text-[10px] bg-green-200 text-green-700 px-2 py-0.5 rounded-full">{p.sorular.length} soru</span>}
+                          </div>
+                        </div>
+
+                        <div className="p-4 space-y-4">
+                          {/* Özet */}
+                          {p.ozet && (
+                            <div className="bg-yellow-50 border border-yellow-100 rounded-xl p-3">
+                              <div className="text-[10px] font-bold text-yellow-700 mb-1">📝 ÖZET</div>
+                              <p className="text-sm text-gray-700 leading-relaxed">{p.ozet}</p>
+                            </div>
+                          )}
+
+                          {/* Tam metin */}
+                          {p.metin_kesit && (
+                            <div>
+                              <div className="text-[10px] font-bold text-gray-500 mb-2">📖 METİN KESİTİ</div>
+                              <div className="bg-white border border-gray-200 rounded-xl p-4 text-sm text-gray-800 leading-loose whitespace-pre-wrap font-serif">
+                                {p.metin_kesit}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Sorular */}
+                          {p.sorular?.length > 0 && (
+                            <div>
+                              <div className="text-[10px] font-bold text-gray-500 mb-2">❓ SORULAR</div>
+                              <div className="space-y-3">
+                                {p.sorular.map((s, si) => (
+                                  <div key={si} className="bg-gray-50 rounded-xl p-3 border border-gray-200">
+                                    <div className="text-sm font-medium text-gray-800 mb-2">{si+1}. {s.soru}</div>
+                                    <div className="grid grid-cols-2 gap-1.5">
+                                      {(s.secenekler||[]).map((opt, oi) => (
+                                        <div key={oi} className={`text-xs px-3 py-2 rounded-lg border ${oi===s.dogru_cevap ? 'bg-green-100 border-green-300 text-green-800 font-semibold' : 'bg-white border-gray-200 text-gray-600'}`}>
+                                          <span className="font-bold mr-1">{String.fromCharCode(65+oi)})</span>{opt}
+                                          {oi===s.dogru_cevap && <span className="ml-1">✓</span>}
+                                        </div>
+                                      ))}
+                                    </div>
+                                    {s.taksonomi && <div className="text-[10px] text-gray-400 mt-1.5">Bloom: {{"bilgi":"Bilgi","kavrama":"Kavrama","uygulama":"Uygulama","analiz":"Analiz","sentez":"Sentez","degerlendirme":"Yaratma"}[s.taksonomi]}</div>}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-12 text-gray-400">
+                  <div className="text-4xl mb-3">📭</div>
+                  <p className="font-medium">Bu kitap için henüz parça oluşturulmamış</p>
+                  <p className="text-sm mt-1">AI Eğit sekmesinden işleme başlatın</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* AI Bilgi Tabanı — PDF/Word yükleme */}
       {gelisimSekme === 'ai-bilgi' && (() => {
 
@@ -11717,6 +11839,14 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                 {/* Alt butonlar */}
                 <div className="flex gap-1.5 mt-2 pt-2 border-t border-gray-100 flex-wrap">
                   {y.durum === 'tamamlandi' && <button onClick={() => sonucGoruntule(y.id)} className="text-[10px] bg-cyan-50 text-cyan-700 border border-cyan-200 px-2.5 py-1 rounded-lg hover:bg-cyan-100 transition-all">📊 Sonuçlar</button>}
+                  {y.durum === 'tamamlandi' && (y.dosya_boyut / 1024 / 1024) <= 16 && (
+                    <button onClick={async () => {
+                      try {
+                        const r = await axios.get(`${API}/ai/bilgi-tabani/tam-metin/${y.id}`);
+                        setKitapOkuyucu(r.data);
+                      } catch(e) { toast({ title: e.response?.data?.detail || "Hata", variant: "destructive" }); }
+                    }} className="text-[10px] bg-teal-50 text-teal-700 border border-teal-200 px-2.5 py-1 rounded-lg hover:bg-teal-100 transition-all">📖 Kitabı Aç</button>
+                  )}
                   {y.durum === 'yuklendi' && <button onClick={async () => { try { toast({ title: "🧠 AI işleme başlatılıyor..." }); await axios.post(`${API}/ai/bilgi-tabani/isle/${y.id}`); toast({ title: "✅ İşleme tamamlandı!" }); const r2 = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setAiYuklemeler(Array.isArray(r2.data)?r2.data:[]); } catch(e) { toast({ title: "İşleme hatası", variant: "destructive" }); } }} className="text-[10px] bg-orange-50 text-orange-700 border border-orange-200 px-2.5 py-1 rounded-lg hover:bg-orange-100 transition-all">🧠 AI ile İşle</button>}
                   {!y.onayli && y.durum !== 'hata' && <button onClick={async () => { try { await axios.put(`${API}/ai/bilgi-tabani/onayla/${y.id}`); toast({ title: "✅ Onaylandı!" }); const r = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setAiYuklemeler(Array.isArray(r.data)?r.data:[]); } catch(e) {} }} className="text-[10px] bg-green-50 text-green-700 border border-green-200 px-2.5 py-1 rounded-lg hover:bg-green-100 transition-all">✅ Onayla</button>}
                   <button onClick={async () => {
