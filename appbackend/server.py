@@ -4737,6 +4737,144 @@ async def kitap_dersleri_cevapla(payload: dict = Body(...), current_user=Depends
     return {"dogru": dogru, "xp_kazanildi": xp, "dogru_cevap": soru.get("dogru_cevap")}
 
 
+# ── KİTAP İÇERİK EDİTÖRÜ (Admin) ──
+
+@api_router.put("/kitap-dersleri/parca/{parca_id}")
+async def kitap_parca_guncelle(
+    parca_id: str,
+    payload: dict = Body(...),
+    current_user=Depends(require_role(UserRole.ADMIN))
+):
+    """Okuma parçasını güncelle."""
+    guncelle = {}
+    for alan in ["baslik", "ozet", "metin_kesit", "tema", "kelime_sayisi"]:
+        if alan in payload:
+            guncelle[alan] = payload[alan]
+    if not guncelle:
+        raise HTTPException(status_code=400, detail="Güncellenecek alan yok")
+    await db.ai_okuma_parcalari.update_one({"id": parca_id}, {"$set": guncelle})
+    return {"ok": True}
+
+
+@api_router.delete("/kitap-dersleri/parca/{parca_id}")
+async def kitap_parca_sil(parca_id: str, current_user=Depends(require_role(UserRole.ADMIN))):
+    """Okuma parçasını sil."""
+    await db.ai_okuma_parcalari.delete_one({"id": parca_id})
+    return {"ok": True}
+
+
+@api_router.put("/kitap-dersleri/soru/{soru_id}")
+async def kitap_soru_guncelle(
+    soru_id: str,
+    payload: dict = Body(...),
+    current_user=Depends(require_role(UserRole.ADMIN))
+):
+    """Soruyu güncelle."""
+    guncelle = {}
+    for alan in ["soru", "secenekler", "dogru_cevap", "taksonomi"]:
+        if alan in payload:
+            guncelle[alan] = payload[alan]
+    if not guncelle:
+        raise HTTPException(status_code=400, detail="Güncellenecek alan yok")
+    await db.ai_uretilen_sorular.update_one({"id": soru_id}, {"$set": guncelle})
+    return {"ok": True}
+
+
+@api_router.delete("/kitap-dersleri/soru/{soru_id}")
+async def kitap_soru_sil(soru_id: str, current_user=Depends(require_role(UserRole.ADMIN))):
+    """Soruyu sil."""
+    await db.ai_uretilen_sorular.delete_one({"id": soru_id})
+    return {"ok": True}
+
+
+@api_router.post("/kitap-dersleri/soru-ekle")
+async def kitap_soru_ekle(
+    payload: dict = Body(...),
+    current_user=Depends(require_role(UserRole.ADMIN))
+):
+    """Parçaya yeni soru ekle."""
+    yeni_soru = {
+        "id": str(uuid.uuid4()),
+        "yukleme_id": payload.get("yukleme_id", ""),
+        "kitap_adi": payload.get("kitap_adi", ""),
+        "sinif": payload.get("sinif", 0),
+        "bolum": payload.get("bolum", 0),
+        "soru": payload.get("soru", ""),
+        "secenekler": payload.get("secenekler", []),
+        "dogru_cevap": payload.get("dogru_cevap", 0),
+        "taksonomi": payload.get("taksonomi", "bilgi"),
+        "tarih": datetime.utcnow().isoformat(),
+    }
+    await db.ai_uretilen_sorular.insert_one(yeni_soru)
+    yeni_soru.pop("_id", None)
+    return yeni_soru
+
+
+@api_router.post("/kitap-dersleri/parca-ekle")
+async def kitap_parca_ekle(
+    payload: dict = Body(...),
+    current_user=Depends(require_role(UserRole.ADMIN))
+):
+    """Kitaba yeni okuma parçası ekle."""
+    yeni_parca = {
+        "id": str(uuid.uuid4()),
+        "yukleme_id": payload.get("yukleme_id", "manuel"),
+        "kitap_adi": payload.get("kitap_adi", ""),
+        "sinif": payload.get("sinif", 0),
+        "bolum": payload.get("bolum", 0),
+        "baslik": payload.get("baslik", ""),
+        "ozet": payload.get("ozet", ""),
+        "metin_kesit": payload.get("metin_kesit", ""),
+        "tema": payload.get("tema", ""),
+        "kelime_sayisi": payload.get("kelime_sayisi", 0),
+        "tarih": datetime.utcnow().isoformat(),
+    }
+    await db.ai_okuma_parcalari.insert_one(yeni_parca)
+    yeni_parca.pop("_id", None)
+    return yeni_parca
+
+
+@api_router.post("/kitap-dersleri/havuza-ekle/{parca_id}")
+async def kitap_parca_havuza_ekle(parca_id: str, current_user=Depends(get_current_user)):
+    """Okuma parçasını gelişim içerik havuzuna ekle."""
+    parca = await db.ai_okuma_parcalari.find_one({"id": parca_id})
+    if not parca:
+        raise HTTPException(status_code=404, detail="Parça bulunamadı")
+    mevcut = await db.gelisim_icerikleri.find_one({"kaynak_parca_id": parca_id})
+    if mevcut:
+        raise HTTPException(status_code=409, detail="Bu parça zaten içerik havuzunda")
+    sorular = await db.ai_uretilen_sorular.find(
+        {"yukleme_id": parca.get("yukleme_id"), "bolum": parca.get("bolum", 0)}
+    ).to_list(length=None)
+    soru_listesi = [{"id": str(uuid.uuid4()), "soru": s.get("soru",""), "secenekler": s.get("secenekler",[]), "dogru_cevap": s.get("dogru_cevap",0), "taksonomi": s.get("taksonomi","bilgi")} for s in sorular]
+    icerik = {
+        "id": str(uuid.uuid4()),
+        "baslik": f"{parca.get('kitap_adi','')} — {parca.get('baslik','')}",
+        "tur": "okuma_parcasi",
+        "aciklama": parca.get("ozet",""),
+        "hedef_kitle": "ogrenci",
+        "okuma_metni": parca.get("metin_kesit",""),
+        "okuma_seviye": "orta",
+        "okuma_sure": max(1, len((parca.get("metin_kesit") or "").split()) // 200),
+        "sorular": soru_listesi,
+        "kaynak": "ai_bilgi_tabani",
+        "kaynak_parca_id": parca_id,
+        "kaynak_kitap": parca.get("kitap_adi",""),
+        "sinif": parca.get("sinif"),
+        "tema": parca.get("tema",""),
+        "yukleyen_id": current_user["id"],
+        "yukleyen_ad": f"{current_user.get('ad','')} {current_user.get('soyad','')}".strip(),
+        "durum": "yayinda",
+        "onayli": True,
+        "oylama_sayisi": 0,
+        "olumlu_oy": 0,
+        "tarih": datetime.utcnow().isoformat(),
+    }
+    await db.gelisim_icerikleri.insert_one(icerik)
+    icerik.pop("_id", None)
+    return {"ok": True, "icerik_id": icerik["id"], "mesaj": "✅ İçerik havuzuna eklendi!"}
+
+
 @api_router.get("/ai/sorular")
 async def ai_sorular_listesi(current_user=Depends(get_current_user)):
     """Tüm AI üretilen soruları listeler."""
@@ -5486,8 +5624,18 @@ async def ai_bilgi_tabani_yukle(
             try:
                 from docx import Document as DocxDocument
                 doc_obj = DocxDocument(io.BytesIO(icerik))
+                # Heading-aware metin çıkarma — başlıkları ayraç olarak kullan
                 for para in doc_obj.paragraphs:
-                    if para.text.strip():
+                    if not para.text.strip():
+                        continue
+                    try:
+                        style = para.style.name if para.style else "Normal"
+                    except:
+                        style = "Normal"
+                    # Başlıkları çift newline ile ayır — chunking için doğal sınır
+                    if "Heading" in style or "Başlık" in style:
+                        ham_metin += f"\n\n=== {para.text.strip()} ===\n\n"
+                    else:
                         ham_metin += para.text + "\n"
                 sayfa_sayisi = max(1, len(ham_metin) // 2000)
             except:
@@ -5507,19 +5655,33 @@ async def ai_bilgi_tabani_yukle(
     kelime_sayisi = len(ham_metin.split())
     await db.ai_yuklemeler.update_one({"id": yukleme_id}, {"$set": {"durum": "ai_analiz", "ilerleme": 30}})
 
-    # Chunking
+    # Chunking — başlık sınırlarına saygılı
     chunk_boyut = {1:200, 2:300, 3:400, 4:500, 5:600, 6:700, 7:800, 8:900}.get(sinif, 500)
-    paragraflar = [p.strip() for p in ham_metin.split("\n") if len(p.strip()) > 30]
+
+    # Önce === başlık === ayraçlarına göre doğal bölümlere ayır
+    import re
+    bolumler = re.split(r'\n\n=== .+ ===\n\n', ham_metin)
+    basliklar = re.findall(r'=== (.+) ===', ham_metin)
+
     chunks = []
-    mevcut_chunk = ""
-    for p in paragraflar:
-        if len(mevcut_chunk.split()) + len(p.split()) > chunk_boyut:
-            if mevcut_chunk.strip():
-                chunks.append(mevcut_chunk.strip())
-            mevcut_chunk = p
-        else:
-            mevcut_chunk += "\n" + p
-    if mevcut_chunk.strip():
+    for bi, bolum in enumerate(bolumler):
+        baslik = basliklar[bi - 1] if bi > 0 and bi - 1 < len(basliklar) else ""
+        paragraflar = [p.strip() for p in bolum.split("\n") if len(p.strip()) > 30]
+        if not paragraflar:
+            continue
+        # Bölüm çok uzunsa kendi içinde parçala
+        mevcut_chunk = f"{baslik}\n" if baslik else ""
+        for p in paragraflar:
+            if len(mevcut_chunk.split()) + len(p.split()) > chunk_boyut:
+                if len(mevcut_chunk.strip().split()) > 30:
+                    chunks.append(mevcut_chunk.strip())
+                mevcut_chunk = p
+            else:
+                mevcut_chunk += "\n" + p
+        if mevcut_chunk.strip():
+            chunks.append(mevcut_chunk.strip())
+
+
         chunks.append(mevcut_chunk.strip())
     if not chunks:
         chunks = [ham_metin[:2000]]
@@ -5907,7 +6069,46 @@ async def ai_bilgi_tabani_ilerleme(yukleme_id: str, current_user=Depends(get_cur
     return {"ilerleme": yukleme.get("ilerleme", 0), "durum": yukleme.get("durum", "yuklendi"), "sonuc": yukleme.get("sonuc", {})}
 
 
-@api_router.post("/ai/bilgi-tabani/yukle-url")
+@api_router.get("/ai/bilgi-tabani/tam-metin/{yukleme_id}")
+async def ai_bilgi_tabani_tam_metin(yukleme_id: str, current_user=Depends(get_current_user)):
+    """Yüklenen dosyanın tüm bölümlerini ve metin parçalarını döner (16MB altı dosyalar için)."""
+    yukleme = await db.ai_yuklemeler.find_one({"id": yukleme_id}, {"dosya_b64": 0, "_id": 0})
+    if not yukleme:
+        raise HTTPException(status_code=404, detail="Yükleme bulunamadı")
+
+    # Boyut kontrolü kaldırıldı — dosya artık DB'de saklanmıyor
+
+    # Tüm okuma parçalarını getir
+    parcalar = await db.ai_okuma_parcalari.find(
+        {"yukleme_id": yukleme_id}
+    ).sort("bolum", 1).to_list(length=None)
+
+    for p in parcalar:
+        p.pop("_id", None)
+        sorular = await db.ai_uretilen_sorular.find(
+            {"yukleme_id": yukleme_id, "bolum": p.get("bolum", 0)}
+        ).to_list(length=None)
+        for s in sorular:
+            s.pop("_id", None)
+        p["sorular"] = sorular
+
+    # Tüm kelimeler
+    kelimeler = await db.meb_kelime_haritasi.find(
+        {"kaynak": yukleme.get("kitap_adi", ""), "sinif": yukleme.get("sinif")}
+    ).sort("zorluk", 1).to_list(length=None)
+    for k in kelimeler:
+        k.pop("_id", None)
+
+    return {
+        "yukleme": yukleme,
+        "parcalar": parcalar,
+        "kelimeler": kelimeler,
+        "toplam_parca": len(parcalar),
+        "toplam_soru": sum(len(p.get("sorular", [])) for p in parcalar),
+        "toplam_kelime": len(kelimeler),
+    }
+
+
 async def ai_bilgi_tabani_yukle_url(payload: dict, current_user=Depends(get_current_user)):
     """URL'den PDF/Word dosyası indirip yükle."""
     url = (payload.get("url") or "").strip()
