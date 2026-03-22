@@ -4043,6 +4043,17 @@ async def kur_atla(payload: dict, current_user=Depends(get_current_user)):
 # SİSTEM AYARLARI YÖNETİMİ (Admin CRUD)
 # ─────────────────────────────────────────────
 
+# ÖNEMLİ: /ayarlar/ozellikler, /ayarlar/{tip}'den ÖNCE tanımlanmalı
+@api_router.get("/ayarlar/ozellikler")
+async def get_ozellik_ayarlari_public():
+    doc = await db.sistem_ayarlari.find_one({"tip": "ozellik_ayarlari"})
+    varsayilan = {f["id"]: {"aktif": True, "roller": {"ogretmen": True, "ogrenci": True, "veli": True}} for f in OZELLIK_TANIMLARI}
+    ayarlar = doc.get("degerler", varsayilan) if doc else varsayilan
+    for f in OZELLIK_TANIMLARI:
+        if f["id"] not in ayarlar:
+            ayarlar[f["id"]] = {"aktif": True, "roller": {"ogretmen": True, "ogrenci": True, "veli": True}}
+    return {"tanimlar": OZELLIK_TANIMLARI, "ayarlar": ayarlar}
+
 @api_router.get("/ayarlar/{tip}")
 async def get_ayar(tip: str, current_user=Depends(get_current_user)):
     doc = await db.sistem_ayarlari.find_one({"tip": tip})
@@ -4641,7 +4652,189 @@ async def ai_okuma_parcalari_listesi(current_user=Depends(get_current_user)):
     return parcalar
 
 
-@api_router.get("/ai/sorular")
+# ── KİTAP DERSLERİ — Öğrenci için sınıf/kitap bazlı okuma ──
+
+@api_router.get("/kitap-dersleri/siniflar")
+async def kitap_dersleri_siniflar(current_user=Depends(get_current_user)):
+    """Parça bulunan sınıf listesini döner."""
+    siniflar = await db.ai_okuma_parcalari.distinct("sinif")
+    return sorted([s for s in siniflar if s])
+
+
+@api_router.get("/kitap-dersleri/kitaplar/{sinif}")
+async def kitap_dersleri_kitaplar(sinif: int, current_user=Depends(get_current_user)):
+    """Belirtilen sınıfa ait kitap listesini döner."""
+    kitaplar = await db.ai_okuma_parcalari.distinct("kitap_adi", {"sinif": sinif})
+    sonuc = []
+    for k in kitaplar:
+        parca_sayisi = await db.ai_okuma_parcalari.count_documents({"sinif": sinif, "kitap_adi": k})
+        soru_sayisi = await db.ai_uretilen_sorular.count_documents({"sinif": sinif, "kitap_adi": k})
+        sonuc.append({"kitap_adi": k, "parca_sayisi": parca_sayisi, "soru_sayisi": soru_sayisi})
+    return sonuc
+
+
+@api_router.get("/kitap-dersleri/parcalar/{sinif}/{kitap_adi}")
+async def kitap_dersleri_parcalar(sinif: int, kitap_adi: str, current_user=Depends(get_current_user)):
+    """Belirtilen kitabın okuma parçalarını ve sorularını döner."""
+    from urllib.parse import unquote
+    kitap_adi = unquote(kitap_adi)
+    parcalar = await db.ai_okuma_parcalari.find(
+        {"sinif": sinif, "kitap_adi": kitap_adi}
+    ).sort("bolum", 1).to_list(length=None)
+    for p in parcalar:
+        p.pop("_id", None)
+        # Her parçanın sorularını ekle
+        sorular = await db.ai_uretilen_sorular.find(
+            {"sinif": sinif, "kitap_adi": kitap_adi, "bolum": p.get("bolum", 0)}
+        ).to_list(length=None)
+        for s in sorular:
+            s.pop("_id", None)
+        p["sorular"] = sorular
+    return parcalar
+
+
+@api_router.post("/kitap-dersleri/cevapla")
+async def kitap_dersleri_cevapla(payload: dict = Body(...), current_user=Depends(get_current_user)):
+    """Öğrencinin soru cevabını kaydet ve XP ver."""
+    soru_id = payload.get("soru_id")
+    cevap = payload.get("cevap")
+    kitap_adi = payload.get("kitap_adi", "")
+    sinif = payload.get("sinif", 0)
+
+    soru = await db.ai_uretilen_sorular.find_one({"id": soru_id})
+    if not soru:
+        raise HTTPException(status_code=404, detail="Soru bulunamadı")
+
+    dogru = soru.get("dogru_cevap") == cevap
+    xp = 5 if dogru else 1
+
+    # Cevabı kaydet
+    await db.ai_soru_cevaplari.insert_one({
+        "id": str(uuid.uuid4()),
+        "ogrenci_id": current_user.get("linked_id") or current_user["id"],
+        "soru_id": soru_id,
+        "kitap_adi": kitap_adi,
+        "sinif": sinif,
+        "cevap": cevap,
+        "dogru": dogru,
+        "xp": xp,
+        "tarih": datetime.utcnow().isoformat(),
+    })
+
+    # XP ver
+    if dogru:
+        ogrenci_id = current_user.get("linked_id") or current_user["id"]
+        await db.students.update_one({"id": ogrenci_id}, {"$inc": {"xp": xp}})
+        await db.xp_logs.insert_one({
+            "id": str(uuid.uuid4()),
+            "ogrenci_id": ogrenci_id,
+            "eylem": "kitap_sorusu",
+            "xp": xp,
+            "aciklama": f"📚 {kitap_adi} — doğru cevap",
+            "tarih": datetime.utcnow().isoformat(),
+        })
+
+    return {"dogru": dogru, "xp_kazanildi": xp, "dogru_cevap": soru.get("dogru_cevap")}
+
+
+# ── KİTAP İÇERİK EDİTÖRÜ (Admin) ──
+
+@api_router.put("/kitap-dersleri/parca/{parca_id}")
+async def kitap_parca_guncelle(
+    parca_id: str,
+    payload: dict = Body(...),
+    current_user=Depends(require_role(UserRole.ADMIN))
+):
+    """Okuma parçasını güncelle."""
+    guncelle = {}
+    for alan in ["baslik", "ozet", "metin_kesit", "tema", "kelime_sayisi"]:
+        if alan in payload:
+            guncelle[alan] = payload[alan]
+    if not guncelle:
+        raise HTTPException(status_code=400, detail="Güncellenecek alan yok")
+    await db.ai_okuma_parcalari.update_one({"id": parca_id}, {"$set": guncelle})
+    return {"ok": True}
+
+
+@api_router.delete("/kitap-dersleri/parca/{parca_id}")
+async def kitap_parca_sil(parca_id: str, current_user=Depends(require_role(UserRole.ADMIN))):
+    """Okuma parçasını sil."""
+    await db.ai_okuma_parcalari.delete_one({"id": parca_id})
+    return {"ok": True}
+
+
+@api_router.put("/kitap-dersleri/soru/{soru_id}")
+async def kitap_soru_guncelle(
+    soru_id: str,
+    payload: dict = Body(...),
+    current_user=Depends(require_role(UserRole.ADMIN))
+):
+    """Soruyu güncelle."""
+    guncelle = {}
+    for alan in ["soru", "secenekler", "dogru_cevap", "taksonomi"]:
+        if alan in payload:
+            guncelle[alan] = payload[alan]
+    if not guncelle:
+        raise HTTPException(status_code=400, detail="Güncellenecek alan yok")
+    await db.ai_uretilen_sorular.update_one({"id": soru_id}, {"$set": guncelle})
+    return {"ok": True}
+
+
+@api_router.delete("/kitap-dersleri/soru/{soru_id}")
+async def kitap_soru_sil(soru_id: str, current_user=Depends(require_role(UserRole.ADMIN))):
+    """Soruyu sil."""
+    await db.ai_uretilen_sorular.delete_one({"id": soru_id})
+    return {"ok": True}
+
+
+@api_router.post("/kitap-dersleri/soru-ekle")
+async def kitap_soru_ekle(
+    payload: dict = Body(...),
+    current_user=Depends(require_role(UserRole.ADMIN))
+):
+    """Parçaya yeni soru ekle."""
+    yeni_soru = {
+        "id": str(uuid.uuid4()),
+        "yukleme_id": payload.get("yukleme_id", ""),
+        "kitap_adi": payload.get("kitap_adi", ""),
+        "sinif": payload.get("sinif", 0),
+        "bolum": payload.get("bolum", 0),
+        "soru": payload.get("soru", ""),
+        "secenekler": payload.get("secenekler", []),
+        "dogru_cevap": payload.get("dogru_cevap", 0),
+        "taksonomi": payload.get("taksonomi", "bilgi"),
+        "tarih": datetime.utcnow().isoformat(),
+    }
+    await db.ai_uretilen_sorular.insert_one(yeni_soru)
+    yeni_soru.pop("_id", None)
+    return yeni_soru
+
+
+@api_router.post("/kitap-dersleri/parca-ekle")
+async def kitap_parca_ekle(
+    payload: dict = Body(...),
+    current_user=Depends(require_role(UserRole.ADMIN))
+):
+    """Kitaba yeni okuma parçası ekle."""
+    yeni_parca = {
+        "id": str(uuid.uuid4()),
+        "yukleme_id": payload.get("yukleme_id", "manuel"),
+        "kitap_adi": payload.get("kitap_adi", ""),
+        "sinif": payload.get("sinif", 0),
+        "bolum": payload.get("bolum", 0),
+        "baslik": payload.get("baslik", ""),
+        "ozet": payload.get("ozet", ""),
+        "metin_kesit": payload.get("metin_kesit", ""),
+        "tema": payload.get("tema", ""),
+        "kelime_sayisi": payload.get("kelime_sayisi", 0),
+        "tarih": datetime.utcnow().isoformat(),
+    }
+    await db.ai_okuma_parcalari.insert_one(yeni_parca)
+    yeni_parca.pop("_id", None)
+    return yeni_parca
+
+
+
 async def ai_sorular_listesi(current_user=Depends(get_current_user)):
     """Tüm AI üretilen soruları listeler."""
     sorular = await db.ai_uretilen_sorular.find({}).sort("tarih", -1).to_list(length=200)
@@ -5312,53 +5505,46 @@ async def ai_bilgi_tabani_yukle(
     kitap_adi: str = Form(""),
     yazar: str = Form(""),
     temalar: str = Form(""),
+    ders_adi: str = Form(""),
+    basim_yili: str = Form(""),
     current_user=Depends(get_current_user)
 ):
-    import os
+    import os, hashlib, io
     ext = os.path.splitext(dosya.filename)[1].lower()
     if ext not in DESTEKLENEN_FORMATLAR:
         raise HTTPException(status_code=400, detail=f"Desteklenmeyen format: {ext}. Desteklenen: {', '.join(DESTEKLENEN_FORMATLAR)}")
 
     icerik = await dosya.read()
-    # Boyut ve günlük yükleme limiti kaldırıldı
 
-    # ── DUPLICATE KONTROL ──
-    import hashlib
+    # Duplicate kontrolü (sadece hash ile — dosya içeriği saklanmaz)
     dosya_hash = hashlib.sha256(icerik).hexdigest()
     mevcut = await db.ai_yuklemeler.find_one({"dosya_hash": dosya_hash})
     if mevcut:
         raise HTTPException(status_code=409, detail=f"Bu dosya daha önce yüklenmiş: '{mevcut.get('kitap_adi', '')}' ({mevcut.get('tarih', '')[:10]}, {mevcut.get('yukleyen_ad', '')})")
 
-    # İsim bazlı benzerlik kontrolü (aynı kitap farklı dosya)
-    benzer = await db.ai_yuklemeler.find_one({
-        "kitap_adi": {"$regex": f"^{(kitap_adi or dosya.filename.replace(ext, '')).strip()[:30]}",  "$options": "i"},
-        "sinif": sinif,
-    })
-    duplicate_uyari = ""
-    if benzer:
-        duplicate_uyari = f"⚠️ Benzer yükleme mevcut: '{benzer.get('kitap_adi')}' ({benzer.get('tarih', '')[:10]}). Yine de yüklendi."
+    gercek_kitap_adi = kitap_adi or dosya.filename.replace(ext, "")
+    yukleme_id = str(uuid.uuid4())
 
-    import base64
-    dosya_b64 = base64.b64encode(icerik).decode("utf-8")
-
+    # Kayıt oluştur — dosya içeriği saklanmaz
     yukleme = {
-        "id": str(uuid.uuid4()),
+        "id": yukleme_id,
         "dosya_adi": dosya.filename,
         "dosya_boyut": len(icerik),
         "dosya_format": ext,
         "dosya_hash": dosya_hash,
-        "dosya_b64": dosya_b64,
         "sinif": sinif,
         "tur": tur,
-        "kitap_adi": kitap_adi or dosya.filename.replace(ext, ""),
+        "kitap_adi": gercek_kitap_adi,
         "yazar": yazar,
+        "ders_adi": ders_adi,
+        "basim_yili": basim_yili,
         "temalar": [t.strip() for t in temalar.split(",") if t.strip()] if temalar else [],
         "yukleyen_id": current_user["id"],
         "yukleyen_ad": f"{current_user.get('ad', '')} {current_user.get('soyad', '')}".strip(),
         "yukleyen_rol": current_user.get("role", ""),
-        "durum": "yuklendi",
+        "durum": "isleniyor",
+        "ilerleme": 5,
         "onayli": current_user.get("role") in ["admin", "coordinator"],
-        # AI Güven Skoru alanları (işleme sonrası doldurulur)
         "guven_skoru": None,
         "okuma_seviyesi": None,
         "sonuc": {},
@@ -5370,8 +5556,6 @@ async def ai_bilgi_tabani_yukle(
     # Puan ver
     puan = AI_EGITIM_PUANLARI.get(f"{ext.replace('.', '')}_yukle", 20)
     await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": puan}})
-
-    # Puan log
     await db.ai_egitim_puanlari.insert_one({
         "id": str(uuid.uuid4()),
         "kullanici_id": current_user["id"],
@@ -5382,12 +5566,206 @@ async def ai_bilgi_tabani_yukle(
         "tarih": datetime.utcnow().isoformat(),
     })
 
+    # ── Dosyayı direkt işle (bellekte tut, MongoDB'ye kaydetme) ──
+    await db.ai_yuklemeler.update_one({"id": yukleme_id}, {"$set": {"durum": "metin_cikariliyor", "ilerleme": 10}})
+
+    ham_metin = ""
+    sayfa_sayisi = 0
+    try:
+        if ext == ".pdf":
+            import fitz
+            doc = fitz.open(stream=icerik, filetype="pdf")
+            sayfa_sayisi = len(doc)
+            for page in doc:
+                ham_metin += page.get_text() + "\n"
+            doc.close()
+        elif ext in [".docx", ".doc"]:
+            try:
+                from docx import Document as DocxDocument
+                doc_obj = DocxDocument(io.BytesIO(icerik))
+                # Heading-aware metin çıkarma — başlıkları ayraç olarak kullan
+                for para in doc_obj.paragraphs:
+                    if not para.text.strip():
+                        continue
+                    try:
+                        style = para.style.name if para.style else "Normal"
+                    except:
+                        style = "Normal"
+                    # Başlıkları çift newline ile ayır — chunking için doğal sınır
+                    if "Heading" in style or "Başlık" in style:
+                        ham_metin += f"\n\n=== {para.text.strip()} ===\n\n"
+                    else:
+                        ham_metin += para.text + "\n"
+                sayfa_sayisi = max(1, len(ham_metin) // 2000)
+            except:
+                ham_metin = icerik.decode("utf-8", errors="ignore")
+                sayfa_sayisi = max(1, len(ham_metin) // 2000)
+        elif ext == ".txt":
+            ham_metin = icerik.decode("utf-8", errors="ignore")
+            sayfa_sayisi = max(1, len(ham_metin) // 2000)
+    except Exception as e:
+        await db.ai_yuklemeler.update_one({"id": yukleme_id}, {"$set": {"durum": "hata", "sonuc": {"hata": str(e)[:200]}}})
+        raise HTTPException(status_code=500, detail=f"Metin çıkarma hatası: {str(e)[:200]}")
+
+    if len(ham_metin.strip()) < 100:
+        await db.ai_yuklemeler.update_one({"id": yukleme_id}, {"$set": {"durum": "hata", "sonuc": {"hata": "Yeterli metin çıkarılamadı"}}})
+        raise HTTPException(status_code=400, detail="Yeterli metin çıkarılamadı (min 100 karakter)")
+
+    kelime_sayisi = len(ham_metin.split())
+    await db.ai_yuklemeler.update_one({"id": yukleme_id}, {"$set": {"durum": "ai_analiz", "ilerleme": 30}})
+
+    # Chunking — başlık sınırlarına saygılı
+    chunk_boyut = {1:200, 2:300, 3:400, 4:500, 5:600, 6:700, 7:800, 8:900}.get(sinif, 500)
+
+    # Önce === başlık === ayraçlarına göre doğal bölümlere ayır
+    import re
+    bolumler = re.split(r'\n\n=== .+ ===\n\n', ham_metin)
+    basliklar = re.findall(r'=== (.+) ===', ham_metin)
+
+    chunks = []
+    for bi, bolum in enumerate(bolumler):
+        baslik = basliklar[bi - 1] if bi > 0 and bi - 1 < len(basliklar) else ""
+        paragraflar = [p.strip() for p in bolum.split("\n") if len(p.strip()) > 30]
+        if not paragraflar:
+            continue
+        # Bölüm çok uzunsa kendi içinde parçala
+        mevcut_chunk = f"{baslik}\n" if baslik else ""
+        for p in paragraflar:
+            if len(mevcut_chunk.split()) + len(p.split()) > chunk_boyut:
+                if len(mevcut_chunk.strip().split()) > 30:
+                    chunks.append(mevcut_chunk.strip())
+                mevcut_chunk = p
+            else:
+                mevcut_chunk += "\n" + p
+        if mevcut_chunk.strip():
+            chunks.append(mevcut_chunk.strip())
+
+
+        chunks.append(mevcut_chunk.strip())
+    if not chunks:
+        chunks = [ham_metin[:2000]]
+    chunks = chunks[:10]
+
+    tum_kelimeler, tum_parcalar, tum_sorular = [], [], []
+
+    for i, chunk in enumerate(chunks):
+        ilerleme = 30 + int((i / len(chunks)) * 55)
+        await db.ai_yuklemeler.update_one({"id": yukleme_id}, {"$set": {"ilerleme": ilerleme}})
+
+        ai_prompt = f"""Kitap: {gercek_kitap_adi}
+Sınıf: {sinif}. sınıf
+Bölüm {i+1}/{len(chunks)}
+
+METİN:
+{chunk[:2000]}
+
+Şu JSON'u üret:
+{{
+  "hedef_kelimeler": [
+    {{"kelime": "...", "anlam": "...", "ornek_cumle": "...", "zorluk": 1-10}}
+  ],
+  "okuma_parcasi": {{
+    "baslik": "Bu bölümün kısa başlığı",
+    "ozet": "2-3 cümle özet",
+    "tema": "MEB teması",
+    "kelime_sayisi": 0
+  }},
+  "sorular": [
+    {{"soru": "...", "secenekler": ["A","B","C","D"], "dogru_cevap": 0, "taksonomi": "bilgi"}}
+  ]
+}}
+
+Kurallar:
+- Hedef kelimeler: {sinif}. sınıf öğrencisinin ÖĞRENMESİ gereken 5-15 kelime
+- Her kelimeye çocuğun anlayacağı basit anlam ve örnek cümle yaz
+- 3-5 soru üret (farklı Bloom basamaklarından)
+- SADECE JSON döndür"""
+
+        result = await call_claude(
+            "Sen MEB Türkçe müfredatını bilen bir dil eğitimcisisin.",
+            ai_prompt, model="sonnet", max_tokens=2000
+        )
+
+        if result.get("parsed"):
+            p = result["parsed"]
+            for k in p.get("hedef_kelimeler", []):
+                k["kaynak_kitap"] = gercek_kitap_adi
+                k["sinif"] = sinif
+                k["bolum"] = i + 1
+                tum_kelimeler.append(k)
+            parca = p.get("okuma_parcasi", {})
+            if parca:
+                parca["kaynak_kitap"] = gercek_kitap_adi
+                parca["bolum"] = i + 1
+                parca["metin_kesit"] = chunk[:500]
+                tum_parcalar.append(parca)
+            for s in p.get("sorular", []):
+                s["kaynak_kitap"] = gercek_kitap_adi
+                s["sinif"] = sinif
+                s["bolum"] = i + 1
+                tum_sorular.append(s)
+
+    # Veritabanına kaydet
+    eklenen_kelime = 0
+    for k in tum_kelimeler:
+        mevcut_k = await db.meb_kelime_haritasi.find_one({"kelime": k.get("kelime", "").lower(), "sinif": sinif})
+        if not mevcut_k:
+            await db.meb_kelime_haritasi.insert_one({
+                "id": str(uuid.uuid4()), "sinif": sinif,
+                "kelime": k.get("kelime", "").lower(), "anlam": k.get("anlam", ""),
+                "ornek_cumle": k.get("ornek_cumle", ""), "zorluk": k.get("zorluk", 5),
+                "kaynak": gercek_kitap_adi, "yukleyen_id": current_user["id"],
+                "tarih": datetime.utcnow().isoformat(),
+            })
+            eklenen_kelime += 1
+
+    for p in tum_parcalar:
+        await db.ai_okuma_parcalari.insert_one({
+            "id": str(uuid.uuid4()), "yukleme_id": yukleme_id,
+            "kitap_adi": gercek_kitap_adi, "sinif": sinif, "bolum": p.get("bolum", 0),
+            "baslik": p.get("baslik", ""), "ozet": p.get("ozet", ""),
+            "tema": p.get("tema", ""), "metin_kesit": p.get("metin_kesit", ""),
+            "kelime_sayisi": p.get("kelime_sayisi", 0), "tarih": datetime.utcnow().isoformat(),
+        })
+
+    for s in tum_sorular:
+        await db.ai_uretilen_sorular.insert_one({
+            "id": str(uuid.uuid4()), "yukleme_id": yukleme_id,
+            "kitap_adi": gercek_kitap_adi, "sinif": sinif, "bolum": s.get("bolum", 0),
+            "soru": s.get("soru", ""), "secenekler": s.get("secenekler", []),
+            "dogru_cevap": s.get("dogru_cevap", 0), "taksonomi": s.get("taksonomi", "kavrama"),
+            "tarih": datetime.utcnow().isoformat(),
+        })
+
+    bonus = 0
+    if eklenen_kelime >= 50:
+        bonus += 5
+        await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": 5}})
+    if len(tum_sorular) >= 20:
+        bonus += 5
+        await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": 5}})
+
+    sonuc = {
+        "sayfa_sayisi": sayfa_sayisi, "kelime_sayisi": kelime_sayisi,
+        "chunk_sayisi": len(chunks), "cikarilan_kelime": len(tum_kelimeler),
+        "eklenen_kelime": eklenen_kelime, "okuma_parcasi": len(tum_parcalar),
+        "uretilen_soru": len(tum_sorular), "bonus_puan": bonus,
+        "mock": not bool(GEMINI_API_KEY),
+        "kelimeler": tum_kelimeler, "parcalar": tum_parcalar, "sorular": tum_sorular,
+    }
+
+    await db.ai_yuklemeler.update_one({"id": yukleme_id}, {"$set": {
+        "durum": "tamamlandi", "ilerleme": 100,
+        "sonuc": {k: v for k, v in sonuc.items() if k not in ["kelimeler", "parcalar", "sorular"]},
+    }})
+
     yukleme.pop("_id", None)
-    yukleme.pop("dosya_b64", None)
-    mesaj = f"✅ +{puan} puan! Dosya yüklendi, işlenmeyi bekliyor."
-    if duplicate_uyari:
-        mesaj += f" {duplicate_uyari}"
-    return {"yukleme": yukleme, "puan_kazanilan": puan, "mesaj": mesaj}
+    return {
+        "yukleme": {**yukleme, "durum": "tamamlandi"},
+        "puan_kazanilan": puan,
+        "mesaj": f"✅ +{puan} puan! AI öğrendi: {eklenen_kelime} kelime, {len(tum_parcalar)} parça, {len(tum_sorular)} soru.",
+        **sonuc
+    }
 
 
 @api_router.post("/ai/bilgi-tabani/isle/{yukleme_id}")
@@ -5399,8 +5777,13 @@ async def ai_bilgi_tabani_isle(yukleme_id: str, current_user=Depends(get_current
     if not yukleme.get("dosya_b64"):
         raise HTTPException(status_code=400, detail="Dosya verisi bulunamadı")
 
-    import base64
-    dosya_bytes = base64.b64decode(yukleme["dosya_b64"])
+    import base64, gzip
+    dosya_raw = base64.b64decode(yukleme["dosya_b64"])
+    # Sıkıştırılmış veriyi aç
+    if yukleme.get("dosya_gzip"):
+        dosya_bytes = gzip.decompress(dosya_raw)
+    else:
+        dosya_bytes = dosya_raw
     ext = yukleme.get("dosya_format", ".pdf")
     sinif = yukleme.get("sinif", 3)
     kitap_adi = yukleme.get("kitap_adi", "Bilinmeyen")
@@ -5695,8 +6078,9 @@ async def ai_bilgi_tabani_yukle_url(payload: dict, current_user=Depends(get_curr
     if mevcut:
         raise HTTPException(status_code=409, detail=f"Bu dosya daha önce yüklenmiş: '{mevcut.get('kitap_adi', '')}'")
 
-    import base64
-    dosya_b64 = base64.b64encode(icerik).decode("utf-8")
+    import base64, gzip
+    icerik_gz = gzip.compress(icerik, compresslevel=9)
+    dosya_b64 = base64.b64encode(icerik_gz).decode("utf-8")
 
     yukleme = {
         "id": str(uuid.uuid4()),
@@ -5704,6 +6088,7 @@ async def ai_bilgi_tabani_yukle_url(payload: dict, current_user=Depends(get_curr
         "dosya_boyut": len(icerik),
         "dosya_format": ext,
         "dosya_hash": dosya_hash,
+        "dosya_gzip": True,
         "dosya_b64": dosya_b64,
         "kaynak_url": url,
         "sinif": sinif,
@@ -9960,58 +10345,3 @@ async def peer_review_ozet(current_user=Depends(get_current_user)):
     except Exception as e:
         logging.error(f"[PEER-REVIEW-OZET] {e}")
         return {"ozet": {}, "liderler": [], "rozet_dagilim": [], "haftalik_trend": [0]*7}
-# Özellik Yönetimi endpoint'leri
-@api_router.get("/ayarlar/ozellikler")
-async def get_ozellik_ayarlari_endpoint(current_user=Depends(get_current_user)):
-    doc = await db.sistem_ayarlari.find_one({"tip": "ozellik_ayarlari"})
-    tanimlar = [
-        {"id":"ogretmen_dashboard","label":"Öğretmen Dashboard","kategori":"ogretmen","ikon":"📊","aciklama":"Risk skorları ve özet"},
-        {"id":"ogretmen_giris_analizi","label":"Giriş Analizi","kategori":"ogretmen","ikon":"🔬","aciklama":"Sesli okuma ve rapor"},
-        {"id":"ogretmen_gelisim","label":"Gelişim Alanı","kategori":"ogretmen","ikon":"🎓","aciklama":"İçerik ve materyal"},
-        {"id":"ogretmen_gorevler","label":"Görev Atama","kategori":"ogretmen","ikon":"📌","aciklama":"Görev sistemi"},
-        {"id":"ogretmen_mesajlar","label":"Mesajlaşma","kategori":"ogretmen","ikon":"✉️","aciklama":"Mesaj sistemi"},
-        {"id":"ogretmen_ai_kocluk","label":"AI Koçluk","kategori":"ogretmen","ikon":"🧠","aciklama":"AI analiz"},
-        {"id":"ogretmen_ai_bilgi","label":"AI Bilgi Tabanı","kategori":"ogretmen","ikon":"📚","aciklama":"PDF yükleme"},
-        {"id":"ogretmen_rozetler","label":"Rozetler","kategori":"ogretmen","ikon":"🏅","aciklama":"Rozet sistemi"},
-        {"id":"ogretmen_hedefler","label":"Hedef Sistemi","kategori":"ogretmen","ikon":"🎯","aciklama":"Hedef takibi"},
-        {"id":"ogretmen_veli_anket","label":"Veli Anketi","kategori":"ogretmen","ikon":"⭐","aciklama":"Anket sonuçları"},
-        {"id":"ogrenci_okuma_kaydi","label":"Okuma Kaydı","kategori":"ogrenci","ikon":"📖","aciklama":"Okuma takibi"},
-        {"id":"ogrenci_gorevler","label":"Görevler","kategori":"ogrenci","ikon":"✅","aciklama":"Görev listesi"},
-        {"id":"ogrenci_gelisim","label":"Gelişim Alanı","kategori":"ogrenci","ikon":"🎓","aciklama":"İçerik okuma"},
-        {"id":"ogrenci_egzersizler","label":"Egzersizler","kategori":"ogrenci","ikon":"👁️","aciklama":"Egzersiz modülleri"},
-        {"id":"ogrenci_xp_lig","label":"XP & Lig","kategori":"ogrenci","ikon":"🏆","aciklama":"Puan sistemi"},
-        {"id":"ogrenci_rozetler","label":"Rozetler","kategori":"ogrenci","ikon":"🎖️","aciklama":"Başarı rozetleri"},
-        {"id":"ogrenci_speech_ai","label":"Sesli Okuma AI","kategori":"ogrenci","ikon":"🎤","aciklama":"Sesli okuma analizi"},
-        {"id":"ogrenci_kelime_evrimi","label":"Kelime Evrimi","kategori":"ogrenci","ikon":"🔤","aciklama":"Kelime kartları"},
-        {"id":"ogrenci_mini_oyunlar","label":"Mini Oyunlar","kategori":"ogrenci","ikon":"🎮","aciklama":"Kelime oyunları"},
-        {"id":"ogrenci_scaffold","label":"Seviyeli Okuma","kategori":"ogrenci","ikon":"📐","aciklama":"Scaffold okuma"},
-        {"id":"ogrenci_materyal","label":"AI Materyal","kategori":"ogrenci","ikon":"🛠️","aciklama":"Materyal üretici"},
-        {"id":"ogrenci_hikaye","label":"Kişisel Hikaye","kategori":"ogrenci","ikon":"✨","aciklama":"AI hikaye"},
-        {"id":"ogrenci_ai_arkadas","label":"AI Arkadaş","kategori":"ogrenci","ikon":"🤖","aciklama":"AI sohbet"},
-        {"id":"ogrenci_orman","label":"Okuma Ormanı","kategori":"ogrenci","ikon":"🌲","aciklama":"Orman oyunu"},
-        {"id":"ogrenci_mesajlar","label":"Mesajlaşma","kategori":"ogrenci","ikon":"💬","aciklama":"Mesaj sistemi"},
-        {"id":"ogrenci_siralama","label":"Sıralama","kategori":"ogrenci","ikon":"📈","aciklama":"Sıralama tablosu"},
-        {"id":"veli_dashboard","label":"Veli Dashboard","kategori":"veli","ikon":"🏠","aciklama":"Genel durum"},
-        {"id":"veli_gorev_takip","label":"Görev Takibi","kategori":"veli","ikon":"📋","aciklama":"Görev görüntüleme"},
-        {"id":"veli_okuma_gecmisi","label":"Okuma Geçmişi","kategori":"veli","ikon":"📅","aciklama":"İstatistikler"},
-        {"id":"veli_bildirimler","label":"Bildirimler","kategori":"veli","ikon":"🔔","aciklama":"Uyarılar"},
-        {"id":"veli_anket","label":"Öğretmen Değerlendirme","kategori":"veli","ikon":"⭐","aciklama":"Anket"},
-        {"id":"veli_mesajlar","label":"Mesajlaşma","kategori":"veli","ikon":"💬","aciklama":"Mesaj sistemi"},
-        {"id":"veli_rapor","label":"Raporlar","kategori":"veli","ikon":"📄","aciklama":"Giriş analizi raporları"},
-    ]
-    varsayilan = {f["id"]: {"aktif": True, "roller": {"ogretmen": True, "ogrenci": True, "veli": True}} for f in tanimlar}
-    ayarlar = doc.get("degerler", varsayilan) if doc else varsayilan
-    for f in tanimlar:
-        if f["id"] not in ayarlar:
-            ayarlar[f["id"]] = {"aktif": True, "roller": {"ogretmen": True, "ogrenci": True, "veli": True}}
-    return {"tanimlar": tanimlar, "ayarlar": ayarlar}
-
-@api_router.put("/ayarlar/ozellikler")
-async def update_ozellik_ayarlari_endpoint(payload: dict = Body(...), current_user=Depends(require_role(UserRole.ADMIN))):
-    ayarlar = payload.get("ayarlar", {})
-    await db.sistem_ayarlari.update_one(
-        {"tip": "ozellik_ayarlari"},
-        {"$set": {"tip": "ozellik_ayarlari", "degerler": ayarlar, "guncelleme_tarihi": datetime.utcnow().isoformat()}},
-        upsert=True
-    )
-    return {"ok": True}
