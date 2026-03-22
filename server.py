@@ -6028,7 +6028,49 @@ async def ai_bilgi_tabani_ilerleme(yukleme_id: str, current_user=Depends(get_cur
     return {"ilerleme": yukleme.get("ilerleme", 0), "durum": yukleme.get("durum", "yuklendi"), "sonuc": yukleme.get("sonuc", {})}
 
 
-@api_router.post("/ai/bilgi-tabani/yukle-url")
+@api_router.get("/ai/bilgi-tabani/tam-metin/{yukleme_id}")
+async def ai_bilgi_tabani_tam_metin(yukleme_id: str, current_user=Depends(get_current_user)):
+    """Yüklenen dosyanın tüm bölümlerini ve metin parçalarını döner (16MB altı dosyalar için)."""
+    yukleme = await db.ai_yuklemeler.find_one({"id": yukleme_id}, {"dosya_b64": 0, "_id": 0})
+    if not yukleme:
+        raise HTTPException(status_code=404, detail="Yükleme bulunamadı")
+
+    # Boyut kontrolü — 16MB üstünde tam metin gösterme
+    dosya_boyut_mb = yukleme.get("dosya_boyut", 0) / 1024 / 1024
+    if dosya_boyut_mb > 16:
+        raise HTTPException(status_code=400, detail=f"Dosya boyutu {dosya_boyut_mb:.1f}MB — tam metin görüntüleme 16MB altı dosyalar için geçerli")
+
+    # Tüm okuma parçalarını getir
+    parcalar = await db.ai_okuma_parcalari.find(
+        {"yukleme_id": yukleme_id}
+    ).sort("bolum", 1).to_list(length=None)
+
+    for p in parcalar:
+        p.pop("_id", None)
+        sorular = await db.ai_uretilen_sorular.find(
+            {"yukleme_id": yukleme_id, "bolum": p.get("bolum", 0)}
+        ).to_list(length=None)
+        for s in sorular:
+            s.pop("_id", None)
+        p["sorular"] = sorular
+
+    # Tüm kelimeler
+    kelimeler = await db.meb_kelime_haritasi.find(
+        {"kaynak": yukleme.get("kitap_adi", ""), "sinif": yukleme.get("sinif")}
+    ).sort("zorluk", 1).to_list(length=None)
+    for k in kelimeler:
+        k.pop("_id", None)
+
+    return {
+        "yukleme": yukleme,
+        "parcalar": parcalar,
+        "kelimeler": kelimeler,
+        "toplam_parca": len(parcalar),
+        "toplam_soru": sum(len(p.get("sorular", [])) for p in parcalar),
+        "toplam_kelime": len(kelimeler),
+    }
+
+
 async def ai_bilgi_tabani_yukle_url(payload: dict, current_user=Depends(get_current_user)):
     """URL'den PDF/Word dosyası indirip yükle."""
     url = (payload.get("url") or "").strip()
