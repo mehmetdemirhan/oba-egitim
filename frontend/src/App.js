@@ -11476,16 +11476,42 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
               {/* Parçalar */}
               {kitapOkuyucu.parcalar?.length > 0 ? (
                 <div>
-                  <div className="font-semibold text-gray-800 mb-3">📖 Okuma Parçaları ve Sorular</div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="font-semibold text-gray-800">📖 Okuma Parçaları ve Sorular</div>
+                    <button onClick={async () => {
+                      let eklenen = 0, atlailan = 0;
+                      for (const p of kitapOkuyucu.parcalar) {
+                        try { await axios.post(`${API}/kitap-dersleri/havuza-ekle/${p.id}`); eklenen++; }
+                        catch(e) { if (e.response?.status === 409) atlailan++; }
+                      }
+                      toast({ title: `✅ ${eklenen} parça eklendi${atlailan > 0 ? `, ${atlailan} zaten vardı` : ''}` });
+                    }} className="text-xs bg-teal-500 text-white px-3 py-1.5 rounded-xl hover:bg-teal-600 transition-all font-medium">
+                      📥 Tümünü Havuza Ekle
+                    </button>
+                  </div>
                   <div className="space-y-4">
                     {kitapOkuyucu.parcalar.map((p, i) => (
                       <div key={i} className="border border-gray-200 rounded-2xl overflow-hidden">
                         {/* Parça başlığı */}
                         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b border-blue-100">
-                          <div className="font-bold text-sm text-blue-900">Bölüm {p.bolum}: {p.baslik}</div>
-                          <div className="flex gap-2 mt-1">
-                            {p.tema && <span className="text-[10px] bg-blue-200 text-blue-700 px-2 py-0.5 rounded-full">{p.tema}</span>}
-                            {p.sorular?.length > 0 && <span className="text-[10px] bg-green-200 text-green-700 px-2 py-0.5 rounded-full">{p.sorular.length} soru</span>}
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="font-bold text-sm text-blue-900">Bölüm {p.bolum}: {p.baslik}</div>
+                              <div className="flex gap-2 mt-1">
+                                {p.tema && <span className="text-[10px] bg-blue-200 text-blue-700 px-2 py-0.5 rounded-full">{p.tema}</span>}
+                                {p.sorular?.length > 0 && <span className="text-[10px] bg-green-200 text-green-700 px-2 py-0.5 rounded-full">{p.sorular.length} soru</span>}
+                              </div>
+                            </div>
+                            <button onClick={async () => {
+                              try {
+                                await axios.post(`${API}/kitap-dersleri/havuza-ekle/${p.id}`);
+                                toast({ title: "✅ İçerik havuzuna eklendi!" });
+                              } catch(e) {
+                                toast({ title: e.response?.data?.detail || "Hata", variant: e.response?.status === 409 ? "default" : "destructive" });
+                              }
+                            }} className="text-[10px] bg-teal-500 text-white px-2.5 py-1.5 rounded-lg hover:bg-teal-600 transition-all shrink-0 font-medium">
+                              📥 Havuza Ekle
+                            </button>
                           </div>
                         </div>
 
@@ -11839,7 +11865,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                 {/* Alt butonlar */}
                 <div className="flex gap-1.5 mt-2 pt-2 border-t border-gray-100 flex-wrap">
                   {y.durum === 'tamamlandi' && <button onClick={() => sonucGoruntule(y.id)} className="text-[10px] bg-cyan-50 text-cyan-700 border border-cyan-200 px-2.5 py-1 rounded-lg hover:bg-cyan-100 transition-all">📊 Sonuçlar</button>}
-                  {y.durum === 'tamamlandi' && (y.dosya_boyut / 1024 / 1024) <= 16 && (
+                  {y.durum === 'tamamlandi' && (
                     <button onClick={async () => {
                       try {
                         const r = await axios.get(`${API}/ai/bilgi-tabani/tam-metin/${y.id}`);
