@@ -5408,6 +5408,8 @@ async def ai_bilgi_tabani_yukle(
     kitap_adi: str = Form(""),
     yazar: str = Form(""),
     temalar: str = Form(""),
+    ders_adi: str = Form(""),
+    basim_yili: str = Form(""),
     current_user=Depends(get_current_user)
 ):
     import os, hashlib, io
@@ -5437,6 +5439,8 @@ async def ai_bilgi_tabani_yukle(
         "tur": tur,
         "kitap_adi": gercek_kitap_adi,
         "yazar": yazar,
+        "ders_adi": ders_adi,
+        "basim_yili": basim_yili,
         "temalar": [t.strip() for t in temalar.split(",") if t.strip()] if temalar else [],
         "yukleyen_id": current_user["id"],
         "yukleyen_ad": f"{current_user.get('ad', '')} {current_user.get('soyad', '')}".strip(),
