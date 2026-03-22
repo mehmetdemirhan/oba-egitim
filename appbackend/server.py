@@ -44,6 +44,7 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")  # geriye dönük uy
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", os.environ.get("ANTHROPIC_API_KEY", ""))
 GEMINI_API_KEY_2 = os.environ.get("GEMINI_API_KEY_2", "")  # Yedek key
 GEMINI_API_KEY_3 = os.environ.get("GEMINI_API_KEY_3", "")  # 3. key
+YANDEX_DISK_TOKEN = os.environ.get("YANDEX_DISK_TOKEN", "")  # Yandex Disk OAuth token
 
 # Model rotasyon listesi — kota dolunca bir sonrakini dene
 GEMINI_MODELS = [
@@ -4834,6 +4835,189 @@ async def kitap_parca_ekle(
     return yeni_parca
 
 
+@api_router.post("/ai/bilgi-tabani/dosya-onizle")
+async def ai_bilgi_tabani_dosya_onizle(
+    dosya: UploadFile = File(...),
+    current_user=Depends(get_current_user)
+):
+    """Yüklenen dosyayı parse edip tam metni döner — DB'ye kaydetmez."""
+    import os, io
+    ext = os.path.splitext(dosya.filename)[1].lower()
+    if ext not in [".pdf", ".docx", ".doc", ".txt"]:
+        raise HTTPException(status_code=400, detail=f"Desteklenmeyen format: {ext}")
+
+    icerik = await dosya.read()
+
+    bolumler = []  # [{"baslik": str, "metin": str, "sayfa": int}]
+    ham_metin = ""
+
+    try:
+        if ext == ".pdf":
+            import fitz
+            doc = fitz.open(stream=icerik, filetype="pdf")
+            for i, page in enumerate(doc):
+                sayfa_metni = page.get_text()
+                ham_metin += sayfa_metni + "\n"
+                bolumler.append({
+                    "baslik": f"Sayfa {i+1}",
+                    "metin": sayfa_metni.strip(),
+                    "sayfa": i+1
+                })
+            doc.close()
+
+        elif ext in [".docx", ".doc"]:
+            from docx import Document as DocxDocument
+            doc_obj = DocxDocument(io.BytesIO(icerik))
+            mevcut_baslik = "Başlangıç"
+            mevcut_metin = []
+            sayfa = 1
+
+            for para in doc_obj.paragraphs:
+                text = para.text.strip()
+                if not text:
+                    continue
+                try:
+                    style = para.style.name if para.style else "Normal"
+                except:
+                    style = "Normal"
+
+                if "Heading" in style or "Başlık" in style:
+                    if mevcut_metin:
+                        bolumler.append({
+                            "baslik": mevcut_baslik,
+                            "metin": "\n".join(mevcut_metin),
+                            "sayfa": sayfa
+                        })
+                        if len("\n".join(mevcut_metin)) > 2000:
+                            sayfa += 1
+                    mevcut_baslik = text
+                    mevcut_metin = []
+                else:
+                    mevcut_metin.append(text)
+                    ham_metin += text + "\n"
+
+            if mevcut_metin:
+                bolumler.append({
+                    "baslik": mevcut_baslik,
+                    "metin": "\n".join(mevcut_metin),
+                    "sayfa": sayfa
+                })
+
+        elif ext == ".txt":
+            ham_metin = icerik.decode("utf-8", errors="ignore")
+            satirlar = ham_metin.split("\n")
+            chunk = []
+            for i, satir in enumerate(satirlar):
+                chunk.append(satir)
+                if len(chunk) >= 50 or i == len(satirlar) - 1:
+                    bolumler.append({
+                        "baslik": f"Bölüm {len(bolumler)+1}",
+                        "metin": "\n".join(chunk),
+                        "sayfa": len(bolumler) + 1
+                    })
+                    chunk = []
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Dosya okunamadı: {str(e)[:200]}")
+
+    # Boş bölümleri filtrele
+    bolumler = [b for b in bolumler if len(b["metin"].strip()) > 20]
+
+    return {
+        "dosya_adi": dosya.filename,
+        "ext": ext,
+        "toplam_bolum": len(bolumler),
+        "toplam_kelime": len(ham_metin.split()),
+        "bolumler": bolumler,
+    }
+
+
+@api_router.get("/ai/bilgi-tabani/kitabi-ac/{yukleme_id}")
+async def ai_bilgi_tabani_kitabi_ac(yukleme_id: str, current_user=Depends(get_current_user)):
+    """Yandex Disk'ten dosyayı indir, parse et ve tam metni döner."""
+    yukleme = await db.ai_yuklemeler.find_one({"id": yukleme_id}, {"dosya_b64": 0, "_id": 0})
+    if not yukleme:
+        raise HTTPException(status_code=404, detail="Yükleme bulunamadı")
+
+    yandex_url = yukleme.get("yandex_url")
+    if not yandex_url:
+        raise HTTPException(status_code=400, detail="Bu kitap Yandex Disk'e kaydedilmemiş. Lütfen yeniden yükleyin.")
+
+    # Yandex'ten indir
+    try:
+        icerik = await yandex_disk_indir(yandex_url)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Dosya indirilemedi: {str(e)[:200]}")
+
+    ext = yukleme.get("dosya_format", ".pdf")
+    import io
+
+    bolumler = []
+    ham_metin = ""
+
+    try:
+        if ext == ".pdf":
+            import fitz
+            doc = fitz.open(stream=icerik, filetype="pdf")
+            for i, page in enumerate(doc):
+                sayfa_metni = page.get_text()
+                ham_metin += sayfa_metni + "\n"
+                if sayfa_metni.strip():
+                    bolumler.append({"baslik": f"Sayfa {i+1}", "metin": sayfa_metni.strip(), "sayfa": i+1})
+            doc.close()
+
+        elif ext in [".docx", ".doc"]:
+            from docx import Document as DocxDocument
+            doc_obj = DocxDocument(io.BytesIO(icerik))
+            mevcut_baslik = "Başlangıç"
+            mevcut_metin = []
+            sayfa = 1
+            for para in doc_obj.paragraphs:
+                text = para.text.strip()
+                if not text:
+                    continue
+                try:
+                    style = para.style.name if para.style else "Normal"
+                except:
+                    style = "Normal"
+                if "Heading" in style or "Başlık" in style:
+                    if mevcut_metin:
+                        bolumler.append({"baslik": mevcut_baslik, "metin": "\n".join(mevcut_metin), "sayfa": sayfa})
+                        if len("\n".join(mevcut_metin)) > 2000:
+                            sayfa += 1
+                    mevcut_baslik = text
+                    mevcut_metin = []
+                else:
+                    mevcut_metin.append(text)
+                    ham_metin += text + "\n"
+            if mevcut_metin:
+                bolumler.append({"baslik": mevcut_baslik, "metin": "\n".join(mevcut_metin), "sayfa": sayfa})
+
+        elif ext == ".txt":
+            ham_metin = icerik.decode("utf-8", errors="ignore")
+            satirlar = ham_metin.split("\n")
+            chunk = []
+            for i, satir in enumerate(satirlar):
+                chunk.append(satir)
+                if len(chunk) >= 50 or i == len(satirlar) - 1:
+                    bolumler.append({"baslik": f"Bölüm {len(bolumler)+1}", "metin": "\n".join(chunk), "sayfa": len(bolumler)+1})
+                    chunk = []
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Dosya okunamadı: {str(e)[:200]}")
+
+    bolumler = [b for b in bolumler if len(b["metin"].strip()) > 20]
+
+    return {
+        "dosya_adi": yukleme.get("dosya_adi", ""),
+        "ext": ext,
+        "toplam_bolum": len(bolumler),
+        "toplam_kelime": len(ham_metin.split()),
+        "bolumler": bolumler,
+        "yukleme": yukleme,
+    }
+
+
 @api_router.post("/kitap-dersleri/havuza-ekle/{parca_id}")
 async def kitap_parca_havuza_ekle(parca_id: str, current_user=Depends(get_current_user)):
     """Okuma parçasını gelişim içerik havuzuna ekle."""
@@ -5538,6 +5722,65 @@ def hesapla_grade_level(metin):
     }
 
 
+# ── YANDEX DISK YARDIMCI FONKSİYONLAR ──────────────────────
+
+async def yandex_disk_yukle(icerik: bytes, dosya_adi: str, ext: str) -> str:
+    """Dosyayı Yandex Disk'e yükle, indirme URL'sini döner."""
+    import aiohttp, urllib.parse, re
+    if not YANDEX_DISK_TOKEN:
+        raise Exception("YANDEX_DISK_TOKEN tanımlı değil")
+
+    # Güvenli dosya adı oluştur
+    temiz_ad = re.sub(r'[^\w\-.]', '_', dosya_adi)
+    yol = f"/OBA_Egitim/{temiz_ad}"
+    headers = {"Authorization": f"OAuth {YANDEX_DISK_TOKEN}"}
+
+    async with aiohttp.ClientSession() as session:
+        # Klasör oluştur (yoksa)
+        await session.put(
+            "https://cloud-api.yandex.net/v1/disk/resources",
+            params={"path": "/OBA_Egitim"},
+            headers=headers
+        )
+
+        # Upload URL al
+        async with session.get(
+            "https://cloud-api.yandex.net/v1/disk/resources/upload",
+            params={"path": yol, "overwrite": "true"},
+            headers=headers
+        ) as r:
+            if r.status != 200:
+                raise Exception(f"Yandex upload URL alınamadı: {r.status}")
+            data = await r.json()
+            upload_url = data["href"]
+
+        # Dosyayı yükle
+        async with session.put(upload_url, data=icerik) as r:
+            if r.status not in [200, 201]:
+                raise Exception(f"Yandex yükleme hatası: {r.status}")
+
+        # İndirme linki al
+        async with session.get(
+            "https://cloud-api.yandex.net/v1/disk/resources/download",
+            params={"path": yol},
+            headers=headers
+        ) as r:
+            if r.status != 200:
+                raise Exception(f"Yandex indirme URL alınamadı: {r.status}")
+            data = await r.json()
+            return data["href"]
+
+
+async def yandex_disk_indir(url: str) -> bytes:
+    """Yandex Disk'ten dosyayı indir."""
+    import aiohttp
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as r:
+            if r.status != 200:
+                raise Exception(f"Yandex indirme hatası: {r.status}")
+            return await r.read()
+
+
 @api_router.post("/ai/bilgi-tabani/yukle")
 async def ai_bilgi_tabani_yukle(
     dosya: UploadFile = File(...),
@@ -5566,13 +5809,23 @@ async def ai_bilgi_tabani_yukle(
     gercek_kitap_adi = kitap_adi or dosya.filename.replace(ext, "")
     yukleme_id = str(uuid.uuid4())
 
-    # Kayıt oluştur — dosya içeriği saklanmaz
+    # Yandex Disk'e yükle (token varsa)
+    yandex_url = None
+    if YANDEX_DISK_TOKEN:
+        try:
+            temiz_ad = f"{yukleme_id}_{dosya.filename}"
+            yandex_url = await yandex_disk_yukle(icerik, temiz_ad, ext)
+        except Exception as e:
+            logging.warning(f"[YANDEX] Yükleme başarısız: {e}")
+
+    # Kayıt oluştur
     yukleme = {
         "id": yukleme_id,
         "dosya_adi": dosya.filename,
         "dosya_boyut": len(icerik),
         "dosya_format": ext,
         "dosya_hash": dosya_hash,
+        "yandex_url": yandex_url,  # Yandex Disk indirme URL'si
         "sinif": sinif,
         "tur": tur,
         "kitap_adi": gercek_kitap_adi,
