@@ -10513,7 +10513,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
   const [aiYuklemeler, setAiYuklemeler] = useState([]);
   const [aiStat, setAiStat] = useState(null);
   const [aiPuanlar, setAiPuanlar] = useState({ toplam: 0, detay: [] });
-  const [yukleForm, setYukleForm] = useState({ sinif: "3", tur: "ders_kitabi", kitap_adi: "", yazar: "", temalar: "" });
+  const [yukleForm, setYukleForm] = useState({ sinif: "3", tur: "ders_kitabi", kitap_adi: "", yazar: "", temalar: "", basim_yili: "", ders_adi: "" });
   const [aiBilgiYukleniyor, setAiBilgiYukleniyor] = useState(false);
   const dosyaRef = React.useRef(null);
   // AI işleme state'leri
@@ -11379,6 +11379,8 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
             fd.append("kitap_adi", yukleForm.kitap_adi || file.name);
             fd.append("yazar", yukleForm.yazar);
             fd.append("temalar", yukleForm.temalar || "");
+            fd.append("ders_adi", yukleForm.ders_adi || "");
+            fd.append("basim_yili", yukleForm.basim_yili || "");
             setAiIslemDurum("📤 Dosya yükleniyor ve AI işliyor...");
             const r = await axios.post(`${API}/ai/bilgi-tabani/yukle`, fd, {
               headers: { "Content-Type": "multipart/form-data" },
@@ -11483,6 +11485,10 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                 <div><Label className="text-xs">Kitap Adı</Label><Input value={yukleForm.kitap_adi} onChange={e => setYukleForm({...yukleForm, kitap_adi: e.target.value})} placeholder="Otomatik alınır" /></div>
                 <div><Label className="text-xs">Yazar</Label><Input value={yukleForm.yazar} onChange={e => setYukleForm({...yukleForm, yazar: e.target.value})} placeholder="Yazar adı" /></div>
               </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div><Label className="text-xs">Ders Adı</Label><Input value={yukleForm.ders_adi} onChange={e => setYukleForm({...yukleForm, ders_adi: e.target.value})} placeholder="Türkçe, Matematik..." /></div>
+                <div><Label className="text-xs">Basım Yılı</Label><Input type="number" min="2000" max="2030" value={yukleForm.basim_yili} onChange={e => setYukleForm({...yukleForm, basim_yili: e.target.value})} placeholder="2024" /></div>
+              </div>
               <Button onClick={dosyaYukle} disabled={aiBilgiYukleniyor} className="w-full bg-cyan-600 text-white">{aiBilgiYukleniyor ? "⏳ Yükleniyor..." : "🧠 Yükle ve AI'a Öğret (+20 puan)"}</Button>
 
               {/* İlerleme Çubuğu */}
@@ -11580,33 +11586,49 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
               const gsRenk = gs ? (gs.toplam >= 70 ? 'text-green-600 bg-green-50' : gs.toplam >= 40 ? 'text-yellow-600 bg-yellow-50' : 'text-red-600 bg-red-50') : '';
               return (
               <div key={y.id} className={`bg-white rounded-xl p-3 border shadow-sm ${!y.onayli ? 'border-l-4 border-l-yellow-400' : ''}`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">{y.dosya_format === '.pdf' ? '📕' : '📘'}</span>
-                    <div><div className="text-sm font-medium">{y.kitap_adi}</div><div className="text-[10px] text-gray-500">{y.sinif}. Sınıf • {y.tur} • {y.dosya_format} • {(y.dosya_boyut / 1024 / 1024).toFixed(1)} MB</div></div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {/* AI Güven Skoru */}
-                    {gs && (<div className={`text-center px-2 py-1 rounded-lg ${gsRenk}`}>
-                      <div className="text-sm font-bold">{gs.toplam}/100</div>
-                      <div className="text-[8px]">Güven Skoru</div>
-                    </div>)}
-                    {/* Okuma Seviyesi */}
-                    {y.okuma_seviyesi && (<div className="text-center px-2 py-1 rounded-lg bg-blue-50 text-blue-600">
-                      <div className="text-sm font-bold">{y.okuma_seviyesi.grade_level}. sınıf</div>
-                      <div className="text-[8px]">Seviye</div>
-                    </div>)}
-                    <div className="text-right">
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full ${y.durum === 'tamamlandi' ? 'bg-green-100 text-green-700' : y.durum === 'hata' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{y.durum === 'tamamlandi' ? '✅ Tamamlandı' : y.durum === 'hata' ? '❌ Hata' : '⏳ Bekliyor'}</span>
-                    {y.durum === 'tamamlandi' && <button onClick={() => sonucGoruntule(y.id)} className="text-[9px] text-cyan-600 hover:underline mt-0.5">Sonuçları Gör →</button>}
-                    {y.durum === 'yuklendi' && <button onClick={async () => { try { toast({ title: "🧠 AI işleme başlatılıyor..." }); await axios.post(`${API}/ai/bilgi-tabani/isle/${y.id}`); toast({ title: "✅ İşleme tamamlandı!" }); const r2 = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setAiYuklemeler(Array.isArray(r2.data)?r2.data:[]); } catch(e) { toast({ title: "İşleme hatası", variant: "destructive" }); } }} className="text-[9px] text-orange-600 hover:underline mt-0.5">AI ile İşle →</button>}
-                      {!y.onayli && <div className="text-[9px] text-yellow-600 mt-0.5">Onay bekliyor</div>}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2 flex-1 min-w-0">
+                    <span className="text-lg mt-0.5">{y.dosya_format === '.pdf' ? '📕' : '📘'}</span>
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-gray-900 truncate">{y.kitap_adi}</div>
+                      <div className="text-[10px] text-gray-500 mt-0.5 flex flex-wrap gap-1">
+                        <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">{y.sinif}. Sınıf</span>
+                        {y.ders_adi && <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">{y.ders_adi}</span>}
+                        <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{y.tur}</span>
+                        {y.yazar && <span className="bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">{y.yazar}</span>}
+                        {y.basim_yili && <span className="bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded">{y.basim_yili}</span>}
+                        <span className="text-gray-400">{y.dosya_format} • {(y.dosya_boyut / 1024 / 1024).toFixed(1)} MB</span>
+                      </div>
                     </div>
                   </div>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    {gs && (<div className={`text-center px-2 py-1 rounded-lg ${gsRenk}`}>
+                      <div className="text-sm font-bold">{gs.toplam}/100</div>
+                      <div className="text-[8px]">Güven</div>
+                    </div>)}
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${y.durum === 'tamamlandi' ? 'bg-green-100 text-green-700' : y.durum === 'hata' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                      {y.durum === 'tamamlandi' ? '✅ Tamamlandı' : y.durum === 'hata' ? '❌ Hata' : '⏳ Bekliyor'}
+                    </span>
+                  </div>
                 </div>
-                {/* Güven Skoru detay (varsa) */}
+                {/* Alt butonlar */}
+                <div className="flex gap-1.5 mt-2 pt-2 border-t border-gray-100 flex-wrap">
+                  {y.durum === 'tamamlandi' && <button onClick={() => sonucGoruntule(y.id)} className="text-[10px] bg-cyan-50 text-cyan-700 border border-cyan-200 px-2.5 py-1 rounded-lg hover:bg-cyan-100 transition-all">📊 Sonuçlar</button>}
+                  {y.durum === 'yuklendi' && <button onClick={async () => { try { toast({ title: "🧠 AI işleme başlatılıyor..." }); await axios.post(`${API}/ai/bilgi-tabani/isle/${y.id}`); toast({ title: "✅ İşleme tamamlandı!" }); const r2 = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setAiYuklemeler(Array.isArray(r2.data)?r2.data:[]); } catch(e) { toast({ title: "İşleme hatası", variant: "destructive" }); } }} className="text-[10px] bg-orange-50 text-orange-700 border border-orange-200 px-2.5 py-1 rounded-lg hover:bg-orange-100 transition-all">🧠 AI ile İşle</button>}
+                  {!y.onayli && y.durum !== 'hata' && <button onClick={async () => { try { await axios.put(`${API}/ai/bilgi-tabani/onayla/${y.id}`); toast({ title: "✅ Onaylandı!" }); const r = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setAiYuklemeler(Array.isArray(r.data)?r.data:[]); } catch(e) {} }} className="text-[10px] bg-green-50 text-green-700 border border-green-200 px-2.5 py-1 rounded-lg hover:bg-green-100 transition-all">✅ Onayla</button>}
+                  <button onClick={async () => {
+                    if (!window.confirm(`"${y.kitap_adi}" silinecek. Emin misiniz?`)) return;
+                    try {
+                      await axios.delete(`${API}/ai/bilgi-tabani/${y.id}`);
+                      toast({ title: "🗑️ Kitap silindi" });
+                      const r2 = await axios.get(`${API}/ai/bilgi-tabani/gecmis`);
+                      setAiYuklemeler(Array.isArray(r2.data)?r2.data:[]);
+                      try { const r3 = await axios.get(`${API}/ai/bilgi-tabani/istatistik`); setAiStat(r3.data); } catch(e) {}
+                    } catch(e) { toast({ title: e.response?.data?.detail || "Silme hatası", variant: "destructive" }); }
+                  }} className="text-[10px] bg-red-50 text-red-600 border border-red-200 px-2.5 py-1 rounded-lg hover:bg-red-100 transition-all">🗑️ Sil</button>
+                </div>
                 {gs && gs.detay && (
-                  <div className="mt-2 pt-2 border-t border-gray-100 grid grid-cols-4 gap-1">
+                  <div className="mt-2 grid grid-cols-4 gap-1">
                     {Object.entries(gs.detay).map(([k, v]) => (
                       <div key={k} className="text-center">
                         <div className="bg-gray-100 rounded-full h-1 mb-0.5"><div className={`h-1 rounded-full ${v.skor >= v.max * 0.7 ? 'bg-green-500' : v.skor >= v.max * 0.4 ? 'bg-yellow-500' : 'bg-red-400'}`} style={{width: `${(v.skor / v.max) * 100}%`}} /></div>
