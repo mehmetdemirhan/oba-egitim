@@ -3194,7 +3194,7 @@ async def gelisim_dosya_yukle(
     icerik = await dosya.read()
     if len(icerik) > 20 * 1024 * 1024:  # 20MB
         raise HTTPException(status_code=400, detail="Dosya 20MB'dan büyük olamaz")
-    dosya_b64 = base64.b64encode(icerik).decode("utf-8")
+    icerik_gz = gzip.compress(icerik, compresslevel=9)     dosya_b64 = base64.b64encode(icerik_gz).decode("utf-8")
     dosya_turu = "pdf" if ext == ".pdf" else "docx"
     return {
         "dosya_b64": dosya_b64,
