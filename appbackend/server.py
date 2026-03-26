@@ -3233,6 +3233,15 @@ async def create_icerik(icerik: IcerikCreate, current_user=Depends(get_current_u
             await db.users.update_one({"id": current_user["id"]}, {"$inc": {"toplam_puan": 3}})
         except: pass
 
+    # Test soruları bonusu → her soru +2 puan, max +20
+    sorular = data.get("sorular", [])
+    soru_bonus = min(len(sorular) * 2, 20)
+    if soru_bonus > 0:
+        data["soru_bonus"] = soru_bonus
+        try:
+            await db.users.update_one({"id": current_user["id"]}, {"$inc": {"toplam_puan": soru_bonus}})
+        except: pass
+
     await db.gelisim_icerik.insert_one(data)
 
     # Kitap türünde içerik eklendiyse kitap havuzuna da kaydet (bölüm bazlı soru için)
@@ -4930,6 +4939,33 @@ async def ai_bilgi_tabani_dosya_onizle(
         "toplam_kelime": len(ham_metin.split()),
         "bolumler": bolumler,
     }
+
+
+@api_router.post("/ai/bilgi-tabani/yandex-kaydet/{yukleme_id}")
+async def ai_bilgi_tabani_yandex_kaydet(
+    yukleme_id: str,
+    dosya: UploadFile = File(...),
+    current_user=Depends(get_current_user)
+):
+    """Eski kitabı Yandex Disk'e kaydet ve yukleme kaydını güncelle."""
+    yukleme = await db.ai_yuklemeler.find_one({"id": yukleme_id})
+    if not yukleme:
+        raise HTTPException(status_code=404, detail="Yükleme bulunamadı")
+    if not YANDEX_DISK_TOKEN:
+        raise HTTPException(status_code=500, detail="YANDEX_DISK_TOKEN tanımlı değil")
+
+    icerik = await dosya.read()
+    import os
+    ext = os.path.splitext(dosya.filename)[1].lower()
+
+    temiz_ad = f"{yukleme_id}_{dosya.filename}"
+    yandex_url = await yandex_disk_yukle(icerik, temiz_ad, ext)
+
+    await db.ai_yuklemeler.update_one(
+        {"id": yukleme_id},
+        {"$set": {"yandex_url": yandex_url, "dosya_format": ext, "dosya_boyut": len(icerik)}}
+    )
+    return {"ok": True, "yandex_url": yandex_url, "mesaj": "✅ Yandex Disk'e kaydedildi"}
 
 
 @api_router.get("/ai/bilgi-tabani/kitabi-ac/{yukleme_id}")
