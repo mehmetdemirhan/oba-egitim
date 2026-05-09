@@ -1866,6 +1866,70 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
   const [gozlemNotu, setGozlemNotu] = useState("");
   const intervalRef = useRef(null);
 
+  // Yazı boyutu (14–24 px) — localStorage'da kalıcı
+  const FONT_KEY = "oba.canli.fontSize";
+  const [fontSize, setFontSize] = useState(() => {
+    try {
+      const v = parseInt(localStorage.getItem(FONT_KEY) || "", 10);
+      return v >= 14 && v <= 24 ? v : 18;
+    } catch { return 18; }
+  });
+  useEffect(() => { try { localStorage.setItem(FONT_KEY, String(fontSize)); } catch {} }, [fontSize]);
+  const fontKucult = () => setFontSize(s => Math.max(14, s - 2));
+  const fontBuyut  = () => setFontSize(s => Math.min(24, s + 2));
+
+  // Cümle bazlı parse — paragraf paragraf, her cümle sonunda kümülatif kelime sayısı
+  const paragraflar = React.useMemo(() => {
+    const icerik = metin?.icerik || "";
+    const cumleyeBol = (par) => {
+      const m = par.match(/[^.!?…]+[.!?…]+["»’”']?\s*/g);
+      if (!m || m.length === 0) return par.trim() ? [par.trim()] : [];
+      return m.map(s => s.trim()).filter(Boolean);
+    };
+    const sayKelime = (s) => s.split(/\s+/).filter(Boolean).length;
+    let toplam = 0;
+    return icerik.split(/\n+/).map(par => {
+      const cumleler = cumleyeBol(par);
+      return cumleler.map(c => {
+        toplam += sayKelime(c);
+        return { cumle: c, kumulatif: toplam };
+      });
+    }).filter(p => p.length > 0);
+  }, [metin?.icerik]);
+
+  const FontKontrol = ({ light = false }) => (
+    <div className="flex items-center gap-1">
+      <button onClick={fontKucult} aria-label="Yazıyı küçült"
+        className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${light ? 'bg-white/70 hover:bg-white text-gray-700 border border-gray-200' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+        disabled={fontSize <= 14}>A−</button>
+      <button onClick={fontBuyut} aria-label="Yazıyı büyüt"
+        className={`w-8 h-8 rounded-lg text-sm font-bold transition-all ${light ? 'bg-white/70 hover:bg-white text-gray-700 border border-gray-200' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+        disabled={fontSize >= 24}>A+</button>
+    </div>
+  );
+
+  const MetinGorseli = ({ maxWidth = "max-w-xl" }) => (
+    <div className={`font-serif text-gray-800 leading-loose ${maxWidth} mx-auto`} style={{ fontSize: `${fontSize}px` }}>
+      {paragraflar.map((cumleler, pi) => (
+        <p key={pi} className="mb-5">
+          {cumleler.map((c, ci) => (
+            <React.Fragment key={ci}>
+              <span>{c.cumle}</span>
+              <sup className="ml-1 mr-1.5 text-gray-300 hover:text-orange-500 transition-all inline-block cursor-default align-super select-none"
+                style={{ fontSize: '0.55em' }}
+                onMouseEnter={e => { e.currentTarget.style.fontSize = '0.85em'; }}
+                onMouseLeave={e => { e.currentTarget.style.fontSize = '0.55em'; }}
+                title="Cümle sonuna kadar okunan toplam kelime">
+                {c.kumulatif}
+              </sup>
+              {' '}
+            </React.Fragment>
+          ))}
+        </p>
+      ))}
+    </div>
+  );
+
   // Rapor form state (öğretmen için)
   const [anlama, setAnlama] = useState({
     cumle_anlama:"orta", bilinmeyen_sozcuk:"orta", baglac_zamir:"orta",
@@ -1933,12 +1997,15 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
     return (
       <div className="fixed inset-0 bg-amber-50 z-50 overflow-auto">
         <div className="max-w-3xl mx-auto p-8">
-          <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-800">{metin.baslik}</h2>
-            <p className="text-sm text-gray-500">{metin.sinif_seviyesi}. Sınıf • {metin.kelime_sayisi} kelime</p>
+          <div className="flex items-start justify-between mb-6 gap-4">
+            <div className="flex-1 text-center">
+              <h2 className="text-2xl font-bold text-gray-800">{metin.baslik}</h2>
+              <p className="text-sm text-gray-500">{metin.sinif_seviyesi}. Sınıf • {metin.kelime_sayisi} kelime</p>
+            </div>
+            <FontKontrol />
           </div>
-          <div className="bg-white rounded-2xl shadow-sm p-8 font-serif text-lg leading-loose text-gray-800 whitespace-pre-wrap">
-            {metin.icerik}
+          <div className="bg-white rounded-2xl shadow-sm p-8">
+            <MetinGorseli maxWidth="max-w-2xl" />
           </div>
         </div>
       </div>
@@ -1955,6 +2022,7 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
           <span className="text-sm text-gray-500">{metin.baslik} • {metin.kelime_sayisi} kelime</span>
         </div>
         <div className="flex items-center gap-4">
+          <FontKontrol />
           <div className="text-3xl font-mono font-bold text-gray-800 tabular-nums">{formatSure(sure)}</div>
           <button onClick={toggleSayac}
             className={`px-4 py-2 rounded-xl text-white font-medium transition-all ${calisıyor ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}>
@@ -1969,9 +2037,7 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
         {/* Sol: Metin */}
         <div className="flex-1 overflow-y-auto bg-amber-50 p-6">
           <h3 className="text-xl font-bold text-gray-800 mb-4 text-center">{metin.baslik}</h3>
-          <div className="font-serif text-base leading-loose text-gray-800 whitespace-pre-wrap max-w-xl mx-auto">
-            {metin.icerik}
-          </div>
+          <MetinGorseli />
         </div>
 
         {/* Sağ panel: sekmeli form */}
