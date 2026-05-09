@@ -2010,11 +2010,17 @@ async def create_metin(data: MetinCreate, current_user=Depends(get_current_user)
 
 # ★ Metin listeleme endpoint'i (frontend: axios.get(`${API}/diagnostic/texts`))
 @api_router.get("/diagnostic/texts")
-async def get_metinler(current_user=Depends(get_current_user)):
+async def get_metinler(sinif_seviyesi: Optional[str] = None, current_user=Depends(get_current_user)):
     role = current_user.get("role", "")
     user_id = current_user.get("id", "")
 
-    items = await db.analiz_metinler.find().sort("olusturma_tarihi", -1).to_list(length=None)
+    query = {}
+    if sinif_seviyesi:
+        m = re.search(r"\d+", sinif_seviyesi)
+        if m:
+            query["sinif_seviyesi"] = m.group()
+
+    items = await db.analiz_metinler.find(query).sort("olusturma_tarihi", -1).to_list(length=None)
     result = []
     for item in items:
         item.pop("_id", None)

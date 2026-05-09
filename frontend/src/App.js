@@ -1560,7 +1560,7 @@ function NormTablosu({ onClose }) {
 }
 
 // ── METİN YÖNETİMİ (Moderasyon Akışlı) ──
-function MetinYonetimi({ onMetinSec, secimModu = false, user }) {
+function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif }) {
   const { toast } = useToast();
   const [metinler, setMetinler] = useState([]);
   const [formAcik, setFormAcik] = useState(false);
@@ -1571,14 +1571,20 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user }) {
   const [puanDuzenle, setPuanDuzenle] = useState(false);
 
   const fetchMetinler = async () => {
-    try { const r = await axios.get(`${API}/diagnostic/texts`); setMetinler(r.data); } catch(e) {}
+    try {
+      const url = filtreSinif
+        ? `${API}/diagnostic/texts?sinif_seviyesi=${encodeURIComponent(filtreSinif)}`
+        : `${API}/diagnostic/texts`;
+      const r = await axios.get(url);
+      setMetinler(r.data);
+    } catch(e) {}
   };
 
   const fetchPuanAyarlari = async () => {
     try { const r = await axios.get(`${API}/ayarlar/puanlar`); setPuanAyarlari(r.data); } catch(e) {}
   };
 
-  useEffect(() => { fetchMetinler(); fetchPuanAyarlari(); }, []);
+  useEffect(() => { fetchMetinler(); fetchPuanAyarlari(); }, [filtreSinif]);
 
   const kelimeSay = (t) => t.trim().split(/\s+/).filter(Boolean).length;
 
@@ -3585,7 +3591,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label>Öğrenci Seç</Label>
-              <Select value={seciliOgrenci?.id || ""} onValueChange={v => setSeciliOgrenci(students.find(s => s.id === v))}>
+              <Select value={seciliOgrenci?.id || ""} onValueChange={v => { setSeciliOgrenci(students.find(s => s.id === v)); setSeciliMetin(null); }}>
                 <SelectTrigger><SelectValue placeholder="Öğrenci seçin..." /></SelectTrigger>
                 <SelectContent position="popper" sideOffset={4} className="max-h-60 overflow-y-auto z-50">
                   {(students || []).map(s => <SelectItem key={s.id} value={s.id}>{s.ad} {s.soyad} — {s.sinif}</SelectItem>)}
@@ -3595,8 +3601,9 @@ function GirisAnaliziModul({ user, students, teachers }) {
             <div>
               <Label>Analiz Metni Seç</Label>
               <button onClick={() => setMetinDialogAcik(true)}
-                className="w-full border border-gray-300 rounded-lg p-2 text-left text-sm hover:border-orange-400 transition-colors">
-                {seciliMetin ? <span className="font-medium">{seciliMetin.baslik} <span className="text-gray-400 font-normal">({seciliMetin.kelime_sayisi} kelime)</span></span> : <span className="text-gray-400">Metin seçmek için tıklayın...</span>}
+                disabled={!seciliOgrenci}
+                className="w-full border border-gray-300 rounded-lg p-2 text-left text-sm hover:border-orange-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-300">
+                {seciliMetin ? <span className="font-medium">{seciliMetin.baslik} <span className="text-gray-400 font-normal">({seciliMetin.kelime_sayisi} kelime)</span></span> : <span className="text-gray-400">{seciliOgrenci ? "Metin seçmek için tıklayın..." : "Önce öğrenci seçin..."}</span>}
               </button>
             </div>
           </div>
@@ -3670,7 +3677,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
             <DialogTitle>📄 Analiz Metinleri</DialogTitle>
             <DialogDescription>{seciliMetin ? "Farklı bir metin seçin veya yeni metin ekleyin" : "Analiz için metin seçin"}</DialogDescription>
           </DialogHeader>
-          <MetinYonetimi secimModu={true} user={user} onMetinSec={m => { setSeciliMetin(m); setMetinDialogAcik(false); }} />
+          <MetinYonetimi secimModu={true} user={user} filtreSinif={seciliOgrenci?.sinif} onMetinSec={m => { setSeciliMetin(m); setMetinDialogAcik(false); }} />
         </DialogContent>
       </Dialog>
     </div>
