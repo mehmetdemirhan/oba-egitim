@@ -1606,53 +1606,9 @@ api_router.include_router(egzersiz_router)
 from modules.kitap import router as kitap_router
 api_router.include_router(kitap_router)
 
-# ── Soru CRUD ──
-class SoruCreate(BaseModel):
-    kitap_id: str
-    bolum: int = 1
-    soru_metni: str
-    secenekler: list = []
-    dogru_cevap: int = 0
-
-@api_router.post("/sorular")
-async def soru_ekle(data: SoruCreate, current_user=Depends(get_current_user)):
-    soru = {
-        "id": str(uuid.uuid4()),
-        "kitap_id": data.kitap_id,
-        "bolum": data.bolum,
-        "soru_metni": data.soru_metni,
-        "secenekler": data.secenekler,
-        "dogru_cevap": data.dogru_cevap,
-        "ekleyen_id": current_user["id"],
-        "ekleyen_ad": f"{current_user.get('ad','')} {current_user.get('soyad','')}".strip(),
-        "kullanim_sayisi": 0,
-        "olusturma_tarihi": datetime.utcnow().isoformat(),
-    }
-    await db.sorular.insert_one(soru)
-    soru.pop("_id", None)
-    return soru
-
-@api_router.get("/sorular/{kitap_id}")
-async def soru_listele(kitap_id: str, bolum: int = None, current_user=Depends(get_current_user)):
-    filtre = {"kitap_id": kitap_id}
-    if bolum is not None:
-        filtre["bolum"] = bolum
-    sorular = await db.sorular.find(filtre).sort("bolum", 1).to_list(length=None)
-    for s in sorular:
-        s.pop("_id", None)
-    return sorular
-
-@api_router.put("/sorular/{soru_id}")
-async def soru_guncelle(soru_id: str, data: dict, current_user=Depends(get_current_user)):
-    update = {k: v for k, v in data.items() if k in ("soru_metni", "secenekler", "dogru_cevap", "bolum")}
-    if update:
-        await db.sorular.update_one({"id": soru_id}, {"$set": update})
-    return {"message": "Güncellendi"}
-
-@api_router.delete("/sorular/{soru_id}")
-async def soru_sil(soru_id: str, current_user=Depends(get_current_user)):
-    await db.sorular.delete_one({"id": soru_id})
-    return {"message": "Silindi"}
+# ── Soru CRUD → modules/sorular.py'ye taşındı.
+from modules.sorular import router as sorular_router
+api_router.include_router(sorular_router)
 # (kitap-bilgi-cek → modules/kitap.py)
 
 # ── PDF Rapor Üretimi ──
