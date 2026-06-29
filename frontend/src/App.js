@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./components/ui/dialog";
 import { Badge } from "./components/ui/badge";
-import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send, Bell } from "lucide-react";
+import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send, Bell, Database, RefreshCw, GitBranch, AlertTriangle } from "lucide-react";
 import { useToast } from "./hooks/use-toast";
 import { Toaster } from "./components/ui/toaster";
 import { ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Tooltip, XAxis, YAxis, CartesianGrid, AreaChart, Area } from 'recharts';
@@ -366,6 +366,8 @@ function AppContent() {
             <TabsTrigger value="giris-analizi" className={tabClass}><Stethoscope className="h-4 w-4 mr-2" />Giriş Analizi</TabsTrigger>
             <TabsTrigger value="mesajlar" className={tabClass}><Mail className="h-4 w-4 mr-2" />Mesajlar</TabsTrigger>
             {user.role === "admin" && <TabsTrigger value="ayarlar" className={tabClass}><Star className="h-4 w-4 mr-2" />Ayarlar</TabsTrigger>}
+            {user.role === "admin" && <TabsTrigger value="yedekleme" className={tabClass}><Database className="h-4 w-4 mr-2" />Yedekleme</TabsTrigger>}
+            {user.role === "admin" && <TabsTrigger value="guncelleme" className={tabClass}><GitBranch className="h-4 w-4 mr-2" />Güncelleme</TabsTrigger>}
             <TabsTrigger value="ai-merkezi" className={tabClass}>🧠 AI Merkezi</TabsTrigger>
           </TabsList>
 
@@ -1158,6 +1160,20 @@ function AppContent() {
           {user.role === "admin" && (
             <TabsContent value="ayarlar">
               <SistemAyarlari user={user} />
+            </TabsContent>
+          )}
+
+          {/* Yedekleme - Sadece Admin */}
+          {user.role === "admin" && (
+            <TabsContent value="yedekleme">
+              <YedeklemeYonetimi />
+            </TabsContent>
+          )}
+
+          {/* Güncelleme - Sadece Admin */}
+          {user.role === "admin" && (
+            <TabsContent value="guncelleme">
+              <GuncellemeKontrol />
             </TabsContent>
           )}
 
@@ -6879,6 +6895,389 @@ function VeliPaneli({ user, logout }) {
     </div>
   );
 }
+
+// ═══════════════════════════════════════════════
+// YEDEKLEME — Admin panel (DB snapshot + restore via GridFS)
+// ═══════════════════════════════════════════════
+
+function YedeklemeYonetimi() {
+  const { toast } = useToast();
+  const [backups, setBackups] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [restoreDialog, setRestoreDialog] = useState(null);
+  const [restoreConfirmText, setRestoreConfirmText] = useState("");
+  const [restoring, setRestoring] = useState(false);
+  const [lastRestoreResult, setLastRestoreResult] = useState(null);
+
+  const fetchBackups = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get(`${API}/admin/backups`);
+      setBackups(res.data || []);
+    } catch (e) {
+      toast({ title: "Hata", description: e.response?.data?.detail || "Yedekler yüklenemedi", variant: "destructive" });
+    }
+    setLoading(false);
+  }, [toast]);
+
+  useEffect(() => { fetchBackups(); }, [fetchBackups]);
+
+  const createBackup = async () => {
+    setCreating(true);
+    try {
+      await axios.post(`${API}/admin/backup`);
+      toast({ title: "Başarılı", description: "Yedek alındı" });
+      fetchBackups();
+    } catch (e) {
+      toast({ title: "Hata", description: e.response?.data?.detail || "Yedek alınamadı", variant: "destructive" });
+    }
+    setCreating(false);
+  };
+
+  const downloadBackup = async (id, filename) => {
+    try {
+      const res = await axios.get(`${API}/admin/backups/${id}/download`, { responseType: "blob" });
+      saveAs(res.data, filename || `oba_backup_${id}.json`);
+    } catch (e) {
+      toast({ title: "Hata", description: "İndirme başarısız", variant: "destructive" });
+    }
+  };
+
+  const deleteBackup = async (id) => {
+    if (!window.confirm("Bu yedek kalıcı olarak silinecek. Emin misin?")) return;
+    try {
+      await axios.delete(`${API}/admin/backups/${id}`);
+      toast({ title: "Silindi", description: "Yedek silindi" });
+      fetchBackups();
+    } catch (e) {
+      toast({ title: "Hata", description: e.response?.data?.detail || "Silme başarısız", variant: "destructive" });
+    }
+  };
+
+  const openRestoreDialog = (row) => {
+    setRestoreDialog(row);
+    setRestoreConfirmText("");
+    setLastRestoreResult(null);
+  };
+
+  const submitRestore = async () => {
+    if (restoreConfirmText !== "GERI YUKLE") return;
+    setRestoring(true);
+    try {
+      const res = await axios.post(`${API}/admin/backups/${restoreDialog.id}/restore`, { onay: restoreConfirmText });
+      setLastRestoreResult(res.data);
+      toast({ title: "Restore tamamlandı", description: `${Object.keys(res.data.report || {}).length} koleksiyon işlendi; ${res.data.merged_admin_count} admin korundu.` });
+      fetchBackups();
+    } catch (e) {
+      toast({ title: "Hata", description: e.response?.data?.detail || "Restore başarısız", variant: "destructive" });
+    }
+    setRestoring(false);
+  };
+
+  const formatBytes = (b) => {
+    if (!b && b !== 0) return "-";
+    if (b < 1024) return `${b} B`;
+    if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+    return `${(b / (1024 * 1024)).toFixed(2)} MB`;
+  };
+
+  const formatDate = (iso) => {
+    if (!iso) return "-";
+    try {
+      const d = new Date(iso);
+      return d.toLocaleString("tr-TR");
+    } catch { return iso; }
+  };
+
+  const etiketBadge = (etiket) => {
+    if (etiket === "auto-pre-restore") {
+      return <Badge className="bg-yellow-100 text-yellow-800 border border-yellow-300">Restore Öncesi (otomatik)</Badge>;
+    }
+    return <Badge className="bg-gray-100 text-gray-700 border border-gray-300">Manuel</Badge>;
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card className="border-0 shadow-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5" />Yedekleme Yönet</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="text-sm text-gray-600 max-w-xl">
+              Tüm veritabanı koleksiyonlarını anlık bir yedeğe kaydeder ve sunucuda saklar.
+              Manuel yedeklerin son <strong>{10}</strong>'u, otomatik (restore öncesi) yedeklerin son <strong>{3}</strong>'ü tutulur.
+              <br />
+              <span className="text-xs text-gray-500">Not: Yedek anlık değildir — yedek alınırken yapılan yazma işlemleri kapsanmayabilir.</span>
+            </div>
+            <Button onClick={createBackup} disabled={creating} className="bg-blue-600 hover:bg-blue-700 text-white">
+              <Database className={"h-4 w-4 mr-2 " + (creating ? "animate-pulse" : "")} />
+              {creating ? "Alınıyor..." : "Yedek Al"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-0 shadow-sm">
+        <CardHeader>
+          <CardTitle>Yedek Geçmişi</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="text-sm text-gray-500">Yükleniyor...</div>
+          ) : backups.length === 0 ? (
+            <div className="text-sm text-gray-500">Henüz yedek yok.</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tarih</TableHead>
+                  <TableHead>Etiket</TableHead>
+                  <TableHead>Sürüm</TableHead>
+                  <TableHead>Boyut</TableHead>
+                  <TableHead>Koleksiyon</TableHead>
+                  <TableHead>Toplam Kayıt</TableHead>
+                  <TableHead>İşlemler</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {backups.map(b => (
+                  <TableRow key={b.id}>
+                    <TableCell className="whitespace-nowrap">{formatDate(b.olusturma_tarihi)}</TableCell>
+                    <TableCell>{etiketBadge(b.etiket)}</TableCell>
+                    <TableCell className="text-xs text-gray-600">{b.app_version || "-"}</TableCell>
+                    <TableCell>{formatBytes(b.boyut_bytes)}</TableCell>
+                    <TableCell>{b.koleksiyon_sayisi}</TableCell>
+                    <TableCell>{b.toplam_kayit}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Button size="sm" variant="outline" onClick={() => downloadBackup(b.id, b.dosya_adi)} title="İndir">
+                          <Download className="h-4 w-4" />
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => openRestoreDialog(b)} title="Geri Yükle">
+                          <RefreshCw className="h-4 w-4" />
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => deleteBackup(b.id)} title="Sil" className="text-red-600 hover:text-red-700">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={!!restoreDialog} onOpenChange={(o) => { if (!o) { setRestoreDialog(null); setRestoreConfirmText(""); setLastRestoreResult(null); } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-700">
+              <AlertTriangle className="h-5 w-5" />
+              Geri Yükleme — TÜM VERİYİ ÜZERİNE YAZAR
+            </DialogTitle>
+            <DialogDescription>
+              {restoreDialog && (
+                <span>
+                  <strong>{formatDate(restoreDialog.olusturma_tarihi)}</strong> tarihli yedek geri yüklenecek.
+                  Mevcut tüm koleksiyonlar (admin kullanıcılar hariç) silinip backup içeriğiyle değiştirilir.
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <div className="bg-yellow-50 border border-yellow-300 rounded p-3 text-xs text-yellow-900">
+              Güvenlik: Restore başlamadan önce mevcut DB'nin otomatik yedeği alınır (etiket: <em>auto-pre-restore</em>).
+              Bir şey ters giderse o yedekten geri dönebilirsin.
+            </div>
+            <div>
+              <Label className="text-sm">Onaylamak için aşağıya tam olarak <code className="font-mono bg-gray-100 px-1">GERI YUKLE</code> yaz:</Label>
+              <Input
+                value={restoreConfirmText}
+                onChange={(e) => setRestoreConfirmText(e.target.value)}
+                placeholder="GERI YUKLE"
+                disabled={restoring}
+                autoFocus
+              />
+            </div>
+            {lastRestoreResult && (
+              <div className="bg-green-50 border border-green-300 rounded p-3 text-xs space-y-1">
+                <div className="font-semibold text-green-800">Restore tamamlandı.</div>
+                <div>Korunan admin: <strong>{lastRestoreResult.merged_admin_count}</strong></div>
+                <div>Güvenlik yedeği ID: <code className="font-mono">{lastRestoreResult.pre_restore_backup_id}</code></div>
+                <details>
+                  <summary className="cursor-pointer text-green-700">Koleksiyon raporu</summary>
+                  <pre className="mt-1 max-h-48 overflow-auto bg-white p-2 rounded border border-green-200 text-[10px]">
+{JSON.stringify(lastRestoreResult.report, null, 2)}
+                  </pre>
+                </details>
+              </div>
+            )}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => { setRestoreDialog(null); setRestoreConfirmText(""); setLastRestoreResult(null); }} disabled={restoring}>
+                {lastRestoreResult ? "Kapat" : "Vazgeç"}
+              </Button>
+              {!lastRestoreResult && (
+                <Button
+                  onClick={submitRestore}
+                  disabled={restoring || restoreConfirmText !== "GERI YUKLE"}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  {restoring ? "Geri yükleniyor..." : "Geri Yükle"}
+                </Button>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════
+// GÜNCELLEME KONTROL — Admin panel (GitHub'dan version check)
+// ═══════════════════════════════════════════════
+
+function GuncellemeKontrol() {
+  const { toast } = useToast();
+  const [version, setVersion] = useState(null);
+  const [info, setInfo] = useState(null);
+  const [checking, setChecking] = useState(false);
+
+  const fetchAll = useCallback(async (force = false) => {
+    setChecking(true);
+    try {
+      const [vRes, uRes] = await Promise.all([
+        axios.get(`${API}/admin/version`),
+        axios.get(`${API}/admin/updates/check`, { params: force ? { force: true } : {} }),
+      ]);
+      setVersion(vRes.data);
+      setInfo(uRes.data);
+    } catch (e) {
+      toast({ title: "Hata", description: e.response?.data?.detail || "Güncelleme bilgisi alınamadı", variant: "destructive" });
+    }
+    setChecking(false);
+  }, [toast]);
+
+  useEffect(() => { fetchAll(false); }, [fetchAll]);
+
+  const formatDate = (iso) => {
+    if (!iso) return "-";
+    try { return new Date(iso).toLocaleString("tr-TR"); } catch { return iso; }
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card className="border-0 shadow-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><GitBranch className="h-5 w-5" />Mevcut Sürüm</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!version ? (
+            <div className="text-sm text-gray-500">Yükleniyor...</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <div className="text-xs text-gray-500">Sürüm</div>
+                <div className="text-lg font-mono font-bold">{version.version || "—"}</div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-500">Commit SHA</div>
+                <div className="text-lg font-mono">{version.commit_sha ? version.commit_sha.slice(0, 7) : "—"}</div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-500">Deploy Tarihi</div>
+                <div className="text-sm">{formatDate(version.deployed_at) || "—"}</div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="border-0 shadow-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span className="flex items-center gap-2"><RefreshCw className={"h-5 w-5 " + (checking ? "animate-spin" : "")} />Güncelleme Durumu</span>
+            <Button size="sm" onClick={() => fetchAll(true)} disabled={checking}>
+              <RefreshCw className={"h-4 w-4 mr-2 " + (checking ? "animate-spin" : "")} />Şimdi Kontrol Et
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!info ? (
+            <div className="text-sm text-gray-500">Yükleniyor...</div>
+          ) : info.configured === false ? (
+            <div className="bg-yellow-50 border border-yellow-300 rounded p-4 text-sm text-yellow-900">
+              <div className="font-semibold mb-1 flex items-center gap-2"><AlertTriangle className="h-4 w-4" />GitHub repo yapılandırılmamış</div>
+              <div>{info.message}</div>
+              <div className="text-xs mt-2 text-yellow-800">
+                Render kontrol panelinden <code className="font-mono">GITHUB_REPO_OWNER</code> ve <code className="font-mono">GITHUB_REPO_NAME</code> ortam değişkenlerini ekleyin.
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {info.update_available ? (
+                <div className="bg-red-50 border border-red-300 rounded p-4 text-sm text-red-900">
+                  <div className="font-semibold mb-2 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />Yeni sürüm mevcut
+                  </div>
+                  <div>
+                    Son sürüm: <strong>{info.latest_release_tag || (info.latest_commit_sha || "").slice(0, 7) || "—"}</strong>
+                  </div>
+                  <div className="text-xs text-red-800 mt-2">
+                    Yeni sürüm yüklemek için <strong>Render kontrol panelinden manuel deploy</strong> başlatın.
+                  </div>
+                  {info.latest_release_url && (
+                    <a href={info.latest_release_url} target="_blank" rel="noopener noreferrer" className="inline-block mt-2 text-blue-600 underline text-xs">
+                      Sürüm notlarını gör →
+                    </a>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-green-50 border border-green-300 rounded p-4 text-sm text-green-900">
+                  <div className="font-semibold flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4" />Sistem güncel
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <div className="text-xs text-gray-500">Son Release</div>
+                  <div className="font-mono">{info.latest_release_tag || "—"}</div>
+                  <div className="text-xs text-gray-500 mt-1">{formatDate(info.latest_release_published_at)}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">Son Commit</div>
+                  <div className="font-mono">{info.latest_commit_sha ? info.latest_commit_sha.slice(0, 7) : "—"}</div>
+                  <div className="text-xs text-gray-500 mt-1">{formatDate(info.latest_commit_date)}</div>
+                  {info.latest_commit_message && (
+                    <div className="text-xs text-gray-600 mt-1 italic">{info.latest_commit_message}</div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                Son kontrol: {formatDate(info.checked_at)}
+                {info.from_cache && <Badge className="bg-gray-100 text-gray-600 border border-gray-300">cache</Badge>}
+              </div>
+
+              {info.errors && info.errors.length > 0 && (
+                <div className="text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded p-2">
+                  GitHub API uyarıları: {info.errors.join("; ")}
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 
 // ═══════════════════════════════════════════════
 // SİSTEM AYARLARI — Admin panel (Rozet, XP, Lig, Anket yönetimi)
