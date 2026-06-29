@@ -295,15 +295,22 @@ async def get_student(student_id: str):
     return Student(**parse_from_mongo(student))
 
 @router.put("/students/{student_id}", response_model=Student)
-async def update_student(student_id: str, student_update: StudentUpdate):
+async def update_student(student_id: str, student_update: StudentUpdate, current_user=Depends(get_current_user)):
     update_data = student_update.dict(exclude_unset=True)
+    # Mali alanları yalnızca admin/koordinatör güncelleyebilir; öğretmen gönderse
+    # bile yok sayılır (ödeme/öğretmen payı yetkisi admin/koordinatöre ait).
+    if current_user.get("role") == "teacher":
+        for alan in ("yapilmasi_gereken_odeme", "yapilan_odeme", "ogretmene_yapilacak_odeme"):
+            update_data.pop(alan, None)
     if not update_data:
         raise HTTPException(status_code=400, detail="Güncellenecek veri bulunamadı")
     old_student = await db.students.find_one({"id": student_id})
     if not old_student:
         raise HTTPException(status_code=404, detail="Öğrenci bulunamadı")
     old_teacher_id = old_student.get('ogretmen_id')
-    new_teacher_id = update_data.get('ogretmen_id')
+    # ogretmen_id kısmi güncellemede gönderilmemişse mevcut atama korunur;
+    # aksi halde None değeri "öğretmeni kaldır" olarak yanlış yorumlanırdı.
+    new_teacher_id = update_data['ogretmen_id'] if 'ogretmen_id' in update_data else old_teacher_id
     old_payment = old_student.get('ogretmene_yapilacak_odeme', 0)
     new_payment = update_data.get('ogretmene_yapilacak_odeme', old_payment)
     await db.students.update_one({"id": student_id}, {"$set": update_data})

@@ -111,7 +111,8 @@ function UserManagement({ teachers }) {
   );
 }
 
-function SimpleEditForm({ item, teachers, courses, classes, onSave, onCancel }) {
+function SimpleEditForm({ item, teachers, courses, classes, onSave, onCancel, userRole }) {
+  const maliYetki = userRole === 'admin' || userRole === 'coordinator';
   const [data, setData] = useState(item.data);
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -142,6 +143,10 @@ function SimpleEditForm({ item, teachers, courses, classes, onSave, onCancel }) 
             <SelectContent>{teachers.map(t=><SelectItem key={t.id} value={t.id}>{t.ad} {t.soyad}</SelectItem>)}</SelectContent>
           </Select>
         </div>
+        {maliYetki && <>
+          <div><Label>Ödeme (₺)</Label><Input type="number" step="0.01" value={data.yapilmasi_gereken_odeme||0} onChange={e => setData({...data,yapilmasi_gereken_odeme:parseFloat(e.target.value)||0})} /></div>
+          <div><Label>Öğretmen Payı (₺)</Label><Input type="number" step="0.01" value={data.ogretmene_yapilacak_odeme||0} onChange={e => setData({...data,ogretmene_yapilacak_odeme:parseFloat(e.target.value)||0})} /></div>
+        </>}
       </>}
       {item.type === 'course' && <>
         <div><Label>Fiyat (₺)</Label><Input type="number" value={data.fiyat||0} onChange={e => setData({...data,fiyat:parseFloat(e.target.value)||0})} /></div>
@@ -1200,7 +1205,7 @@ function AppContent() {
               <DialogTitle>{editingItem?.type === 'teacher' ? 'Öğretmen Düzenle' : editingItem?.type === 'student' ? 'Öğrenci Düzenle' : 'Kurs Düzenle'}</DialogTitle>
               <DialogDescription>Bilgileri güncelleyin</DialogDescription>
             </DialogHeader>
-            {editingItem && <SimpleEditForm item={editingItem} teachers={teachers} courses={availableCourses} classes={availableClasses} onSave={handleEdit} onCancel={() => setEditDialogOpen(false)} />}
+            {editingItem && <SimpleEditForm item={editingItem} teachers={teachers} courses={availableCourses} classes={availableClasses} onSave={handleEdit} onCancel={() => setEditDialogOpen(false)} userRole={user.role} />}
           </DialogContent>
         </Dialog>
 

@@ -139,6 +139,33 @@ async def run():
         r = await ac.get("/api/students", headers=H_admin)
         check("yapilmasi_gereken_odeme" in r.json()[0], "admin listesinde mali alanlar mevcut")
 
+        # 12) Admin, öğretmenin eklediği öğrenciye sonradan ücret atar (PUT /students)
+        ela_id = yeni["id"]
+        r = await ac.put(f"/api/students/{ela_id}", json={
+            "yapilmasi_gereken_odeme": 1200, "ogretmene_yapilacak_odeme": 400,
+        }, headers=H_admin)
+        check(r.status_code == 200, f"admin öğrenciyi güncelledi (status={r.status_code})")
+        r = await ac.get(f"/api/students/{ela_id}")
+        s = r.json()
+        check(s["yapilmasi_gereken_odeme"] == 1200, "admin ödeme tutarını kaydetti (1200)")
+        check(s["ogretmene_yapilacak_odeme"] == 400, "admin öğretmen payını kaydetti (400)")
+        # öğretmen toplam alacağı 400'e yükseldi (0 → 400)
+        r = await ac.get(f"/api/teachers/{teacher_id}")
+        check(r.json()["yapilmasi_gereken_odeme"] == 400, "öğretmen toplam ödemesi 400'e güncellendi")
+        # muhasebe borç tutarı = yapilmasi_gereken_odeme - yapilan_odeme = 1200
+        check(max(0, s["yapilmasi_gereken_odeme"] - s["yapilan_odeme"]) == 1200, "öğrenci borç tutarı 1200")
+
+        # 13) Öğretmen PUT ile mali alan göndermeye çalışırsa yok sayılır
+        r = await ac.put(f"/api/students/{ela_id}", json={
+            "kur": "5", "yapilmasi_gereken_odeme": 99999, "ogretmene_yapilacak_odeme": 88888,
+        }, headers=H_teacher)
+        check(r.status_code == 200, "öğretmen güncelleme isteği geçti")
+        r = await ac.get(f"/api/students/{ela_id}")
+        s = r.json()
+        check(s["kur"] == "5", "öğretmen mali olmayan alanı (kur) güncelleyebildi")
+        check(s["yapilmasi_gereken_odeme"] == 1200 and s["ogretmene_yapilacak_odeme"] == 400,
+              "öğretmenin gönderdiği mali alanlar yok sayıldı")
+
     await server.client.drop_database(TEST_DB)
 
 
