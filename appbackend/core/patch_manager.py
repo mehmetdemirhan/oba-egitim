@@ -202,6 +202,31 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def import_check(backend_entries: list) -> list:
+    """Yerleşen backend modüllerini import etmeyi dener. Hata listesi döner."""
+    hatalar = []
+    importlib.invalidate_caches()
+    import sys
+    for entry in backend_entries:
+        mod_adi = "modules." + Path(entry).stem
+        try:
+            if mod_adi in sys.modules:
+                importlib.reload(sys.modules[mod_adi])
+            else:
+                importlib.import_module(mod_adi)
+        except Exception as e:
+            hatalar.append(f"{mod_adi}: {type(e).__name__}: {e}")
+    return hatalar
+
+
+def _yerlesenleri_sil(yollar: list):
+    for y in yollar:
+        try:
+            Path(y).unlink()
+        except FileNotFoundError:
+            pass
+
+
 # ─────────────────────────────────────────────
 # Kurulum (Faz 1: temel) — güvenlik/versiyon/rollback sonraki fazlarda eklenir
 # ─────────────────────────────────────────────
@@ -225,6 +250,15 @@ def install_patch(data: bytes) -> dict:
     sonuc["name"] = name
     sonuc["version"] = manifest.get("version")
 
+    # 1.5) GÜVENLİK TARAMASI (AST) — yerleştirmeden ÖNCE
+    from core import patch_security
+    guvenlik = patch_security.scan_zip(data)
+    sonuc["warnings"].extend(guvenlik["warnings"])
+    if guvenlik["errors"]:
+        sonuc["errors"].append("Güvenlik taraması başarısız (tehlikeli kod):")
+        sonuc["errors"].extend(guvenlik["errors"])
+        return sonuc
+
     # 2) sınıflandır
     plan = classify_zip(data)
     if plan["rejected"]:
@@ -244,6 +278,16 @@ def install_patch(data: bytes) -> dict:
         sonuc["errors"].append(f"Dosya yerleştirme hatası: {e}")
         return sonuc
     sonuc["placed_files"] = yazilan
+
+    # 3.5) IMPORT KONTROLÜ — backend modülleri gerçekten import edilebiliyor mu?
+    import_hatalari = import_check(plan["backend"])
+    if import_hatalari:
+        # Yerleşen dosyaları geri al (tam sürümlü rollback Faz 4'te)
+        _yerlesenleri_sil(yazilan)
+        sonuc["placed_files"] = []
+        sonuc["errors"].append("Import kontrolü başarısız (modül yüklenemiyor):")
+        sonuc["errors"].extend(import_hatalari)
+        return sonuc
 
     # 4) manifest kaydet
     manifest.setdefault("core", name in KORUMALI_MODULLER)
