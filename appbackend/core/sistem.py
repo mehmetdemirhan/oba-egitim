@@ -128,3 +128,23 @@ async def get_ogrenci_rozetleri():
 async def get_anket_sorulari():
     doc = await db.sistem_ayarlari.find_one({"tip": "anket_sorulari"})
     return doc.get("degerler", ANKET_SORULARI_DEFAULT) if doc else ANKET_SORULARI_DEFAULT
+
+
+# ── Puan Ayarları (içerik katkı puanları) ──
+VARSAYILAN_PUANLAR = {
+    "metin_ekleme": 5,
+    "oylama_katilim": 2,
+    "metin_havuza_girme": 10,
+    "icerik_ekleme": 5,
+    "icerik_oylama": 2,
+    "ai_kitap_yukleme": 25,
+    "ai_ders_kitabi_yukleme": 40,
+    "ai_kitap_onaylandi": 15,
+}
+
+
+async def get_puan_ayarlari():
+    doc = await db.sistem_ayarlari.find_one({"tip": "puan_ayarlari"})
+    if doc:
+        return doc.get("puanlar", VARSAYILAN_PUANLAR)
+    return VARSAYILAN_PUANLAR
