@@ -228,6 +228,121 @@ def _yerlesenleri_sil(yollar: list):
 
 
 # ─────────────────────────────────────────────
+# Sürüm yönetimi (eski_versiyonlar/{modul}/{versiyon}/)
+# ─────────────────────────────────────────────
+def _index_path(name: str) -> Path:
+    return VERSIONS_DIR / name / "_index.json"
+
+
+def _index_oku(name: str) -> list:
+    p = _index_path(name)
+    if p.exists():
+        try:
+            return json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            return []
+    return []
+
+
+def _index_yaz(name: str, idx: list):
+    p = _index_path(name)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(idx, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def snapshot_version(name: str) -> str | None:
+    """Mevcut (canlı) modül dosyalarını arşive yedekler. Arşiv dizin adını döner.
+
+    Yalnızca modül zaten kuruluysa çalışır (güncelleme öncesi). Son MAX_VERSIONS
+    sürümü tutar; fazlasını (en eskiyi) siler.
+    """
+    cur = manifest_oku(name)
+    if not cur:
+        return None
+    ver = str(cur.get("version", "0.0.0"))
+    base = VERSIONS_DIR / name
+    # benzersiz dizin adı (aynı sürüm tekrar yedeklenebilir)
+    etiket = ver
+    n = 2
+    while (base / etiket).exists():
+        etiket = f"{ver}__{n}"
+        n += 1
+    vdir = base / etiket
+    (vdir / "backend").mkdir(parents=True, exist_ok=True)
+    (vdir / "frontend").mkdir(parents=True, exist_ok=True)
+
+    for f in cur.get("backend_files", []):
+        src = MODULES_DIR / f
+        if src.exists():
+            shutil.copy2(src, vdir / "backend" / f)
+    for f in cur.get("frontend_files", []):
+        src = FRONTEND_MODULES_DIR / f
+        if src.exists():
+            shutil.copy2(src, vdir / "frontend" / f)
+    (vdir / "manifest.json").write_text(
+        json.dumps(cur, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+    idx = _index_oku(name)
+    idx.append({"etiket": etiket, "version": ver, "archived_at": _now()})
+    # rotasyon: son MAX_VERSIONS kalsın
+    while len(idx) > MAX_VERSIONS:
+        eski = idx.pop(0)
+        try:
+            shutil.rmtree(base / eski["etiket"], ignore_errors=True)
+        except Exception:
+            pass
+    _index_yaz(name, idx)
+    return etiket
+
+
+def list_versions(name: str) -> list:
+    """Arşivlenmiş sürümleri (yeniden eskiye) döner."""
+    return list(reversed(_index_oku(name)))
+
+
+def restore_version(name: str, etiket: str) -> dict:
+    """Arşivdeki bir sürümü canlıya geri yükler."""
+    sonuc = {"ok": False, "errors": [], "restored_files": []}
+    vdir = VERSIONS_DIR / name / etiket
+    if not vdir.exists():
+        sonuc["errors"].append(f"Sürüm bulunamadı: {name}/{etiket}")
+        return sonuc
+    eski_manifest = None
+    mp = vdir / "manifest.json"
+    if mp.exists():
+        try:
+            eski_manifest = json.loads(mp.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    restored = []
+    for sub, hedef_dir in (("backend", MODULES_DIR), ("frontend", FRONTEND_MODULES_DIR)):
+        sdir = vdir / sub
+        if sdir.exists():
+            for f in sdir.iterdir():
+                if f.is_file():
+                    hedef_dir.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(f, hedef_dir / f.name)
+                    restored.append(str(hedef_dir / f.name))
+    if eski_manifest:
+        # active/core durumunu koru (mevcut manifest'ten)
+        mevcut = manifest_oku(name) or {}
+        eski_manifest["active"] = mevcut.get("active", eski_manifest.get("active", True))
+        eski_manifest["restored_at"] = _now()
+        manifest_kaydet(eski_manifest)
+
+    # import doğrula
+    hata = import_check([f"{Path(p).name}" for p in restored if p.endswith(".py")])
+    if hata:
+        sonuc["errors"].append("Geri yükleme sonrası import hatası: " + "; ".join(hata))
+        return sonuc
+    sonuc["ok"] = True
+    sonuc["restored_files"] = restored
+    return sonuc
+
+
+# ─────────────────────────────────────────────
 # Kurulum (Faz 1: temel) — güvenlik/versiyon/rollback sonraki fazlarda eklenir
 # ─────────────────────────────────────────────
 def install_patch(data: bytes) -> dict:
@@ -270,6 +385,17 @@ def install_patch(data: bytes) -> dict:
     if not (plan["backend"] or plan["frontend"] or plan["static"]):
         sonuc["errors"].append("ZIP içinde yerleştirilecek dosya yok.")
         return sonuc
+
+    # 2.5) GÜNCELLEMEyse mevcut sürümü arşivle (versiyon geçmişi + rollback kaynağı)
+    onceki_etiket = None
+    if manifest_oku(name) is not None:
+        try:
+            onceki_etiket = snapshot_version(name)
+            if onceki_etiket:
+                sonuc["warnings"].append(f"Önceki sürüm arşivlendi: {onceki_etiket}")
+        except Exception as e:
+            sonuc["warnings"].append(f"Sürüm arşivlenemedi: {e}")
+    sonuc["onceki_etiket"] = onceki_etiket
 
     # 3) yerleştir
     try:

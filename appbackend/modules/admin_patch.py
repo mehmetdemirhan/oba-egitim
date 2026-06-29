@@ -34,3 +34,24 @@ async def modul_yukle(
         "restart_uyarisi": "Backend yeniden başlatılıyor (uvicorn --reload). 10-15 saniye sonra hazır olacak.",
         **sonuc,
     }
+
+
+@router.get("/admin/moduller/{ad}/versiyonlar")
+async def modul_versiyonlar(ad: str, current_user=Depends(require_role(UserRole.ADMIN))):
+    """Bir modülün arşivlenmiş geçmiş sürümleri (yeniden eskiye)."""
+    if pm.manifest_oku(ad) is None and not (pm.VERSIONS_DIR / ad).exists():
+        raise HTTPException(status_code=404, detail="Modül bulunamadı.")
+    return pm.list_versions(ad)
+
+
+@router.post("/admin/moduller/{ad}/geri-yukle/{etiket}")
+async def modul_geri_yukle(ad: str, etiket: str, current_user=Depends(require_role(UserRole.ADMIN))):
+    """Modülü arşivdeki bir sürüme geri döndürür."""
+    sonuc = pm.restore_version(ad, etiket)
+    if not sonuc["ok"]:
+        raise HTTPException(status_code=400, detail={"mesaj": "Geri yükleme başarısız", **sonuc})
+    return {
+        "mesaj": f"'{ad}' '{etiket}' sürümüne geri yüklendi.",
+        "restart_uyarisi": "Backend yeniden başlatılıyor. 10-15 saniye sonra hazır olacak.",
+        **sonuc,
+    }
