@@ -182,13 +182,13 @@ async def get_metinler(sinif_seviyesi: Optional[str] = None, current_user=Depend
 
 @router.post("/diagnostic/texts/{metin_id}/admin-karar")
 async def metin_admin_karar(metin_id: str, karar: dict, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
-    # karar: {"onay": True/False, "direkt": True/False}
-    # direkt=True → oylama atla, direkt havuza al
+    # karar: {"onay": True/False}
+    # Admin kararı öğretmen oylamasını (>%60) BYPASS eder:
+    #   onay=True  → metin doğrudan havuza (yayında) alınır, oylama beklenmez
+    #   onay=False → metin reddedilir
+    # Not: Öğretmen oylaması (metin_oy_ver) hâlâ >%60 kuralıyla yayına alabilir.
     onay = karar.get("onay", False)
-    direkt = karar.get("direkt", False)
-    if not onay:
-        yeni_durum = "reddedildi"
-    elif direkt:
+    if onay:
         yeni_durum = "havuzda"
         # Ekleyene bonus puan (havuza direkt girince - dinamik)
         puanlar = await get_puan_ayarlari()
@@ -196,7 +196,7 @@ async def metin_admin_karar(metin_id: str, karar: dict, current_user=Depends(req
         if metin and metin.get("ekleyen_id"):
             await db.users.update_one({"id": metin["ekleyen_id"]}, {"$inc": {"puan": puanlar.get("metin_havuza_girme", 10)}})
     else:
-        yeni_durum = "oylama"
+        yeni_durum = "reddedildi"
     await db.analiz_metinler.update_one(
         {"id": metin_id},
         {"$set": {"durum": yeni_durum, **({"yayin_tarihi": datetime.utcnow().isoformat()} if yeni_durum == "havuzda" else {})}}

@@ -63,6 +63,33 @@ async def run():
         r = await ac.get("/api/diagnostic/texts", headers=H)
         check(r.status_code == 200 and any(m["id"] == metin_id for m in r.json()), "metin listede")
 
+        # Admin onayı oylamayı bypass eder → öğretmen metni doğrudan havuza girer
+        teacher_id = str(uuid.uuid4())
+        await server.db.users.insert_one({"id": teacher_id, "ad": "Ogr", "soyad": "T", "role": "teacher", "puan": 0})
+        TH = {"Authorization": f"Bearer {create_access_token({'sub': teacher_id})}"}
+        r = await ac.post("/api/diagnostic/texts", json={
+            "baslik": "Ogretmen Metni", "icerik": "Kucuk bir kasabada yasayan cocuk.",
+            "sinif_seviyesi": "4", "tur": "hikaye",
+        }, headers=TH)
+        ogr_metin_id = r.json()["id"]
+        check(r.json().get("durum") == "beklemede", "öğretmen metni beklemede durumunda")
+        r = await ac.post(f"/api/diagnostic/texts/{ogr_metin_id}/admin-karar", json={"onay": True}, headers=H)
+        check(r.status_code == 200 and r.json().get("durum") == "havuzda", "admin onayı metni doğrudan havuza aldı (oylama atlandı)")
+        # Öğrenci gözünden havuzda görünüyor mu?
+        student_id = str(uuid.uuid4())
+        await server.db.users.insert_one({"id": student_id, "ad": "Ali", "soyad": "Ogr", "role": "student", "puan": 0})
+        SH = {"Authorization": f"Bearer {create_access_token({'sub': student_id})}"}
+        r = await ac.get("/api/diagnostic/texts", headers=SH)
+        check(r.status_code == 200 and any(m["id"] == ogr_metin_id for m in r.json()), "onaylı metin havuzda (öğrenci görüyor)")
+        # Admin reddi → reddedildi
+        r = await ac.post("/api/diagnostic/texts", json={
+            "baslik": "Red Metni", "icerik": "Test icerik red.",
+            "sinif_seviyesi": "4", "tur": "hikaye",
+        }, headers=TH)
+        red_metin_id = r.json()["id"]
+        r = await ac.post(f"/api/diagnostic/texts/{red_metin_id}/admin-karar", json={"onay": False}, headers=H)
+        check(r.status_code == 200 and r.json().get("durum") == "reddedildi", "admin reddi metni reddedildi yaptı")
+
         # Oturum başlat
         ogr_id = str(uuid.uuid4())
         await server.db.students.insert_one({"id": ogr_id, "ad": "Ali", "soyad": "Veli", "sinif": "4", "toplam_xp": 0})
