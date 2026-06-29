@@ -1,0 +1,8 @@
+{
+  "name": "ornek_modul",
+  "version": "1.0.0",
+  "description": "Örnek yama modülü — Modül Yöneticisi için referans şablon.",
+  "author": "OBA Eğitim",
+  "type": "backend",
+  "core": false
+}

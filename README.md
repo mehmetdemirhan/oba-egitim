@@ -15,3 +15,14 @@ Yedekleme ve güncelleme özellikleri için backend'e (`appbackend/.env` lokalde
 | `RENDER_GIT_COMMIT` | Render otomatik | `/api/admin/version` çağrısının commit SHA değeri için. |
 
 `GITHUB_REPO_*` boş bırakılırsa güncelleme sekmesi yapılandırılmadığını bildirir; backup özellikleri etkilenmez.
+
+## Modül Yönetimi (Yama Sistemi)
+
+Backend modülerdir; her özellik `appbackend/modules/<ad>.py` içinde bir `APIRouter`
+olarak yaşar ve `modules/registry.json` sırasına göre dinamik yüklenir. Admin
+panelindeki **Modüller** sekmesinden ZIP ile modül yükleme / güncelleme /
+açma-kapama / silme / eski sürüme dönme yapılabilir (AST güvenlik taraması +
+otomatik rollback + son 3 sürüm arşivi ile).
+
+Ayrıntılı geliştirme rehberi, manifest şeması ve örnek paket:
+**[docs/MODUL_GELISTIRME.md](docs/MODUL_GELISTIRME.md)** · örnek: `docs/ornek_modul.zip`
