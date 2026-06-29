@@ -42,9 +42,10 @@ async def run():
     token = server.create_access_token({"sub": "bil-user-1"})
     auth = {"Authorization": f"Bearer {token}"}
 
-    # bildirim_olustur paylaşılan fonksiyonu (server.py'den import edilmiş hali) çalışmalı
-    await server.bildirim_olustur("bil-user-1", "mesaj_geldi", "Test bildirimi")
-    await server.bildirim_olustur("bil-user-1", "risk_yuksek", "Risk bildirimi")
+    # bildirim_olustur paylaşılan fonksiyonu (modules.bildirim'den) çalışmalı
+    from modules.bildirim import bildirim_olustur
+    await bildirim_olustur("bil-user-1", "mesaj_geldi", "Test bildirimi")
+    await bildirim_olustur("bil-user-1", "risk_yuksek", "Risk bildirimi")
 
     transport = ASGITransport(app=server.app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:

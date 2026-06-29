@@ -48,6 +48,8 @@ def zip_ver(ver):
 def main():
     from core import patch_manager as pm
 
+    from core import registry
+
     def temizle():
         for p in [pm.MODULES_DIR / f"{AD}.py", pm.MANIFESTS_DIR / f"{AD}.json"]:
             try:
@@ -55,6 +57,7 @@ def main():
             except FileNotFoundError:
                 pass
         shutil.rmtree(pm.VERSIONS_DIR / AD, ignore_errors=True)
+        registry.remove_module(AD)
 
     temizle()
     try:

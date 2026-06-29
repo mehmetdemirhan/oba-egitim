@@ -122,25 +122,5 @@
   {
     "name": "kullanici",
     "active": true
-  },
-  {
-    "name": "test_ornek_yama",
-    "active": true
-  },
-  {
-    "name": "test_sec_warn",
-    "active": true
-  },
-  {
-    "name": "test_sec_ok",
-    "active": true
-  },
-  {
-    "name": "test_ver_yama",
-    "active": true
-  },
-  {
-    "name": "test_rb_yama",
-    "active": true
   }
 ]

@@ -61,11 +61,13 @@ def ornek_zip() -> bytes:
 
 def temizle():
     from core import patch_manager as pm
+    from core import registry
     for p in [pm.MODULES_DIR / f"{MODUL_ADI}.py", pm.MANIFESTS_DIR / f"{MODUL_ADI}.json"]:
         try:
             p.unlink()
         except FileNotFoundError:
             pass
+    registry.remove_module(MODUL_ADI)
 
 
 async def run():

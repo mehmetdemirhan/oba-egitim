@@ -49,6 +49,8 @@ def main():
     adlar = ["test_sec_dangerous", "test_sec_syntax", "test_sec_import",
              "test_sec_warn", "test_sec_ok"]
 
+    from core import registry
+
     def temizle():
         for a in adlar:
             for p in [pm.MODULES_DIR / f"{a}.py", pm.MANIFESTS_DIR / f"{a}.json"]:
@@ -56,6 +58,7 @@ def main():
                     p.unlink()
                 except FileNotFoundError:
                     pass
+            registry.remove_module(a)
 
     temizle()
     try:

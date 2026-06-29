@@ -47,6 +47,8 @@ def zip_ile(ad, ver, py):
 def main():
     from core import patch_manager as pm
 
+    from core import registry
+
     def temizle():
         for p in [pm.MODULES_DIR / f"{AD}.py", pm.MANIFESTS_DIR / f"{AD}.json",
                   pm.MODULES_DIR / "test_rb_yeni.py", pm.MANIFESTS_DIR / "test_rb_yeni.json"]:
@@ -55,6 +57,8 @@ def main():
             except FileNotFoundError:
                 pass
         shutil.rmtree(pm.VERSIONS_DIR / AD, ignore_errors=True)
+        registry.remove_module(AD)
+        registry.remove_module("test_rb_yeni")
 
     temizle()
     try:
