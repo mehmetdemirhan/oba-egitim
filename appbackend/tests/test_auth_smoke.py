@@ -1,0 +1,107 @@
+"""Auth (/auth/*) smoke testi — login/me/change-password/users davranışı.
+
+İzole test DB'sine karşı çalışır (oba_test_auth_smoke). Gerçek DB'ye dokunmaz.
+    cd appbackend
+    .venv/Scripts/python.exe tests/test_auth_smoke.py
+"""
+import asyncio
+import os
+import sys
+
+TEST_DB = "oba_test_auth_smoke"
+os.environ["MONGO_URL"] = os.environ.get("MONGO_URL_TEST", "mongodb://localhost:27017")
+os.environ["DB_NAME"] = TEST_DB
+os.environ.setdefault("SECRET_KEY", "test-secret-key")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+_gecen = 0
+_kalan = 0
+
+
+def check(kosul, mesaj):
+    global _gecen, _kalan
+    if kosul:
+        _gecen += 1
+        print(f"  [GECTI] {mesaj}")
+    else:
+        _kalan += 1
+        print(f"  [KALDI] {mesaj}")
+
+
+async def run():
+    import server
+    from httpx import AsyncClient, ASGITransport
+    from datetime import datetime, timezone
+
+    db = server.db
+    await server.client.drop_database(TEST_DB)
+
+    # Admin kullanıcı (parola hash'i ile)
+    await db.users.insert_one({
+        "id": "auth-admin-1", "role": "admin", "ad": "Yetkili", "soyad": "Admin",
+        "email": "admin@test.local", "telefon": "5550001122",
+        "password_hash": server.hash_password("gizli123"),
+        "olusturma_tarihi": datetime.now(timezone.utc).isoformat(),
+    })
+
+    transport = ASGITransport(app=server.app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        # 1) Yanlış şifre → 401
+        r = await ac.post("/api/auth/login", json={"email_or_phone": "admin@test.local", "password": "yanlis"})
+        check(r.status_code == 401, f"yanlış şifre 401 (status={r.status_code})")
+
+        # 2) Doğru şifre → token
+        r = await ac.post("/api/auth/login", json={"email_or_phone": "admin@test.local", "password": "gizli123"})
+        check(r.status_code == 200, f"doğru şifre 200 (status={r.status_code})")
+        token = r.json().get("access_token")
+        check(bool(token), "login token döndürdü")
+        check(r.json().get("user", {}).get("role") == "admin", "login user.role=admin")
+        auth = {"Authorization": f"Bearer {token}"}
+
+        # 3) Telefon ile login
+        r = await ac.post("/api/auth/login", json={"email_or_phone": "5550001122", "password": "gizli123"})
+        check(r.status_code == 200, f"telefon ile login 200 (status={r.status_code})")
+
+        # 4) /auth/me
+        r = await ac.get("/api/auth/me", headers=auth)
+        check(r.status_code == 200 and r.json().get("id") == "auth-admin-1", "/auth/me doğru kullanıcı")
+
+        # 5) Admin başka kullanıcı oluşturur
+        r = await ac.post("/api/auth/users", headers=auth, json={
+            "ad": "Yeni", "soyad": "Öğretmen", "email": "ogr@test.local",
+            "password": "pass123", "role": "teacher",
+        })
+        check(r.status_code == 200 and r.json().get("role") == "teacher", "admin yeni kullanıcı oluşturdu")
+
+        # 6) Aynı email tekrar → 400
+        r = await ac.post("/api/auth/users", headers=auth, json={
+            "ad": "X", "soyad": "Y", "email": "ogr@test.local", "password": "p", "role": "teacher",
+        })
+        check(r.status_code == 400, f"duplike email 400 (status={r.status_code})")
+
+        # 7) Liste
+        r = await ac.get("/api/auth/users", headers=auth)
+        check(r.status_code == 200 and len(r.json()) == 2, "kullanıcı listesi 2 kayıt")
+
+        # 8) change-password sonra yeni şifre ile login
+        r = await ac.post("/api/auth/change-password", headers=auth,
+                          json={"old_password": "gizli123", "new_password": "yeni456"})
+        check(r.status_code == 200, f"change-password 200 (status={r.status_code})")
+        r = await ac.post("/api/auth/login", json={"email_or_phone": "admin@test.local", "password": "yeni456"})
+        check(r.status_code == 200, "yeni şifre ile login çalışıyor")
+
+        # 9) Token'sız korumalı uç → 403
+        r = await ac.get("/api/auth/users")
+        check(r.status_code in (401, 403), f"token'sız /auth/users reddedildi (status={r.status_code})")
+
+    await server.client.drop_database(TEST_DB)
+
+
+def main():
+    asyncio.run(run())
+    print(f"\nSONUC: {_gecen}/{_gecen + _kalan} kontrol gecti")
+    sys.exit(0 if _kalan == 0 else 1)
+
+
+if __name__ == "__main__":
+    main()
