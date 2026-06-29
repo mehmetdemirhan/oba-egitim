@@ -3831,6 +3831,12 @@ function OgretmenPaneli({ user, logout }) {
   const [mesajAlici, setMesajAlici] = useState("");
   const [mesajForm, setMesajForm] = useState({ konu: "", icerik: "" });
   const [mesajGorunum, setMesajGorunum] = useState("gelen");
+  // Yeni öğrenci ekleme (öğretmen) — mali alanlar yok, öğretmen otomatik atanır
+  const yeniOgrenciBos = { ad: "", soyad: "", sinif: "", veli_ad: "", veli_soyad: "", veli_telefon: "", aldigi_egitim: "", kur: "" };
+  const [yeniOgrenciAcik, setYeniOgrenciAcik] = useState(false);
+  const [yeniOgrenciForm, setYeniOgrenciForm] = useState(yeniOgrenciBos);
+  const [yeniOgrenciYukleniyor, setYeniOgrenciYukleniyor] = useState(false);
+  const egitimSecenekleri = ["Okuma Becerileri Temel", "Okuma Becerileri İleri", "Hızlı Okuma", "Anlama Becerileri", "Yazım Kuralları", "Dikkat Geliştirme", "Kelime Dağarcığı", "Metin Analizi"];
 
   const ogretmenId = user.linked_id || user.id;
 
@@ -3857,6 +3863,23 @@ function OgretmenPaneli({ user, logout }) {
   }, [ogretmenId]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  const yeniOgrenciKaydet = async (e) => {
+    e.preventDefault();
+    setYeniOgrenciYukleniyor(true);
+    try {
+      // Mali alanlar ve öğretmen ataması backend'de zorlanır; göndermesek de olur.
+      await axios.post(`${API}/students`, yeniOgrenciForm);
+      setYeniOgrenciAcik(false);
+      setYeniOgrenciForm(yeniOgrenciBos);
+      await fetchAll();
+      toast({ title: "Başarılı", description: "Öğrenci eklendi" });
+    } catch (err) {
+      toast({ title: "Hata", description: err.response?.data?.detail || "Öğrenci eklenemedi", variant: "destructive" });
+    } finally {
+      setYeniOgrenciYukleniyor(false);
+    }
+  };
 
   // Öğrenci detayını çek
   const ogrenciDetayCek = async (ogrenci) => {
@@ -4628,7 +4651,10 @@ function OgretmenPaneli({ user, logout }) {
           </div>)}
 
           <div className="flex items-center justify-between"><h2 className="text-lg font-bold">👥 Öğrencilerim</h2>
-            <Button size="sm" onClick={() => setGorevAtaGoster(!gorevAtaGoster)} className="bg-orange-500 text-white text-xs"><Plus className="h-3 w-3 mr-1" />Görev Ata</Button></div>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={() => setYeniOgrenciAcik(true)} className="bg-blue-600 text-white text-xs"><Plus className="h-3 w-3 mr-1" />Yeni Öğrenci</Button>
+              <Button size="sm" onClick={() => setGorevAtaGoster(!gorevAtaGoster)} className="bg-orange-500 text-white text-xs"><Plus className="h-3 w-3 mr-1" />Görev Ata</Button>
+            </div></div>
 
           {/* Hızlı görev atama */}
           {gorevAtaGoster && (<Card className="border-0 shadow-sm border-l-4 border-l-orange-500"><CardContent className="p-4"><form onSubmit={gorevAta} className="space-y-3">
@@ -4656,6 +4682,44 @@ function OgretmenPaneli({ user, logout }) {
             </Card>);
           })}
           {ogrenciler.length === 0 && riskler.length === 0 && (<div className="text-center py-12"><div className="text-5xl mb-3">👥</div><p className="text-gray-500">Henüz öğrenciniz yok</p></div>)}
+
+          {/* Yeni Öğrenci Modalı */}
+          <Dialog open={yeniOgrenciAcik} onOpenChange={setYeniOgrenciAcik}>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />Yeni Öğrenci</DialogTitle>
+                <DialogDescription>Öğrenci size otomatik atanır. Ödeme bilgileri yönetici tarafından eklenir.</DialogDescription>
+              </DialogHeader>
+              <form onSubmit={yeniOgrenciKaydet} className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div><Label>Ad *</Label><Input value={yeniOgrenciForm.ad} onChange={e => setYeniOgrenciForm({...yeniOgrenciForm, ad: e.target.value})} required /></div>
+                  <div><Label>Soyad *</Label><Input value={yeniOgrenciForm.soyad} onChange={e => setYeniOgrenciForm({...yeniOgrenciForm, soyad: e.target.value})} required /></div>
+                </div>
+                <div><Label>Sınıf *</Label>
+                  <Select value={yeniOgrenciForm.sinif} onValueChange={v => setYeniOgrenciForm({...yeniOgrenciForm, sinif: v})}>
+                    <SelectTrigger><SelectValue placeholder="Seçin" /></SelectTrigger>
+                    <SelectContent>{["1","2","3","4","5","6","7","8"].map(c => <SelectItem key={c} value={c}>{c}. Sınıf</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><Label>Veli Adı</Label><Input value={yeniOgrenciForm.veli_ad} onChange={e => setYeniOgrenciForm({...yeniOgrenciForm, veli_ad: e.target.value})} /></div>
+                  <div><Label>Veli Soyadı</Label><Input value={yeniOgrenciForm.veli_soyad} onChange={e => setYeniOgrenciForm({...yeniOgrenciForm, veli_soyad: e.target.value})} /></div>
+                </div>
+                <div><Label>Veli Telefon</Label><Input value={yeniOgrenciForm.veli_telefon} onChange={e => setYeniOgrenciForm({...yeniOgrenciForm, veli_telefon: e.target.value})} placeholder="05xx xxx xx xx" /></div>
+                <div><Label>Eğitim</Label>
+                  <Select value={yeniOgrenciForm.aldigi_egitim} onValueChange={v => setYeniOgrenciForm({...yeniOgrenciForm, aldigi_egitim: v})}>
+                    <SelectTrigger><SelectValue placeholder="Seçin" /></SelectTrigger>
+                    <SelectContent>{egitimSecenekleri.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div><Label>Kur</Label><Input value={yeniOgrenciForm.kur} onChange={e => setYeniOgrenciForm({...yeniOgrenciForm, kur: e.target.value})} placeholder="Ör: 1" /></div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button type="button" variant="outline" onClick={() => setYeniOgrenciAcik(false)}>İptal</Button>
+                  <Button type="submit" disabled={yeniOgrenciYukleniyor} className="bg-blue-600 text-white">{yeniOgrenciYukleniyor ? "Ekleniyor..." : "Ekle"}</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
         </>)}
 
         {/* ═══ GÖREVLER ═══ */}

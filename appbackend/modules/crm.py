@@ -230,8 +230,19 @@ async def delete_teacher(teacher_id: str):
     return {"message": "Öğretmen başarıyla silindi"}
 
 @router.post("/students", response_model=Student)
-async def create_student(student_data: StudentCreate):
-    student = Student(**student_data.dict())
+async def create_student(student_data: StudentCreate, current_user=Depends(get_current_user)):
+    rol = current_user.get("role")
+    if rol not in ("admin", "coordinator", "teacher"):
+        raise HTTPException(status_code=403, detail="Bu işlem için yetkiniz yok")
+    data = student_data.dict()
+    if rol == "teacher":
+        # Öğretmen kendi öğrencisini ekler: mali alanlar ve öğretmen ataması
+        # body'den gelse bile yok sayılır; ogretmen_id öğretmenin students
+        # filtresiyle (linked_id || id) uyumlu olacak şekilde backend'de set edilir.
+        data["ogretmen_id"] = current_user.get("linked_id") or current_user.get("id")
+        data["yapilmasi_gereken_odeme"] = 0.0
+        data["ogretmene_yapilacak_odeme"] = 0.0
+    student = Student(**data)
     await db.students.insert_one(prepare_for_mongo(student.dict()))
     if student.ogretmen_id:
         teacher = await db.teachers.find_one({"id": student.ogretmen_id})
@@ -265,10 +276,16 @@ async def create_student(student_data: StudentCreate):
         await db.payments.insert_one(ogretmen_kaydi)
     return student
 
-@router.get("/students", response_model=List[Student])
-async def get_students():
+@router.get("/students")
+async def get_students(current_user=Depends(get_current_user)):
     students = await db.students.find().to_list(length=None)
-    return [Student(**parse_from_mongo(s)) for s in students]
+    sonuc = [Student(**parse_from_mongo(s)).dict() for s in students]
+    # Öğretmen rolü mali alanları görmemeli (öğretmen payı/ödeme yalnızca admin/koordinatör).
+    if current_user.get("role") == "teacher":
+        for s in sonuc:
+            for alan in ("yapilmasi_gereken_odeme", "yapilan_odeme", "ogretmene_yapilacak_odeme"):
+                s.pop(alan, None)
+    return sonuc
 
 @router.get("/students/{student_id}", response_model=Student)
 async def get_student(student_id: str):

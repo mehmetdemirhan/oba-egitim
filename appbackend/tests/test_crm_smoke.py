@@ -30,11 +30,16 @@ def check(kosul, mesaj):
 
 
 async def run():
+    import uuid
     import server
+    from core.auth import create_access_token
     from httpx import AsyncClient, ASGITransport
 
     await server.client.drop_database(TEST_DB)
-    # CRM endpoint'lerinin çoğu auth'suz; öğrenci oluşturma için token gerekmez.
+    # Öğrenci oluşturma artık kimlik ister; admin token'ı kullanılır.
+    admin_id = str(uuid.uuid4())
+    await server.db.users.insert_one({"id": admin_id, "ad": "Yön", "soyad": "Etici", "role": "admin"})
+    H_admin = {"Authorization": f"Bearer {create_access_token({'sub': admin_id})}"}
     transport = ASGITransport(app=server.app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         # 1) Öğretmen oluştur
@@ -46,7 +51,7 @@ async def run():
         check(r.status_code == 200, f"öğretmen oluştu (status={r.status_code})")
         teacher_id = r.json()["id"]
 
-        # 2) Öğrenci oluştur → öğretmene ata, ödeme alanlarıyla
+        # 2) Öğrenci oluştur (admin) → öğretmene ata, ödeme alanlarıyla
         r = await ac.post("/api/students", json={
             "ad": "Can", "soyad": "Demir", "sinif": "4",
             "veli_ad": "Veli", "veli_soyad": "Demir", "veli_telefon": "5559998877",
@@ -54,7 +59,7 @@ async def run():
             "yapilmasi_gereken_odeme": 1000,
             "ogretmene_yapilacak_odeme": 300,
             "ogretmen_id": teacher_id,
-        })
+        }, headers=H_admin)
         check(r.status_code == 200, f"öğrenci oluştu (status={r.status_code})")
         student_id = r.json()["id"]
 
@@ -100,6 +105,39 @@ async def run():
         check(r.status_code == 200, "öğrenci silindi")
         r = await ac.get(f"/api/teachers/{teacher_id}")
         check(r.json()["ogrenci_sayisi"] == 0, "öğrenci silinince sayaç 0'a döndü")
+
+        # 10) Öğretmen kendi öğrencisini ekler: teacher_id zorlanır, mali alanlar yok sayılır
+        teacher_user_id = str(uuid.uuid4())
+        await server.db.users.insert_one({"id": teacher_user_id, "ad": "Ayşe", "soyad": "Yıldız",
+                                          "role": "teacher", "linked_id": teacher_id})
+        H_teacher = {"Authorization": f"Bearer {create_access_token({'sub': teacher_user_id})}"}
+        r = await ac.post("/api/students", json={
+            "ad": "Ela", "soyad": "Kaya", "sinif": "3",
+            "veli_ad": "Veli", "veli_soyad": "Kaya", "veli_telefon": "5550001122",
+            "aldigi_egitim": "Anlama Becerileri", "kur": "2",
+            "yapilmasi_gereken_odeme": 5000, "ogretmene_yapilacak_odeme": 999,
+            "ogretmen_id": "SAHTE_BASKA_OGRETMEN",
+        }, headers=H_teacher)
+        check(r.status_code == 200, f"öğretmen öğrenci ekledi (status={r.status_code})")
+        yeni = r.json()
+        check(yeni["ogretmen_id"] == teacher_id, "ogretmen_id öğretmene zorlandı (body yok sayıldı)")
+        check(yeni["yapilmasi_gereken_odeme"] == 0 and yeni["ogretmene_yapilacak_odeme"] == 0,
+              "mali alanlar yok sayıldı (0)")
+        r = await ac.get(f"/api/teachers/{teacher_id}")
+        check(r.json()["ogrenci_sayisi"] == 1, "öğretmen sayacı tekrar 1")
+        # öğretmenin eklemesi mali kayıt üretmemeli (hâlâ 2 otomatik kayıt + 1 manuel = 3)
+        r = await ac.get("/api/payments")
+        check(len(r.json()) == 3, f"öğretmen ekleme yeni ödeme kaydı üretmedi ({len(r.json())})")
+
+        # 11) Öğretmen /students listesinde mali alanlar gizli
+        r = await ac.get("/api/students", headers=H_teacher)
+        check(r.status_code == 200 and len(r.json()) >= 1, "öğretmen /students listesini aldı")
+        ogr = r.json()[0]
+        check(all(a not in ogr for a in ("yapilmasi_gereken_odeme", "yapilan_odeme",
+              "ogretmene_yapilacak_odeme")), "öğretmen listesinde mali alanlar yok")
+        # admin aynı listede mali alanları görür
+        r = await ac.get("/api/students", headers=H_admin)
+        check("yapilmasi_gereken_odeme" in r.json()[0], "admin listesinde mali alanlar mevcut")
 
     await server.client.drop_database(TEST_DB)
 
