@@ -227,6 +227,30 @@ def _yerlesenleri_sil(yollar: list):
             pass
 
 
+def _rollback(name: str, onceki_etiket: str | None, yazilan: list, sonuc: dict) -> dict:
+    """Hata sonrası otomatik geri alma.
+
+    Güncelleme ise (onceki_etiket var) arşivdeki önceki sürümü geri yükler;
+    yeni kurulum ise yerleşen dosyaları siler.
+    """
+    upd = {"rolled_back": False}
+    if onceki_etiket:
+        geri = restore_version(name, onceki_etiket)
+        if geri["ok"]:
+            upd["rolled_back"] = True
+            sonuc["warnings"].append(
+                f"⏪ Otomatik geri alındı: önceki sürüm ({onceki_etiket}) geri yüklendi."
+            )
+        else:
+            sonuc["errors"].append(
+                "KRİTİK: otomatik geri alma da başarısız! " + "; ".join(geri["errors"])
+            )
+    else:
+        _yerlesenleri_sil(yazilan)
+        sonuc["warnings"].append("Yeni modül kaldırıldı (kurulum tamamen geri alındı).")
+    return upd
+
+
 # ─────────────────────────────────────────────
 # Sürüm yönetimi (eski_versiyonlar/{modul}/{versiyon}/)
 # ─────────────────────────────────────────────
@@ -405,14 +429,13 @@ def install_patch(data: bytes) -> dict:
         return sonuc
     sonuc["placed_files"] = yazilan
 
-    # 3.5) IMPORT KONTROLÜ — backend modülleri gerçekten import edilebiliyor mu?
+    # 3.5) IMPORT KONTROLÜ + OTOMATİK ROLLBACK
     import_hatalari = import_check(plan["backend"])
     if import_hatalari:
-        # Yerleşen dosyaları geri al (tam sürümlü rollback Faz 4'te)
-        _yerlesenleri_sil(yazilan)
-        sonuc["placed_files"] = []
         sonuc["errors"].append("Import kontrolü başarısız (modül yüklenemiyor):")
         sonuc["errors"].extend(import_hatalari)
+        sonuc.update(_rollback(name, onceki_etiket, yazilan, sonuc))
+        sonuc["placed_files"] = []
         return sonuc
 
     # 4) manifest kaydet
