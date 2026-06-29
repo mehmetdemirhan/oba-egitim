@@ -1,0 +1,15 @@
+{
+  "name": "ilerleme",
+  "version": "1.0.0",
+  "description": "İlerleme/oyunlaştırma modülü (/xp/*, /kur/*, /rozetler/*, /sezon/*, /puan-tablosu/birlesik).",
+  "author": "OBA Eğitim",
+  "type": "backend",
+  "core": false,
+  "active": true,
+  "backend_files": [
+    "ilerleme.py"
+  ],
+  "frontend_files": [],
+  "installed_at": "2026-06-29T10:17:34.629972+00:00",
+  "builtin": true
+}

@@ -1,0 +1,15 @@
+{
+  "name": "risk",
+  "version": "1.0.0",
+  "description": "Risk skoru hesaplama endpoint'leri (/risk-skor/*).",
+  "author": "OBA Eğitim",
+  "type": "backend",
+  "core": false,
+  "active": true,
+  "backend_files": [
+    "risk.py"
+  ],
+  "frontend_files": [],
+  "installed_at": "2026-06-29T10:17:34.621428+00:00",
+  "builtin": true
+}

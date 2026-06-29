@@ -1,0 +1,15 @@
+{
+  "name": "kullanici",
+  "version": "1.0.0",
+  "description": "Kullanıcı + il/harita istatistik modülü (/kullanici/il-guncelle, /istatistik/turkiye-harita).",
+  "author": "OBA Eğitim",
+  "type": "backend",
+  "core": false,
+  "active": true,
+  "backend_files": [
+    "kullanici.py"
+  ],
+  "frontend_files": [],
+  "installed_at": "2026-06-29T10:17:34.752029+00:00",
+  "builtin": true
+}

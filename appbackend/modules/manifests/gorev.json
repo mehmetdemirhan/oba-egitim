@@ -1,0 +1,15 @@
+{
+  "name": "gorev",
+  "version": "1.0.0",
+  "description": "Görev atama sistemi endpoint'leri (/gorevler/*) ve modelleri.",
+  "author": "OBA Eğitim",
+  "type": "backend",
+  "core": false,
+  "active": true,
+  "backend_files": [
+    "gorev.py"
+  ],
+  "frontend_files": [],
+  "installed_at": "2026-06-29T10:17:34.722083+00:00",
+  "builtin": true
+}

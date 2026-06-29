@@ -1,0 +1,15 @@
+{
+  "name": "ai_kitap_zeka",
+  "version": "1.0.0",
+  "description": "AI kitap zekası modülü (/ai/kitap-zeka/*, /ai/kitap-zeka-haritasi, /ai/kitap-oyun).",
+  "author": "OBA Eğitim",
+  "type": "backend",
+  "core": false,
+  "active": true,
+  "backend_files": [
+    "ai_kitap_zeka.py"
+  ],
+  "frontend_files": [],
+  "installed_at": "2026-06-29T10:17:34.735224+00:00",
+  "builtin": true
+}

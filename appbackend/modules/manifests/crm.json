@@ -1,0 +1,15 @@
+{
+  "name": "crm",
+  "version": "1.0.0",
+  "description": "CRM çekirdeği: öğretmen, öğrenci, kurs, ders, ödeme ve dışa aktarım.",
+  "author": "OBA Eğitim",
+  "type": "backend",
+  "core": false,
+  "active": true,
+  "backend_files": [
+    "crm.py"
+  ],
+  "frontend_files": [],
+  "installed_at": "2026-06-29T10:17:34.556842+00:00",
+  "builtin": true
+}

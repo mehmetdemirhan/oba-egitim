@@ -1,0 +1,15 @@
+{
+  "name": "kitap",
+  "version": "1.0.0",
+  "description": "Kitap + Soru Havuzu modülü (/kitaplar/*, /kitap-bilgi-cek).",
+  "author": "OBA Eğitim",
+  "type": "backend",
+  "core": false,
+  "active": true,
+  "backend_files": [
+    "kitap.py"
+  ],
+  "frontend_files": [],
+  "installed_at": "2026-06-29T10:17:34.592807+00:00",
+  "builtin": true
+}

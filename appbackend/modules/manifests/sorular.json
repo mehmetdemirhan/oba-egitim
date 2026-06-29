@@ -1,0 +1,15 @@
+{
+  "name": "sorular",
+  "version": "1.0.0",
+  "description": "Soru CRUD modülü (/sorular/*).",
+  "author": "OBA Eğitim",
+  "type": "backend",
+  "core": false,
+  "active": true,
+  "backend_files": [
+    "sorular.py"
+  ],
+  "frontend_files": [],
+  "installed_at": "2026-06-29T10:17:34.595877+00:00",
+  "builtin": true
+}

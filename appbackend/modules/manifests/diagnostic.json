@@ -1,0 +1,15 @@
+{
+  "name": "diagnostic",
+  "version": "1.0.0",
+  "description": "Tanılama (diagnostic) modülü — /diagnostic/* ve PDF rapor üretimi.",
+  "author": "OBA Eğitim",
+  "type": "backend",
+  "core": false,
+  "active": true,
+  "backend_files": [
+    "diagnostic.py"
+  ],
+  "frontend_files": [],
+  "installed_at": "2026-06-29T10:17:34.576755+00:00",
+  "builtin": true
+}

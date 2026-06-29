@@ -1,0 +1,15 @@
+{
+  "name": "ai_bilgi_tabani",
+  "version": "1.0.0",
+  "description": "AI bilgi tabanı modülü (/ai/bilgi-tabani/*, /ai/sorular, /ai/maliyet-ozet, /ai/demo-yukle).",
+  "author": "OBA Eğitim",
+  "type": "backend",
+  "core": false,
+  "active": true,
+  "backend_files": [
+    "ai_bilgi_tabani.py"
+  ],
+  "frontend_files": [],
+  "installed_at": "2026-06-29T10:17:34.694405+00:00",
+  "builtin": true
+}

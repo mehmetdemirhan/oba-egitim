@@ -184,18 +184,61 @@ def manifest_oku(name: str) -> dict | None:
 
 
 def list_modules() -> list:
-    """Kurulu tüm modüllerin manifest'lerini döner (UI için)."""
+    """Kurulu modülleri registry SIRASINDA, manifest + aktiflik birleşik döner (UI)."""
+    from core import registry
     _ensure_dirs()
-    out = []
+    amap = registry.active_map()
+    sirali = [e["name"] for e in registry.load_registry()]
+    out, gorulen = [], set()
+    for name in sirali:
+        gorulen.add(name)
+        m = manifest_oku(name) or {
+            "name": name, "version": "?", "description": "(manifest yok)",
+            "author": "-", "type": "backend",
+        }
+        m["active"] = amap.get(name, True)
+        m["core"] = (name in registry.KORUMALI_MODULLER) or bool(m.get("core", False))
+        out.append(m)
+    # registry'de olmayıp manifest'i olan modüller (yetim)
     for p in sorted(MANIFESTS_DIR.glob("*.json")):
-        try:
-            m = json.loads(p.read_text(encoding="utf-8"))
-            m.setdefault("active", True)
-            m.setdefault("core", m["name"] in KORUMALI_MODULLER)
-            out.append(m)
-        except Exception:
+        if p.stem in gorulen:
             continue
+        m = manifest_oku(p.stem)
+        if m:
+            m["active"] = amap.get(p.stem, True)
+            m["core"] = (p.stem in registry.KORUMALI_MODULLER) or bool(m.get("core", False))
+            out.append(m)
     return out
+
+
+def delete_module(name: str) -> dict:
+    """Modülü tamamen kaldırır: dosyalar + manifest + registry + sürüm arşivi."""
+    from core import registry
+    res = {"ok": False, "errors": [], "removed": []}
+    if name in registry.KORUMALI_MODULLER:
+        res["errors"].append(f"'{name}' korumalı çekirdek modüldür, silinemez.")
+        return res
+    man = manifest_oku(name)
+    hedefler = []
+    if man:
+        hedefler += [MODULES_DIR / f for f in man.get("backend_files", [])]
+        hedefler += [FRONTEND_MODULES_DIR / f for f in man.get("frontend_files", [])]
+    else:
+        hedefler.append(MODULES_DIR / f"{name}.py")
+    for f in hedefler:
+        try:
+            Path(f).unlink()
+            res["removed"].append(str(f))
+        except FileNotFoundError:
+            pass
+    try:
+        _manifest_path(name).unlink()
+    except FileNotFoundError:
+        pass
+    registry.remove_module(name)
+    shutil.rmtree(VERSIONS_DIR / name, ignore_errors=True)
+    res["ok"] = True
+    return res
 
 
 def _now() -> str:
@@ -445,6 +488,10 @@ def install_patch(data: bytes) -> dict:
     manifest["backend_files"] = [Path(p).name for p in plan["backend"]]
     manifest["frontend_files"] = [Path(p).name for p in (plan["frontend"] + plan["static"])]
     manifest_kaydet(manifest)
+
+    # 5) registry'ye ekle (yeni modül) — mevcutsa sırası/aktifliği korunur
+    from core import registry
+    registry.add_module(name, active=manifest.get("active", True))
 
     sonuc["ok"] = True
     return sonuc

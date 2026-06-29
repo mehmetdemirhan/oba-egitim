@@ -1,0 +1,15 @@
+{
+  "name": "mesaj",
+  "version": "1.0.0",
+  "description": "Mesajlaşma sistemi endpoint'leri (/mesajlar/*) ve modelleri.",
+  "author": "OBA Eğitim",
+  "type": "backend",
+  "core": false,
+  "active": true,
+  "backend_files": [
+    "mesaj.py"
+  ],
+  "frontend_files": [],
+  "installed_at": "2026-06-29T10:17:34.716809+00:00",
+  "builtin": true
+}

@@ -1,0 +1,15 @@
+{
+  "name": "ogrenci_panel",
+  "version": "1.0.0",
+  "description": "Okuma kayıtları (reading_logs) + öğrenci paneli endpoint'leri.",
+  "author": "OBA Eğitim",
+  "type": "backend",
+  "core": false,
+  "active": true,
+  "backend_files": [
+    "ogrenci_panel.py"
+  ],
+  "frontend_files": [],
+  "installed_at": "2026-06-29T10:17:34.617348+00:00",
+  "builtin": true
+}

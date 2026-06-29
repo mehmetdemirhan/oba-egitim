@@ -1,0 +1,15 @@
+{
+  "name": "kitap_dersleri",
+  "version": "1.0.0",
+  "description": "Kitap dersleri (sınıf bazlı parça/soru havuzu) modülü (/kitap-dersleri/*).",
+  "author": "OBA Eğitim",
+  "type": "backend",
+  "core": false,
+  "active": true,
+  "backend_files": [
+    "kitap_dersleri.py"
+  ],
+  "frontend_files": [],
+  "installed_at": "2026-06-29T10:17:34.667383+00:00",
+  "builtin": true
+}

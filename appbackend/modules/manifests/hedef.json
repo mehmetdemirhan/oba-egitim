@@ -1,0 +1,15 @@
+{
+  "name": "hedef",
+  "version": "1.0.0",
+  "description": "Öğretmen hedef sistemi endpoint'leri (/hedefler/*) ve şablonları.",
+  "author": "OBA Eğitim",
+  "type": "backend",
+  "core": false,
+  "active": true,
+  "backend_files": [
+    "hedef.py"
+  ],
+  "frontend_files": [],
+  "installed_at": "2026-06-29T10:17:34.707634+00:00",
+  "builtin": true
+}

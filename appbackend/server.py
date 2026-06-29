@@ -104,8 +104,6 @@ api_router = APIRouter(prefix="/api")
 
 # UserCreate/UserLogin/UserResponse/TokenResponse/ChangePassword ve 7 endpoint
 # aynı yollarla kayıtlı kalır.
-from modules.auth_api import router as auth_router
-api_router.include_router(auth_router)
 
 # STARTUP: Admin kullanıcı oluştur
 
@@ -119,59 +117,33 @@ app.add_event_handler("startup", create_default_admin)
 # MEVCUT ROUTE'LAR (değişmeden korunuyor)
 
 # Dashboard & istatistik endpoint'leri (/dashboard, /dashboard/bekleyenler,
-from modules.dashboard import router as dashboard_router
-api_router.include_router(dashboard_router)
 
 # CRM endpoint'leri (/teachers, /students, /courses, /dersler, /payments, /export)
-from modules.crm import router as crm_router
-api_router.include_router(crm_router)
 
 # YEDEKLEME (BACKUP) + GÜNCELLEME (UPDATE CHECK) — ADMIN
 #   /admin/backups/{id}/download, /admin/backups/{id}/restore, DELETE,
 #   /admin/version, /admin/updates/check) aynı yollarla kayıtlı kalır.
-from modules.yedekleme import router as yedekleme_router
-api_router.include_router(yedekleme_router)
 
 # GİRİŞ ANALİZİ (FAZ 1A)
 
-from modules.diagnostic import router as diagnostic_router
-api_router.include_router(diagnostic_router)
 
 # ── Puan Ayarları ──
 from core.sistem import VARSAYILAN_PUANLAR, get_puan_ayarlari
 
-from modules.ayarlar import router as ayarlar_router
-api_router.include_router(ayarlar_router)
 
-from modules.egzersiz import router as egzersiz_router
-api_router.include_router(egzersiz_router)
 
-from modules.kitap import router as kitap_router
-api_router.include_router(kitap_router)
 
-from modules.sorular import router as sorular_router
-api_router.include_router(sorular_router)
 
-from modules.admin_debug import router as admin_debug_router
-api_router.include_router(admin_debug_router)
 
 # MODÜL YÖNETİCİSİ (yama sistemi) — ADMIN
-from modules.admin_patch import router as admin_patch_router
-api_router.include_router(admin_patch_router)
 
 # GELİŞİM ALANI - Tam İş Akışı
 
-from modules.gelisim import router as gelisim_router
-api_router.include_router(gelisim_router)
 
 # OKUMA KAYITLARI (reading_logs) + ÖĞRENCİ PANELİ
 # aynı yollarla kayıtlı.
-from modules.ogrenci_panel import router as ogrenci_panel_router
-api_router.include_router(ogrenci_panel_router)
 
 # /risk-skor/{ogrenci_id} ve /risk-skor/toplu aynı yollar+sırayla kayıtlı.
-from modules.risk import router as risk_router
-api_router.include_router(risk_router)
 
 # XP + LİG + KUR SİSTEMİ (Faz 3)
 
@@ -182,8 +154,6 @@ from core.sistem import (
     get_ogrenci_rozetleri, get_anket_sorulari,
 )
 
-from modules.ilerleme import router as ilerleme_router
-api_router.include_router(ilerleme_router)
 
 # SİSTEM AYARLARI YÖNETİMİ (Admin CRUD)
 
@@ -191,8 +161,6 @@ api_router.include_router(ilerleme_router)
 
 # VELİ DEĞERLENDİRME ANKETİ
 
-from modules.anketler import router as anketler_router
-api_router.include_router(anketler_router)
 
 # KUR ATLAMA KAYDI (rozet için güncelleme)
 
@@ -201,31 +169,19 @@ _original_kur_atla = None  # placeholder
 
 # AI KOÇLUK + DNA + SORU ÜRETİMİ + HİKAYE
 
-from modules.ai_kocluk import router as ai_kocluk_router
-api_router.include_router(ai_kocluk_router)
 
-from modules.ai_uretim import router as ai_uretim_router
-api_router.include_router(ai_uretim_router)
 
 # ── KİTAP DERSLERİ — Öğrenci için sınıf/kitap bazlı okuma ──
 
-from modules.kitap_dersleri import router as kitap_dersleri_router
-api_router.include_router(kitap_dersleri_router)
 
 # ── KİTAP İÇERİK EDİTÖRÜ (Admin) ──
 
-from modules.ai_bilgi_tabani import router as ai_bilgi_tabani_router
-api_router.include_router(ai_bilgi_tabani_router)
 
-from modules.ai_socratic import router as ai_socratic_router
-api_router.include_router(ai_socratic_router)
 
 # DALGA 2: SOCRATİC READİNG + KELİME EVRİMİ + MİNİ OYUN
 
 # ── KELİME EVRİMİ (SPACED REPETITION) ──
 
-from modules.ai_kelime import router as ai_kelime_router
-api_router.include_router(ai_kelime_router)
 
 # ── MİNİ OYUN ÜRETİCİ ──
 
@@ -234,36 +190,20 @@ api_router.include_router(ai_kelime_router)
 # ── YANDEX DISK YARDIMCI FONKSİYONLAR ──────────────────────
 
 # /hedefler/sablonlar, /hedefler (POST/GET), /hedefler/{id} (DELETE) aynı yollarla.
-from modules.hedef import router as hedef_router
-api_router.include_router(hedef_router)
 
 # Endpoint'ler (/bildirimler, /bildirimler/okunmamis, .../okundu,
 # /bildirimler/tumunu-oku, DELETE, /bildirimler/kontrol) aynı yollarla kayıtlı.
 # Paylaşılan semboller server.py'nin başka yerlerinde (startup demo seed,
 # diagnostic rapor, görev, mesaj) kullanıldığı için import ediliyor.
-from modules.bildirim import (
-    router as bildirim_router,
-    BILDIRIM_TURLERI,
-    bildirim_olustur,
-    bildirim_gorev_atandi,
-    bildirim_rapor_tamamlandi,
-)
-api_router.include_router(bildirim_router)
 
 # /mesajlar, /mesajlar/{id}/okundu, /mesajlar/okunmamis-sayisi aynı yollarla.
 # (create_mesaj, bildirim_olustur'u modules.bildirim'den kullanır.)
-from modules.mesaj import router as mesaj_router
-api_router.include_router(mesaj_router)
 
 # /gorevler, /gorevler/toplu, /gorevler/{id}/durum, DELETE, /gorevler/istatistik
 # aynı yollarla. (create_gorev, bildirim_gorev_atandi'yı modules.bildirim'den kullanır.)
-from modules.gorev import router as gorev_router
-api_router.include_router(gorev_router)
 
 # DALGA 3: SPEECH AI — SESLİ OKUMA ANALİZİ
 
-from modules.ai_speech import router as ai_speech_router, SPEECH_OKUMA_METİNLERİ
-api_router.include_router(ai_speech_router)
 
 # DALGA 4: KİTAP ZEKÂ HARİTASI
 
@@ -277,20 +217,14 @@ ZEKA_ETIKETLER = {
     "hedef_kelime_yogunlugu": "Kelime Yoğunluğu",
 }
 
-from modules.ai_kitap_zeka import router as ai_kitap_zeka_router
-api_router.include_router(ai_kitap_zeka_router)
 
 # DALGA 3: AI MOTİVASYON MOTORU
 
 # DALGA 3: OKUMA EVRENİ (5 BÖLGE)
 
-from modules.ai_oyunlastirma import router as ai_oyunlastirma_router
-api_router.include_router(ai_oyunlastirma_router)
 
 # DALGA 3: OKUMA DİKKAT ANALİZİ
 
-from modules.ai_dikkat_arkadas import router as ai_dikkat_arkadas_router
-api_router.include_router(ai_dikkat_arkadas_router)
 
 # DALGA 3: OKUMA DİKKAT ANALİZİ
 
@@ -326,8 +260,6 @@ api_router.include_router(ai_dikkat_arkadas_router)
 
 # TÜRKİYE OKUMA HARİTASI (Anonim, KVKK uyumlu)
 
-from modules.kullanici import router as kullanici_router
-api_router.include_router(kullanici_router)
 
 # ETKİ İSTATİSTİKLERİ
 
@@ -337,6 +269,8 @@ api_router.include_router(kullanici_router)
 
 # ★ CORS middleware yukarıda (app oluşturulduktan hemen sonra) eklendi
 # Router'ı burada dahil ediyoruz
+from core.registry import register_routers
+register_routers(api_router)
 app.include_router(api_router)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')

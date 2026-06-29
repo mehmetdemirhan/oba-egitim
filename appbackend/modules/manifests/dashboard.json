@@ -1,0 +1,15 @@
+{
+  "name": "dashboard",
+  "version": "1.0.0",
+  "description": "Dashboard & istatistik endpoint'leri (/dashboard, /stats/*) ve modelleri.",
+  "author": "OBA Eğitim",
+  "type": "backend",
+  "core": true,
+  "active": true,
+  "backend_files": [
+    "dashboard.py"
+  ],
+  "frontend_files": [],
+  "installed_at": "2026-06-29T10:17:34.546615+00:00",
+  "builtin": true
+}

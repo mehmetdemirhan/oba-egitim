@@ -1,0 +1,15 @@
+{
+  "name": "anketler",
+  "version": "1.0.0",
+  "description": "Veli anketleri modülü (/anketler/*).",
+  "author": "OBA Eğitim",
+  "type": "backend",
+  "core": false,
+  "active": true,
+  "backend_files": [
+    "anketler.py"
+  ],
+  "frontend_files": [],
+  "installed_at": "2026-06-29T10:17:34.633793+00:00",
+  "builtin": true
+}
