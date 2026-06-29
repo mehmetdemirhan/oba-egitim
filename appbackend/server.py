@@ -155,6 +155,10 @@ api_router.include_router(sorular_router)
 from modules.admin_debug import router as admin_debug_router
 api_router.include_router(admin_debug_router)
 
+# MODÜL YÖNETİCİSİ (yama sistemi) — ADMIN
+from modules.admin_patch import router as admin_patch_router
+api_router.include_router(admin_patch_router)
+
 # GELİŞİM ALANI - Tam İş Akışı
 
 from modules.gelisim import router as gelisim_router
