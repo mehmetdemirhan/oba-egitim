@@ -171,6 +171,90 @@ def _olay_siralama_mock(sinif, konu, soru_sayisi):
     }
 
 
+# ─────────────────────────────────────────────────────────────
+# Tier 2: Okuduğunu anlama (FAZ 2)
+# Ortak şema: {"metin": "kısa paragraf", "sorular": [{soru, secenekler, dogru}]}
+# puanlama = "secmeli"; render metni bir kez üstte gösterir.
+# ─────────────────────────────────────────────────────────────
+
+def _metinli_user(odak):
+    """Belirli bir okuduğunu anlama odağı için metin+seçmeli prompt üretici."""
+    def fn(sinif, konu, soru_sayisi, zorluk):
+        konu_str = konu or "günlük hayattan bir olay"
+        return (
+            f"Sınıf {sinif} seviyesine uygun, '{konu_str}' hakkında 3-5 cümlelik kısa bir "
+            f"Türkçe paragraf yaz. Zorluk: {zorluk or 'orta'}. Ardından bu paragrafa dayalı, "
+            f"{odak} ölçen {soru_sayisi} adet çoktan seçmeli soru üret. Her sorunun 4 seçeneği "
+            "olsun ve doğru seçeneğin indeksini (0-3) belirt.\n"
+            "JSON şeması: "
+            '{"metin": "kısa paragraf", "sorular": [{"soru": "...", "secenekler": ["a","b","c","d"], "dogru": 0}]}'
+            + _JSON_KURAL
+        )
+    return fn
+
+
+def _metinli_mock_fabrika(metin, sorular):
+    def fn(sinif, konu, soru_sayisi):
+        return {"metin": metin, "sorular": sorular[: max(1, min(soru_sayisi, len(sorular)))]}
+    return fn
+
+
+_5N1K_METIN = (
+    "Ayşe, cumartesi sabahı erkenden kalktı. Annesiyle birlikte pazara gitti ve "
+    "taze sebze aldılar. Eve dönünce birlikte çorba yaptılar."
+)
+_5n1k_mock = _metinli_mock_fabrika(_5N1K_METIN, [
+    {"soru": "Pazara kim gitti?", "secenekler": ["Ayşe ve annesi", "Ayşe ve babası", "Sadece annesi", "Komşular"], "dogru": 0},
+    {"soru": "Ayşe ne zaman kalktı?", "secenekler": ["Cumartesi sabahı", "Pazar akşamı", "Hafta içi", "Gece"], "dogru": 0},
+    {"soru": "Pazardan ne aldılar?", "secenekler": ["Taze sebze", "Oyuncak", "Kitap", "Giysi"], "dogru": 0},
+    {"soru": "Eve dönünce ne yaptılar?", "secenekler": ["Çorba yaptılar", "Uyudular", "Dışarı çıktılar", "Televizyon izlediler"], "dogru": 0},
+])
+
+_ANA_FIKIR_METIN = (
+    "Ormanlar, dünyamız için çok önemlidir. Havayı temizler, birçok canlıya ev sahipliği "
+    "yapar ve toprağı korur. Bu yüzden ağaçları korumalı ve yenilerini dikmeliyiz."
+)
+_ana_fikir_mock = _metinli_mock_fabrika(_ANA_FIKIR_METIN, [
+    {"soru": "Metnin ana fikri nedir?", "secenekler": ["Ormanları korumalıyız", "Ağaçlar uzundur", "Hayvanlar koşar", "Yaz sıcaktır"], "dogru": 0},
+    {"soru": "Ormanlar havaya ne yapar?", "secenekler": ["Temizler", "Kirletir", "Isıtır", "Hiçbir şey"], "dogru": 0},
+    {"soru": "Metne göre ne yapmalıyız?", "secenekler": ["Yeni ağaçlar dikmeliyiz", "Ağaçları kesmeliyiz", "Ormanı yakmalıyız", "Hiçbir şey yapmamalıyız"], "dogru": 0},
+    {"soru": "Ormanlar kimlere ev olur?", "secenekler": ["Birçok canlıya", "Sadece kuşlara", "Sadece insanlara", "Hiç kimseye"], "dogru": 0},
+])
+
+_CIKARIM_METIN = (
+    "Ali sabah pencereden dışarı baktı. Yerler ıslaktı ve insanlar şemsiyelerini "
+    "kapatıyordu. Gökyüzü yavaş yavaş açılıyordu."
+)
+_cikarim_mock = _metinli_mock_fabrika(_CIKARIM_METIN, [
+    {"soru": "Az önce ne olmuş olabilir?", "secenekler": ["Yağmur yağmış", "Kar yağmış", "Çok sıcak olmuş", "Fırtına çıkmış"], "dogru": 0},
+    {"soru": "Hava şu an nasıl?", "secenekler": ["Açılıyor", "Karlı", "Sisli", "Çok karanlık"], "dogru": 0},
+    {"soru": "İnsanlar neden şemsiye taşıyordu?", "secenekler": ["Yağmur yağdığı için", "Güneş için", "Süs için", "Rüzgâr için"], "dogru": 0},
+    {"soru": "Yerlerin ıslak olması neyi gösterir?", "secenekler": ["Yağış olduğunu", "Sıcak olduğunu", "Gece olduğunu", "Kuru olduğunu"], "dogru": 0},
+])
+
+_SEBEP_SONUC_METIN = (
+    "Murat ödevini zamanında yapmadı. Bu yüzden öğretmeni ona ek ödev verdi. "
+    "Murat o akşam parka gidemedi."
+)
+_sebep_sonuc_mock = _metinli_mock_fabrika(_SEBEP_SONUC_METIN, [
+    {"soru": "Murat neden ek ödev aldı?", "secenekler": ["Ödevini yapmadığı için", "Hasta olduğu için", "Geç kaldığı için", "Konuştuğu için"], "dogru": 0},
+    {"soru": "Murat neden parka gidemedi?", "secenekler": ["Ek ödevi olduğu için", "Hava kötü olduğu için", "Yorgun olduğu için", "Para olmadığı için"], "dogru": 0},
+    {"soru": "Ödevi zamanında yapsaydı ne olurdu?", "secenekler": ["Ek ödev almazdı", "Yine ceza alırdı", "Okula gitmezdi", "Uyuyamazdı"], "dogru": 0},
+    {"soru": "Olayın sonucu nedir?", "secenekler": ["Parka gidememesi", "Hasta olması", "Ödül alması", "Tatile çıkması"], "dogru": 0},
+])
+
+_TAHMIN_METIN = (
+    "Elif yeni bir tohum ekti ve her gün düzenli olarak suladı. Birkaç gün sonra "
+    "topraktan küçük yeşil bir filiz çıkmaya başladı."
+)
+_tahmin_mock = _metinli_mock_fabrika(_TAHMIN_METIN, [
+    {"soru": "Bundan sonra ne olması beklenir?", "secenekler": ["Filiz büyüyüp bitki olur", "Tohum kaybolur", "Toprak donar", "Filiz küçülür"], "dogru": 0},
+    {"soru": "Elif bitkinin büyümesi için ne yapmalı?", "secenekler": ["Sulamaya devam etmeli", "Suyu kesmeli", "Tohumu çıkarmalı", "Karanlığa koymalı"], "dogru": 0},
+    {"soru": "Filizin çıkması neyi gösterir?", "secenekler": ["Tohumun canlandığını", "Tohumun kuruduğunu", "Toprağın bozulduğunu", "Suyun bittiğini"], "dogru": 0},
+    {"soru": "Zamanla bitki ne verebilir?", "secenekler": ["Çiçek veya meyve", "Taş", "Kar", "Hiçbir şey"], "dogru": 0},
+])
+
+
 # Tip -> {system, user, mock}
 PROMPTLAR = {
     "demo": {
@@ -202,6 +286,32 @@ PROMPTLAR = {
         "system": _SISTEM_TR,
         "user": _olay_siralama_user,
         "mock": _olay_siralama_mock,
+    },
+    # ── Tier 2 (FAZ 2) ──────────────────────────────────────────
+    "bes_n_bir_k": {
+        "system": _SISTEM_TR,
+        "user": _metinli_user("metnin temel bilgilerini (kim, ne, nerede, ne zaman, neden, nasıl)"),
+        "mock": _5n1k_mock,
+    },
+    "ana_fikir": {
+        "system": _SISTEM_TR,
+        "user": _metinli_user("ana fikri ve yardımcı düşünceleri"),
+        "mock": _ana_fikir_mock,
+    },
+    "cikarim": {
+        "system": _SISTEM_TR,
+        "user": _metinli_user("doğrudan söylenmeyeni ipuçlarından çıkarmayı (çıkarım)"),
+        "mock": _cikarim_mock,
+    },
+    "sebep_sonuc": {
+        "system": _SISTEM_TR,
+        "user": _metinli_user("olaylar arasındaki sebep-sonuç ilişkisini"),
+        "mock": _sebep_sonuc_mock,
+    },
+    "tahmin_et": {
+        "system": _SISTEM_TR,
+        "user": _metinli_user("metnin nasıl devam edeceğine dair tahmini"),
+        "mock": _tahmin_mock,
     },
 }
 

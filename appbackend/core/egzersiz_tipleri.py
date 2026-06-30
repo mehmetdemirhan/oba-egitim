@@ -90,6 +90,58 @@ EGZERSIZ_TIPLERI = {
         "soru_sayisi": 5,
         "ikon": "📖",
     },
+    # ── Tier 2: Okuduğunu anlama / üst düzey beceriler (FAZ 2) ────
+    # Hepsi kısa bir metin + çoktan seçmeli sorular (puanlama="secmeli").
+    "bes_n_bir_k": {
+        "ad": "5N1K Soruları",
+        "aciklama": "Metni oku; kim, ne, nerede, ne zaman, neden ve nasıl sorularını yanıtla.",
+        "sinif_min": 2,
+        "sinif_max": 8,
+        "kategori": "anlama",
+        "puanlama": "secmeli",
+        "soru_sayisi": 4,
+        "ikon": "❓",
+    },
+    "ana_fikir": {
+        "ad": "Ana Fikir Bulma",
+        "aciklama": "Metnin ana fikrini ve yardımcı düşüncelerini belirle.",
+        "sinif_min": 3,
+        "sinif_max": 8,
+        "kategori": "anlama",
+        "puanlama": "secmeli",
+        "soru_sayisi": 4,
+        "ikon": "💡",
+    },
+    "cikarim": {
+        "ad": "Çıkarım Yapma",
+        "aciklama": "Metinde doğrudan söylenmeyeni, ipuçlarından çıkar.",
+        "sinif_min": 3,
+        "sinif_max": 8,
+        "kategori": "anlama",
+        "puanlama": "secmeli",
+        "soru_sayisi": 4,
+        "ikon": "🔎",
+    },
+    "sebep_sonuc": {
+        "ad": "Sebep-Sonuç İlişkisi",
+        "aciklama": "Olaylar arasındaki sebep-sonuç bağlantısını bul.",
+        "sinif_min": 2,
+        "sinif_max": 8,
+        "kategori": "anlama",
+        "puanlama": "secmeli",
+        "soru_sayisi": 4,
+        "ikon": "🔗",
+    },
+    "tahmin_et": {
+        "ad": "Tahmin Et",
+        "aciklama": "Metnin nasıl devam edeceğini ipuçlarına göre tahmin et.",
+        "sinif_min": 2,
+        "sinif_max": 8,
+        "kategori": "anlama",
+        "puanlama": "secmeli",
+        "soru_sayisi": 4,
+        "ikon": "🔮",
+    },
 }
 
 

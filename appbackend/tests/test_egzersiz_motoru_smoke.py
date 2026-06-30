@@ -136,6 +136,27 @@ async def run():
                           json={"soru_no": 0, "cevap": dogru_sira}, headers=H)
         check(r.status_code == 200 and r.json()["dogru"] is True, "sıralama doğru sıra doğru işaretlendi")
 
+        # ── FAZ 2: Tier 2 (okuduğunu anlama, metin + secmeli) ──
+        r = await ac.get("/api/egzersiz/tipler", headers=H)
+        tip_idler = {t["id"] for t in r.json()["tipler"]}
+        for beklenen in ("bes_n_bir_k", "ana_fikir", "cikarim", "sebep_sonuc", "tahmin_et"):
+            check(beklenen in tip_idler, f"{beklenen} listede")
+
+        # 5N1K üret: metin + sorular gelir; oturum + doğru cevap doğru işaretlenir
+        r = await ac.post("/api/egzersiz/uret", json={"tip": "bes_n_bir_k", "sinif": 3}, headers=H)
+        check(r.status_code == 200, f"5n1k üret 200 (status={r.status_code})")
+        t2 = r.json()
+        check("metin" in t2["icerik"] and len(t2["icerik"]["metin"]) > 0, "5n1k içeriğinde metin var")
+        sorular2 = t2["icerik"]["sorular"]
+        check(len(sorular2) >= 1, "5n1k en az 1 soru")
+        r = await ac.post("/api/egzersiz/oturum",
+                          json={"tip": "bes_n_bir_k", "sinif": 3, "icerik_id": t2["id"]}, headers=H)
+        check(r.json()["toplam_soru"] == len(sorular2), "5n1k toplam_soru = soru sayısı")
+        t2_oturum = r.json()["oturum_id"]
+        r = await ac.post(f"/api/egzersiz/oturum/{t2_oturum}/cevap",
+                          json={"soru_no": 0, "cevap": sorular2[0]["dogru"]}, headers=H)
+        check(r.status_code == 200 and r.json()["dogru"] is True, "5n1k doğru cevap doğru işaretlendi")
+
     await server.client.drop_database(TEST_DB)
 
 
