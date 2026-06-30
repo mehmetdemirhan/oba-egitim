@@ -397,6 +397,173 @@ def _baglam_mock(sinif, konu, soru_sayisi):
     return {"sorular": havuz[: max(1, min(soru_sayisi, len(havuz)))]}
 
 
+# ─────────────────────────────────────────────────────────────
+# Tier 4: Gelişmiş beceriler (FAZ 4) — hepsi çoktan seçmeli
+# ─────────────────────────────────────────────────────────────
+
+# 1) Frayer Modeli — {"kelime", sorular:[{soru, secenekler, dogru}]}
+def _frayer_user(sinif, konu, soru_sayisi, zorluk):
+    konu_str = konu or "bir kavram"
+    return (
+        f"Sınıf {sinif} seviyesine uygun, '{konu_str}' ile ilgili bir kelime seç. "
+        f"Zorluk: {zorluk or 'orta'}. Kelimeyi 'kelime' alanında ver. Ardından {soru_sayisi} adet "
+        "ifade üret; her ifade için öğrenci ifadenin Frayer modelindeki hangi bölgeye ait "
+        "olduğunu seçecek. Seçenekler her soruda aynı olsun: "
+        '["Tanım","Özellik","Örnek","Örnek Değil"]. Doğru bölgenin indeksini (0-3) belirt.\n'
+        "JSON şeması: "
+        '{"kelime": "meyve", "sorular": [{"soru": "Elma bir meyvedir.", '
+        '"secenekler": ["Tanım","Özellik","Örnek","Örnek Değil"], "dogru": 2}]}'
+        + _JSON_KURAL
+    )
+
+
+def _frayer_mock(sinif, konu, soru_sayisi):
+    se = ["Tanım", "Özellik", "Örnek", "Örnek Değil"]
+    havuz = [
+        {"soru": "Ağaçlarda yetişen, yenilebilen bitkisel besindir.", "secenekler": se, "dogru": 0},
+        {"soru": "Genellikle tatlı veya ekşi olur, vitamin içerir.", "secenekler": se, "dogru": 1},
+        {"soru": "Elma, armut ve kiraz birer örnektir.", "secenekler": se, "dogru": 2},
+        {"soru": "Masa bir meyve değildir.", "secenekler": se, "dogru": 3},
+    ]
+    return {"kelime": "meyve", "sorular": havuz[: max(1, min(soru_sayisi, len(havuz)))]}
+
+
+# 2) Anlam Haritası — {"merkez", sorular:[...]}
+def _anlam_haritasi_user(sinif, konu, soru_sayisi, zorluk):
+    konu_str = konu or "okul"
+    return (
+        f"Sınıf {sinif} seviyesine uygun bir merkez kelime seç (örn. '{konu_str}'). "
+        f"Zorluk: {zorluk or 'orta'}. Kelimeyi 'merkez' alanında ver. {soru_sayisi} adet çoktan "
+        "seçmeli soru üret; her soru merkez kelimeyle ilişkili olanı sorsun. 4 seçenek ve doğru "
+        "indeksi (0-3).\n"
+        "JSON şeması: "
+        '{"merkez": "okul", "sorular": [{"soru": "Hangisi okul ile ilişkilidir?", '
+        '"secenekler": ["öğretmen","balina","gemi","çöl"], "dogru": 0}]}'
+        + _JSON_KURAL
+    )
+
+
+def _anlam_haritasi_mock(sinif, konu, soru_sayisi):
+    havuz = [
+        {"soru": "Hangisi okul ile ilişkilidir?", "secenekler": ["öğretmen", "balina", "gemi", "çöl"], "dogru": 0},
+        {"soru": "Okulda hangisini kullanırız?", "secenekler": ["defter", "çapa", "yelken", "olta"], "dogru": 0},
+        {"soru": "Hangisi okulda olan bir kişidir?", "secenekler": ["öğrenci", "kaptan", "çiftçi", "pilot"], "dogru": 0},
+        {"soru": "Okulda hangi etkinlik yapılır?", "secenekler": ["ders", "avlanma", "denizcilik", "madencilik"], "dogru": 0},
+    ]
+    return {"merkez": "okul", "sorular": havuz[: max(1, min(soru_sayisi, len(havuz)))]}
+
+
+# 3) Venn Şeması — {"a","b", sorular:[{soru, secenekler:[a,b,"Her ikisi"], dogru}]}
+def _venn_user(sinif, konu, soru_sayisi, zorluk):
+    return (
+        f"Sınıf {sinif} seviyesine uygun, karşılaştırılabilecek iki kavram seç ('a' ve 'b'). "
+        f"Zorluk: {zorluk or 'orta'}. {soru_sayisi} adet özellik üret; her özellik için öğrenci "
+        "özelliğin yalnız a'ya mı, yalnız b'ye mi yoksa her ikisine mi ait olduğunu seçecek. "
+        'Seçenekler: [a, b, "Her ikisi"]. Doğru indeksi (0-2) belirt.\n'
+        "JSON şeması: "
+        '{"a": "Kedi", "b": "Balık", "sorular": [{"soru": "Suda yaşar.", '
+        '"secenekler": ["Kedi","Balık","Her ikisi"], "dogru": 1}]}'
+        + _JSON_KURAL
+    )
+
+
+def _venn_mock(sinif, konu, soru_sayisi):
+    a, b = "Kedi", "Balık"
+    se = [a, b, "Her ikisi"]
+    havuz = [
+        {"soru": "Suda yaşar.", "secenekler": se, "dogru": 1},
+        {"soru": "Tüyleri vardır.", "secenekler": se, "dogru": 0},
+        {"soru": "Bir canlıdır.", "secenekler": se, "dogru": 2},
+        {"soru": "Karada yürür.", "secenekler": se, "dogru": 0},
+    ]
+    return {"a": a, "b": b, "sorular": havuz[: max(1, min(soru_sayisi, len(havuz)))]}
+
+
+# 4) Tekerleme — {"metin", sorular:[...]}  (metin+secmeli)
+def _tekerleme_user(sinif, konu, soru_sayisi, zorluk):
+    return (
+        f"Sınıf {sinif} seviyesine uygun, kısa ve eğlenceli bir Türkçe tekerleme yaz "
+        f"(2-4 satır). Zorluk: {zorluk or 'kolay'}. Tekerlemeyi 'metin' alanında ver. Ardından "
+        f"{soru_sayisi} adet çoktan seçmeli soru üret (uyaklı kelime, eksik kelime veya ses "
+        "tekrarı hakkında). 4 seçenek ve doğru indeksi (0-3).\n"
+        "JSON şeması: "
+        '{"metin": "Dağda davul çalınır...", "sorular": [{"soru": "...", '
+        '"secenekler": ["a","b","c","d"], "dogru": 0}]}'
+        + _JSON_KURAL
+    )
+
+
+_TEKERLEME_METIN = (
+    "Komşunun kuru kuyusu,\n"
+    "Kara kazan kapkara.\n"
+    "Bir berber bir berbere,\n"
+    "Gel beraber bir berber dükkânı açalım dedi."
+)
+
+
+def _tekerleme_mock_fn(sinif, konu, soru_sayisi):
+    havuz = [
+        {"soru": "Tekerlemede hangi ses sık tekrar ediyor?", "secenekler": ["b", "z", "f", "ç"], "dogru": 0},
+        {"soru": "'berber' kelimesiyle uyaklı olan hangisidir?", "secenekler": ["beraber", "kalem", "deniz", "okul"], "dogru": 0},
+        {"soru": "'Kara kazan ___' boşluğa hangisi gelir?", "secenekler": ["kapkara", "bembeyaz", "sapsarı", "yemyeşil"], "dogru": 0},
+        {"soru": "Tekerleme neyle ilgilidir?", "secenekler": ["berber dükkânı", "uçak", "deniz", "orman"], "dogru": 0},
+    ]
+    return {"metin": _TEKERLEME_METIN, "sorular": havuz[: max(1, min(soru_sayisi, len(havuz)))]}
+
+
+# 5) Sight Words (sık kullanılan kelimeler) — {"sorular":[...]}
+def _sight_user(sinif, konu, soru_sayisi, zorluk):
+    return (
+        f"Sınıf {sinif} seviyesine uygun, Türkçede sık kullanılan kelimelerle {soru_sayisi} adet "
+        f"hızlı tanıma sorusu üret. Zorluk: {zorluk or 'kolay'}. Soru, bir kelimeyi doğru "
+        "yazımıyla tanımayı ölçsün; 4 seçenek (biri doğru yazım) ver, doğru indeksi (0-3).\n"
+        "JSON şeması: "
+        '{"sorular": [{"soru": "Hangisi doğru yazılmıştır?", '
+        '"secenekler": ["geliyor","geliyo","gliyor","gelior"], "dogru": 0}]}'
+        + _JSON_KURAL
+    )
+
+
+def _sight_mock(sinif, konu, soru_sayisi):
+    havuz = [
+        {"soru": "Hangisi doğru yazılmıştır?", "secenekler": ["geliyor", "geliyo", "gliyor", "gelior"], "dogru": 0},
+        {"soru": "Hangisi doğru yazılmıştır?", "secenekler": ["çünkü", "çünki", "çünkü̇", "cunku"], "dogru": 0},
+        {"soru": "Hangisi doğru yazılmıştır?", "secenekler": ["birçok", "bir cok", "birçoğ", "birçokk"], "dogru": 0},
+        {"soru": "Hangisi doğru yazılmıştır?", "secenekler": ["şöyle", "şöle", "şuyle", "soyle"], "dogru": 0},
+        {"soru": "Hangisi doğru yazılmıştır?", "secenekler": ["herkes", "herkez", "herkeş", "her kez"], "dogru": 0},
+    ]
+    return {"sorular": havuz[: max(1, min(soru_sayisi, len(havuz)))]}
+
+
+# 6) Diyalog — {"metin", sorular:[...]}  (konuşma + secmeli)
+def _diyalog_user(sinif, konu, soru_sayisi, zorluk):
+    konu_str = konu or "günlük bir konuşma"
+    return (
+        f"Sınıf {sinif} seviyesine uygun, '{konu_str}' hakkında iki kişi arasında kısa bir diyalog "
+        f"yaz (her satır 'Ad: söz' biçiminde). Zorluk: {zorluk or 'orta'}. Diyaloğu 'metin' "
+        f"alanında ver. Ardından {soru_sayisi} adet çoktan seçmeli soru üret (konuşmanın anlamı, "
+        "uygun yanıt veya duygu hakkında). 4 seçenek ve doğru indeksi (0-3).\n"
+        "JSON şeması: "
+        '{"metin": "Ali: Merhaba!\\nAyşe: Merhaba, nasılsın?", "sorular": [{"soru": "...", '
+        '"secenekler": ["a","b","c","d"], "dogru": 0}]}'
+        + _JSON_KURAL
+    )
+
+
+_DIYALOG_METIN = (
+    "Ali: Merhaba Ayşe, bugün parka gelecek misin?\n"
+    "Ayşe: Merhaba Ali! Çok isterdim ama ödevimi bitirmem gerek.\n"
+    "Ali: O zaman ödevini bitirince beni ara, birlikte gideriz.\n"
+    "Ayşe: Tamam, anlaştık!"
+)
+_diyalog_mock = _metinli_mock_fabrika(_DIYALOG_METIN, [
+    {"soru": "Ali, Ayşe'yi nereye davet ediyor?", "secenekler": ["Parka", "Sinemaya", "Okula", "Markete"], "dogru": 0},
+    {"soru": "Ayşe neden hemen gelemiyor?", "secenekler": ["Ödevi olduğu için", "Hasta olduğu için", "Yorgun olduğu için", "Uzakta olduğu için"], "dogru": 0},
+    {"soru": "Ayşe ödevini bitirince ne yapacak?", "secenekler": ["Ali'yi arayacak", "Uyuyacak", "Markete gidecek", "Televizyon izleyecek"], "dogru": 0},
+    {"soru": "Konuşmanın sonunda ne oldu?", "secenekler": ["Anlaştılar", "Tartıştılar", "Vazgeçtiler", "Küstüler"], "dogru": 0},
+])
+
+
 # Tip -> {system, user, mock}
 PROMPTLAR = {
     "demo": {
@@ -485,6 +652,37 @@ PROMPTLAR = {
         "system": _SISTEM_TR,
         "user": _baglam_user,
         "mock": _baglam_mock,
+    },
+    # ── Tier 4 (FAZ 4) ──────────────────────────────────────────
+    "frayer": {
+        "system": _SISTEM_TR,
+        "user": _frayer_user,
+        "mock": _frayer_mock,
+    },
+    "anlam_haritasi": {
+        "system": _SISTEM_TR,
+        "user": _anlam_haritasi_user,
+        "mock": _anlam_haritasi_mock,
+    },
+    "venn": {
+        "system": _SISTEM_TR,
+        "user": _venn_user,
+        "mock": _venn_mock,
+    },
+    "tekerleme": {
+        "system": _SISTEM_TR,
+        "user": _tekerleme_user,
+        "mock": _tekerleme_mock_fn,
+    },
+    "sight_words": {
+        "system": _SISTEM_TR,
+        "user": _sight_user,
+        "mock": _sight_mock,
+    },
+    "diyalog": {
+        "system": _SISTEM_TR,
+        "user": _diyalog_user,
+        "mock": _diyalog_mock,
     },
 }
 

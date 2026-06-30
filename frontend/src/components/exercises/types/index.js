@@ -19,6 +19,12 @@ import AnagramRender from "./AnagramRender";
 import BulmacaRender from "./BulmacaRender";
 import HafizaKartiRender from "./HafizaKartiRender";
 import KelimeYagmuruRender from "./KelimeYagmuruRender";
+// Tier 4 (FAZ 4)
+import FrayerRender from "./FrayerRender";
+import AnlamHaritasiRender from "./AnlamHaritasiRender";
+import VennRender from "./VennRender";
+import TekerlemeRender from "./TekerlemeRender";
+import DiyalogRender from "./DiyalogRender";
 
 const RENDER_MAP = {
   demo: DemoRender,
@@ -41,6 +47,13 @@ const RENDER_MAP = {
   kelime_yagmuru: KelimeYagmuruRender,
   kelime_merdiveni: SecmeliRender,   // standart çoktan seçmeli
   baglam_ipucu: SecmeliRender,       // standart çoktan seçmeli
+  // Tier 4 (FAZ 4)
+  frayer: FrayerRender,
+  anlam_haritasi: AnlamHaritasiRender,
+  venn: VennRender,
+  tekerleme: TekerlemeRender,
+  sight_words: SecmeliRender,        // standart çoktan seçmeli
+  diyalog: DiyalogRender,
 };
 
 export function getRenderComponent(tip) {

@@ -202,6 +202,47 @@ async def run():
                           json={"soru_no": 0, "cevap": sorular_md[0]["dogru"]}, headers=H)
         check(r.status_code == 200 and r.json()["dogru"] is True, "kelime_merdiveni doğru cevap işaretlendi")
 
+        # ── FAZ 4: Tier 4 (gelişmiş beceriler — hepsi secmeli) ──
+        r = await ac.get("/api/egzersiz/tipler", headers=H)
+        tip_idler = {t["id"] for t in r.json()["tipler"]}
+        for beklenen in ("frayer", "anlam_haritasi", "venn", "tekerleme", "sight_words", "diyalog"):
+            check(beklenen in tip_idler, f"{beklenen} listede")
+
+        # Frayer: kelime + sorular; oturum + doğru cevap
+        r = await ac.post("/api/egzersiz/uret", json={"tip": "frayer", "sinif": 4}, headers=H)
+        check(r.status_code == 200 and "kelime" in r.json()["icerik"], "frayer kelime alanı üretildi")
+        fr = r.json()
+        sorular_fr = fr["icerik"]["sorular"]
+        r = await ac.post("/api/egzersiz/oturum",
+                          json={"tip": "frayer", "sinif": 4, "icerik_id": fr["id"]}, headers=H)
+        check(r.json()["toplam_soru"] == len(sorular_fr), "frayer toplam_soru = soru sayısı")
+        fr_oturum = r.json()["oturum_id"]
+        r = await ac.post(f"/api/egzersiz/oturum/{fr_oturum}/cevap",
+                          json={"soru_no": 0, "cevap": sorular_fr[0]["dogru"]}, headers=H)
+        check(r.status_code == 200 and r.json()["dogru"] is True, "frayer doğru cevap işaretlendi")
+
+        # Venn: a + b + sorular
+        r = await ac.post("/api/egzersiz/uret", json={"tip": "venn", "sinif": 4}, headers=H)
+        vn = r.json()["icerik"]
+        check("a" in vn and "b" in vn and len(vn.get("sorular", [])) >= 1, "venn a/b/sorular üretildi")
+
+        # Anlam haritası: merkez
+        r = await ac.post("/api/egzersiz/uret", json={"tip": "anlam_haritasi", "sinif": 3}, headers=H)
+        check("merkez" in r.json()["icerik"], "anlam_haritasi merkez üretildi")
+
+        # Diyalog: metin + sorular (metinli)
+        r = await ac.post("/api/egzersiz/uret", json={"tip": "diyalog", "sinif": 3}, headers=H)
+        dg = r.json()["icerik"]
+        check("metin" in dg and len(dg.get("sorular", [])) >= 1, "diyalog metin + sorular üretildi")
+
+        # Tekerleme: metin + sorular
+        r = await ac.post("/api/egzersiz/uret", json={"tip": "tekerleme", "sinif": 2}, headers=H)
+        check("metin" in r.json()["icerik"], "tekerleme metin üretildi")
+
+        # Sight words: sorular
+        r = await ac.post("/api/egzersiz/uret", json={"tip": "sight_words", "sinif": 2}, headers=H)
+        check(len(r.json()["icerik"].get("sorular", [])) >= 1, "sight_words soruları üretildi")
+
     await server.client.drop_database(TEST_DB)
 
 
