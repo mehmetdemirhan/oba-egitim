@@ -1,6 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { getRenderComponent } from "./types";
+import ExerciseSkeleton from "./ExerciseSkeleton";
+
+// Tip listesi açıldığında arka planda ön-yüklenecek (prefetch) tip sayısı.
+const PREFETCH_ADET = 3;
 
 /**
  * EgzersizKutuphanesi — jenerik egzersiz motoru (UI tarafı).
@@ -33,6 +37,11 @@ export default function EgzersizKutuphanesi({ apiBase, sinif = 3, ogretmenModu =
   const [sonuc, setSonuc] = useState(null);
   const [hata, setHata] = useState(null);
   const [basliyor, setBasliyor] = useState(false);
+  const [baslayanTip, setBaslayanTip] = useState(null); // skeleton için seçilen tip
+
+  // Ön-yükleme (prefetch) cache'i — `${sinif}:${tipId}` -> Promise<oturumData>.
+  // Tarayıcı deposu (localStorage vb.) YOK; sadece bileşen ömrü boyunca bellekte.
+  const prefetchRef = useRef({});
 
   // Tip listesini çek (sınıf değişince yenile)
   useEffect(() => {
@@ -61,14 +70,39 @@ export default function EgzersizKutuphanesi({ apiBase, sinif = 3, ogretmenModu =
     return g;
   }, [tipler]);
 
+  // Tip listesi gelince ilk birkaç tipin oturumunu arka planda ön-yükle (prefetch).
+  // Öğrenci bir tipe tıkladığında network çağrısı çoğunlukla zaten bitmiş olur.
+  // Öğretmen önizlemesinde (ogretmenModu) prefetch yapılmaz — gereksiz oturum açmamak için.
+  useEffect(() => {
+    if (ogretmenModu || !tipler.length) return;
+    tipler.slice(0, PREFETCH_ADET).forEach((t) => {
+      const anahtar = `${secliSinif}:${t.id}`;
+      if (prefetchRef.current[anahtar]) return;
+      prefetchRef.current[anahtar] = axios
+        .post(`${apiBase}/egzersiz/oturum`, { tip: t.id, sinif: secliSinif })
+        .then((r) => r.data)
+        .catch(() => null);
+    });
+  }, [tipler, secliSinif, ogretmenModu, apiBase]);
+
   const egzersizBaslat = async (tip) => {
     if (basliyor) return;
     setBasliyor(true);
+    setBaslayanTip(tip);   // skeleton bu tipin düzenine göre çizilir
     setHata(null);
     try {
-      const r = await axios.post(`${apiBase}/egzersiz/oturum`, { tip: tip.id, sinif: secliSinif });
+      const anahtar = `${secliSinif}:${tip.id}`;
+      let data = null;
+      if (prefetchRef.current[anahtar]) {
+        data = await prefetchRef.current[anahtar];   // ön-yüklenmişse anında gelir
+        delete prefetchRef.current[anahtar];          // tüketildi
+      }
+      if (!data) {
+        const r = await axios.post(`${apiBase}/egzersiz/oturum`, { tip: tip.id, sinif: secliSinif });
+        data = r.data;
+      }
       setSeciliTip(tip);
-      setOturum(r.data);
+      setOturum(data);
       setSoruNo(0);
       setCevaplandi(false);
       setDogruSayisi(0);
@@ -78,6 +112,7 @@ export default function EgzersizKutuphanesi({ apiBase, sinif = 3, ogretmenModu =
       setHata("Egzersiz başlatılamadı. Lütfen tekrar deneyin.");
     } finally {
       setBasliyor(false);
+      setBaslayanTip(null);
     }
   };
 
@@ -217,6 +252,18 @@ export default function EgzersizKutuphanesi({ apiBase, sinif = 3, ogretmenModu =
           </div>
         )}
       </div>
+    );
+  }
+
+  // ── YÜKLENİYOR (SKELETON) ──────────────────────────────────────
+  // Bir tipe tıklandı, oturum/içerik henüz gelmedi → iskelet göster.
+  if (basliyor && baslayanTip) {
+    return (
+      <ExerciseSkeleton
+        puanlama={baslayanTip.puanlama}
+        ad={baslayanTip.ad}
+        ikon={baslayanTip.ikon}
+      />
     );
   }
 
