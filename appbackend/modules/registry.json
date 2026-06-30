@@ -28,6 +28,10 @@
     "active": true
   },
   {
+    "name": "egzersiz_motoru",
+    "active": true
+  },
+  {
     "name": "kitap",
     "active": true
   },

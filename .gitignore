@@ -2,3 +2,12 @@
 __pycache__/
 .claude/
 node_modules/
+
+# tek seferlik debug scriptleri
+metin_kontrol.py
+metin_kontrol_v2.py
+toplu_metin_yukle_v2.py
+toplu_metin_yukle.py
+_debug_check.py
+db_listele.py
+metinleri_havuza_tasi.py
