@@ -25,7 +25,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from core.db import db
-from core.auth import get_current_user
+from core.auth import get_current_user, require_role, UserRole
 from core.ai import call_claude
 from core.sistem import get_xp_tablosu
 from core.egzersiz_tipleri import tip_var_mi, tip_meta, tip_listesi
@@ -85,18 +85,40 @@ async def _icerik_uret(tip: str, sinif: int, konu: str | None, zorluk: str | Non
 
 
 async def _icerik_kaydet(tip: str, sinif: int, konu: str | None, zorluk: str | None,
-                         icerik: dict, ekleyen_id: str, mock: bool) -> dict:
+                         icerik: dict, ekleyen_id: str, mock: bool,
+                         kaynak: str = "ai_uretim", olusturan: dict | None = None,
+                         varyant_grubu: str | None = None) -> dict:
+    """İçeriği kalıcı kütüphaneye kaydeder.
+
+    Kütüphane şeması (eski kayıtlar bu alanlar olmadan da çalışır; sorgular
+    eksik `durum`'u "aktif" kabul eder):
+      - durum: "aktif" | "arsivli"
+      - varyant_grubu: orijinal içeriğin id'si (orijinal ise kendi id'si)
+      - kaynak: "ai_uretim" | "manuel" | "prewarm"
+      - olusturan_id / olusturan_ad / olusturan_rol
+      - son_kullanim_tarihi
+    """
+    yeni_id = str(uuid.uuid4())
+    olusturan = olusturan or {}
     doc = {
-        "id": str(uuid.uuid4()),
+        "id": yeni_id,
         "tip": tip,
         "sinif": sinif,
         "konu": konu or "",
         "zorluk": zorluk or "orta",
         "icerik": icerik,
         "mock": bool(mock),
+        "durum": "aktif",
+        # Orijinal içerik kendi id'sini grup yapar; varyantlar orijinalin grubunu paylaşır.
+        "varyant_grubu": varyant_grubu or yeni_id,
+        "kaynak": kaynak,
+        "olusturan_id": olusturan.get("id") or ekleyen_id,
+        "olusturan_ad": olusturan.get("ad", ""),
+        "olusturan_rol": olusturan.get("rol", ""),
         "olusturma_tarihi": datetime.utcnow().isoformat(),
         "ekleyen_id": ekleyen_id,
         "kullanim_sayisi": 0,
+        "son_kullanim_tarihi": None,
     }
     await db.egzersiz_icerikler.insert_one(dict(doc))
     return doc
@@ -123,19 +145,27 @@ async def _arka_plan_uret(tip: str, sinif: int, ekleyen_id: str):
         _yenileme_aktif.discard(anahtar)
 
 
-async def _icerik_sec_veya_uret(tip: str, sinif: int, ekleyen_id: str) -> dict:
-    """Oturum için içerik seçer.
+# Eski kayıtlarda `durum` alanı yoksa "aktif" kabul edilir (migration gerekmez).
+_AKTIF = {"$or": [{"durum": "aktif"}, {"durum": {"$exists": False}}]}
 
-    1. Cache'ten (tip, sınıf) için içerikleri kullanım sayısına göre artan sırada
-       getirir; en az kullanılanların oluşturduğu küçük banttan RASTGELE seçer
-       (yük dengesi + çeşitlilik).
-    2. Hiç içerik yoksa SADECE O ZAMAN AI ile üretir ve cache'ler.
+
+def _aktif_sorgu(tip: str, sinif: int) -> dict:
+    return {"tip": tip, "sinif": sinif, **_AKTIF}
+
+
+async def _icerik_sec_veya_uret(tip: str, sinif: int, ekleyen_id: str) -> dict:
+    """Oturum için kalıcı kütüphaneden içerik seçer.
+
+    1. (tip, sınıf) için durum="aktif" içerikleri kullanım sayısı artan, eşitlikte
+       son kullanımı en eski olacak şekilde getirir (round-robin etkisi); en az
+       kullanılanların oluşturduğu küçük banttan RASTGELE seçer (çeşitlilik).
+    2. Hiç aktif içerik yoksa SADECE O ZAMAN AI ile üretir ve kütüphaneye ekler.
     3. Havuzdaki en az kullanılan içerik bile YENILEME_ESIGI'ye ulaştıysa
        (tüm havuz "sıcak"), arka planda taze içerik üretmeyi sıraya koyar.
     """
-    adaylar = await db.egzersiz_icerikler.find({
-        "tip": tip, "sinif": sinif,
-    }).sort("kullanim_sayisi", 1).to_list(length=30)
+    adaylar = await db.egzersiz_icerikler.find(_aktif_sorgu(tip, sinif)).sort(
+        [("kullanim_sayisi", 1), ("son_kullanim_tarihi", 1)]
+    ).to_list(length=30)
 
     if adaylar:
         en_az = adaylar[0].get("kullanim_sayisi", 0)
@@ -147,7 +177,64 @@ async def _icerik_sec_veya_uret(tip: str, sinif: int, ekleyen_id: str) -> dict:
         return secilen
 
     icerik, mock = await _icerik_uret(tip, sinif, None, None)
-    return await _icerik_kaydet(tip, sinif, None, None, icerik, ekleyen_id, mock)
+    return await _icerik_kaydet(tip, sinif, None, None, icerik, ekleyen_id, mock,
+                                kaynak="ai_uretim")
+
+
+# ─────────────────────────────────────────────
+# Kütüphane yardımcıları
+# ─────────────────────────────────────────────
+def _kullanici_ad(user: dict) -> str:
+    ad = f"{user.get('ad', '')} {user.get('soyad', '')}".strip()
+    return ad or user.get("ad") or "Kullanıcı"
+
+
+def _icerik_ozet(icerik: dict, uzunluk: int = 100) -> str:
+    """İçeriğin insan-okur kısa özetini (ilk ~100 karakter) üretir."""
+    if not isinstance(icerik, dict):
+        return ""
+    parca = ""
+    if icerik.get("metin"):
+        parca = str(icerik["metin"])
+    elif icerik.get("sorular"):
+        ilk = icerik["sorular"][0] if icerik["sorular"] else {}
+        parca = str(ilk.get("soru", ""))
+    elif icerik.get("ciftler"):
+        parca = ", ".join(f"{c.get('sol', '')}={c.get('sag', '')}" for c in icerik["ciftler"][:4])
+    elif icerik.get("kelimeler"):
+        parca = ", ".join(str(k.get("cevap", k)) for k in icerik["kelimeler"][:6])
+    elif icerik.get("kelime"):
+        parca = str(icerik["kelime"])
+    elif icerik.get("parcalar"):
+        parca = " ".join(map(str, icerik["parcalar"]))
+    elif icerik.get("olaylar"):
+        parca = " / ".join(map(str, icerik["olaylar"][:3]))
+    elif icerik.get("hedef"):
+        parca = str(icerik["hedef"])
+    parca = " ".join(parca.split())
+    return parca[:uzunluk] + ("…" if len(parca) > uzunluk else "")
+
+
+def _ozet_kayit(d: dict) -> dict:
+    """Kütüphane listesi için tek içeriğin özet kaydı."""
+    meta = tip_meta(d.get("tip", "")) or {}
+    return {
+        "id": d.get("id"),
+        "tip": d.get("tip"),
+        "tip_ad": meta.get("ad", d.get("tip")),
+        "ikon": meta.get("ikon", "📝"),
+        "sinif": d.get("sinif"),
+        "ozet": _icerik_ozet(d.get("icerik", {})),
+        "olusturan_ad": d.get("olusturan_ad") or "—",
+        "olusturan_rol": d.get("olusturan_rol") or "",
+        "kaynak": d.get("kaynak", "ai_uretim"),
+        "durum": d.get("durum", "aktif"),
+        "kullanim_sayisi": d.get("kullanim_sayisi", 0),
+        "varyant_grubu": d.get("varyant_grubu") or d.get("id"),
+        "son_kullanim_tarihi": d.get("son_kullanim_tarihi"),
+        "olusturma_tarihi": d.get("olusturma_tarihi"),
+        "mock": d.get("mock", False),
+    }
 
 
 def _kontrol(meta: dict, icerik: dict, soru_no: int, cevap) -> tuple[bool, object]:
@@ -226,7 +313,11 @@ async def egzersiz_oturum_baslat(data: dict, current_user=Depends(get_current_us
     else:
         icerik_doc = await _icerik_sec_veya_uret(tip, sinif, current_user.get("id"))
 
-    await db.egzersiz_icerikler.update_one({"id": icerik_doc["id"]}, {"$inc": {"kullanim_sayisi": 1}})
+    await db.egzersiz_icerikler.update_one(
+        {"id": icerik_doc["id"]},
+        {"$inc": {"kullanim_sayisi": 1},
+         "$set": {"son_kullanim_tarihi": datetime.utcnow().isoformat()}},
+    )
 
     oturum = {
         "id": str(uuid.uuid4()),
@@ -341,14 +432,128 @@ async def egzersiz_gecmis(ogrenci_id: str, current_user=Depends(get_current_user
     return {"oturumlar": oturumlar}
 
 
+# ─────────────────────────────────────────────
+# Kütüphane endpoint'leri (öğretmen/koordinatör/admin)
+# ─────────────────────────────────────────────
+_KUTUPHANE_YETKI = require_role(UserRole.ADMIN, UserRole.COORDINATOR, UserRole.TEACHER)
+
+
 @router.get("/egzersiz/icerikler")
-async def egzersiz_icerikler(tip: str = Query(...), sinif: int | None = Query(None),
-                             current_user=Depends(get_current_user)):
-    """Öğretmen için: cache'lenmiş içerikleri listeler."""
-    sorgu = {"tip": tip}
+async def egzersiz_icerikler(
+    tip: str | None = Query(None),
+    sinif: int | None = Query(None),
+    durum: str = Query("aktif"),
+    sayfa: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    current_user=Depends(_KUTUPHANE_YETKI),
+):
+    """Kalıcı içerik kütüphanesi — sayfalı liste (öğretmen/koordinatör/admin).
+
+    durum: "aktif" (varsayılan) | "arsivli" | "hepsi".
+    """
+    sorgu: dict = {}
+    if tip:
+        sorgu["tip"] = tip
     if sinif is not None:
         sorgu["sinif"] = sinif
-    icerikler = await db.egzersiz_icerikler.find(sorgu).sort("olusturma_tarihi", -1).to_list(length=100)
-    for i in icerikler:
-        i.pop("_id", None)
-    return {"icerikler": icerikler}
+    if durum == "aktif":
+        sorgu.update(_AKTIF)
+    elif durum and durum != "hepsi":
+        sorgu["durum"] = durum
+
+    toplam = await db.egzersiz_icerikler.count_documents(sorgu)
+    atla = (sayfa - 1) * limit
+    docs = await db.egzersiz_icerikler.find(sorgu).sort(
+        "olusturma_tarihi", -1
+    ).skip(atla).limit(limit).to_list(length=limit)
+
+    return {
+        "icerikler": [_ozet_kayit(d) for d in docs],
+        "toplam": toplam,
+        "sayfa": sayfa,
+        "limit": limit,
+        "sayfa_sayisi": max(1, -(-toplam // limit)),  # ceil
+    }
+
+
+@router.get("/egzersiz/icerik/{icerik_id}")
+async def egzersiz_icerik_detay(icerik_id: str, current_user=Depends(_KUTUPHANE_YETKI)):
+    """Tek içeriğin tam detayı + aynı varyant grubundaki kardeşleri (önizleme)."""
+    doc = await db.egzersiz_icerikler.find_one({"id": icerik_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="İçerik bulunamadı")
+
+    grup = doc.get("varyant_grubu") or doc["id"]
+    kardesler = await db.egzersiz_icerikler.find(
+        {"$or": [{"varyant_grubu": grup}, {"id": icerik_id}]}
+    ).sort("olusturma_tarihi", -1).to_list(length=50)
+
+    kardes_ozet = [{
+        "id": k.get("id"),
+        "ozet": _icerik_ozet(k.get("icerik", {})),
+        "durum": k.get("durum", "aktif"),
+        "kullanim_sayisi": k.get("kullanim_sayisi", 0),
+        "olusturma_tarihi": k.get("olusturma_tarihi"),
+        "kendisi": k.get("id") == icerik_id,
+    } for k in kardesler]
+
+    meta = tip_meta(doc.get("tip", "")) or {}
+    return {
+        **_temizle(doc),
+        "tip_ad": meta.get("ad", doc.get("tip")),
+        "ikon": meta.get("ikon", "📝"),
+        "puanlama": meta.get("puanlama", "secmeli"),
+        "varyant_sayisi": len(kardes_ozet),
+        "kardesler": kardes_ozet,
+    }
+
+
+@router.post("/egzersiz/icerik/{icerik_id}/varyant-uret")
+async def egzersiz_varyant_uret(icerik_id: str, current_user=Depends(_KUTUPHANE_YETKI)):
+    """Mevcut içeriğin YENİ bir varyantını AI ile üretir.
+
+    Eski içerik ARŞİVLENMEZ — "aktif" kalır. Yeni içerik aynı varyant grubuna
+    eklenir; böylece kütüphanede gruplanır.
+    """
+    eski = await db.egzersiz_icerikler.find_one({"id": icerik_id})
+    if not eski:
+        raise HTTPException(status_code=404, detail="İçerik bulunamadı")
+
+    tip = eski["tip"]
+    sinif = int(eski.get("sinif", 3))
+    konu = eski.get("konu") or None
+    zorluk = eski.get("zorluk") or None
+    grup = eski.get("varyant_grubu") or eski["id"]
+
+    icerik, mock = await _icerik_uret(tip, sinif, konu, zorluk)
+    olusturan = {
+        "id": current_user.get("id"),
+        "ad": _kullanici_ad(current_user),
+        "rol": current_user.get("role", ""),
+    }
+    yeni = await _icerik_kaydet(tip, sinif, konu, zorluk, icerik, current_user.get("id"),
+                                mock, kaynak="ai_uretim", olusturan=olusturan,
+                                varyant_grubu=grup)
+    return {**_temizle(yeni), "varyant_uretildi": True}
+
+
+@router.patch("/egzersiz/icerik/{icerik_id}/arsivle")
+async def egzersiz_arsivle(icerik_id: str, current_user=Depends(require_role(UserRole.ADMIN))):
+    """İçeriği arşivler (durum="arsivli"). Yalnızca admin. Kayıt DB'de kalır;
+    oturum çekiminde artık gelmez."""
+    res = await db.egzersiz_icerikler.update_one(
+        {"id": icerik_id}, {"$set": {"durum": "arsivli"}}
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="İçerik bulunamadı")
+    return {"id": icerik_id, "durum": "arsivli"}
+
+
+@router.delete("/egzersiz/icerik/{icerik_id}")
+async def egzersiz_icerik_sil(icerik_id: str, current_user=Depends(require_role(UserRole.ADMIN))):
+    """İçeriği kalıcı siler (hard delete). Yalnızca admin; nadir kullanılır.
+    Genelde arşivleme tercih edilmelidir."""
+    res = await db.egzersiz_icerikler.delete_one({"id": icerik_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="İçerik bulunamadı")
+    return {"id": icerik_id, "silindi": True}

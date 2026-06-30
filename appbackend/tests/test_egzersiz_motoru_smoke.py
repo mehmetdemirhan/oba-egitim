@@ -46,6 +46,14 @@ async def run():
     await server.db.students.insert_one({"id": uid, "ad": "Ogr", "soyad": "Test", "sinif": 3, "toplam_xp": 0})
     H = {"Authorization": f"Bearer {create_access_token({'sub': uid})}"}
 
+    # Kütüphane endpoint'leri için öğretmen + admin kullanıcıları
+    ogr_id = str(uuid.uuid4())
+    await server.db.users.insert_one({"id": ogr_id, "ad": "Ayse", "soyad": "Ogretmen", "role": "teacher"})
+    HT = {"Authorization": f"Bearer {create_access_token({'sub': ogr_id})}"}
+    adm_id = str(uuid.uuid4())
+    await server.db.users.insert_one({"id": adm_id, "ad": "Yonetici", "soyad": "Admin", "role": "admin"})
+    HA = {"Authorization": f"Bearer {create_access_token({'sub': adm_id})}"}
+
     transport = ASGITransport(app=server.app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         # 1. Tip listesi
@@ -99,9 +107,12 @@ async def run():
         check(r.status_code == 200 and len(r.json()["oturumlar"]) == 1, "geçmişte 1 oturum")
         check(r.json()["oturumlar"][0]["durum"] == "tamamlandi", "oturum tamamlandı")
 
-        # 7. İçerikler (öğretmen kütüphanesi)
+        # 7. İçerikler (kütüphane) — öğrenci 403, öğretmen 200
         r = await ac.get("/api/egzersiz/icerikler?tip=demo&sinif=3", headers=H)
-        check(r.status_code == 200 and len(r.json()["icerikler"]) >= 1, "içerikler listelendi")
+        check(r.status_code == 403, "öğrenci kütüphaneye erişemez (403)")
+        r = await ac.get("/api/egzersiz/icerikler?tip=demo&sinif=3", headers=HT)
+        check(r.status_code == 200 and len(r.json()["icerikler"]) >= 1, "öğretmen içerikleri listeledi")
+        check("toplam" in r.json() and "sayfa" in r.json(), "kütüphane sayfalama alanları döndü")
 
         # ── FAZ 1: Tier 1 tipleri (eslesme + sira grader yolları) ──
         r = await ac.get("/api/egzersiz/tipler", headers=H)
@@ -286,6 +297,59 @@ async def run():
         # kullanım sayısı arttı mı (en az kullanılan seçimi için)
         secilen = await server.db.egzersiz_icerikler.find_one({"id": cache_id})
         check(secilen.get("kullanim_sayisi", 0) >= 1, "cache: kullanım sayısı arttı")
+        check(secilen.get("son_kullanim_tarihi"), "cache: son_kullanim_tarihi damgalandı")
+
+        # ── KÜTÜPHANE: varyant üret / detay / arşivle / sil ──
+        # Bir orijinal içerik üret (es_karsit_anlamli s4)
+        r = await ac.post("/api/egzersiz/uret", json={"tip": "es_karsit_anlamli", "sinif": 4}, headers=H)
+        orijinal_id = r.json()["id"]
+        # Yeni kayıtta kütüphane alanları var mı
+        od = await server.db.egzersiz_icerikler.find_one({"id": orijinal_id})
+        check(od.get("durum") == "aktif", "kütüphane: yeni içerik durum=aktif")
+        check(od.get("varyant_grubu") == orijinal_id, "kütüphane: orijinalin varyant_grubu kendi id'si")
+
+        # Varyant üret — öğrenci 403, öğretmen 200
+        r = await ac.post(f"/api/egzersiz/icerik/{orijinal_id}/varyant-uret", headers=H)
+        check(r.status_code == 403, "varyant üret: öğrenci 403")
+        r = await ac.post(f"/api/egzersiz/icerik/{orijinal_id}/varyant-uret", headers=HT)
+        check(r.status_code == 200, f"varyant üret: öğretmen 200 (status={r.status_code})")
+        varyant = r.json()
+        check(varyant["id"] != orijinal_id, "varyant: yeni id üretildi")
+        check(varyant["varyant_grubu"] == orijinal_id, "varyant: aynı varyant grubunda")
+        check(varyant.get("olusturan_rol") == "teacher", "varyant: olusturan_rol=teacher")
+        # Orijinal hâlâ aktif (arşivlenmedi)
+        od2 = await server.db.egzersiz_icerikler.find_one({"id": orijinal_id})
+        check(od2.get("durum") == "aktif", "varyant: orijinal aktif kaldı (silinmedi/arşivlenmedi)")
+
+        # Detay + kardeşler (en az 2 varyant)
+        r = await ac.get(f"/api/egzersiz/icerik/{orijinal_id}", headers=HT)
+        check(r.status_code == 200 and r.json().get("varyant_sayisi", 0) >= 2, "detay: kardeş varyantlar listelendi")
+        check(any(k["kendisi"] for k in r.json()["kardesler"]), "detay: kendisi işaretlendi")
+
+        # Arşivle — öğretmen 403, admin 200
+        r = await ac.patch(f"/api/egzersiz/icerik/{varyant['id']}/arsivle", headers=HT)
+        check(r.status_code == 403, "arşivle: öğretmen 403 (sadece admin)")
+        r = await ac.patch(f"/api/egzersiz/icerik/{varyant['id']}/arsivle", headers=HA)
+        check(r.status_code == 200, f"arşivle: admin 200 (status={r.status_code})")
+        arsiv = await server.db.egzersiz_icerikler.find_one({"id": varyant["id"]})
+        check(arsiv.get("durum") == "arsivli", "arşivle: durum=arsivli oldu")
+        # Aktif listede artık görünmemeli, arsivli filtresinde görünmeli
+        r = await ac.get("/api/egzersiz/icerikler?tip=es_karsit_anlamli&sinif=4&durum=aktif", headers=HT)
+        aktif_idler = {i["id"] for i in r.json()["icerikler"]}
+        check(varyant["id"] not in aktif_idler, "arşivle: aktif listede yok")
+        r = await ac.get("/api/egzersiz/icerikler?tip=es_karsit_anlamli&sinif=4&durum=arsivli", headers=HT)
+        check(varyant["id"] in {i["id"] for i in r.json()["icerikler"]}, "arşivle: arşivli listede var")
+
+        # Sil — öğretmen 403, admin 200 (hard delete)
+        r = await ac.delete(f"/api/egzersiz/icerik/{varyant['id']}", headers=HT)
+        check(r.status_code == 403, "sil: öğretmen 403 (sadece admin)")
+        r = await ac.delete(f"/api/egzersiz/icerik/{varyant['id']}", headers=HA)
+        check(r.status_code == 200, f"sil: admin 200 (status={r.status_code})")
+        check(await server.db.egzersiz_icerikler.find_one({"id": varyant["id"]}) is None, "sil: kayıt DB'den kalktı")
+
+        # Bilinmeyen içerik → 404
+        r = await ac.get("/api/egzersiz/icerik/yok_boyle_id", headers=HT)
+        check(r.status_code == 404, "detay: bilinmeyen içerik 404")
 
     await server.client.drop_database(TEST_DB)
 

@@ -37,6 +37,9 @@ HEDEF_ADET = 2            # (tip, sınıf) başına hedef GERÇEK içerik sayıs
 BEKLEME_SN = 1.5         # her AI çağrısı arası bekleme (kota koruması)
 ARDISIK_HATA_SINIRI = 6  # bu kadar ardışık mock/hata → kota bitti say, dur
 
+# Önyükleme ile üretilen içeriklerin "üreten" kimliği (kütüphanede görünür).
+PREWARM_OLUSTURAN = {"id": "system_prewarm", "ad": "Sistem (Önyükleme)", "rol": "system"}
+
 AI_VAR = bool(GEMINI_API_KEY or GEMINI_API_KEY_2 or GEMINI_API_KEY_3)
 
 
@@ -79,6 +82,11 @@ async def calistir(hedef_adet: int, sadece_tip: str | None):
                 atlanan_dolu += 1
                 continue
 
+            # Bu (tip,sınıf) için mevcut bir varyant grubu varsa onu kullan;
+            # yoksa ilk üretilen orijinal olur ve grubu kendi id'si olur.
+            mevcut_doc = await db.egzersiz_icerikler.find_one({"tip": tip, "sinif": sinif})
+            grup = (mevcut_doc.get("varyant_grubu") or mevcut_doc.get("id")) if mevcut_doc else None
+
             for _ in range(hedef_adet - mevcut):
                 try:
                     icerik, mock = await _icerik_uret(tip, sinif, None, None)
@@ -103,7 +111,12 @@ async def calistir(hedef_adet: int, sadece_tip: str | None):
                     await asyncio.sleep(BEKLEME_SN)
                     continue
 
-                await _icerik_kaydet(tip, sinif, None, None, icerik, "cache_prewarm", mock)
+                yeni = await _icerik_kaydet(
+                    tip, sinif, None, None, icerik, "cache_prewarm", mock,
+                    kaynak="prewarm", olusturan=PREWARM_OLUSTURAN, varyant_grubu=grup,
+                )
+                if grup is None:  # ilk üretilen orijinal → sonrakiler bu gruba girer
+                    grup = yeni["id"]
                 uretilen += 1
                 ardisik_hata = 0
                 etiket = "mock" if mock else "AI"
