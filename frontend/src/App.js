@@ -3807,7 +3807,6 @@ function OgretmenPaneli({ user, logout }) {
   const { toast } = useToast();
   const { isFullscreen } = useFullscreenExercise();
   const [aktifSekme, setAktifSekme] = useState("dashboard");
-  const [egzKutuphaneGorunum, setEgzKutuphaneGorunum] = useState("egzersizler"); // egzersizler | yonetim
   const [ogrenciler, setOgrenciler] = useState([]);
   // ── Özellik Yönetimi ──
   const [ozellikAyarlari, setOzellikAyarlari] = useState({});
@@ -3962,7 +3961,6 @@ function OgretmenPaneli({ user, logout }) {
     ozellikAktif("ogretmen_gorevler")      && { id: "gorevler",     label: "Görevler",     icon: "📌", badge: benimGorevlerim.filter(g => g.durum !== "tamamlandi").length || null },
     ozellikAktif("ogretmen_giris_analizi") && { id: "giris-analizi",label: "Analiz",       icon: "🔬" },
     ozellikAktif("ogretmen_gelisim")       && { id: "gelisim",      label: "Gelişim",      icon: "🎓" },
-    { id: "egzersiz-kutuphane", label: "Egzersizler", icon: "🎯" },
     { id: "program", label: "Program", icon: "📅" },
     ozellikAktif("ogretmen_mesajlar")      && { id: "mesajlar",     label: "Mesajlar",     icon: "✉️", badge: okunmamisSayisi || null },
   ].filter(Boolean);
@@ -4775,26 +4773,15 @@ function OgretmenPaneli({ user, logout }) {
         {aktifSekme === "gelisim" && ozellikAktif("ogretmen_gelisim") && (<GelisimAlani user={user} />)}
         {aktifSekme === "gelisim" && !ozellikAktif("ogretmen_gelisim") && (<div className="text-center py-16 text-gray-400"><div className="text-4xl mb-3">🔒</div><p className="font-medium">Bu özellik şu an devre dışı</p><p className="text-sm mt-1">Sistem yöneticisi bu modülü kapatmıştır.</p></div>)}
 
-        {/* ═══ EGZERSİZ KÜTÜPHANESİ ═══ */}
+        {/* ═══ EGZERSİZLER → GELİŞİM ALTINA TAŞINDI ═══ */}
+        {/* Üst seviye "Egzersizler" sekmesi kaldırıldı; tüm egzersiz içeriği artık
+            "Gelişim → Egzersizler" alt-sekmesinde. Eski state'e düşülürse yönlendir. */}
         {aktifSekme === "egzersiz-kutuphane" && (
-          <div className="space-y-3">
-            {/* Alt görünüm seçici: Egzersizler (varsayılan) | Kütüphane Yönetimi */}
-            <div className="flex gap-2">
-              {[{ v: "egzersizler", l: "🎯 Egzersizler" }, { v: "yonetim", l: "📚 Kütüphane Yönetimi" }].map((t) => (
-                <button key={t.v} onClick={() => setEgzKutuphaneGorunum(t.v)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-medium border ${egzKutuphaneGorunum === t.v ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-200"}`}>
-                  {t.l}
-                </button>
-              ))}
-            </div>
-            {egzKutuphaneGorunum === "yonetim" ? (
-              <ExerciseLibrary apiBase={API} userRole={user.role} />
-            ) : (
-              <ExerciseStarter title="Egzersizler" icon="🎯"
-                description="Bir egzersiz seç ve dene.">
-                <EgzersizKutuphanesi apiBase={API} sinif={3} ogretmenModu={true} />
-              </ExerciseStarter>
-            )}
+          <div className="text-center py-16">
+            <div className="text-4xl mb-3">🎯</div>
+            <p className="font-medium text-gray-700">Egzersizler "Gelişim" sekmesine taşındı</p>
+            <p className="text-sm text-gray-500 mt-1">Tüm egzersizler artık Gelişim → Egzersizler altında.</p>
+            <Button className="mt-4 bg-indigo-600 text-white" onClick={() => setAktifSekme("gelisim")}>Gelişim'e Git →</Button>
           </div>
         )}
 
@@ -11362,6 +11349,8 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
   const [yeniSoru, setYeniSoru] = useState({ soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0, taksonomi: "kavrama" });
   const [gelisimSekme, setGelisimSekme] = useState("icerikler");
   const [egzersizPuanlari, setEgzersizPuanlari] = useState({});
+  // Egzersizler alt-sekmesi görünümü (öğretmen): egzersizler | yonetim (üst tab'dan birleştirildi)
+  const [egzGorunum, setEgzGorunum] = useState("egzersizler");
   // Admin AI araç state'leri
   const [adminAiModal, setAdminAiModal] = useState(null); // { kitap, mod: "materyal"|"scaffold" }
   const [adminAiYukleniyor, setAdminAiYukleniyor] = useState(false);
@@ -12669,21 +12658,73 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
         <GorevYonetimi user={user} students={students} teachers={teachers} />
       )}
 
-      {gelisimSekme === 'egzersizler' && (
-        <ExerciseStarter title="Göz ve Okuma Egzersizleri" icon="👁️"
-          description="Göz takip, Schulte, hızlı okuma ve daha fazlası — okuma kaslarını güçlendir.">
-        <EgzersizlerModul user={user} egzersizPuanlari={egzersizPuanlari} onTamamla={async (egzersizId) => {
-          try {
-            const r = await axios.post(`${API}/egzersiz/tamamla`, { kullanici_id: user.id, egzersiz_id: egzersizId });
-            toast({ title: `🎉 +${r.data.kazanilan_puan} puan kazandınız!` });
-            fetchAll();
-          } catch(e) {
-            if (e.response?.status === 409) toast({ title: "Bu egzersizi bugün zaten yaptınız" });
-            else toast({ title: "Hata", variant: "destructive" });
-          }
-        }} />
-        </ExerciseStarter>
-      )}
+      {gelisimSekme === 'egzersizler' && (() => {
+        // Göz ve Okuma Egzersizleri modülü (tek tanım — her iki görünümde de kullanılır)
+        const gozModul = (
+          <ExerciseStarter title="Göz ve Okuma Egzersizleri" icon="👁️"
+            description="Göz takip, Schulte, hızlı okuma ve daha fazlası — okuma kaslarını güçlendir.">
+          <EgzersizlerModul user={user} egzersizPuanlari={egzersizPuanlari} onTamamla={async (egzersizId) => {
+            try {
+              const r = await axios.post(`${API}/egzersiz/tamamla`, { kullanici_id: user.id, egzersiz_id: egzersizId });
+              toast({ title: `🎉 +${r.data.kazanilan_puan} puan kazandınız!` });
+              fetchAll();
+            } catch(e) {
+              if (e.response?.status === 409) toast({ title: "Bu egzersizi bugün zaten yaptınız" });
+              else toast({ title: "Hata", variant: "destructive" });
+            }
+          }} />
+          </ExerciseStarter>
+        );
+
+        // Öğretmen dışındaki roller (admin vb.) için eski davranış korunur: sadece Göz egzersizleri.
+        if (user.role !== 'teacher') return gozModul;
+
+        // ── ÖĞRETMEN: birleştirilmiş egzersiz alanı (üst "Egzersizler" sekmesi buraya taşındı) ──
+        return (
+          <div className="space-y-4">
+            {/* Görünüm seçici: Egzersizler | Kütüphane Yönetimi */}
+            {!isFullscreen && (
+              <div className="flex gap-2">
+                {[{ v: "egzersizler", l: "🎯 Egzersizler" }, { v: "yonetim", l: "📚 Kütüphane Yönetimi" }].map((t) => (
+                  <button key={t.v} onClick={() => setEgzGorunum(t.v)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-medium border ${egzGorunum === t.v ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-200"}`}>
+                    {t.l}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {egzGorunum === 'yonetim' ? (
+              <ExerciseLibrary apiBase={API} userRole={user.role} />
+            ) : (<>
+              {/* ═══ 🎯 KLASİK EGZERSİZLER ═══ */}
+              <div>
+                {!isFullscreen && (
+                  <div className="flex items-center gap-2 mb-2 px-1">
+                    <span className="text-lg">🎯</span>
+                    <h3 className="text-sm font-bold text-gray-800">Klasik Egzersizler</h3>
+                  </div>
+                )}
+                {gozModul}
+              </div>
+
+              {/* ═══ 🎮 YENİ EGZERSİZ KÜTÜPHANESİ ═══ */}
+              <div className="pt-1">
+                {!isFullscreen && (
+                  <div className="flex items-center gap-2 mb-2 px-1">
+                    <span className="text-lg">🎮</span>
+                    <h3 className="text-sm font-bold text-gray-800">Yeni Egzersiz Kütüphanesi</h3>
+                  </div>
+                )}
+                <ExerciseStarter title="Yeni Egzersiz Kütüphanesi" icon="🎯"
+                  description="Tüm egzersiz tipleri — sınıf seviyesine göre filtrele ya da 'Tümü' ile hepsini gör.">
+                  <EgzersizKutuphanesi apiBase={API} sinif={3} ogretmenModu={true} />
+                </ExerciseStarter>
+              </div>
+            </>)}
+          </div>
+        );
+      })()}
 
       {gelisimSekme === 'puan-ayar' && user.role === 'admin' && (
         <div className="bg-white rounded-xl border border-gray-200 p-6">

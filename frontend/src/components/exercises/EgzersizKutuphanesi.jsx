@@ -24,7 +24,12 @@ const PREFETCH_ADET = 3;
  *   ogretmenModu — true ise sınıf seçici her zaman açık (öğretmen önizlemesi)
  */
 export default function EgzersizKutuphanesi({ apiBase, sinif = 3, ogretmenModu = false }) {
-  const [secliSinif, setSecliSinif] = useState(Number(sinif) || 3);
+  // "tumu" → sınıf filtresi yok (tüm seviyeler). Öğretmen önizlemesinde varsayılan "Tümü";
+  // öğrencide kendi sınıfı varsayılan kalır.
+  const [secliSinif, setSecliSinif] = useState(ogretmenModu ? "tumu" : (Number(sinif) || 3));
+  const tumMu = secliSinif === "tumu";
+  // "Tümü" seçiliyken egzersiz başlatırken backend int sınıf bekler → tipin alt sınırını gönder.
+  const sinifCozumle = (t) => (tumMu ? (t?.sinif_min || 3) : secliSinif);
   const [tipler, setTipler] = useState([]);
   const [yukleniyor, setYukleniyor] = useState(true);
 
@@ -49,7 +54,7 @@ export default function EgzersizKutuphanesi({ apiBase, sinif = 3, ogretmenModu =
     (async () => {
       setYukleniyor(true);
       try {
-        const r = await axios.get(`${apiBase}/egzersiz/tipler`, { params: { sinif: secliSinif } });
+        const r = await axios.get(`${apiBase}/egzersiz/tipler`, { params: tumMu ? {} : { sinif: secliSinif } });
         if (!iptal) setTipler(r.data?.tipler || []);
       } catch (e) {
         if (!iptal) setTipler([]);
@@ -79,7 +84,7 @@ export default function EgzersizKutuphanesi({ apiBase, sinif = 3, ogretmenModu =
       const anahtar = `${secliSinif}:${t.id}`;
       if (prefetchRef.current[anahtar]) return;
       prefetchRef.current[anahtar] = axios
-        .post(`${apiBase}/egzersiz/oturum`, { tip: t.id, sinif: secliSinif })
+        .post(`${apiBase}/egzersiz/oturum`, { tip: t.id, sinif: sinifCozumle(t) })
         .then((r) => r.data)
         .catch(() => null);
     });
@@ -98,7 +103,7 @@ export default function EgzersizKutuphanesi({ apiBase, sinif = 3, ogretmenModu =
         delete prefetchRef.current[anahtar];          // tüketildi
       }
       if (!data) {
-        const r = await axios.post(`${apiBase}/egzersiz/oturum`, { tip: tip.id, sinif: secliSinif });
+        const r = await axios.post(`${apiBase}/egzersiz/oturum`, { tip: tip.id, sinif: sinifCozumle(tip) });
         data = r.data;
       }
       setSeciliTip(tip);
@@ -277,8 +282,10 @@ export default function EgzersizKutuphanesi({ apiBase, sinif = 3, ogretmenModu =
         </div>
         <label className="text-xs text-gray-600 flex items-center gap-1.5">
           Sınıf:
-          <select value={secliSinif} onChange={(e) => setSecliSinif(Number(e.target.value))}
+          <select value={secliSinif}
+            onChange={(e) => { const v = e.target.value; setSecliSinif(v === "tumu" ? "tumu" : Number(v)); }}
             className="px-2 py-1 rounded-lg border border-gray-200 text-sm bg-white">
+            {ogretmenModu && <option value="tumu">Tümü</option>}
             {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
               <option key={s} value={s}>{s}. sınıf</option>
             ))}
