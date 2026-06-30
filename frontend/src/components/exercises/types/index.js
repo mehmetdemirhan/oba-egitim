@@ -27,6 +27,8 @@ import TekerlemeRender from "./TekerlemeRender";
 import DiyalogRender from "./DiyalogRender";
 // FAZ 5: Fonolojik farkındalık
 import FonolojiRender from "./FonolojiRender";
+// Kelime Gezmece (çapraz bulmaca harf oyunu)
+import KelimeGezmece from "./KelimeGezmece";
 
 const RENDER_MAP = {
   demo: DemoRender,
@@ -64,6 +66,8 @@ const RENDER_MAP = {
   kafiye: FonolojiRender,
   ses_birlestirme: FonolojiRender,
   ses_cikarma: FonolojiRender,
+  // Kelime Gezmece — kendi akışını yöneten tam oyun bileşeni
+  kelime_gezmece: KelimeGezmece,
 };
 
 export function getRenderComponent(tip) {
