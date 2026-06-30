@@ -18,6 +18,7 @@ yalnızca yeni egzersiz tiplerini yönetir.
 """
 import uuid
 import random
+import asyncio
 import logging
 from datetime import datetime
 
@@ -32,8 +33,12 @@ from core.egzersiz_prompts import prompt_uret, mock_uret
 
 router = APIRouter()
 
-# Bir içeriğin kaç oturumda tekrar gösterilebileceği (cache yeniden kullanım)
-MAX_KULLANIM = 5
+# Bir içerik bu kadar kez kullanılınca (havuzdaki en az kullanılan bile) arka
+# planda taze içerik üretilir — kullanıcı beklemeden çeşitlilik korunur.
+YENILEME_ESIGI = 20
+
+# Aynı (tip, sınıf) için aynı anda birden fazla arka plan üretimi tetiklenmesin.
+_yenileme_aktif: set = set()
 
 
 # ─────────────────────────────────────────────
@@ -97,14 +102,50 @@ async def _icerik_kaydet(tip: str, sinif: int, konu: str | None, zorluk: str | N
     return doc
 
 
+async def _arka_plan_uret(tip: str, sinif: int, ekleyen_id: str):
+    """Sıcak (çok kullanılan) bir tip için arka planda yeni içerik üretip cache'ler.
+
+    Yalnızca GERÇEK (mock olmayan) içerik eklenir; kullanıcı akışını bloklamaz.
+    Aynı (tip, sınıf) için eşzamanlı tekrar tetiklenmeyi `_yenileme_aktif` engeller.
+    """
+    anahtar = (tip, sinif)
+    if anahtar in _yenileme_aktif:
+        return
+    _yenileme_aktif.add(anahtar)
+    try:
+        icerik, mock = await _icerik_uret(tip, sinif, None, None)
+        if not mock:
+            await _icerik_kaydet(tip, sinif, None, None, icerik, ekleyen_id, mock)
+            logging.info(f"[egzersiz_motoru] arka plan içerik üretildi: {tip} s{sinif}")
+    except Exception as ex:
+        logging.warning(f"[egzersiz_motoru] arka plan üretim hatası ({tip} s{sinif}): {ex}")
+    finally:
+        _yenileme_aktif.discard(anahtar)
+
+
 async def _icerik_sec_veya_uret(tip: str, sinif: int, ekleyen_id: str) -> dict:
-    """Oturum için içerik seçer: önce cache'ten az kullanılmış rastgele bir içerik,
-    yoksa AI ile üretir."""
+    """Oturum için içerik seçer.
+
+    1. Cache'ten (tip, sınıf) için içerikleri kullanım sayısına göre artan sırada
+       getirir; en az kullanılanların oluşturduğu küçük banttan RASTGELE seçer
+       (yük dengesi + çeşitlilik).
+    2. Hiç içerik yoksa SADECE O ZAMAN AI ile üretir ve cache'ler.
+    3. Havuzdaki en az kullanılan içerik bile YENILEME_ESIGI'ye ulaştıysa
+       (tüm havuz "sıcak"), arka planda taze içerik üretmeyi sıraya koyar.
+    """
     adaylar = await db.egzersiz_icerikler.find({
-        "tip": tip, "sinif": sinif, "kullanim_sayisi": {"$lt": MAX_KULLANIM}
-    }).to_list(length=50)
+        "tip": tip, "sinif": sinif,
+    }).sort("kullanim_sayisi", 1).to_list(length=30)
+
     if adaylar:
-        return random.choice(adaylar)
+        en_az = adaylar[0].get("kullanim_sayisi", 0)
+        havuz = [a for a in adaylar if a.get("kullanim_sayisi", 0) <= en_az + 2]
+        secilen = random.choice(havuz)
+        if en_az >= YENILEME_ESIGI:
+            # Bloklamadan arka planda yeni içerik üret (kullanıcı bunu beklemez).
+            asyncio.create_task(_arka_plan_uret(tip, sinif, ekleyen_id))
+        return secilen
+
     icerik, mock = await _icerik_uret(tip, sinif, None, None)
     return await _icerik_kaydet(tip, sinif, None, None, icerik, ekleyen_id, mock)
 

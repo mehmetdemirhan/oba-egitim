@@ -272,6 +272,21 @@ async def run():
                               json={"soru_no": 0, "cevap": sorular_f[0]["dogru"]}, headers=H)
             check(r.status_code == 200 and r.json()["dogru"] is True, f"{tip} doğru cevap işaretlendi")
 
+        # ── Cache stratejisi: icerik_id verilmeden oturum cache'ten içerik kullanır ──
+        # İzole bir (tip, sınıf) hazırla: tek içerik üret, sonra icerik_id'siz oturum aç.
+        r = await ac.post("/api/egzersiz/uret", json={"tip": "demo", "sinif": 7}, headers=H)
+        cache_id = r.json()["id"]
+        adet_once = await server.db.egzersiz_icerikler.count_documents({"tip": "demo", "sinif": 7})
+        check(adet_once == 1, "cache: demo s7 için tek içerik var")
+        # icerik_id VERİLMEDEN oturum → cache'teki içerik yeniden kullanılmalı (yeni üretim YOK)
+        r = await ac.post("/api/egzersiz/oturum", json={"tip": "demo", "sinif": 7}, headers=H)
+        check(r.json().get("icerik_id") == cache_id, "cache: oturum mevcut içeriği yeniden kullandı")
+        adet_sonra = await server.db.egzersiz_icerikler.count_documents({"tip": "demo", "sinif": 7})
+        check(adet_sonra == 1, "cache: yeni içerik ÜRETİLMEDİ (AI çağrısı atlandı)")
+        # kullanım sayısı arttı mı (en az kullanılan seçimi için)
+        secilen = await server.db.egzersiz_icerikler.find_one({"id": cache_id})
+        check(secilen.get("kullanim_sayisi", 0) >= 1, "cache: kullanım sayısı arttı")
+
     await server.client.drop_database(TEST_DB)
 
 
