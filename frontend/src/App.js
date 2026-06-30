@@ -16,6 +16,8 @@ import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, 
 import { useToast } from "./hooks/use-toast";
 import { Toaster } from "./components/ui/toaster";
 import ModulYonetimi from "./components/ModulYonetimi";
+import ExerciseStarter from "./components/ExerciseStarter";
+import { FullscreenExerciseProvider, useFullscreenExercise } from "./context/FullscreenExerciseContext";
 import { ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Tooltip, XAxis, YAxis, CartesianGrid, AreaChart, Area } from 'recharts';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
@@ -164,6 +166,7 @@ function AppContent() {
   // ── TÜM HOOK'LAR EN ÜSTTE ──
   const { user, logout, loading } = useAuth();
   const { toast } = useToast();
+  const { isFullscreen } = useFullscreenExercise();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [teachers, setTeachers] = useState([]);
   const [students, setStudents] = useState([]);
@@ -337,7 +340,8 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto p-4">
-        {/* Header */}
+        {/* Header — tam ekran egzersiz modunda gizlenir */}
+        {!isFullscreen && (
         <div className="bg-white rounded-3xl shadow-sm p-6 mb-6 border border-gray-100">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -360,8 +364,10 @@ function AppContent() {
             </div>
           </div>
         </div>
+        )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
+          {!isFullscreen && (
           <TabsList className="inline-flex h-12 items-center justify-center rounded-2xl bg-white p-1 shadow-sm border border-gray-200 flex-wrap gap-1 mb-6">
             <TabsTrigger value="dashboard" className={tabClass}><BarChart3 className="h-4 w-4 mr-2" />Dashboard</TabsTrigger>
             <TabsTrigger value="teachers" className={tabClass}><UserCheck className="h-4 w-4 mr-2" />Öğretmenler</TabsTrigger>
@@ -377,6 +383,7 @@ function AppContent() {
             {user.role === "admin" && <TabsTrigger value="moduller" className={tabClass}><Package className="h-4 w-4 mr-2" />Modüller</TabsTrigger>}
             <TabsTrigger value="ai-merkezi" className={tabClass}>🧠 AI Merkezi</TabsTrigger>
           </TabsList>
+          )}
 
           {/* Modül Yönetimi (yama sistemi) */}
           {user.role === "admin" && (
@@ -3789,6 +3796,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
 
 function OgretmenPaneli({ user, logout }) {
   const { toast } = useToast();
+  const { isFullscreen } = useFullscreenExercise();
   const [aktifSekme, setAktifSekme] = useState("dashboard");
   const [ogrenciler, setOgrenciler] = useState([]);
   // ── Özellik Yönetimi ──
@@ -4128,7 +4136,8 @@ function OgretmenPaneli({ user, logout }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+      {/* Header — tam ekran egzersiz modunda gizlenir */}
+      {!isFullscreen && (
       <div className="bg-white border-b sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -4141,8 +4150,10 @@ function OgretmenPaneli({ user, logout }) {
           </div>
         </div>
       </div>
+      )}
 
-      {/* Tabs */}
+      {/* Tabs — tam ekran egzersiz modunda gizlenir */}
+      {!isFullscreen && (
       <div className="bg-white border-b sticky top-[60px] z-10">
         <div className="max-w-4xl mx-auto px-2 flex gap-1 overflow-x-auto py-2">
           {sekmeler.map(s => (
@@ -4153,6 +4164,7 @@ function OgretmenPaneli({ user, logout }) {
           ))}
         </div>
       </div>
+      )}
 
       <div className="max-w-4xl mx-auto p-4 space-y-4">
 
@@ -4786,6 +4798,7 @@ function OgretmenPaneli({ user, logout }) {
 
 function OgrenciPaneli({ user, logout }) {
   const { toast } = useToast();
+  const { isFullscreen } = useFullscreenExercise();
   const [profil, setProfil] = useState(null);
   // ── Özellik Yönetimi ──
   const [ozellikAyarlari, setOzellikAyarlari] = useState({});
@@ -5451,7 +5464,8 @@ function OgrenciPaneli({ user, logout }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+      {/* Header — tam ekran egzersiz modunda gizlenir */}
+      {!isFullscreen && (
       <div className="bg-white border-b sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -5465,8 +5479,10 @@ function OgrenciPaneli({ user, logout }) {
           </div>
         </div>
       </div>
+      )}
 
-      {/* 5 Tab — temiz, taşmaz */}
+      {/* 5 Tab — temiz, taşmaz — tam ekran egzersiz modunda gizlenir */}
+      {!isFullscreen && (
       <div className="bg-white border-b sticky top-[60px] z-10">
         <div className="max-w-2xl mx-auto px-2 flex justify-between py-2">
           {sekmeler.map(s => (
@@ -5479,6 +5495,7 @@ function OgrenciPaneli({ user, logout }) {
           ))}
         </div>
       </div>
+      )}
 
       <div className="max-w-2xl mx-auto p-4 space-y-4">
 
@@ -5768,17 +5785,26 @@ function OgrenciPaneli({ user, logout }) {
 
           {/* ── AI OKUMA ARKADAŞI ── */}
           {gelisimAltSekme === "arkadas" && (
-            <AiArkadasSekme apiBase={API} user={user} />
+            <ExerciseStarter title="AI Okuma Arkadaşı" icon="🦉"
+              description="Yapay zekâ okuma arkadaşınla sohbet et, sorular sor ve birlikte keşfet.">
+              <AiArkadasSekme apiBase={API} user={user} />
+            </ExerciseStarter>
           )}
 
           {/* ── KİTAP DERSİ ── */}
           {gelisimAltSekme === "kitap_dersi" && (
-            <KitapDersiModul user={user} apiBase={API} />
+            <ExerciseStarter title="Kitap Dersi" icon="📖"
+              description="Bloom taksonomisine göre kitabını adım adım derinlemesine işle.">
+              <KitapDersiModul user={user} apiBase={API} />
+            </ExerciseStarter>
           )}
 
           {/* ── OKUMA EVRENİ ── */}
           {gelisimAltSekme === "evren" && (
-            <OkumaEvreniSekme apiBase={API} user={user} />
+            <ExerciseStarter title="Okuma Evreni" icon="🌌"
+              description="XP, lig ve kelime/kitap/anlama testleriyle okuma evreninde ilerle.">
+              <OkumaEvreniSekme apiBase={API} user={user} />
+            </ExerciseStarter>
           )}
           {gelisimAltSekme === "icerikler" && (
             <div className="space-y-2">
@@ -5843,10 +5869,13 @@ function OgrenciPaneli({ user, logout }) {
 
           {/* Egzersizler */}
           {gelisimAltSekme === "egzersizler" && (
-            <EgzersizlerModul user={user} egzersizPuanlari={egzersizPuanlari} onTamamla={async (egzersizId) => {
-              try { const r = await axios.post(`${API}/egzersiz/tamamla`, { kullanici_id: user.id, egzersiz_id: egzersizId }); toast({ title: `🎉 +${r.data.kazanilan_puan} puan kazandın!` }); fetchAll(); }
-              catch(e) { if (e.response?.status === 409) toast({ title: "Bu egzersizi bugün zaten yaptın" }); else toast({ title: "Hata", variant: "destructive" }); }
-            }} />
+            <ExerciseStarter title="Göz ve Okuma Egzersizleri" icon="👁️"
+              description="Göz takip, Schulte, hızlı okuma ve daha fazlası — okuma kaslarını güçlendir.">
+              <EgzersizlerModul user={user} egzersizPuanlari={egzersizPuanlari} onTamamla={async (egzersizId) => {
+                try { const r = await axios.post(`${API}/egzersiz/tamamla`, { kullanici_id: user.id, egzersiz_id: egzersizId }); toast({ title: `🎉 +${r.data.kazanilan_puan} puan kazandın!` }); fetchAll(); }
+                catch(e) { if (e.response?.status === 409) toast({ title: "Bu egzersizi bugün zaten yaptın" }); else toast({ title: "Hata", variant: "destructive" }); }
+              }} />
+            </ExerciseStarter>
           )}
 
           {/* Okumalarım */}
@@ -5857,7 +5886,10 @@ function OgrenciPaneli({ user, logout }) {
           </>)}
 
           {/* ── Kelime Evrimi (Spaced Repetition) ── */}
-          {gelisimAltSekme === "kelime_evrimi" && (() => {
+          {gelisimAltSekme === "kelime_evrimi" && (
+            <ExerciseStarter title="Kelime Evrimi" icon="🧠"
+              description="Leitner yöntemiyle aralıklı tekrar — öğrendiğin kelimeleri kalıcı hale getir.">
+            {(() => {
             return (<div className="space-y-3">
               {kelimeData && (
                 <div className="grid grid-cols-3 gap-2">
@@ -6111,10 +6143,14 @@ function OgrenciPaneli({ user, logout }) {
                 <div className="text-center py-8 text-gray-500"><div className="text-3xl mb-2">🎉</div><p className="text-sm">Bugün tekrar edilecek kelime yok!</p><p className="text-xs text-gray-400 mt-1">Yeni kelimeler okudukça eklenecek</p></div>
               )}
             </div>);
-          })()}
+            })()}
+            </ExerciseStarter>
+          )}
 
           {/* ═══ HİKÂYEM (Adaptive Story Engine) ═══ */}
           {gelisimAltSekme === "hikayem" && (
+            <ExerciseStarter title="Bana Özel Hikâye" icon="✨"
+              description="DNA profilin ve ilgi alanına göre AI hikâye yazar, Bloom soruları üretir.">
             <div className="space-y-4">
               {!hikayeData ? (
                 <div className="bg-white rounded-2xl p-5 border shadow-sm space-y-4">
@@ -6235,6 +6271,7 @@ function OgrenciPaneli({ user, logout }) {
                 </div>
               )}
             </div>
+            </ExerciseStarter>
           )}
 
           {/* ═══ MATERYAL ÜRETİCİ ═══ */}
@@ -6663,6 +6700,7 @@ function MesajlarPanel({ user }) {
 
 function VeliPaneli({ user, logout }) {
   const { toast } = useToast();
+  const { isFullscreen } = useFullscreenExercise();
   const [cocuklar, setCocuklar] = useState([]);
   // ── Özellik Yönetimi ──
   const [ozellikAyarlari, setOzellikAyarlari] = useState({});
@@ -6762,6 +6800,7 @@ function VeliPaneli({ user, logout }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {!isFullscreen && (
       <div className="bg-white border-b sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -6774,9 +6813,10 @@ function VeliPaneli({ user, logout }) {
           </div>
         </div>
       </div>
+      )}
 
       {/* Çocuk seçici */}
-      {cocuklar.length > 1 && (
+      {!isFullscreen && cocuklar.length > 1 && (
         <div className="bg-white border-b px-4 py-2">
           <div className="max-w-2xl mx-auto flex gap-2">
             {cocuklar.map(c => (
@@ -6789,6 +6829,7 @@ function VeliPaneli({ user, logout }) {
         </div>
       )}
 
+      {!isFullscreen && (
       <div className="bg-white border-b sticky top-[60px] z-10">
         <div className="max-w-2xl mx-auto px-2 flex gap-1 overflow-x-auto py-2">
           {sekmeler.map(s => (
@@ -6800,6 +6841,7 @@ function VeliPaneli({ user, logout }) {
           ))}
         </div>
       </div>
+      )}
 
       <div className="max-w-2xl mx-auto p-4 space-y-5">
         {!seciliCocuk && cocuklar.length === 0 ? (
@@ -11146,6 +11188,7 @@ function GeminiDurumSatiri({ apiBase }) {
 
 function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabChange }) {
   const { toast } = useToast();
+  const { isFullscreen } = useFullscreenExercise();
   const [icerikler, setIcerikler] = useState([]);
   const [tamamlananlar, setTamamlananlar] = useState([]);
   const [puanTablosu, setPuanTablosu] = useState([]);
@@ -11994,7 +12037,8 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
 
   return (
     <div className="space-y-6">
-      {/* Alt sekme: İçerikler / Egzersizler */}
+      {/* Alt sekme: İçerikler / Egzersizler — tam ekran egzersiz modunda gizlenir */}
+      {!isFullscreen && (
       <div className="flex gap-2 mb-2">
         <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'icerikler' ? 'bg-orange-500 text-white shadow' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`} onClick={() => setGelisimSekme('icerikler')}>📚 İçerikler</button>
         <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'egzersizler' ? 'bg-blue-500 text-white shadow' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`} onClick={() => setGelisimSekme('egzersizler')}>👁️ Egzersizler</button>
@@ -12006,6 +12050,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
           <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'puan-ayar' ? 'bg-purple-500 text-white shadow' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`} onClick={() => setGelisimSekme('puan-ayar')}>⚙️ Egzersiz Puanları</button>
         )}
       </div>
+      )}
 
       {/* Görevler alt sekmesi */}
 
@@ -12486,6 +12531,8 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
       )}
 
       {gelisimSekme === 'egzersizler' && (
+        <ExerciseStarter title="Göz ve Okuma Egzersizleri" icon="👁️"
+          description="Göz takip, Schulte, hızlı okuma ve daha fazlası — okuma kaslarını güçlendir.">
         <EgzersizlerModul user={user} egzersizPuanlari={egzersizPuanlari} onTamamla={async (egzersizId) => {
           try {
             const r = await axios.post(`${API}/egzersiz/tamamla`, { kullanici_id: user.id, egzersiz_id: egzersizId });
@@ -12496,6 +12543,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
             else toast({ title: "Hata", variant: "destructive" });
           }
         }} />
+        </ExerciseStarter>
       )}
 
       {gelisimSekme === 'puan-ayar' && user.role === 'admin' && (
@@ -13227,5 +13275,9 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
 
 
 export default function App() {
-  return <AppContent />;
+  return (
+    <FullscreenExerciseProvider>
+      <AppContent />
+    </FullscreenExerciseProvider>
+  );
 }
