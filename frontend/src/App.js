@@ -19,6 +19,7 @@ import ModulYonetimi from "./components/ModulYonetimi";
 import ExerciseStarter from "./components/ExerciseStarter";
 import EgzersizKutuphanesi from "./components/exercises/EgzersizKutuphanesi";
 import ExerciseLibrary from "./components/exercises/ExerciseLibrary";
+import HaftalikTakvim from "./components/program/HaftalikTakvim";
 import { FullscreenExerciseProvider, useFullscreenExercise } from "./context/FullscreenExerciseContext";
 import { ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Tooltip, XAxis, YAxis, CartesianGrid, AreaChart, Area } from 'recharts';
 import * as XLSX from 'xlsx';
@@ -377,6 +378,7 @@ function AppContent() {
             {user.role !== "coordinator" && <TabsTrigger value="payments" className={tabClass}><CreditCard className="h-4 w-4 mr-2" />Muhasebe</TabsTrigger>}
             {user.role === "admin" && <TabsTrigger value="users" className={tabClass}><Shield className="h-4 w-4 mr-2" />Kullanıcılar</TabsTrigger>}
             <TabsTrigger value="gelisim" className={tabClass}><Trophy className="h-4 w-4 mr-2" />Gelişim</TabsTrigger>
+            <TabsTrigger value="ders-programi" className={tabClass}>📅 Ders Programı</TabsTrigger>
             <TabsTrigger value="giris-analizi" className={tabClass}><Stethoscope className="h-4 w-4 mr-2" />Giriş Analizi</TabsTrigger>
             <TabsTrigger value="mesajlar" className={tabClass}><Mail className="h-4 w-4 mr-2" />Mesajlar</TabsTrigger>
             {user.role === "admin" && <TabsTrigger value="ayarlar" className={tabClass}><Star className="h-4 w-4 mr-2" />Ayarlar</TabsTrigger>}
@@ -1167,6 +1169,11 @@ function AppContent() {
           {/* Gelisim Alani */}
           <TabsContent value="gelisim">
             <GelisimAlani user={user} students={students} teachers={teachers} courses={courses} onTabChange={setActiveTab} />
+          </TabsContent>
+
+          {/* Ders Programı (haftalık takvim) */}
+          <TabsContent value="ders-programi">
+            <HaftalikTakvim apiBase={API} user={user} ogrenciler={students} ogretmenler={teachers} />
           </TabsContent>
 
           {/* Görev Yönetimi */}
@@ -3956,6 +3963,7 @@ function OgretmenPaneli({ user, logout }) {
     ozellikAktif("ogretmen_giris_analizi") && { id: "giris-analizi",label: "Analiz",       icon: "🔬" },
     ozellikAktif("ogretmen_gelisim")       && { id: "gelisim",      label: "Gelişim",      icon: "🎓" },
     { id: "egzersiz-kutuphane", label: "Egzersizler", icon: "🎯" },
+    { id: "program", label: "Program", icon: "📅" },
     ozellikAktif("ogretmen_mesajlar")      && { id: "mesajlar",     label: "Mesajlar",     icon: "✉️", badge: okunmamisSayisi || null },
   ].filter(Boolean);
 
@@ -4790,6 +4798,14 @@ function OgretmenPaneli({ user, logout }) {
           </div>
         )}
 
+        {/* ═══ DERS PROGRAMI ═══ */}
+        {aktifSekme === "program" && (
+          <div className="space-y-3">
+            <h2 className="text-lg font-bold">📅 Ders Programı</h2>
+            <HaftalikTakvim apiBase={API} user={user} ogrenciler={ogrenciler} />
+          </div>
+        )}
+
         {/* ═══ MESAJLAR ═══ */}
         {aktifSekme === "mesajlar" && (<div className="space-y-4">
           <h2 className="text-lg font-bold">✉️ Mesajlar</h2>
@@ -4969,6 +4985,9 @@ function OgrenciPaneli({ user, logout }) {
   const [socraticSoru, setSocraticSoru] = useState(null);
   const [socraticCevap, setSocraticCevap] = useState("");
   const [socraticSonuc, setSocraticSonuc] = useState(null);
+  // Sokratik Okuma — bağımsız başlatıcı (klasik egzersiz kartı)
+  const [sokratikForm, setSokratikForm] = useState({ kitap_adi: "", bolum: "" });
+  const [sokratikYukleniyor, setSokratikYukleniyor] = useState(false);
 
   // ── SPEECH AI Fonksiyonları ──
   const speechBaslat = async (metin) => {
@@ -5894,14 +5913,50 @@ function OgrenciPaneli({ user, logout }) {
             )}
           </>)}
 
-          {/* Egzersizler */}
+          {/* Egzersizler — Klasik (kartlar) + Yeni Kütüphane (grid) ayrımı */}
           {gelisimAltSekme === "egzersizler" && (<>
-            {/* Yeni Egzersiz Kütüphanesi (jenerik motor — Tier 1-4 + fonoloji) */}
-            <ExerciseStarter title="Yeni Egzersiz Kütüphanesi" icon="🎯"
-              description="Kelime, okuduğunu anlama, oyun ve fonolojik farkındalık egzersizleri — sınıf seviyene göre.">
-              <EgzersizKutuphanesi apiBase={API} sinif={user.sinif || 3} />
-            </ExerciseStarter>
+            {/* ═══ 🎯 KLASİK EGZERSİZLER ═══ */}
+            <div>
+              <div className="flex items-center gap-2 mb-2 px-1">
+                <span className="text-lg">🎯</span>
+                <h3 className="text-sm font-bold text-gray-800">Klasik Egzersizler</h3>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  {id:"kelime_evrimi", emoji:"🧠", l:"Kelime Evrimi",     d:"Leitner ile aralıklı tekrar",       oz:"ogrenci_kelime_evrimi", grad:"from-cyan-500 to-blue-600",     go:()=>setGelisimAltSekme("kelime_evrimi")},
+                  {id:"sokratik",      emoji:"🤖", l:"Sokratik Okuma",    d:"Okuma koçun soru sorar",            oz:"ogrenci_gelisim",       grad:"from-sky-500 to-cyan-600",      go:()=>setGelisimAltSekme("sokratik")},
+                  {id:"speech",        emoji:"🎤", l:"Sesli Okuma",       d:"AI telaffuzunu analiz eder",        oz:"ogrenci_speech_ai",     grad:"from-purple-500 to-indigo-600", go:()=>setAktifEkran("speech")},
+                  {id:"arkadas",       emoji:"🦉", l:"AI Okuma Arkadaşı", d:"Sohbet et, birlikte keşfet",        oz:"ogrenci_ai_arkadas",    grad:"from-amber-500 to-orange-600",  go:()=>setGelisimAltSekme("arkadas")},
+                  {id:"hikayem",       emoji:"✨", l:"Hikâyem",           d:"Sana özel AI hikâye + Bloom",       oz:"ogrenci_hikaye",        grad:"from-pink-500 to-purple-600",   go:()=>setGelisimAltSekme("hikayem")},
+                  {id:"goz",           emoji:"👁️", l:"Göz Egzersizleri",   d:"Göz takip, Schulte, hızlı okuma",   oz:"ogrenci_egzersizler",   grad:"from-emerald-500 to-teal-600",  go:()=>setGelisimAltSekme("goz")},
+                  {id:"kitap_dersi",   emoji:"📖", l:"Kitap Dersi",       d:"Bloom ile derinlemesine işle",      oz:"ogrenci_gelisim",       grad:"from-indigo-500 to-blue-600",   go:()=>setGelisimAltSekme("kitap_dersi")},
+                  {id:"evren",         emoji:"🌌", l:"Okuma Evreni",      d:"XP, lig ve anlama testleri",        oz:"ogrenci_xp_lig",        grad:"from-violet-500 to-fuchsia-600",go:()=>setGelisimAltSekme("evren")},
+                ].filter(k => ozellikAktif(k.oz)).map(k => (
+                  <button key={k.id} onClick={k.go}
+                    className="bg-white rounded-2xl p-3 border shadow-sm text-left hover:shadow-md hover:border-indigo-300 transition-all active:scale-[0.97] group">
+                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${k.grad} flex items-center justify-center text-xl mb-2 shadow-sm`}>{k.emoji}</div>
+                    <div className="text-[12px] font-bold text-gray-800 group-hover:text-indigo-700 leading-tight">{k.l}</div>
+                    <div className="text-[10px] text-gray-400 mt-0.5 leading-tight">{k.d}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
 
+            {/* ═══ 🎮 YENİ EGZERSİZ KÜTÜPHANESİ ═══ */}
+            <div className="pt-1">
+              <div className="flex items-center gap-2 mb-2 px-1">
+                <span className="text-lg">🎮</span>
+                <h3 className="text-sm font-bold text-gray-800">Yeni Egzersiz Kütüphanesi</h3>
+              </div>
+              <ExerciseStarter title="Yeni Egzersiz Kütüphanesi" icon="🎯"
+                description="Kelime, okuduğunu anlama, oyun ve fonolojik farkındalık egzersizleri — sınıf seviyene göre.">
+                <EgzersizKutuphanesi apiBase={API} sinif={user.sinif || 3} />
+              </ExerciseStarter>
+            </div>
+          </>)}
+
+          {/* ── GÖZ VE OKUMA EGZERSİZLERİ (klasik egzersiz kartından erişilir) ── */}
+          {gelisimAltSekme === "goz" && (
             <ExerciseStarter title="Göz ve Okuma Egzersizleri" icon="👁️"
               description="Göz takip, Schulte, hızlı okuma ve daha fazlası — okuma kaslarını güçlendir.">
               <EgzersizlerModul user={user} egzersizPuanlari={egzersizPuanlari} onTamamla={async (egzersizId) => {
@@ -5909,7 +5964,58 @@ function OgrenciPaneli({ user, logout }) {
                 catch(e) { if (e.response?.status === 409) toast({ title: "Bu egzersizi bugün zaten yaptın" }); else toast({ title: "Hata", variant: "destructive" }); }
               }} />
             </ExerciseStarter>
-          </>)}
+          )}
+
+          {/* ── SOKRATİK OKUMA (klasik egzersiz kartından erişilir — bağımsız başlatıcı) ── */}
+          {gelisimAltSekme === "sokratik" && (
+            <ExerciseStarter title="Sokratik Okuma" icon="🤖"
+              description="Okuduğun kitabı yaz, okuma koçun sana düşündürücü sorular sorsun.">
+              <div className="space-y-3">
+                <div className="bg-white rounded-2xl p-4 border shadow-sm space-y-3">
+                  <div><Label className="text-xs">Kitap Adı *</Label><Input value={sokratikForm.kitap_adi} onChange={e => setSokratikForm({...sokratikForm, kitap_adi: e.target.value})} placeholder="Hangi kitabı okudun?" /></div>
+                  <div><Label className="text-xs">Bölüm</Label><Input value={sokratikForm.bolum} onChange={e => setSokratikForm({...sokratikForm, bolum: e.target.value})} placeholder="Bölüm 3 (isteğe bağlı)" /></div>
+                  <Button disabled={!sokratikForm.kitap_adi.trim() || sokratikYukleniyor} onClick={async () => {
+                    setSokratikYukleniyor(true); setSocraticSoru(null); setSocraticCevap(""); setSocraticSonuc(null);
+                    try {
+                      const r = await axios.post(`${API}/ai/socratic-soru`, { kitap_adi: sokratikForm.kitap_adi, bolum: sokratikForm.bolum, sure_dk: 10, sinif: user.sinif || 3 });
+                      setSocraticSoru(r.data);
+                    } catch(e) { toast({ title: "Soru alınamadı", variant: "destructive" }); }
+                    setSokratikYukleniyor(false);
+                  }} className="w-full bg-gradient-to-r from-sky-500 to-cyan-600 text-white">
+                    {sokratikYukleniyor ? "⏳ Soru hazırlanıyor..." : "🤖 Bana Soru Sor"}
+                  </Button>
+                </div>
+
+                {socraticSoru && (
+                  <Card className="border-2 border-cyan-300 shadow-lg">
+                    <CardHeader className="bg-gradient-to-r from-cyan-50 to-blue-50 pb-2">
+                      <CardTitle className="text-base flex items-center gap-2">🤖 Okuma Koçun Soruyor</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-3 space-y-3">
+                      <p className="text-sm font-medium text-gray-800">{socraticSoru.soru}</p>
+                      {socraticSoru.ipucu && <p className="text-xs text-cyan-600 italic">💡 İpucu: {socraticSoru.ipucu}</p>}
+                      {!socraticSonuc ? (<>
+                        <textarea value={socraticCevap} onChange={e => setSocraticCevap(e.target.value)} className="w-full border rounded-lg p-2 text-sm min-h-[60px]" placeholder="Düşünceni yaz..." />
+                        <Button className="w-full bg-cyan-600 text-white text-sm" onClick={async () => {
+                          try { const r = await axios.post(`${API}/ai/socratic-cevap`, { soru: socraticSoru.soru, cevap: socraticCevap }); setSocraticSonuc(r.data); }
+                          catch(e) { setSocraticSonuc({ puan: 3, geri_bildirim: "Teşekkürler! 👏", xp: 5 }); }
+                        }}>Gönder 🚀</Button>
+                      </>) : (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            {[1,2,3,4,5].map(s => <span key={s} className="text-lg">{s <= socraticSonuc.puan ? '⭐' : '☆'}</span>)}
+                            <span className="text-xs text-green-600 font-bold">+{socraticSonuc.xp} XP</span>
+                          </div>
+                          <p className="text-sm text-gray-700 bg-cyan-50 p-2 rounded-lg">{socraticSonuc.geri_bildirim}</p>
+                          <Button className="w-full bg-green-600 text-white text-sm" onClick={() => { setSocraticSoru(null); setSocraticSonuc(null); setSocraticCevap(""); }}>Tekrar Sor 🔄</Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </ExerciseStarter>
+          )}
 
           {/* Okumalarım */}
           {gelisimAltSekme === "okumalarim" && (<>
