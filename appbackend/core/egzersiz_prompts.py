@@ -564,6 +564,95 @@ _diyalog_mock = _metinli_mock_fabrika(_DIYALOG_METIN, [
 ])
 
 
+# ─────────────────────────────────────────────────────────────
+# FAZ 5: Fonolojik farkındalık (1-2. sınıf) — hepsi çoktan seçmeli
+# Şema: {"sorular":[{soru, secenekler, dogru, seslendir}]}
+# 'seslendir' = render katmanında Web Speech API ile okunacak metin.
+# ─────────────────────────────────────────────────────────────
+
+_SISTEM_FONOLOJI = (
+    "Sen 1-2. sınıf öğrencileri için fonolojik farkındalık (ses ve hece) "
+    "etkinlikleri hazırlayan bir öğretmen asistanısın. Dil sade ve kısa olsun."
+)
+
+
+def _fonoloji_user(odak, ornek):
+    """Belirli bir fonolojik odak için çoktan seçmeli prompt üretici."""
+    def fn(sinif, konu, soru_sayisi, zorluk):
+        konu_str = konu or "basit kelimeler"
+        return (
+            f"1-2. sınıf seviyesine uygun, '{konu_str}' temasında {soru_sayisi} adet soru üret: "
+            f"{odak} Her soruda 4 seçenek ve doğru indeksi (0-3) bulunsun. Ayrıca her soru için "
+            "'seslendir' alanında sesli okunacak metni (kelime veya heceler) ver; küçük yaş için "
+            "kısa ve net olsun.\n"
+            "JSON şeması: " + ornek + _JSON_KURAL
+        )
+    return fn
+
+
+def _fon_mock(havuz):
+    def fn(sinif, konu, soru_sayisi):
+        return {"sorular": havuz[: max(1, min(soru_sayisi, len(havuz)))]}
+    return fn
+
+
+_hece_sayma_mock = _fon_mock([
+    {"soru": "'kelebek' kelimesi kaç hecelidir?", "secenekler": ["2", "3", "4", "5"], "dogru": 1, "seslendir": "kelebek"},
+    {"soru": "'ev' kelimesi kaç hecelidir?", "secenekler": ["1", "2", "3", "4"], "dogru": 0, "seslendir": "ev"},
+    {"soru": "'masa' kelimesi kaç hecelidir?", "secenekler": ["1", "2", "3", "4"], "dogru": 1, "seslendir": "masa"},
+    {"soru": "'okul' kelimesi kaç hecelidir?", "secenekler": ["1", "2", "3", "4"], "dogru": 1, "seslendir": "okul"},
+    {"soru": "'araba' kelimesi kaç hecelidir?", "secenekler": ["2", "3", "4", "5"], "dogru": 1, "seslendir": "araba"},
+])
+
+_hece_birlestirme_mock = _fon_mock([
+    {"soru": "ki + tap heceleri hangi kelimeyi oluşturur?", "secenekler": ["kitap", "kapı", "tapu", "kütük"], "dogru": 0, "seslendir": "ki, tap"},
+    {"soru": "ka + lem heceleri hangi kelimeyi oluşturur?", "secenekler": ["kalem", "kale", "lema", "mekal"], "dogru": 0, "seslendir": "ka, lem"},
+    {"soru": "el + ma heceleri hangi kelimeyi oluşturur?", "secenekler": ["elma", "mela", "emal", "alem"], "dogru": 0, "seslendir": "el, ma"},
+    {"soru": "ka + pı heceleri hangi kelimeyi oluşturur?", "secenekler": ["kapı", "pıka", "akıp", "paki"], "dogru": 0, "seslendir": "ka, pı"},
+    {"soru": "ta + vuk heceleri hangi kelimeyi oluşturur?", "secenekler": ["tavuk", "vukta", "kutav", "vakti"], "dogru": 0, "seslendir": "ta, vuk"},
+])
+
+_ilk_ses_mock = _fon_mock([
+    {"soru": "'elma' kelimesi hangi sesle başlar?", "secenekler": ["e", "a", "l", "m"], "dogru": 0, "seslendir": "elma"},
+    {"soru": "'kapı' kelimesi hangi sesle başlar?", "secenekler": ["k", "a", "p", "ı"], "dogru": 0, "seslendir": "kapı"},
+    {"soru": "'top' kelimesi hangi sesle başlar?", "secenekler": ["t", "o", "p", "s"], "dogru": 0, "seslendir": "top"},
+    {"soru": "'armut' kelimesi hangi sesle başlar?", "secenekler": ["a", "r", "m", "u"], "dogru": 0, "seslendir": "armut"},
+    {"soru": "'balık' kelimesi hangi sesle başlar?", "secenekler": ["b", "a", "l", "k"], "dogru": 0, "seslendir": "balık"},
+])
+
+_son_ses_mock = _fon_mock([
+    {"soru": "'kalem' kelimesi hangi sesle biter?", "secenekler": ["m", "k", "e", "l"], "dogru": 0, "seslendir": "kalem"},
+    {"soru": "'top' kelimesi hangi sesle biter?", "secenekler": ["p", "t", "o", "s"], "dogru": 0, "seslendir": "top"},
+    {"soru": "'kapı' kelimesi hangi sesle biter?", "secenekler": ["ı", "k", "a", "p"], "dogru": 0, "seslendir": "kapı"},
+    {"soru": "'armut' kelimesi hangi sesle biter?", "secenekler": ["t", "a", "r", "u"], "dogru": 0, "seslendir": "armut"},
+    {"soru": "'elma' kelimesi hangi sesle biter?", "secenekler": ["a", "e", "l", "m"], "dogru": 0, "seslendir": "elma"},
+])
+
+_kafiye_mock = _fon_mock([
+    {"soru": "'top' ile kafiyeli olan hangisidir?", "secenekler": ["hop", "kedi", "araba", "masa"], "dogru": 0, "seslendir": "top"},
+    {"soru": "'kar' ile kafiyeli olan hangisidir?", "secenekler": ["nar", "ev", "göl", "su"], "dogru": 0, "seslendir": "kar"},
+    {"soru": "'masa' ile kafiyeli olan hangisidir?", "secenekler": ["kasa", "kalem", "deniz", "okul"], "dogru": 0, "seslendir": "masa"},
+    {"soru": "'el' ile kafiyeli olan hangisidir?", "secenekler": ["bel", "kapı", "araba", "kuş"], "dogru": 0, "seslendir": "el"},
+    {"soru": "'kale' ile kafiyeli olan hangisidir?", "secenekler": ["lale", "kitap", "deniz", "top"], "dogru": 0, "seslendir": "kale"},
+])
+
+_ses_birlestirme_mock = _fon_mock([
+    {"soru": "k - e - d - i sesleri hangi kelimeyi oluşturur?", "secenekler": ["kedi", "deri", "kalem", "dere"], "dogru": 0, "seslendir": "k, e, d, i"},
+    {"soru": "e - l sesleri hangi kelimeyi oluşturur?", "secenekler": ["el", "le", "al", "ol"], "dogru": 0, "seslendir": "e, l"},
+    {"soru": "t - o - p sesleri hangi kelimeyi oluşturur?", "secenekler": ["top", "pot", "opt", "tos"], "dogru": 0, "seslendir": "t, o, p"},
+    {"soru": "a - r - ı sesleri hangi kelimeyi oluşturur?", "secenekler": ["arı", "ıra", "rai", "ira"], "dogru": 0, "seslendir": "a, r, ı"},
+    {"soru": "s - u sesleri hangi kelimeyi oluşturur?", "secenekler": ["su", "us", "as", "os"], "dogru": 0, "seslendir": "s, u"},
+])
+
+_ses_cikarma_mock = _fon_mock([
+    {"soru": "'kitap' kelimesinden 'ki' hecesi atılırsa ne kalır?", "secenekler": ["tap", "ki", "kit", "pat"], "dogru": 0, "seslendir": "kitap"},
+    {"soru": "'kalem' kelimesinden 'ka' hecesi atılırsa ne kalır?", "secenekler": ["lem", "ka", "kal", "mek"], "dogru": 0, "seslendir": "kalem"},
+    {"soru": "'armut' kelimesinden 'ar' hecesi atılırsa ne kalır?", "secenekler": ["mut", "ar", "arm", "tum"], "dogru": 0, "seslendir": "armut"},
+    {"soru": "'elma' kelimesinden 'el' hecesi atılırsa ne kalır?", "secenekler": ["ma", "el", "elm", "ame"], "dogru": 0, "seslendir": "elma"},
+    {"soru": "'masa' kelimesinden 'ma' hecesi atılırsa ne kalır?", "secenekler": ["sa", "ma", "mas", "sam"], "dogru": 0, "seslendir": "masa"},
+])
+
+
 # Tip -> {system, user, mock}
 PROMPTLAR = {
     "demo": {
@@ -683,6 +772,56 @@ PROMPTLAR = {
         "system": _SISTEM_TR,
         "user": _diyalog_user,
         "mock": _diyalog_mock,
+    },
+    # ── FAZ 5: Fonolojik farkındalık ────────────────────────────
+    "hece_sayma": {
+        "system": _SISTEM_FONOLOJI,
+        "user": _fonoloji_user(
+            "kelimenin kaç heceli olduğunu sor.",
+            '{"sorular": [{"soru": "\'kelebek\' kaç hecelidir?", "secenekler": ["2","3","4","5"], "dogru": 1, "seslendir": "kelebek"}]}'),
+        "mock": _hece_sayma_mock,
+    },
+    "hece_birlestirme": {
+        "system": _SISTEM_FONOLOJI,
+        "user": _fonoloji_user(
+            "verilen heceleri birleştirince hangi kelimenin oluştuğunu sor.",
+            '{"sorular": [{"soru": "ki + tap hangi kelimedir?", "secenekler": ["kitap","kapı","tapu","kütük"], "dogru": 0, "seslendir": "ki, tap"}]}'),
+        "mock": _hece_birlestirme_mock,
+    },
+    "ilk_ses": {
+        "system": _SISTEM_FONOLOJI,
+        "user": _fonoloji_user(
+            "kelimenin hangi sesle başladığını sor.",
+            '{"sorular": [{"soru": "\'elma\' hangi sesle başlar?", "secenekler": ["e","a","l","m"], "dogru": 0, "seslendir": "elma"}]}'),
+        "mock": _ilk_ses_mock,
+    },
+    "son_ses": {
+        "system": _SISTEM_FONOLOJI,
+        "user": _fonoloji_user(
+            "kelimenin hangi sesle bittiğini sor.",
+            '{"sorular": [{"soru": "\'kalem\' hangi sesle biter?", "secenekler": ["m","k","e","l"], "dogru": 0, "seslendir": "kalem"}]}'),
+        "mock": _son_ses_mock,
+    },
+    "kafiye": {
+        "system": _SISTEM_FONOLOJI,
+        "user": _fonoloji_user(
+            "verilen kelimeyle kafiyeli (uyaklı) kelimeyi sor.",
+            '{"sorular": [{"soru": "\'top\' ile kafiyeli olan?", "secenekler": ["hop","kedi","araba","masa"], "dogru": 0, "seslendir": "top"}]}'),
+        "mock": _kafiye_mock,
+    },
+    "ses_birlestirme": {
+        "system": _SISTEM_FONOLOJI,
+        "user": _fonoloji_user(
+            "tek tek söylenen sesleri birleştirince hangi kelimenin oluştuğunu sor.",
+            '{"sorular": [{"soru": "k - e - d - i hangi kelimedir?", "secenekler": ["kedi","deri","kalem","dere"], "dogru": 0, "seslendir": "k, e, d, i"}]}'),
+        "mock": _ses_birlestirme_mock,
+    },
+    "ses_cikarma": {
+        "system": _SISTEM_FONOLOJI,
+        "user": _fonoloji_user(
+            "kelimeden bir hece/ses çıkarılınca ne kaldığını sor.",
+            '{"sorular": [{"soru": "\'kitap\'tan \'ki\' atılırsa ne kalır?", "secenekler": ["tap","ki","kit","pat"], "dogru": 0, "seslendir": "kitap"}]}'),
+        "mock": _ses_cikarma_mock,
     },
 }
 

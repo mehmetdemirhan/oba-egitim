@@ -25,6 +25,8 @@ import AnlamHaritasiRender from "./AnlamHaritasiRender";
 import VennRender from "./VennRender";
 import TekerlemeRender from "./TekerlemeRender";
 import DiyalogRender from "./DiyalogRender";
+// FAZ 5: Fonolojik farkındalık
+import FonolojiRender from "./FonolojiRender";
 
 const RENDER_MAP = {
   demo: DemoRender,
@@ -54,6 +56,14 @@ const RENDER_MAP = {
   tekerleme: TekerlemeRender,
   sight_words: SecmeliRender,        // standart çoktan seçmeli
   diyalog: DiyalogRender,
+  // FAZ 5: Fonolojik farkındalık (hepsi Web Speech destekli tek render)
+  hece_sayma: FonolojiRender,
+  hece_birlestirme: FonolojiRender,
+  ilk_ses: FonolojiRender,
+  son_ses: FonolojiRender,
+  kafiye: FonolojiRender,
+  ses_birlestirme: FonolojiRender,
+  ses_cikarma: FonolojiRender,
 };
 
 export function getRenderComponent(tip) {

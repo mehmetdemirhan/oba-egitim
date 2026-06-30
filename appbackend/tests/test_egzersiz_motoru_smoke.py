@@ -243,6 +243,35 @@ async def run():
         r = await ac.post("/api/egzersiz/uret", json={"tip": "sight_words", "sinif": 2}, headers=H)
         check(len(r.json()["icerik"].get("sorular", [])) >= 1, "sight_words soruları üretildi")
 
+        # ── FAZ 5: Fonolojik farkındalık (7 alt tip, secmeli + seslendir) ──
+        # Tüm fonoloji tipleri (sınıf filtresiz tam liste) kayıtlı mı?
+        r = await ac.get("/api/egzersiz/tipler", headers=H)
+        tip_idler = {t["id"] for t in r.json()["tipler"]}
+        fon_tipler = ("hece_sayma", "hece_birlestirme", "ilk_ses", "son_ses",
+                      "kafiye", "ses_birlestirme", "ses_cikarma")
+        for beklenen in fon_tipler:
+            check(beklenen in tip_idler, f"{beklenen} listede")
+
+        # Sınıf filtresi: ses_cikarma (sinif_min=2) 1. sınıfta GÖRÜNMEZ, 2. sınıfta görünür
+        r1 = {t["id"] for t in (await ac.get("/api/egzersiz/tipler?sinif=1", headers=H)).json()["tipler"]}
+        check("ilk_ses" in r1 and "ses_cikarma" not in r1, "1. sınıf filtresi doğru (ilk_ses var, ses_cikarma yok)")
+        r2 = {t["id"] for t in (await ac.get("/api/egzersiz/tipler?sinif=2", headers=H)).json()["tipler"]}
+        check("ses_cikarma" in r2, "ses_cikarma 2. sınıf listesinde")
+
+        # Her fonoloji tipi: üret → seslendir alanı var → oturum → doğru cevap (grade 2 hepsine uyar)
+        for tip in fon_tipler:
+            r = await ac.post("/api/egzersiz/uret", json={"tip": tip, "sinif": 2}, headers=H)
+            check(r.status_code == 200, f"{tip} üret 200 (status={r.status_code})")
+            doc = r.json()
+            sorular_f = doc["icerik"]["sorular"]
+            check(len(sorular_f) >= 1 and "seslendir" in sorular_f[0], f"{tip} seslendir alanı var")
+            r = await ac.post("/api/egzersiz/oturum",
+                              json={"tip": tip, "sinif": 2, "icerik_id": doc["id"]}, headers=H)
+            ot = r.json()["oturum_id"]
+            r = await ac.post(f"/api/egzersiz/oturum/{ot}/cevap",
+                              json={"soru_no": 0, "cevap": sorular_f[0]["dogru"]}, headers=H)
+            check(r.status_code == 200 and r.json()["dogru"] is True, f"{tip} doğru cevap işaretlendi")
+
     await server.client.drop_database(TEST_DB)
 
 
