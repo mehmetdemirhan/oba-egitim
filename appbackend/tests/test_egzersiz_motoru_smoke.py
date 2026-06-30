@@ -103,6 +103,39 @@ async def run():
         r = await ac.get("/api/egzersiz/icerikler?tip=demo&sinif=3", headers=H)
         check(r.status_code == 200 and len(r.json()["icerikler"]) >= 1, "içerikler listelendi")
 
+        # ── FAZ 1: Tier 1 tipleri (eslesme + sira grader yolları) ──
+        r = await ac.get("/api/egzersiz/tipler", headers=H)
+        tip_idler = {t["id"] for t in r.json()["tipler"]}
+        for beklenen in ("kelime_anlam_eslestirme", "cloze_bosluk_doldurma",
+                         "es_karsit_anlamli", "karisik_cumle_siralama", "hikaye_olay_siralama"):
+            check(beklenen in tip_idler, f"{beklenen} listede")
+
+        # Eşleştirme (puanlama=eslesme): doğru anlam eşleşmesi doğru işaretlenir
+        r = await ac.post("/api/egzersiz/uret", json={"tip": "kelime_anlam_eslestirme", "sinif": 3}, headers=H)
+        check(r.status_code == 200, f"eslestirme üret 200 (status={r.status_code})")
+        es = r.json()
+        ciftler = es["icerik"]["ciftler"]
+        check(len(ciftler) >= 2, "eslestirmede en az 2 çift")
+        r = await ac.post("/api/egzersiz/oturum",
+                          json={"tip": "kelime_anlam_eslestirme", "sinif": 3, "icerik_id": es["id"]}, headers=H)
+        check(r.json()["toplam_soru"] == len(ciftler), "eslestirme toplam_soru = çift sayısı")
+        es_oturum = r.json()["oturum_id"]
+        r = await ac.post(f"/api/egzersiz/oturum/{es_oturum}/cevap",
+                          json={"soru_no": 0, "cevap": {"sol": 0, "sag": ciftler[0]["sag"]}}, headers=H)
+        check(r.status_code == 200 and r.json()["dogru"] is True, "eslestirme doğru eşleşme doğru işaretlendi")
+
+        # Sıralama (puanlama=sira): tek soru, doğru sıra doğru işaretlenir
+        r = await ac.post("/api/egzersiz/uret", json={"tip": "karisik_cumle_siralama", "sinif": 3}, headers=H)
+        sr = r.json()
+        dogru_sira = sr["icerik"]["dogru_sira"]
+        r = await ac.post("/api/egzersiz/oturum",
+                          json={"tip": "karisik_cumle_siralama", "sinif": 3, "icerik_id": sr["id"]}, headers=H)
+        check(r.json()["toplam_soru"] == 1, "sıralama toplam_soru = 1")
+        sr_oturum = r.json()["oturum_id"]
+        r = await ac.post(f"/api/egzersiz/oturum/{sr_oturum}/cevap",
+                          json={"soru_no": 0, "cevap": dogru_sira}, headers=H)
+        check(r.status_code == 200 and r.json()["dogru"] is True, "sıralama doğru sıra doğru işaretlendi")
+
     await server.client.drop_database(TEST_DB)
 
 

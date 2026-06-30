@@ -26,7 +26,8 @@ KATEGORILER = {
 
 # Tip kayıtları — id (snake_case) → meta
 # Not: FAZ 0'da yalnızca motor testi için "demo" tipi vardır.
-# Tier 1-4 ve fonoloji tipleri sonraki fazlarda eklenecektir.
+# FAZ 1 (Tier 1) ile 5 temel egzersiz tipi eklendi.
+# Tier 2-4 ve fonoloji tipleri sonraki fazlarda eklenecektir.
 EGZERSIZ_TIPLERI = {
     "demo": {
         "ad": "Demo Egzersiz",
@@ -37,6 +38,57 @@ EGZERSIZ_TIPLERI = {
         "puanlama": "secmeli",
         "soru_sayisi": 3,
         "ikon": "🧪",
+    },
+    # ── Tier 1: 5 temel egzersiz (FAZ 1) ──────────────────────────
+    "kelime_anlam_eslestirme": {
+        "ad": "Kelime-Anlam Eşleştirme",
+        "aciklama": "Verilen kelimeleri doğru anlamlarıyla eşleştir.",
+        "sinif_min": 1,
+        "sinif_max": 8,
+        "kategori": "kelime",
+        "puanlama": "eslesme",
+        "soru_sayisi": 5,
+        "ikon": "🔗",
+    },
+    "cloze_bosluk_doldurma": {
+        "ad": "Boşluk Doldurma",
+        "aciklama": "Cümledeki boşluğa en uygun kelimeyi seç.",
+        "sinif_min": 2,
+        "sinif_max": 8,
+        "kategori": "anlama",
+        "puanlama": "secmeli",
+        "soru_sayisi": 5,
+        "ikon": "✏️",
+    },
+    "es_karsit_anlamli": {
+        "ad": "Eş ve Karşıt Anlamlılar",
+        "aciklama": "Kelimenin eş veya karşıt anlamlısını bul.",
+        "sinif_min": 2,
+        "sinif_max": 8,
+        "kategori": "kelime",
+        "puanlama": "secmeli",
+        "soru_sayisi": 5,
+        "ikon": "↔️",
+    },
+    "karisik_cumle_siralama": {
+        "ad": "Karışık Cümle Sıralama",
+        "aciklama": "Karışık verilen kelimeleri sıralayarak anlamlı cümle oluştur.",
+        "sinif_min": 1,
+        "sinif_max": 8,
+        "kategori": "gelismis",
+        "puanlama": "sira",
+        "soru_sayisi": 5,
+        "ikon": "🔀",
+    },
+    "hikaye_olay_siralama": {
+        "ad": "Hikâye Olay Sıralama",
+        "aciklama": "Hikâyedeki olayları doğru sıraya koy.",
+        "sinif_min": 2,
+        "sinif_max": 8,
+        "kategori": "anlama",
+        "puanlama": "sira",
+        "soru_sayisi": 5,
+        "ikon": "📖",
     },
 }
 
