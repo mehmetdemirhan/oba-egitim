@@ -3800,7 +3800,7 @@ function OgretmenPaneli({ user, logout }) {
   const { toast } = useToast();
   const { isFullscreen } = useFullscreenExercise();
   const [aktifSekme, setAktifSekme] = useState("dashboard");
-  const [egzKutuphaneGorunum, setEgzKutuphaneGorunum] = useState("yonetim"); // yonetim | onizle
+  const [egzKutuphaneGorunum, setEgzKutuphaneGorunum] = useState("egzersizler"); // egzersizler | yonetim
   const [ogrenciler, setOgrenciler] = useState([]);
   // ── Özellik Yönetimi ──
   const [ozellikAyarlari, setOzellikAyarlari] = useState({});
@@ -4770,9 +4770,9 @@ function OgretmenPaneli({ user, logout }) {
         {/* ═══ EGZERSİZ KÜTÜPHANESİ ═══ */}
         {aktifSekme === "egzersiz-kutuphane" && (
           <div className="space-y-3">
-            {/* Alt görünüm seçici: Kütüphane Yönetimi | Önizle & Dene */}
+            {/* Alt görünüm seçici: Egzersizler (varsayılan) | Kütüphane Yönetimi */}
             <div className="flex gap-2">
-              {[{ v: "yonetim", l: "📚 Kütüphane Yönetimi" }, { v: "onizle", l: "🎯 Önizle & Dene" }].map((t) => (
+              {[{ v: "egzersizler", l: "🎯 Egzersizler" }, { v: "yonetim", l: "📚 Kütüphane Yönetimi" }].map((t) => (
                 <button key={t.v} onClick={() => setEgzKutuphaneGorunum(t.v)}
                   className={`px-3 py-1.5 rounded-xl text-xs font-medium border ${egzKutuphaneGorunum === t.v ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-200"}`}>
                   {t.l}
@@ -4782,8 +4782,8 @@ function OgretmenPaneli({ user, logout }) {
             {egzKutuphaneGorunum === "yonetim" ? (
               <ExerciseLibrary apiBase={API} userRole={user.role} />
             ) : (
-              <ExerciseStarter title="Egzersiz Kütüphanesi" icon="🎯"
-                description="Öğrencilere yönelik egzersizleri sınıf seviyesine göre önizle ve dene.">
+              <ExerciseStarter title="Egzersizler" icon="🎯"
+                description="Bir egzersiz seç ve dene.">
                 <EgzersizKutuphanesi apiBase={API} sinif={3} ogretmenModu={true} />
               </ExerciseStarter>
             )}
