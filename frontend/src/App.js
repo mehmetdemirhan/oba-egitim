@@ -18,6 +18,7 @@ import { Toaster } from "./components/ui/toaster";
 import ModulYonetimi from "./components/ModulYonetimi";
 import ExerciseStarter from "./components/ExerciseStarter";
 import EgzersizKutuphanesi from "./components/exercises/EgzersizKutuphanesi";
+import ExerciseLibrary from "./components/exercises/ExerciseLibrary";
 import { FullscreenExerciseProvider, useFullscreenExercise } from "./context/FullscreenExerciseContext";
 import { ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Tooltip, XAxis, YAxis, CartesianGrid, AreaChart, Area } from 'recharts';
 import * as XLSX from 'xlsx';
@@ -3799,6 +3800,7 @@ function OgretmenPaneli({ user, logout }) {
   const { toast } = useToast();
   const { isFullscreen } = useFullscreenExercise();
   const [aktifSekme, setAktifSekme] = useState("dashboard");
+  const [egzKutuphaneGorunum, setEgzKutuphaneGorunum] = useState("yonetim"); // yonetim | onizle
   const [ogrenciler, setOgrenciler] = useState([]);
   // ── Özellik Yönetimi ──
   const [ozellikAyarlari, setOzellikAyarlari] = useState({});
@@ -4767,10 +4769,25 @@ function OgretmenPaneli({ user, logout }) {
 
         {/* ═══ EGZERSİZ KÜTÜPHANESİ ═══ */}
         {aktifSekme === "egzersiz-kutuphane" && (
-          <ExerciseStarter title="Egzersiz Kütüphanesi" icon="🎯"
-            description="Öğrencilere yönelik egzersizleri sınıf seviyesine göre önizle ve dene.">
-            <EgzersizKutuphanesi apiBase={API} sinif={3} ogretmenModu={true} />
-          </ExerciseStarter>
+          <div className="space-y-3">
+            {/* Alt görünüm seçici: Kütüphane Yönetimi | Önizle & Dene */}
+            <div className="flex gap-2">
+              {[{ v: "yonetim", l: "📚 Kütüphane Yönetimi" }, { v: "onizle", l: "🎯 Önizle & Dene" }].map((t) => (
+                <button key={t.v} onClick={() => setEgzKutuphaneGorunum(t.v)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-medium border ${egzKutuphaneGorunum === t.v ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-200"}`}>
+                  {t.l}
+                </button>
+              ))}
+            </div>
+            {egzKutuphaneGorunum === "yonetim" ? (
+              <ExerciseLibrary apiBase={API} userRole={user.role} />
+            ) : (
+              <ExerciseStarter title="Egzersiz Kütüphanesi" icon="🎯"
+                description="Öğrencilere yönelik egzersizleri sınıf seviyesine göre önizle ve dene.">
+                <EgzersizKutuphanesi apiBase={API} sinif={3} ogretmenModu={true} />
+              </ExerciseStarter>
+            )}
+          </div>
         )}
 
         {/* ═══ MESAJLAR ═══ */}
