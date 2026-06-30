@@ -653,6 +653,24 @@ _ses_cikarma_mock = _fon_mock([
 ])
 
 
+# ─────────────────────────────────────────────────────────────
+# Kelime Gezmece (çapraz bulmaca) — AI KULLANILMAZ.
+# İçerik core/bulmaca_olusturucu.py ile yerel üretilir. Motor (egzersiz_motoru)
+# bu tip için _icerik_uret içinde doğrudan bulmaca_uret çağırır; AI prompt'u
+# devreye girmez. Yine de jenerik mock akışı (ve öğretmen önizlemesi) için
+# buraya bir "mock" üretici bağlanır: user=None → motor mock'a düşse bile
+# gerçek bir bulmaca döner.
+# ─────────────────────────────────────────────────────────────
+def _kelime_gezmece_user(sinif, konu, soru_sayisi, zorluk):
+    return None  # AI istenmez
+
+
+def _kelime_gezmece_mock(sinif, konu, soru_sayisi):
+    # Geç içe aktarım: core katmanında döngüsel bağımlılığı önler.
+    from core.bulmaca_olusturucu import bulmaca_uret
+    return bulmaca_uret(sinif)
+
+
 # Tip -> {system, user, mock}
 PROMPTLAR = {
     "demo": {
@@ -822,6 +840,12 @@ PROMPTLAR = {
             "kelimeden bir hece/ses çıkarılınca ne kaldığını sor.",
             '{"sorular": [{"soru": "\'kitap\'tan \'ki\' atılırsa ne kalır?", "secenekler": ["tap","ki","kit","pat"], "dogru": 0, "seslendir": "kitap"}]}'),
         "mock": _ses_cikarma_mock,
+    },
+    # ── Kelime Gezmece — yerel bulmaca üretimi (AI yok) ──────────
+    "kelime_gezmece": {
+        "system": _SISTEM_TR,
+        "user": _kelime_gezmece_user,
+        "mock": _kelime_gezmece_mock,
     },
 }
 

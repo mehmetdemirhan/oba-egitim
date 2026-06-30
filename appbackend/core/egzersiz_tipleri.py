@@ -337,6 +337,22 @@ EGZERSIZ_TIPLERI = {
         "soru_sayisi": 5,
         "ikon": "✂️",
     },
+    # ── Kelime Gezmece (çapraz bulmaca harf oyunu) ───────────────
+    # İçerik AI ile DEĞİL, core/bulmaca_olusturucu.py ile üretilir
+    # (icerik_uretici="bulmaca"). Puanlama "serbest"; oyun kendi akışını
+    # yönetir, tamamlanınca tek seferde başarı bildirir. Özel puanlama
+    # (grid +10 / bonus +15) /egzersiz/kelime-gezmece/dogrula ile yapılır.
+    "kelime_gezmece": {
+        "ad": "Kelime Gezmece",
+        "aciklama": "Harfleri birleştirerek çapraz bulmacadaki gizli kelimeleri bul.",
+        "sinif_min": 1,
+        "sinif_max": 8,
+        "kategori": "oyun",
+        "puanlama": "serbest",
+        "soru_sayisi": 1,
+        "ikon": "🧩",
+        "icerik_uretici": "bulmaca",
+    },
 }
 
 

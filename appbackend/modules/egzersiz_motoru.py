@@ -30,6 +30,7 @@ from core.ai import call_claude
 from core.sistem import get_xp_tablosu
 from core.egzersiz_tipleri import tip_var_mi, tip_meta, tip_listesi
 from core.egzersiz_prompts import prompt_uret, mock_uret
+from core.bulmaca_olusturucu import bulmaca_uret, kelime_dogrula
 
 router = APIRouter()
 
@@ -67,6 +68,12 @@ async def _icerik_uret(tip: str, sinif: int, konu: str | None, zorluk: str | Non
     """
     meta = tip_meta(tip)
     soru_sayisi = meta.get("soru_sayisi", 5)
+
+    # Kelime Gezmece (ve "bulmaca" üreticili tipler): içerik AI ile değil,
+    # core/bulmaca_olusturucu.py ile yerel üretilir. Mock değildir.
+    if meta.get("icerik_uretici") == "bulmaca":
+        return bulmaca_uret(sinif), False
+
     system, user_msg = prompt_uret(tip, sinif, konu, soru_sayisi, zorluk)
     if not user_msg:
         return mock_uret(tip, sinif, konu, soru_sayisi), True
@@ -419,6 +426,37 @@ async def egzersiz_bitir(oturum_id: str, data: dict = None, current_user=Depends
         "xp": xp,
         "oran": round(oran * 100),
     }
+
+
+@router.post("/egzersiz/kelime-gezmece/dogrula")
+async def kelime_gezmece_dogrula(data: dict, current_user=Depends(get_current_user)):
+    """Kelime Gezmece — oyuncunun oluşturduğu kelimeyi doğrular.
+
+    Body: { icerik_id, harf_sirasi: ["e","l","m","a"] }
+    Yanıt: { kelime, durum: "grid"|"bonus"|"gecersiz", puan_kazanildi }
+
+    Puanlama (KELIME_GEZMECE özel kuralı): grid kelimesi +10, bonus kelime +15.
+    Kelime havuzunun tamamı istemciye verilmez; doğrulama burada yapılır.
+    Yetki: giriş yapmış herhangi bir kullanıcı (öğrenci/öğretmen/admin).
+    """
+    icerik_id = data.get("icerik_id")
+    harf_sirasi = data.get("harf_sirasi") or []
+    if not icerik_id:
+        raise HTTPException(status_code=400, detail="icerik_id gerekli")
+    if not isinstance(harf_sirasi, list) or not harf_sirasi:
+        raise HTTPException(status_code=400, detail="harf_sirasi (liste) gerekli")
+
+    icerik_doc = await db.egzersiz_icerikler.find_one({"id": icerik_id})
+    if not icerik_doc:
+        raise HTTPException(status_code=404, detail="İçerik bulunamadı")
+    if icerik_doc.get("tip") != "kelime_gezmece":
+        raise HTTPException(status_code=400, detail="İçerik Kelime Gezmece türünde değil")
+
+    icerik = icerik_doc.get("icerik", {})
+    sinif = int(icerik_doc.get("sinif", 3))
+    kelime = "".join(str(h) for h in harf_sirasi)
+    durum, puan = kelime_dogrula(icerik, kelime, sinif)
+    return {"kelime": kelime, "durum": durum, "puan_kazanildi": puan}
 
 
 @router.get("/egzersiz/gecmis/{ogrenci_id}")
