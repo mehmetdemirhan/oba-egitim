@@ -126,5 +126,9 @@
   {
     "name": "kullanici",
     "active": true
+  },
+  {
+    "name": "ders_programi",
+    "active": true
   }
 ]

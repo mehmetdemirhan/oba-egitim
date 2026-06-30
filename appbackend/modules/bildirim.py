@@ -32,6 +32,7 @@ BILDIRIM_TURLERI = {
     "anket_hatirlatma": {"baslik": "⭐ Değerlendirme", "oncelik": "normal"},
     "lig_yukseldi": {"baslik": "🏆 Lig Yükselme", "oncelik": "normal"},
     "haftalik_ozet": {"baslik": "📊 Haftalık Özet", "oncelik": "normal"},
+    "ders_degisiklik": {"baslik": "📅 Ders Değişikliği", "oncelik": "yuksek"},
 }
 
 
