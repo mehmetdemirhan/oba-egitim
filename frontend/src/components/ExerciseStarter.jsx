@@ -1,92 +1,69 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useEffect, useCallback } from "react";
 import { useFullscreenExercise } from "../context/FullscreenExerciseContext";
 
 /**
- * ExerciseStarter — her egzersiz/aktivite ekranını saran ortak başlatıcı.
+ * ExerciseStarter — her egzersiz/aktivite ekranını saran ortak kapsayıcı.
  *
- * 1. Egzersiz açıldığında önce bir "başlangıç kartı" gösterir:
- *      - Egzersizin adı + kısa açıklaması
- *      - "Normal Modda Başlat"  → header/sekmeler görünür kalır
- *      - "Tam Ekran Başlat"     → uygulama içi tam sayfa modu (header/sekme gizlenir)
- *    Kullanıcı seçim yapana kadar egzersiz (children) render edilmez.
+ * Egzersiz doğrudan normal modda açılır (başlangıçta zorunlu seçim YOK).
+ * Egzersizin üstünde küçük bir "⛶ Tam Ekran" düğmesi (ayar kontrolü) bulunur;
+ * buna basınca uygulama içi tam sayfa moduna geçilir:
+ *   - Panel header'ı + sekme bar'ı gizlenir
+ *   - Sağ üstte sabit "✕ Tam Ekrandan Çık" düğmesi çıkar
  *
- * 2. "Tam Ekran Başlat" seçilince global fullscreen state açılır; paneller
- *    header + sekme bar'ını gizler. Sağ üstte küçük bir "✕ Çıkış" butonu çıkar.
- *
- * 3. Tam ekrandan çıkış (buton veya ESC) egzersizi YARIDA KESMEZ; sadece görünümü
- *    normale döndürür — egzersiz state'i korunur.
+ * Tam ekrandan çıkış (düğme veya ESC) egzersizi YARIDA KESMEZ; sadece görünümü
+ * normale döndürür — egzersiz state'i korunur. Bileşen DOM'dan kalkınca
+ * (sekme değişimi vb.) tam ekran modu otomatik sıfırlanır.
  *
  * Props:
- *   title       — egzersiz adı (zorunlu)
+ *   title       — egzersiz adı (opsiyonel, erişilebilirlik etiketinde kullanılır)
  *   description — kısa açıklama (opsiyonel)
- *   icon        — emoji/ikon (opsiyonel)
+ *   icon        — emoji/ikon (opsiyonel, geriye dönük uyumluluk için kabul edilir)
  *   children    — egzersiz içeriği
  */
-export default function ExerciseStarter({ title, description, icon, children }) {
-  // null = henüz başlatılmadı; "normal" | "fullscreen" = başlatıldı
-  const [mode, setMode] = useState(null);
-  const { setIsFullscreen } = useFullscreenExercise();
+export default function ExerciseStarter({ title, children }) {
+  const { isFullscreen, setIsFullscreen } = useFullscreenExercise();
 
-  // Tam ekran modunda global state'i aç, diğer durumlarda kapat.
-  useEffect(() => {
-    setIsFullscreen(mode === "fullscreen");
-  }, [mode, setIsFullscreen]);
-
-  // Bileşen DOM'dan kalkınca (sekme değişimi vb.) global modu sıfırla.
+  // Bileşen DOM'dan kalkınca (sekme değişimi vb.) tam ekran modunu sıfırla.
   useEffect(() => {
     return () => setIsFullscreen(false);
   }, [setIsFullscreen]);
 
-  // Tam ekrandan çık ama egzersizi koru → mode "normal"
-  const tamEkrandanCik = useCallback(() => setMode("normal"), []);
+  const tamEkraniAc = useCallback(() => setIsFullscreen(true), [setIsFullscreen]);
+  const tamEkrandanCik = useCallback(() => setIsFullscreen(false), [setIsFullscreen]);
 
   // ESC ile tam ekrandan çık
   useEffect(() => {
-    if (mode !== "fullscreen") return;
+    if (!isFullscreen) return;
     const onKey = (e) => { if (e.key === "Escape") tamEkrandanCik(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [mode, tamEkrandanCik]);
+  }, [isFullscreen, tamEkrandanCik]);
 
-  // ── Başlangıç kartı ──
-  if (mode === null) {
-    return (
-      <div className="flex items-center justify-center py-6 px-2">
-        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 sm:p-8 max-w-md w-full text-center">
-          {icon && <div className="text-4xl mb-3">{icon}</div>}
-          <h2 className="text-xl font-bold text-gray-900 mb-2">{title}</h2>
-          {description && (
-            <p className="text-gray-500 text-sm mb-6 leading-relaxed">{description}</p>
-          )}
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <button
-              onClick={() => setMode("normal")}
-              className="flex-1 px-4 py-3 rounded-2xl font-medium text-sm border border-gray-200 text-gray-700 hover:bg-gray-50 transition-all">
-              Normal Modda Başlat
-            </button>
-            <button
-              onClick={() => setMode("fullscreen")}
-              className="flex-1 px-4 py-3 rounded-2xl font-medium text-sm bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-sm hover:opacity-90 transition-all">
-              ⛶ Tam Ekran Başlat
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Egzersiz başladı ──
   return (
-    <>
-      {mode === "fullscreen" && (
+    <div className="space-y-2">
+      {/* Ayar kontrolü — egzersizi tam ekrana al */}
+      {!isFullscreen && (
+        <div className="flex justify-end">
+          <button
+            onClick={tamEkraniAc}
+            title={title ? `${title} — tam ekran` : "Tam ekran"}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-medium border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 transition-all">
+            ⛶ Tam Ekran
+          </button>
+        </div>
+      )}
+
+      {/* Tam ekran modunda sabit çıkış düğmesi */}
+      {isFullscreen && (
         <button
           onClick={tamEkrandanCik}
           title="Tam ekrandan çık (ESC)"
           className="fixed top-3 right-3 z-[60] flex items-center gap-1 px-3 py-2 rounded-xl bg-white/90 backdrop-blur border border-gray-200 shadow-md text-sm font-medium text-gray-700 hover:bg-white transition-all">
-          ✕ Çıkış
+          ✕ Tam Ekrandan Çık
         </button>
       )}
+
       {children}
-    </>
+    </div>
   );
 }
