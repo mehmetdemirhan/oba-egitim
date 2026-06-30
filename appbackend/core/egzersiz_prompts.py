@@ -255,6 +255,148 @@ _tahmin_mock = _metinli_mock_fabrika(_TAHMIN_METIN, [
 ])
 
 
+# ─────────────────────────────────────────────────────────────
+# Tier 3: Kelime oyunları (FAZ 3)
+# ─────────────────────────────────────────────────────────────
+
+# 1) Anagram — puanlama: serbest → {"kelime","karisik","ipucu"} (istemci puanlar)
+def _anagram_user(sinif, konu, soru_sayisi, zorluk):
+    konu_str = konu or "günlük hayat"
+    return (
+        f"Sınıf {sinif} seviyesine uygun, '{konu_str}' temasında Türkçe tek bir kelime seç "
+        f"(4-7 harf). Zorluk: {zorluk or 'orta'}. Kelimeyi 'kelime' alanında ver; 'karisik' "
+        "alanında harflerini karışık sırayla tire ile ayırarak ver; 'ipucu' alanında kelimenin "
+        "anlamına dair kısa bir ipucu yaz.\n"
+        "JSON şeması: "
+        '{"kelime": "kalem", "karisik": "m-l-a-e-k", "ipucu": "Yazı yazmaya yarayan araç"}'
+        + _JSON_KURAL
+    )
+
+
+def _anagram_mock(sinif, konu, soru_sayisi):
+    return {"kelime": "kalem", "karisik": "m-l-a-e-k", "ipucu": "Yazı yazmaya yarayan araç"}
+
+
+# 2) Kelime Bulmaca — puanlama: serbest → {"kelimeler":[{ipucu,cevap}]} (ipucu → kelime)
+def _bulmaca_user(sinif, konu, soru_sayisi, zorluk):
+    konu_str = konu or "günlük hayat"
+    return (
+        f"Sınıf {sinif} seviyesine uygun, '{konu_str}' temasında ipucu-kelime biçiminde 4 adet "
+        f"bulmaca öğesi üret. Zorluk: {zorluk or 'orta'}. Her öğede kısa bir 'ipucu' ve bu "
+        "ipucunun yanıtı olan tek kelimelik 'cevap' bulunsun.\n"
+        "JSON şeması: "
+        '{"kelimeler": [{"ipucu": "Gökyüzünde uçan tüylü canlı", "cevap": "kuş"}]}'
+        + _JSON_KURAL
+    )
+
+
+def _bulmaca_mock(sinif, konu, soru_sayisi):
+    return {"kelimeler": [
+        {"ipucu": "Gökyüzünde uçan tüylü canlı", "cevap": "kuş"},
+        {"ipucu": "Yazı yazmaya yarayan araç", "cevap": "kalem"},
+        {"ipucu": "Geceleri gökyüzünde parlar", "cevap": "yıldız"},
+        {"ipucu": "Süt veren evcil hayvan", "cevap": "inek"},
+    ]}
+
+
+# 3) Hafıza Kartları — puanlama: serbest → {"ciftler":[{sol,sag}]} (eşleştirme oyunu)
+def _hafiza_user(sinif, konu, soru_sayisi, zorluk):
+    konu_str = konu or "günlük hayat"
+    return (
+        f"Sınıf {sinif} seviyesine uygun, '{konu_str}' temasında 4-6 adet kelime ve kısa anlamı "
+        f"üret. Zorluk: {zorluk or 'orta'}. Hafıza oyununda kelime-anlam çiftleri eşleştirilecek.\n"
+        "JSON şeması: "
+        '{"ciftler": [{"sol": "cömert", "sag": "Eli açık"}]}'
+        + _JSON_KURAL
+    )
+
+
+def _hafiza_mock(sinif, konu, soru_sayisi):
+    return {"ciftler": [
+        {"sol": "cömert", "sag": "Eli açık"},
+        {"sol": "çevik", "sag": "Hızlı hareket eden"},
+        {"sol": "dürüst", "sag": "Doğru sözlü"},
+        {"sol": "sabırlı", "sag": "Acele etmeyen"},
+    ]}
+
+
+# 4) Kelime Yağmuru — puanlama: serbest → {"hedef","dogrular","yanlislar"} (zamana karşı)
+def _yagmur_user(sinif, konu, soru_sayisi, zorluk):
+    konu_str = konu or "meyveler"
+    return (
+        f"Sınıf {sinif} seviyesine uygun bir kategori seç (örn. '{konu_str}'). "
+        f"Zorluk: {zorluk or 'orta'}. 'hedef' alanında oyuncudan hangi kelimeleri yakalamasını "
+        "istediğini kısaca açıkla; 'dogrular' alanında kategoriye uyan 6 kelime, 'yanlislar' "
+        "alanında uymayan 6 kelime ver.\n"
+        "JSON şeması: "
+        '{"hedef": "Meyve isimlerini yakala", "dogrular": ["elma","armut"], "yanlislar": ["masa","kalem"]}'
+        + _JSON_KURAL
+    )
+
+
+def _yagmur_mock(sinif, konu, soru_sayisi):
+    return {
+        "hedef": "Meyve isimlerini yakala",
+        "dogrular": ["elma", "armut", "kiraz", "muz", "üzüm", "çilek"],
+        "yanlislar": ["masa", "kalem", "araba", "kapı", "taş", "defter"],
+    }
+
+
+# 5) Kelime Merdiveni — puanlama: secmeli (tek harf değişimi)
+def _merdiven_user(sinif, konu, soru_sayisi, zorluk):
+    return (
+        f"Sınıf {sinif} seviyesine uygun {soru_sayisi} adet 'kelime merdiveni' sorusu üret. "
+        f"Zorluk: {zorluk or 'orta'}. Her soruda bir kelimenin tek bir harfini değiştirerek elde "
+        "edilen yeni anlamlı kelimeyi sor; 4 seçenek ver ve doğru indeksini (0-3) belirt.\n"
+        "JSON şeması: "
+        '{"sorular": [{"soru": "\'kar\' kelimesinin ilk harfini değiştirerek hangi kelimeyi elde edersin?", '
+        '"secenekler": ["bar","göl","taş","el"], "dogru": 0}]}'
+        + _JSON_KURAL
+    )
+
+
+def _merdiven_mock(sinif, konu, soru_sayisi):
+    havuz = [
+        {"soru": "'kar' kelimesinin ilk harfini değiştirerek hangi kelimeyi elde edersin?",
+         "secenekler": ["bar", "göl", "taş", "el"], "dogru": 0},
+        {"soru": "'taş' kelimesinin ilk harfini değiştirerek hangi kelimeyi elde edersin?",
+         "secenekler": ["kuş", "baş", "göz", "el"], "dogru": 1},
+        {"soru": "'kol' kelimesinin son harfini değiştirerek hangi kelimeyi elde edersin?",
+         "secenekler": ["kel", "koş", "kor", "yol"], "dogru": 2},
+        {"soru": "'el' kelimesinin başına bir harf ekleyerek hangi kelimeyi elde edersin?",
+         "secenekler": ["bel", "araba", "kalem", "masa"], "dogru": 0},
+    ]
+    return {"sorular": havuz[: max(1, min(soru_sayisi, len(havuz)))]}
+
+
+# 6) Bağlam İpucu — puanlama: secmeli (cümle ipuçlarından anlam)
+def _baglam_user(sinif, konu, soru_sayisi, zorluk):
+    return (
+        f"Sınıf {sinif} seviyesine uygun {soru_sayisi} adet 'bağlam ipucu' sorusu üret. "
+        f"Zorluk: {zorluk or 'orta'}. Her soruda içinde az bilinen bir kelimenin (*yıldız* içinde) "
+        "geçtiği bir cümle ver ve cümledeki ipuçlarından o kelimenin anlamını sor; 4 seçenek ver "
+        "ve doğru indeksini (0-3) belirt.\n"
+        "JSON şeması: "
+        '{"sorular": [{"soru": "\'Hava çok *puslu* olduğu için karşıyı zor görüyorduk.\' '
+        'Buradaki *puslu* ne demektir?", "secenekler": ["sisli","güneşli","sıcak","renkli"], "dogru": 0}]}'
+        + _JSON_KURAL
+    )
+
+
+def _baglam_mock(sinif, konu, soru_sayisi):
+    havuz = [
+        {"soru": "'Hava çok *puslu* olduğu için karşıyı zor görüyorduk.' Buradaki *puslu* ne demektir?",
+         "secenekler": ["sisli", "güneşli", "sıcak", "renkli"], "dogru": 0},
+        {"soru": "'Çocuk çok *müteşekkir* görünüyordu, sürekli teşekkür ediyordu.' Buradaki *müteşekkir* ne demektir?",
+         "secenekler": ["teşekkür eden", "kızgın", "üzgün", "yorgun"], "dogru": 0},
+        {"soru": "'Yolcular *meşakkatli* bir tırmanıştan sonra zirveye ulaştı.' Buradaki *meşakkatli* ne demektir?",
+         "secenekler": ["yorucu", "kolay", "kısa", "neşeli"], "dogru": 0},
+        {"soru": "'Bahçe rengârenk çiçeklerle *bezenmiş*ti.' Buradaki *bezenmiş* ne demektir?",
+         "secenekler": ["süslenmiş", "kurumuş", "boşalmış", "kararmış"], "dogru": 0},
+    ]
+    return {"sorular": havuz[: max(1, min(soru_sayisi, len(havuz)))]}
+
+
 # Tip -> {system, user, mock}
 PROMPTLAR = {
     "demo": {
@@ -312,6 +454,37 @@ PROMPTLAR = {
         "system": _SISTEM_TR,
         "user": _metinli_user("metnin nasıl devam edeceğine dair tahmini"),
         "mock": _tahmin_mock,
+    },
+    # ── Tier 3 (FAZ 3) ──────────────────────────────────────────
+    "anagram": {
+        "system": _SISTEM_TR,
+        "user": _anagram_user,
+        "mock": _anagram_mock,
+    },
+    "bulmaca": {
+        "system": _SISTEM_TR,
+        "user": _bulmaca_user,
+        "mock": _bulmaca_mock,
+    },
+    "hafiza_karti": {
+        "system": _SISTEM_TR,
+        "user": _hafiza_user,
+        "mock": _hafiza_mock,
+    },
+    "kelime_yagmuru": {
+        "system": _SISTEM_TR,
+        "user": _yagmur_user,
+        "mock": _yagmur_mock,
+    },
+    "kelime_merdiveni": {
+        "system": _SISTEM_TR,
+        "user": _merdiven_user,
+        "mock": _merdiven_mock,
+    },
+    "baglam_ipucu": {
+        "system": _SISTEM_TR,
+        "user": _baglam_user,
+        "mock": _baglam_mock,
     },
 }
 

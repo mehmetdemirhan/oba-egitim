@@ -157,6 +157,51 @@ async def run():
                           json={"soru_no": 0, "cevap": sorular2[0]["dogru"]}, headers=H)
         check(r.status_code == 200 and r.json()["dogru"] is True, "5n1k doğru cevap doğru işaretlendi")
 
+        # ── FAZ 3: Tier 3 (kelime oyunları — serbest + secmeli) ──
+        r = await ac.get("/api/egzersiz/tipler", headers=H)
+        tip_idler = {t["id"] for t in r.json()["tipler"]}
+        for beklenen in ("anagram", "bulmaca", "hafiza_karti", "kelime_yagmuru",
+                         "kelime_merdiveni", "baglam_ipucu"):
+            check(beklenen in tip_idler, f"{beklenen} listede")
+
+        # Anagram (puanlama=serbest): tek puanlama; istemci doğru der → dogru True
+        r = await ac.post("/api/egzersiz/uret", json={"tip": "anagram", "sinif": 3}, headers=H)
+        check(r.status_code == 200, f"anagram üret 200 (status={r.status_code})")
+        ag = r.json()
+        check("kelime" in ag["icerik"], "anagram içeriğinde kelime var")
+        r = await ac.post("/api/egzersiz/oturum",
+                          json={"tip": "anagram", "sinif": 3, "icerik_id": ag["id"]}, headers=H)
+        check(r.json()["toplam_soru"] == 1, "anagram toplam_soru = 1 (serbest)")
+        ag_oturum = r.json()["oturum_id"]
+        r = await ac.post(f"/api/egzersiz/oturum/{ag_oturum}/cevap",
+                          json={"soru_no": 0, "cevap": True}, headers=H)
+        check(r.status_code == 200 and r.json()["dogru"] is True, "anagram serbest doğru işaretlendi")
+
+        # Hafıza kartları (serbest): içerikte ciftler var
+        r = await ac.post("/api/egzersiz/uret", json={"tip": "hafiza_karti", "sinif": 3}, headers=H)
+        check(r.status_code == 200 and len(r.json()["icerik"].get("ciftler", [])) >= 2, "hafiza_karti çiftleri üretildi")
+
+        # Kelime yağmuru (serbest): dogrular + yanlislar
+        r = await ac.post("/api/egzersiz/uret", json={"tip": "kelime_yagmuru", "sinif": 3}, headers=H)
+        yg = r.json()["icerik"]
+        check(len(yg.get("dogrular", [])) >= 1 and len(yg.get("yanlislar", [])) >= 1, "kelime_yagmuru doğru/yanlış kelimeler var")
+
+        # Bulmaca (serbest): ipucu-kelime listesi
+        r = await ac.post("/api/egzersiz/uret", json={"tip": "bulmaca", "sinif": 3}, headers=H)
+        check(len(r.json()["icerik"].get("kelimeler", [])) >= 1, "bulmaca öğeleri üretildi")
+
+        # Kelime merdiveni (secmeli): standart çoktan seçmeli akış
+        r = await ac.post("/api/egzersiz/uret", json={"tip": "kelime_merdiveni", "sinif": 4}, headers=H)
+        md = r.json()
+        sorular_md = md["icerik"]["sorular"]
+        check(len(sorular_md) >= 1, "kelime_merdiveni soruları üretildi")
+        r = await ac.post("/api/egzersiz/oturum",
+                          json={"tip": "kelime_merdiveni", "sinif": 4, "icerik_id": md["id"]}, headers=H)
+        md_oturum = r.json()["oturum_id"]
+        r = await ac.post(f"/api/egzersiz/oturum/{md_oturum}/cevap",
+                          json={"soru_no": 0, "cevap": sorular_md[0]["dogru"]}, headers=H)
+        check(r.status_code == 200 and r.json()["dogru"] is True, "kelime_merdiveni doğru cevap işaretlendi")
+
     await server.client.drop_database(TEST_DB)
 
 

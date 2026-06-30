@@ -13,6 +13,12 @@ import AnaFikirRender from "./AnaFikirRender";
 import CikarimRender from "./CikarimRender";
 import SebepSonucRender from "./SebepSonucRender";
 import TahminEtRender from "./TahminEtRender";
+// Tier 3 (FAZ 3)
+import SecmeliRender from "./SecmeliRender";
+import AnagramRender from "./AnagramRender";
+import BulmacaRender from "./BulmacaRender";
+import HafizaKartiRender from "./HafizaKartiRender";
+import KelimeYagmuruRender from "./KelimeYagmuruRender";
 
 const RENDER_MAP = {
   demo: DemoRender,
@@ -28,6 +34,13 @@ const RENDER_MAP = {
   cikarim: CikarimRender,
   sebep_sonuc: SebepSonucRender,
   tahmin_et: TahminEtRender,
+  // Tier 3 (FAZ 3)
+  anagram: AnagramRender,
+  bulmaca: BulmacaRender,
+  hafiza_karti: HafizaKartiRender,
+  kelime_yagmuru: KelimeYagmuruRender,
+  kelime_merdiveni: SecmeliRender,   // standart çoktan seçmeli
+  baglam_ipucu: SecmeliRender,       // standart çoktan seçmeli
 };
 
 export function getRenderComponent(tip) {
