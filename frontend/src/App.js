@@ -17,6 +17,7 @@ import { useToast } from "./hooks/use-toast";
 import { Toaster } from "./components/ui/toaster";
 import ModulYonetimi from "./components/ModulYonetimi";
 import ExerciseStarter from "./components/ExerciseStarter";
+import EgzersizKutuphanesi from "./components/exercises/EgzersizKutuphanesi";
 import { FullscreenExerciseProvider, useFullscreenExercise } from "./context/FullscreenExerciseContext";
 import { ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Tooltip, XAxis, YAxis, CartesianGrid, AreaChart, Area } from 'recharts';
 import * as XLSX from 'xlsx';
@@ -3952,6 +3953,7 @@ function OgretmenPaneli({ user, logout }) {
     ozellikAktif("ogretmen_gorevler")      && { id: "gorevler",     label: "Görevler",     icon: "📌", badge: benimGorevlerim.filter(g => g.durum !== "tamamlandi").length || null },
     ozellikAktif("ogretmen_giris_analizi") && { id: "giris-analizi",label: "Analiz",       icon: "🔬" },
     ozellikAktif("ogretmen_gelisim")       && { id: "gelisim",      label: "Gelişim",      icon: "🎓" },
+    { id: "egzersiz-kutuphane", label: "Egzersizler", icon: "🎯" },
     ozellikAktif("ogretmen_mesajlar")      && { id: "mesajlar",     label: "Mesajlar",     icon: "✉️", badge: okunmamisSayisi || null },
   ].filter(Boolean);
 
@@ -4762,6 +4764,14 @@ function OgretmenPaneli({ user, logout }) {
         {/* ═══ GELİŞİM ═══ */}
         {aktifSekme === "gelisim" && ozellikAktif("ogretmen_gelisim") && (<GelisimAlani user={user} />)}
         {aktifSekme === "gelisim" && !ozellikAktif("ogretmen_gelisim") && (<div className="text-center py-16 text-gray-400"><div className="text-4xl mb-3">🔒</div><p className="font-medium">Bu özellik şu an devre dışı</p><p className="text-sm mt-1">Sistem yöneticisi bu modülü kapatmıştır.</p></div>)}
+
+        {/* ═══ EGZERSİZ KÜTÜPHANESİ ═══ */}
+        {aktifSekme === "egzersiz-kutuphane" && (
+          <ExerciseStarter title="Egzersiz Kütüphanesi" icon="🎯"
+            description="Öğrencilere yönelik egzersizleri sınıf seviyesine göre önizle ve dene.">
+            <EgzersizKutuphanesi apiBase={API} sinif={3} ogretmenModu={true} />
+          </ExerciseStarter>
+        )}
 
         {/* ═══ MESAJLAR ═══ */}
         {aktifSekme === "mesajlar" && (<div className="space-y-4">
@@ -5868,7 +5878,13 @@ function OgrenciPaneli({ user, logout }) {
           </>)}
 
           {/* Egzersizler */}
-          {gelisimAltSekme === "egzersizler" && (
+          {gelisimAltSekme === "egzersizler" && (<>
+            {/* Yeni Egzersiz Kütüphanesi (jenerik motor — Tier 1-4 + fonoloji) */}
+            <ExerciseStarter title="Yeni Egzersiz Kütüphanesi" icon="🎯"
+              description="Kelime, okuduğunu anlama, oyun ve fonolojik farkındalık egzersizleri — sınıf seviyene göre.">
+              <EgzersizKutuphanesi apiBase={API} sinif={user.sinif || 3} />
+            </ExerciseStarter>
+
             <ExerciseStarter title="Göz ve Okuma Egzersizleri" icon="👁️"
               description="Göz takip, Schulte, hızlı okuma ve daha fazlası — okuma kaslarını güçlendir.">
               <EgzersizlerModul user={user} egzersizPuanlari={egzersizPuanlari} onTamamla={async (egzersizId) => {
@@ -5876,7 +5892,7 @@ function OgrenciPaneli({ user, logout }) {
                 catch(e) { if (e.response?.status === 409) toast({ title: "Bu egzersizi bugün zaten yaptın" }); else toast({ title: "Hata", variant: "destructive" }); }
               }} />
             </ExerciseStarter>
-          )}
+          </>)}
 
           {/* Okumalarım */}
           {gelisimAltSekme === "okumalarim" && (<>

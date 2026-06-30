@@ -172,5 +172,6 @@ def tip_listesi(sinif: int | None = None) -> list:
             "kategori_ad": KATEGORILER.get(meta["kategori"], meta["kategori"]),
             "ikon": meta.get("ikon", "📝"),
             "soru_sayisi": meta.get("soru_sayisi", 5),
+            "puanlama": meta.get("puanlama", "secmeli"),
         })
     return out

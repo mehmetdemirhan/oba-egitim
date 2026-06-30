@@ -1,0 +1,269 @@
+import React, { useEffect, useMemo, useState } from "react";
+import axios from "axios";
+import { getRenderComponent } from "./types";
+
+/**
+ * EgzersizKutuphanesi — jenerik egzersiz motoru (UI tarafı).
+ *
+ * Tek bir bileşen tüm egzersiz tiplerini yönetir:
+ *   1. /egzersiz/tipler ile kayıtlı tipleri listeler (kategoriye göre gruplu).
+ *   2. Seçilen tip için /egzersiz/oturum başlatır, içeriği alır.
+ *   3. Tipe uygun render bileşenini (types/index.js) seçip soru soru gösterir.
+ *   4. Her cevabı /egzersiz/oturum/{id}/cevap ile değerlendirir.
+ *   5. Bitince /egzersiz/oturum/{id}/bitir ile puan + XP hesaplar, sonucu gösterir.
+ *
+ * Tip başına özel kod YOKTUR; yeni tip eklemek = backend kaydı + bir render bileşeni.
+ *
+ * Props:
+ *   apiBase      — `${BACKEND_URL}/api` (App.js'teki API sabiti)
+ *   sinif        — varsayılan sınıf filtresi (öğrenci için user.sinif)
+ *   ogretmenModu — true ise sınıf seçici her zaman açık (öğretmen önizlemesi)
+ */
+export default function EgzersizKutuphanesi({ apiBase, sinif = 3, ogretmenModu = false }) {
+  const [secliSinif, setSecliSinif] = useState(Number(sinif) || 3);
+  const [tipler, setTipler] = useState([]);
+  const [yukleniyor, setYukleniyor] = useState(true);
+
+  const [seciliTip, setSeciliTip] = useState(null);   // {id, ad, ...}
+  const [oturum, setOturum] = useState(null);          // {oturum_id, tip, toplam_soru, icerik, mock}
+  const [soruNo, setSoruNo] = useState(0);
+  const [cevaplandi, setCevaplandi] = useState(false);
+  const [dogruSayisi, setDogruSayisi] = useState(0);
+  const [baslangic, setBaslangic] = useState(0);
+  const [sonuc, setSonuc] = useState(null);
+  const [hata, setHata] = useState(null);
+  const [basliyor, setBasliyor] = useState(false);
+
+  // Tip listesini çek (sınıf değişince yenile)
+  useEffect(() => {
+    let iptal = false;
+    (async () => {
+      setYukleniyor(true);
+      try {
+        const r = await axios.get(`${apiBase}/egzersiz/tipler`, { params: { sinif: secliSinif } });
+        if (!iptal) setTipler(r.data?.tipler || []);
+      } catch (e) {
+        if (!iptal) setTipler([]);
+      } finally {
+        if (!iptal) setYukleniyor(false);
+      }
+    })();
+    return () => { iptal = true; };
+  }, [apiBase, secliSinif]);
+
+  // Kategoriye göre grupla (listede başlıklı bölümler)
+  const gruplar = useMemo(() => {
+    const g = {};
+    for (const t of tipler) {
+      const k = t.kategori_ad || "Diğer";
+      (g[k] = g[k] || []).push(t);
+    }
+    return g;
+  }, [tipler]);
+
+  const egzersizBaslat = async (tip) => {
+    if (basliyor) return;
+    setBasliyor(true);
+    setHata(null);
+    try {
+      const r = await axios.post(`${apiBase}/egzersiz/oturum`, { tip: tip.id, sinif: secliSinif });
+      setSeciliTip(tip);
+      setOturum(r.data);
+      setSoruNo(0);
+      setCevaplandi(false);
+      setDogruSayisi(0);
+      setSonuc(null);
+      setBaslangic(Date.now());
+    } catch (e) {
+      setHata("Egzersiz başlatılamadı. Lütfen tekrar deneyin.");
+    } finally {
+      setBasliyor(false);
+    }
+  };
+
+  // Render bileşenlerinin çağırdığı ortak cevap fonksiyonu
+  const onCevap = async (cevap) => {
+    if (!oturum) return { dogru: false, dogru_cevap: null };
+    try {
+      const r = await axios.post(
+        `${apiBase}/egzersiz/oturum/${oturum.oturum_id}/cevap`,
+        { soru_no: soruNo, cevap }
+      );
+      setCevaplandi(true);
+      if (r.data?.dogru) setDogruSayisi((s) => s + 1);
+      return r.data;
+    } catch (e) {
+      setCevaplandi(true);
+      return { dogru: false, dogru_cevap: null };
+    }
+  };
+
+  const bitir = async () => {
+    const sure = Math.max(0, Math.round((Date.now() - baslangic) / 1000));
+    try {
+      const r = await axios.post(
+        `${apiBase}/egzersiz/oturum/${oturum.oturum_id}/bitir`,
+        { sure_sn: sure }
+      );
+      setSonuc(r.data);
+    } catch (e) {
+      setSonuc({
+        dogru_sayisi: dogruSayisi,
+        toplam_soru: oturum?.toplam_soru || 1,
+        oran: 0, xp: 0, puan: 0,
+      });
+    }
+  };
+
+  const sonraki = () => {
+    const toplam = oturum?.toplam_soru || 1;
+    if (soruNo + 1 < toplam) {
+      setSoruNo((n) => n + 1);
+      setCevaplandi(false);
+    } else {
+      bitir();
+    }
+  };
+
+  const kutuphaneyeDon = () => {
+    setSeciliTip(null);
+    setOturum(null);
+    setSonuc(null);
+    setSoruNo(0);
+    setCevaplandi(false);
+    setHata(null);
+  };
+
+  const tekrarDene = () => seciliTip && egzersizBaslat(seciliTip);
+
+  // ── SONUÇ EKRANI ───────────────────────────────────────────────
+  if (sonuc) {
+    const oran = sonuc.oran ?? 0;
+    const basarili = oran >= 60;
+    return (
+      <div className="space-y-4">
+        <div className={`rounded-2xl p-6 text-center border ${basarili ? "bg-green-50 border-green-200" : "bg-amber-50 border-amber-200"}`}>
+          <div className="text-5xl mb-2">{basarili ? "🎉" : "💪"}</div>
+          <div className="text-xl font-bold text-gray-800">{seciliTip?.ad}</div>
+          <div className="text-3xl font-extrabold mt-3 text-gray-900">
+            {sonuc.dogru_sayisi}/{sonuc.toplam_soru}
+          </div>
+          <div className="text-sm text-gray-500 mt-1">Başarı: %{oran}</div>
+          <div className="flex items-center justify-center gap-4 mt-3 text-sm">
+            <span className="px-3 py-1 rounded-full bg-indigo-100 text-indigo-700 font-semibold">+{sonuc.xp || 0} XP</span>
+            <span className="px-3 py-1 rounded-full bg-purple-100 text-purple-700 font-semibold">+{sonuc.puan || 0} puan</span>
+          </div>
+        </div>
+        <div className="flex items-center justify-center gap-2">
+          <button onClick={tekrarDene}
+            className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition">
+            🔁 Tekrar Dene
+          </button>
+          <button onClick={kutuphaneyeDon}
+            className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">
+            ← Kütüphaneye Dön
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── EGZERSİZ EKRANI ────────────────────────────────────────────
+  if (oturum) {
+    const Render = getRenderComponent(oturum.tip);
+    const toplam = oturum.toplam_soru || 1;
+    const sonSoru = soruNo + 1 >= toplam;
+    return (
+      <div className="space-y-3">
+        {/* Üst bar: başlık + ilerleme */}
+        <div className="flex items-center justify-between">
+          <button onClick={kutuphaneyeDon}
+            className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
+            ← Çık
+          </button>
+          <div className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+            <span>{seciliTip?.ikon} {seciliTip?.ad}</span>
+            {oturum.mock && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-400">çevrimdışı</span>
+            )}
+          </div>
+          <div className="text-xs font-medium text-gray-400">{Math.min(soruNo + 1, toplam)}/{toplam}</div>
+        </div>
+
+        {/* İlerleme çubuğu */}
+        <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+          <div className="h-full bg-indigo-500 transition-all"
+            style={{ width: `${(Math.min(soruNo + (cevaplandi ? 1 : 0), toplam) / toplam) * 100}%` }} />
+        </div>
+
+        {/* Soru render */}
+        {Render ? (
+          <Render icerik={oturum.icerik} onCevap={onCevap} soruNo={soruNo}
+            ilerleme={{ mevcut: soruNo + 1, toplam }} />
+        ) : (
+          <div className="text-center py-10 text-gray-400">
+            <div className="text-3xl mb-2">🚧</div>
+            Bu egzersiz türünün görünümü henüz hazır değil.
+          </div>
+        )}
+
+        {/* Sonraki / Bitir */}
+        {(cevaplandi || !Render) && (
+          <div className="flex justify-end">
+            <button onClick={sonraki}
+              className="px-5 py-2 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition">
+              {sonSoru ? "Bitir ✓" : "Sonraki →"}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── KÜTÜPHANE (TİP LİSTESİ) ────────────────────────────────────
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <h3 className="text-base font-bold text-gray-800">🎯 Egzersiz Kütüphanesi</h3>
+          <p className="text-xs text-gray-500">Bir egzersiz seç ve hemen başla.</p>
+        </div>
+        <label className="text-xs text-gray-600 flex items-center gap-1.5">
+          Sınıf:
+          <select value={secliSinif} onChange={(e) => setSecliSinif(Number(e.target.value))}
+            className="px-2 py-1 rounded-lg border border-gray-200 text-sm bg-white">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
+              <option key={s} value={s}>{s}. sınıf</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {hata && (
+        <div className="px-4 py-2 rounded-xl bg-red-50 border border-red-200 text-sm text-red-600">{hata}</div>
+      )}
+
+      {yukleniyor ? (
+        <div className="text-center py-10 text-gray-400 text-sm">Yükleniyor…</div>
+      ) : tipler.length === 0 ? (
+        <div className="text-center py-10 text-gray-400 text-sm">Bu sınıf için egzersiz bulunamadı.</div>
+      ) : (
+        Object.entries(gruplar).map(([kategori, liste]) => (
+          <div key={kategori} className="space-y-2">
+            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide">{kategori}</h4>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {liste.map((t) => (
+                <button key={t.id} onClick={() => egzersizBaslat(t)} disabled={basliyor}
+                  className="text-left p-3 rounded-2xl border border-gray-100 bg-white shadow-sm hover:shadow-md hover:border-indigo-200 transition disabled:opacity-50">
+                  <div className="text-2xl mb-1">{t.ikon || "📝"}</div>
+                  <div className="text-sm font-semibold text-gray-800 leading-tight">{t.ad}</div>
+                  <div className="text-[11px] text-gray-400 mt-0.5 line-clamp-2">{t.aciklama}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
