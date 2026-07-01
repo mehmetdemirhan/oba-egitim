@@ -19,12 +19,18 @@ from core.turkce_kelime_havuzu import sinif_kelimeleri, tr_kucuk
 
 
 async def meb_kelime_kayitlari(sinif: int, sadece_anlamli: bool = True,
-                               limit: int = 500) -> list[dict]:
-    """MEB kelime kayıtlarını (dict) döndürür. En az kullanılan önce."""
+                               limit: int = 500, ders_filtre: list | None = None) -> list[dict]:
+    """MEB kelime kayıtlarını (dict) döndürür. En az kullanılan önce.
+
+    ders_filtre: None → tüm dersler; ["turkce"] veya ["turkce","sosyal_bilgiler"]
+    → yalnızca bu derslerden.
+    """
     try:
         sorgu: dict = {"sinif": int(sinif), "durum": "aktif"}
         if sadece_anlamli:
             sorgu["anlam"] = {"$nin": [None, ""]}
+        if ders_filtre:
+            sorgu["ders"] = {"$in": list(ders_filtre)}
         docs = await db.meb_kelimeleri.find(sorgu).sort("kullanim_sayisi", 1).to_list(length=limit)
         for d in docs:
             d.pop("_id", None)
@@ -35,9 +41,9 @@ async def meb_kelime_kayitlari(sinif: int, sadece_anlamli: bool = True,
 
 
 async def meb_kelime_stringleri(sinif: int, sadece_anlamli: bool = False,
-                                limit: int = 500) -> list[str]:
+                                limit: int = 500, ders_filtre: list | None = None) -> list[str]:
     """Sadece kelime string'lerini (küçük harf, tekilleştirilmiş) döndürür."""
-    docs = await meb_kelime_kayitlari(sinif, sadece_anlamli=sadece_anlamli, limit=limit)
+    docs = await meb_kelime_kayitlari(sinif, sadece_anlamli=sadece_anlamli, limit=limit, ders_filtre=ders_filtre)
     gorulen: set[str] = set()
     out: list[str] = []
     for d in docs:
@@ -62,35 +68,43 @@ async def _kullanim_artir(sinif: int, kelimeler: list[str]):
 
 
 async def kelime_sec(sinif: int, sayi: int, tip: str = "genel",
+                     ders_filtre: list | None = None, meb_orani: float = 0.7,
                      istatistik: bool = True) -> list[dict]:
     """Sınıf seviyesine uygun `sayi` kadar kelime döndürür.
 
-    Öncelik: MEB (anlamlı) → genel havuz. Dönüş öğeleri:
-      {"kelime", "anlam", "ornek_cumle", "kaynak": "meb"|"havuz"}
+    Öncelik: MEB (anlamlı, ders_filtre'ye uyan) → genel havuz. Dönüş öğeleri:
+      {"kelime", "anlam", "ornek_cumle", "ders", "kaynak": "meb"|"havuz"}
 
-    tip: bazı egzersizler için ipucu (ör. "es_anlamli" AI gerektirir); şu an
-    yalnızca kaynak önceliğini etkilemez, çağıran modül için bilgi amaçlı.
+    ders_filtre: None → tüm dersler karışık; liste → yalnızca o dersler.
+    meb_orani: MEB kelimelerinin hedef oranı (0-1). Havuz yetersizse MEB ile
+      tamamlanır; MEB yetersizse havuzla tamamlanır (yani öncelik yine MEB'de).
     """
     sayi = max(0, int(sayi))
+    meb_hedef = sayi if meb_orani >= 1 else max(1, round(sayi * meb_orani))
     out: list[dict] = []
     gorulen: set[str] = set()
 
-    meb = await meb_kelime_kayitlari(sinif, sadece_anlamli=True)
+    meb = await meb_kelime_kayitlari(sinif, sadece_anlamli=True, ders_filtre=ders_filtre)
     random.shuffle(meb)
-    for d in meb:
-        k = tr_kucuk(str(d.get("kelime", "")).strip())
-        if not k or k in gorulen:
-            continue
-        gorulen.add(k)
-        out.append({
-            "kelime": k,
-            "anlam": d.get("anlam", ""),
-            "ornek_cumle": d.get("ornek_cumle", ""),
-            "kaynak": "meb",
-        })
-        if len(out) >= sayi:
-            break
 
+    def _meb_ekle(hedef):
+        for d in meb:
+            if len(out) >= hedef:
+                break
+            k = tr_kucuk(str(d.get("kelime", "")).strip())
+            if not k or k in gorulen:
+                continue
+            gorulen.add(k)
+            out.append({
+                "kelime": k, "anlam": d.get("anlam", ""),
+                "ornek_cumle": d.get("ornek_cumle", ""),
+                "ders": d.get("ders", "turkce"), "kaynak": "meb",
+            })
+
+    # 1) MEB'den hedef orana kadar
+    _meb_ekle(min(meb_hedef, sayi))
+
+    # 2) Genel havuzla tamamla
     if len(out) < sayi:
         havuz = list(sinif_kelimeleri(sinif))
         random.shuffle(havuz)
@@ -99,9 +113,13 @@ async def kelime_sec(sinif: int, sayi: int, tip: str = "genel",
             if k in gorulen:
                 continue
             gorulen.add(k)
-            out.append({"kelime": k, "anlam": "", "ornek_cumle": "", "kaynak": "havuz"})
+            out.append({"kelime": k, "anlam": "", "ornek_cumle": "", "ders": None, "kaynak": "havuz"})
             if len(out) >= sayi:
                 break
+
+    # 3) Hâlâ eksikse kalan MEB kelimeleriyle tamamla (öncelik MEB'de)
+    if len(out) < sayi:
+        _meb_ekle(sayi)
 
     if istatistik:
         secilen_meb = [o["kelime"] for o in out if o["kaynak"] == "meb"]

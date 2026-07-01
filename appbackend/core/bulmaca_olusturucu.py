@@ -342,13 +342,15 @@ def _baska_kelime_kullaniyor(izgara: _Izgara, r: int, c: int) -> bool:
 # Genel API
 # ─────────────────────────────────────────────────────────────
 def bulmaca_uret(sinif: int = 3, seviye_no: int = 1,
-                 meb_kelimeler: list[str] | None = None) -> dict:
+                 meb_kelimeler: list[str] | None = None,
+                 ders_filtre: list | None = None) -> dict:
     """Sınıf seviyesine ve seviye numarasına uygun bir Kelime Gezmece bulmacası üretir.
 
     `seviye_no` arttıkça zorluk artar (bkz. _seviye_parametreleri); sınıf tavanları
     korunur. `meb_kelimeler` verilirse (MEB müfredat kelimeleri) bulmaca bu
-    kelimeler etrafında/önceliğiyle kurulur. Çıktıya `seviye_no`, `sinif` ve
-    `meb_oncelik` alanları eklenir.
+    kelimeler etrafında/önceliğiyle kurulur. `ders_filtre` bilgi amaçlıdır; MEB
+    kelimeleri zaten çağıran katmanda derse göre filtrelenip `meb_kelimeler` olarak
+    geçilir. Çıktıya `seviye_no`, `sinif`, `meb_oncelik` alanları eklenir.
     """
     sinif = max(1, min(8, int(sinif)))
     seviye_no = max(1, int(seviye_no))
