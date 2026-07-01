@@ -7514,6 +7514,7 @@ function SistemAyarlari({ user }) {
   const [ayarSekme, setAyarSekme] = useState("xp");
   const [xpTablosu, setXpTablosu] = useState({ okuma_gorevi: 10, anlama_testi: 15, kelime_gorevi: 8, gunluk_streak: 5, kitap_bitirme: 30, yazili_ozet: 20, egzersiz: 5, gelisim_tamamla: 5, gorev_tamamla: 10 });
   const [ligEsikleri, setLigEsikleri] = useState({ bronz: 0, gumus: 200, altin: 500, elmas: 1000 });
+  const [ogretmenAgirliklari, setOgretmenAgirliklari] = useState({ ogrenci_basi: 20, kur_basi: 50, veli_yildiz: 5 });
   const [ogretmenRozetler, setOgretmenRozetler] = useState([
     {kod:"icerik_ilk",ad:"İlk Adım",ikon:"🌱",kategori:"icerik",seviye:"bronz",puan:5},
     {kod:"icerik_5",ad:"İçerik Üreticisi",ikon:"✍️",kategori:"icerik",seviye:"gumus",puan:10},
@@ -7588,6 +7589,7 @@ function SistemAyarlari({ user }) {
     const tryLoadFromDB = async () => {
       try { const r = await axios.get(`${API}/ayarlar/xp_tablosu`); if (r.data?.degerler && Object.keys(r.data.degerler).length > 0) setXpTablosu(r.data.degerler); } catch(e) {}
       try { const r = await axios.get(`${API}/ayarlar/lig_esikleri`); if (r.data?.degerler && Object.keys(r.data.degerler).length > 0) setLigEsikleri(r.data.degerler); } catch(e) {}
+      try { const r = await axios.get(`${API}/ayarlar/ogretmen_puan_agirliklari`); if (r.data?.degerler && Object.keys(r.data.degerler).length > 0) setOgretmenAgirliklari(prev => ({ ...prev, ...r.data.degerler })); } catch(e) {}
       try { const r = await axios.get(`${API}/ayarlar/ogretmen_rozetleri`); if (Array.isArray(r.data?.degerler) && r.data.degerler.length > 0) setOgretmenRozetler(r.data.degerler); } catch(e) {}
       try { const r = await axios.get(`${API}/ayarlar/ogrenci_rozetleri`); if (Array.isArray(r.data?.degerler) && r.data.degerler.length > 0) setOgrenciRozetler(r.data.degerler); } catch(e) {}
       try { const r = await axios.get(`${API}/ayarlar/anket_sorulari`); if (Array.isArray(r.data?.degerler) && r.data.degerler.length > 0) setAnketSorulari(r.data.degerler); } catch(e) {}
@@ -7611,7 +7613,7 @@ function SistemAyarlari({ user }) {
       <p className="text-gray-500 text-sm">Rozet, XP, lig ve anket ayarlarını buradan yönetin. Değişiklikler anında uygulanır.</p>
 
       <div className="flex gap-2 flex-wrap">
-        {[{id:"ozellikler",l:"🎛️ Özellik Yönetimi"},{id:"xp",l:"💰 XP Değerleri"},{id:"lig",l:"🏆 Lig Eşikleri"},{id:"ogretmen_rozet",l:"🏅 Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"🎓 Öğrenci Rozetleri"},{id:"anket",l:"⭐ Anket Soruları"},{id:"kvkk",l:"🔒 Veri & KVKK"},{id:"sezon",l:"🔄 Sezonluk Reset"}].map(s => (
+        {[{id:"ozellikler",l:"🎛️ Özellik Yönetimi"},{id:"xp",l:"💰 XP Değerleri"},{id:"ogretmen_xp",l:"👨‍🏫 Öğretmen XP"},{id:"lig",l:"🏆 Lig Eşikleri"},{id:"ogretmen_rozet",l:"🏅 Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"🎓 Öğrenci Rozetleri"},{id:"anket",l:"⭐ Anket Soruları"},{id:"kvkk",l:"🔒 Veri & KVKK"},{id:"sezon",l:"🔄 Sezonluk Reset"}].map(s => (
           <button key={s.id} onClick={() => setAyarSekme(s.id)}
             className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${ayarSekme === s.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200'}`}>{s.l}</button>
         ))}
@@ -7627,6 +7629,27 @@ function SistemAyarlari({ user }) {
           </div>
         ))}
         <Button onClick={() => kaydet("xp_tablosu", xpTablosu)} disabled={kayitEdiliyor} className="w-full bg-blue-600 text-white mt-4">💾 XP Değerlerini Kaydet</Button>
+      </div></CardContent></Card>)}
+
+      {/* Öğretmen XP Ağırlıkları */}
+      {ayarSekme === "ogretmen_xp" && (<Card className="border-0 shadow-sm"><CardHeader><CardTitle>👨‍🏫 Öğretmen XP Ağırlıkları</CardTitle><p className="text-sm text-gray-500">Öğretmen puanına etkinlik ve rozet dışında bu çıktılar da eklenir. Değişiklik anında sıralamaya yansır.</p></CardHeader><CardContent><div className="space-y-3">
+        {[
+          {key:"ogrenci_basi", l:"👥 Aldığın öğrenci", birim:"puan/öğrenci"},
+          {key:"kur_basi", l:"🎓 Kur atlatma", birim:"puan/kur"},
+          {key:"veli_yildiz", l:"⭐ Veli anketi", birim:"puan/yıldız"},
+        ].map(({key, l, birim}) => (
+          <div key={key} className="flex items-center justify-between gap-4">
+            <Label className="text-sm flex-1">{l}</Label>
+            <Input type="number" min="0" className="w-24 text-center" value={ogretmenAgirliklari[key] ?? 0}
+              onChange={e => setOgretmenAgirliklari({...ogretmenAgirliklari, [key]: parseInt(e.target.value) || 0})} />
+            <span className="text-[11px] text-gray-400 w-24">{birim}</span>
+          </div>
+        ))}
+        <p className="text-xs text-gray-400 bg-gray-50 rounded-lg p-3">
+          Örnek: yıldız başına {ogretmenAgirliklari.veli_yildiz ?? 5} → 5 yıldızlık bir anket +{(ogretmenAgirliklari.veli_yildiz ?? 5) * 5} puan.
+          Toplam XP = etkinlik + rozet + öğrenci + kur + veli.
+        </p>
+        <Button onClick={() => kaydet("ogretmen_puan_agirliklari", ogretmenAgirliklari)} disabled={kayitEdiliyor} className="w-full bg-blue-600 text-white mt-4">💾 Öğretmen XP Ağırlıklarını Kaydet</Button>
       </div></CardContent></Card>)}
 
       {/* Lig Eşikleri */}
