@@ -411,16 +411,20 @@ async def ogretmen_basarilarim(current_user=Depends(get_current_user)):
     }
 
     # ── Veli değerlendirmesi ──
-    anketler = await db.veli_anketleri.find({"ogretmen_id": ogretmen_id}).to_list(length=None)
-    anket_puanlari = []
-    for a in anketler:
-        py = [y.get("puan", 0) for y in a.get("yanitlar", []) if y.get("puan")]
-        if py:
-            anket_puanlari.append(sum(py) / len(py))
-    veli_degerlendirmesi = {
-        "ortalama": round(sum(anket_puanlari) / len(anket_puanlari), 1) if anket_puanlari else 0,
-        "toplam_anket": len(anketler),
-    }
+    try:
+        anketler = await db.veli_anketleri.find({"ogretmen_id": ogretmen_id}).to_list(length=None)
+        anket_puanlari = []
+        for a in anketler:
+            py = [y.get("puan", 0) for y in (a.get("yanitlar") or []) if isinstance(y, dict) and y.get("puan")]
+            if py:
+                anket_puanlari.append(sum(py) / len(py))
+        veli_degerlendirmesi = {
+            "ortalama": round(sum(anket_puanlari) / len(anket_puanlari), 1) if anket_puanlari else 0,
+            "toplam_anket": len(anketler),
+        }
+    except Exception as ex:
+        logging.warning(f"[basarilarim] veli değerlendirmesi hatası: {ex}")
+        veli_degerlendirmesi = {"ortalama": 0, "toplam_anket": 0}
 
     # ── Öğrenci özet (aktif = son 7 gün okuma kaydı olan) ──
     ogrenciler = await db.students.find({"ogretmen_id": ogretmen_id, "arsivli": {"$ne": True}}).to_list(length=None)
@@ -440,24 +444,40 @@ async def ogretmen_basarilarim(current_user=Depends(get_current_user)):
     icerik_ozet = {"olusturulan_icerik": olusturulan, "onaylanan_icerik": onaylanan, "oy_verdigi_icerik": oy_verdigi}
 
     # ── Kur başarıları (kur_atlamalari koleksiyonundan) ──
-    kurlar = await db.kur_atlamalari.find({"ogretmen_id": ogretmen_id}).to_list(length=None)
-    gruplar = {}
-    for k in kurlar:
-        gruplar.setdefault(k.get("ogrenci_id"), []).append(k)
-    en_uzun_takip = None
-    for oid, kayitlar in gruplar.items():
-        adet = len(kayitlar)
-        if en_uzun_takip is None or adet > en_uzun_takip["kur_sayisi"]:
-            eskiler = [k.get("eski_kur") for k in kayitlar if k.get("eski_kur") is not None]
-            yeniler = [k.get("yeni_kur") for k in kayitlar if k.get("yeni_kur") is not None]
-            st = await db.students.find_one({"id": oid})
-            en_uzun_takip = {
-                "kur_sayisi": adet,
-                "ogrenci_adi": f"{(st or {}).get('ad', '')} {(st or {}).get('soyad', '')}".strip() or "Öğrenci",
-                "baslangic_kur": min(eskiler) if eskiler else None,
-                "mevcut_kur": max(yeniler) if yeniler else None,
-            }
-    kur_basarilari = {"kur_atlatilan_ogrenci_sayisi": len(gruplar), "en_uzun_takip": en_uzun_takip}
+    def _guvenli_uc(degerler, en_kucuk):
+        """Karışık tip (str/int) kur değerlerinde min/max patlamasın diye güvenli uç."""
+        if not degerler:
+            return None
+        try:
+            return min(degerler) if en_kucuk else max(degerler)
+        except TypeError:
+            try:
+                s = sorted(degerler, key=lambda x: str(x))
+                return s[0] if en_kucuk else s[-1]
+            except Exception:
+                return degerler[0]
+    try:
+        kurlar = await db.kur_atlamalari.find({"ogretmen_id": ogretmen_id}).to_list(length=None)
+        gruplar = {}
+        for k in kurlar:
+            gruplar.setdefault(k.get("ogrenci_id"), []).append(k)
+        en_uzun_takip = None
+        for oid, kayitlar in gruplar.items():
+            adet = len(kayitlar)
+            if en_uzun_takip is None or adet > en_uzun_takip["kur_sayisi"]:
+                eskiler = [k.get("eski_kur") for k in kayitlar if k.get("eski_kur") is not None]
+                yeniler = [k.get("yeni_kur") for k in kayitlar if k.get("yeni_kur") is not None]
+                st = await db.students.find_one({"id": oid})
+                en_uzun_takip = {
+                    "kur_sayisi": adet,
+                    "ogrenci_adi": f"{(st or {}).get('ad', '')} {(st or {}).get('soyad', '')}".strip() or "Öğrenci",
+                    "baslangic_kur": _guvenli_uc(eskiler, True),
+                    "mevcut_kur": _guvenli_uc(yeniler, False),
+                }
+        kur_basarilari = {"kur_atlatilan_ogrenci_sayisi": len(gruplar), "en_uzun_takip": en_uzun_takip}
+    except Exception as ex:
+        logging.warning(f"[basarilarim] kur başarıları hatası: {ex}")
+        kur_basarilari = {"kur_atlatilan_ogrenci_sayisi": 0, "en_uzun_takip": None}
 
     # ── Zaman serisi (son 12 hafta) ──
     # Öğretmenlerin xp_logs kaydı yoktur (xp_logs öğrenci-özeldir); bu yüzden seri,
@@ -471,10 +491,15 @@ async def ogretmen_basarilarim(current_user=Depends(get_current_user)):
     rozet_puan_map = {r["kod"]: r.get("puan", r.get("xp", 0)) for r in ogretmen_rozet_list}
 
     def _parse_dt(s):
+        """ISO tarihi NAIVE (tz-siz) datetime'a çevirir. tz-aware ise UTC'ye
+        çevirip tzinfo düşürülür — `simdi` (utcnow, naive) ile çıkarma güvenli olsun."""
         try:
-            return datetime.fromisoformat((s or "").replace("Z", ""))
+            d = datetime.fromisoformat((s or "").replace("Z", "+00:00"))
         except Exception:
             return None
+        if d.tzinfo is not None:
+            d = d.astimezone(timezone.utc).replace(tzinfo=None)
+        return d
 
     def _bucketle(d, xp_puan, rozet_mi):
         nonlocal base_xp, base_rozet
@@ -493,16 +518,23 @@ async def ogretmen_basarilarim(current_user=Depends(get_current_user)):
             if rozet_mi:
                 d_rozet[wi] += 1
 
-    for r in kazanilan:
-        _bucketle(_parse_dt(r.get("kazanma_tarihi")), rozet_puan_map.get(r.get("rozet_kodu"), 0), True)
-    for ic in tum_icerik:
-        if ic.get("ekleyen_id") != user_id:
-            continue
-        d = _parse_dt(ic.get("tarih") or ic.get("olusturma_tarihi") or ic.get("created_at"))
-        _bucketle(d, 5 if ic.get("durum") == "yayinda" else 1, False)
+    try:
+        for r in kazanilan:
+            _bucketle(_parse_dt(r.get("kazanma_tarihi")), rozet_puan_map.get(r.get("rozet_kodu"), 0), True)
+        for ic in tum_icerik:
+            if ic.get("ekleyen_id") != user_id:
+                continue
+            d = _parse_dt(ic.get("tarih") or ic.get("olusturma_tarihi") or ic.get("created_at"))
+            _bucketle(d, 5 if ic.get("durum") == "yayinda" else 1, False)
+    except Exception as ex:
+        logging.warning(f"[basarilarim] zaman serisi bucketleme hatası: {ex}")
+        d_xp = [0] * HAFTA
+        d_rozet = [0] * HAFTA
+        base_xp = 0
+        base_rozet = len(kazanilan)
 
     # Son kümülatif değeri gerçek toplam puana sabitle
-    ofset = puan_bilgisi["toplam_xp"] - (base_xp + sum(d_xp))
+    ofset = (puan_bilgisi.get("toplam_xp") or 0) - (base_xp + sum(d_xp))
     if ofset > 0:
         base_xp += ofset
 
