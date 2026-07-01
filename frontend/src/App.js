@@ -22,6 +22,7 @@ import InstagramAyarlari from "./components/admin/InstagramAyarlari";
 import ExerciseStarter from "./components/ExerciseStarter";
 import UnifiedExerciseGrid from "./components/exercises/UnifiedExerciseGrid";
 import { GOZ_YENI_EGZERSIZLER, GOZ_YENI_RENDER } from "./components/exercises/goz";
+import { EgzersizDuzen } from "./components/exercises/goz/ortak";
 import OgretmenBasarilarim from "./components/gelisim/OgretmenBasarilarim";
 import OgretmenProfil from "./components/profil/OgretmenProfil";
 import ProfilGorunurlukAyarlari from "./components/admin/ProfilGorunurlukAyarlari";
@@ -3117,6 +3118,26 @@ function EgzersizlerModul({ user, egzersizPuanlari = {}, onTamamla }) {
     { key: 'dikkat', baslik: '🎯 Dikkat ve Ayırt Etme' },
   ];
 
+  // Legacy egzersizlerin "?" popover açıklamaları (eski alt yönerge metinleri).
+  const EGZ_ACIKLAMA = {
+    'goz-takip': 'Mavi topu gözlerinizle takip edin. Başınızı hareket ettirmeyin.',
+    'goz-sekiz': 'Mor topu sonsuzluk (∞) şeklinde takip edin.',
+    'goz-zigzag': 'Turuncu topu zigzag çizerek takip edin. Satır okuma hızınızı artırır.',
+    'goz-genisletme': 'Kırmızı noktaya odaklanın, çevredeki harfleri okumaya çalışın.',
+    'hizli-kelime': 'Kelimelere odaklanın. Geri dönüp okumayın, sadece ileriye bakın.',
+    'odaklanma': 'Kırmızı noktaya odaklanın, çevredeki rakam/harfleri okumaya çalışın.',
+    'periferik': 'Kırmızı noktaya odaklanıp çevredeki kelimeleri okumaya çalışın.',
+    'schulte': 'Sayıları 1\'den başlayarak sırayla bulun. Gözünüzü merkeze sabit tutun.',
+    'goz-yoga': 'Yeşil daire büyürken yakına, küçülürken uzağa odaklanın.',
+    'renk-eslestir': 'Yazının anlamını değil, RENGINI seçin. Stroop etkisini yenin!',
+    'kelime-avcisi': 'Hedef kelimeyi metinde bulup tıklayın. Hepsini bulun!',
+    'ters-kelime': 'Kelimenin orijinalini yazıp Enter\'a basın.',
+    'eksik-harf': 'Eksik harfi bulup yazın. Otomatik kontrol edilir.',
+    'karisik-cumle': 'Kelimelere doğru sırayla tıklayarak cümleyi oluşturun.',
+  };
+  // Koyu (canvas) zeminli legacy egzersizler; diğerleri açık zemin.
+  const KOYU_EGZ = ['goz-takip','goz-sekiz','goz-zigzag','goz-genisletme','odaklanma','periferik','goz-yoga','hizli-kelime'];
+
   const durdur = () => {
     setCalisiyorMu(false);
     if (animRef.current) { cancelAnimationFrame(animRef.current); animRef.current = null; }
@@ -3403,16 +3424,14 @@ function EgzersizlerModul({ user, egzersizPuanlari = {}, onTamamla }) {
           <div className="flex items-center justify-between mb-4">
             <Button variant="outline" onClick={() => { durdur(); setAktifEgzersiz(null); }}>← Geri</Button>
             <h2 className="font-bold">{egzersizler.find(e => e.id === aktifEgzersiz)?.baslik}</h2>
-            <div className="flex items-center gap-3">
-              <span className={`text-lg font-bold ${kalanSure <= 5 ? 'text-red-500' : 'text-gray-700'}`}>{kalanSure}s</span>
-              <Button size="sm" className={calisiyorMu ? 'bg-red-500' : 'bg-green-500'} onClick={() => calisiyorMu ? durdur() : baslat(aktifEgzersiz)}>
-                {calisiyorMu ? '⏸ Durdur' : '▶ Başlat'}
-              </Button>
-            </div>
+            <span className="w-16" />
           </div>
-          <div className="mb-4 p-4 bg-white rounded-xl border border-gray-200">
-            <h4 className="text-sm font-semibold mb-3">⚙️ Ayarlar</h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <EgzersizDuzen
+            calisiyor={calisiyorMu} kalan={kalanSure} sure={egzersizAyar.sure}
+            baslat={() => baslat(aktifEgzersiz)} durdur={durdur}
+            koyu={KOYU_EGZ.includes(aktifEgzersiz)}
+            aciklama={EGZ_ACIKLAMA[aktifEgzersiz]}
+            ayarlar={<>
               {aktifEgzersiz !== 'hizli-kelime' && (
                 <div><label className="text-xs text-gray-500 block mb-1">Hız</label><input type="range" min="0.5" max="5" step="0.5" value={egzersizAyar.hiz} onChange={e => setEgzersizAyar({...egzersizAyar, hiz: parseFloat(e.target.value)})} className="w-full" /><span className="text-xs font-medium">{egzersizAyar.hiz}x</span></div>
               )}
@@ -3426,17 +3445,16 @@ function EgzersizlerModul({ user, egzersizPuanlari = {}, onTamamla }) {
               {aktifEgzersiz === 'schulte' && (
                 <div><label className="text-xs text-gray-500 block mb-1">Tablo Boyutu</label><input type="range" min="3" max="7" step="1" value={schulteSize} onChange={e => { setSchulteSize(parseInt(e.target.value)); }} className="w-full" /><span className="text-xs font-medium">{schulteSize}x{schulteSize}</span></div>
               )}
-            </div>
-          </div>
+            </>}>
           {aktifEgzersiz === 'hizli-kelime' ? (
-            <div className="bg-gray-900 rounded-2xl flex items-center justify-center" style={{height:'400px'}}>
+            <div className="h-full flex items-center justify-center">
               <div className="text-center">
-                <div className="text-5xl font-bold text-white mb-4">{wpmKelimeler[wpmIndex] || ''}</div>
-                <div className="text-gray-500 text-sm">{egzersizAyar.kelimeHiz} kelime/dakika • Kelime {wpmIndex + 1}/{wpmKelimeler.length}</div>
+                <div className="text-6xl font-bold text-white mb-4">{wpmKelimeler[wpmIndex] || ''}</div>
+                <div className="text-gray-400 text-sm">{egzersizAyar.kelimeHiz} kelime/dakika • Kelime {wpmIndex + 1}/{wpmKelimeler.length}</div>
               </div>
             </div>
           ) : aktifEgzersiz === 'schulte' ? (
-            <div className="bg-white rounded-2xl border border-gray-200 p-4 flex flex-col items-center" style={{minHeight:'400px'}}>
+            <div className="h-full overflow-auto p-4 flex flex-col items-center">
               <div className="text-sm mb-3 text-gray-600">Sıradaki sayı: <span className="text-2xl font-bold text-amber-600">{schulteNext}</span> • Skor: <span className="font-bold text-green-600">{interSkor}</span></div>
               <div className="grid gap-1" style={{gridTemplateColumns: `repeat(${schulteSize}, 1fr)`}}>
                 {schulteGrid.map((num, i) => (
@@ -3452,7 +3470,7 @@ function EgzersizlerModul({ user, egzersizPuanlari = {}, onTamamla }) {
               </div>
             </div>
           ) : aktifEgzersiz === 'renk-eslestir' && renkSoru ? (
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col items-center justify-center" style={{minHeight:'400px'}}>
+            <div className="h-full overflow-auto p-6 flex flex-col items-center justify-center">
               <div className="text-sm mb-2 text-gray-500">Yazının <strong>rengini</strong> seçin (yazdığını değil!)</div>
               <div className="text-6xl font-black mb-8" style={{color: renkSoru.renk}}>{renkSoru.yazi}</div>
               <div className="grid grid-cols-2 gap-3">
@@ -3474,7 +3492,7 @@ function EgzersizlerModul({ user, egzersizPuanlari = {}, onTamamla }) {
               <div className="mt-4 text-lg font-bold text-green-600">Skor: {interSkor}</div>
             </div>
           ) : aktifEgzersiz === 'kelime-avcisi' ? (
-            <div className="bg-white rounded-2xl border border-gray-200 p-4" style={{minHeight:'400px'}}>
+            <div className="h-full overflow-auto p-4">
               <div className="text-center mb-3">
                 <span className="text-sm text-gray-500">Hedef kelime: </span><span className="text-xl font-black text-sky-600 bg-sky-50 px-3 py-1 rounded-lg">{kelimeAvcisiHedef}</span>
                 <span className="ml-3 text-sm text-green-600 font-bold">Bulunan: {kelimeAvcisiBulunan.size}</span>
@@ -3489,7 +3507,7 @@ function EgzersizlerModul({ user, egzersizPuanlari = {}, onTamamla }) {
               </div>
             </div>
           ) : aktifEgzersiz === 'ters-kelime' && interSoru ? (
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col items-center justify-center" style={{minHeight:'400px'}}>
+            <div className="h-full overflow-auto p-6 flex flex-col items-center justify-center">
               <div className="text-sm text-gray-500 mb-2">Bu kelimeyi tersten okuyun ve yazın:</div>
               <div className="text-5xl font-black text-violet-600 mb-6 tracking-widest">{interSoru.ters}</div>
               <input className="border-2 border-violet-300 rounded-xl px-4 py-3 text-2xl text-center font-bold w-64 focus:outline-none focus:ring-2 focus:ring-violet-400" placeholder="Cevabınız..."
@@ -3504,7 +3522,7 @@ function EgzersizlerModul({ user, egzersizPuanlari = {}, onTamamla }) {
               <div className="mt-4 text-sm font-bold text-green-600">Skor: {interSkor}</div>
             </div>
           ) : aktifEgzersiz === 'eksik-harf' && interSoru ? (
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col items-center justify-center" style={{minHeight:'400px'}}>
+            <div className="h-full overflow-auto p-6 flex flex-col items-center justify-center">
               <div className="text-sm text-gray-500 mb-2">Eksik harfi tamamlayın:</div>
               <div className="text-5xl font-black text-cyan-600 mb-6 tracking-widest">{interSoru.gosterim}</div>
               <input className="border-2 border-cyan-300 rounded-xl px-4 py-3 text-2xl text-center font-bold w-32 focus:outline-none focus:ring-2 focus:ring-cyan-400" placeholder="?" maxLength={1}
@@ -3522,7 +3540,7 @@ function EgzersizlerModul({ user, egzersizPuanlari = {}, onTamamla }) {
               <div className="mt-4 text-sm font-bold text-green-600">Skor: {interSkor}</div>
             </div>
           ) : aktifEgzersiz === 'karisik-cumle' && interSoru ? (
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col items-center" style={{minHeight:'400px'}}>
+            <div className="h-full overflow-auto p-6 flex flex-col items-center">
               <div className="text-sm text-gray-500 mb-3">Kelimeleri doğru sıraya tıklayarak dizin:</div>
               <div className="min-h-[50px] border-2 border-dashed border-red-200 rounded-xl p-3 mb-4 w-full text-center">
                 {interSoru.secilen.length > 0 ? <span className="text-lg font-medium text-gray-800">{interSoru.secilen.join(' ')}</span> : <span className="text-gray-400 text-sm">Kelimelere sırayla tıklayın...</span>}
@@ -3553,26 +3571,9 @@ function EgzersizlerModul({ user, egzersizPuanlari = {}, onTamamla }) {
               <div className="mt-2 text-sm font-bold text-green-600">Skor: {interSkor}</div>
             </div>
           ) : (
-            <div className="bg-gray-50 rounded-2xl border border-gray-200 overflow-hidden" style={{height:'400px'}}>
-              <canvas ref={canvasRef} className="w-full h-full" />
-            </div>
+            <canvas ref={canvasRef} className="w-full h-full" />
           )}
-          <div className="mt-3 text-center text-sm text-gray-500">
-            {aktifEgzersiz === 'goz-takip' && 'Mavi topu gözlerinizle takip edin. Başınızı hareket ettirmeyin.'}
-            {aktifEgzersiz === 'goz-sekiz' && 'Mor topu sonsuzluk (∞) şeklinde takip edin.'}
-            {aktifEgzersiz === 'goz-zigzag' && 'Turuncu topu zigzag çizerek takip edin. Satır okuma hızınızı artırır.'}
-            {aktifEgzersiz === 'goz-genisletme' && 'Kırmızı noktaya odaklanın, çevredeki harfleri okumaya çalışın.'}
-            {aktifEgzersiz === 'hizli-kelime' && 'Kelimelere odaklanın. Geri dönüp okumayın, sadece ileriye bakın.'}
-            {aktifEgzersiz === 'odaklanma' && 'Kırmızı noktaya odaklanın, çevredeki rakam/harfleri okumaya çalışın.'}
-            {aktifEgzersiz === 'periferik' && 'Kırmızı noktaya odaklanıp çevredeki kelimeleri okumaya çalışın.'}
-            {aktifEgzersiz === 'schulte' && 'Sayıları 1\'den başlayarak sırayla bulun. Gözünüzü merkeze sabit tutun.'}
-            {aktifEgzersiz === 'goz-yoga' && 'Yeşil daire büyürken yakına, küçülürken uzağa odaklanın.'}
-            {aktifEgzersiz === 'renk-eslestir' && 'Yazının anlamını değil, RENGINI seçin. Stroop etkisini yenin!'}
-            {aktifEgzersiz === 'kelime-avcisi' && 'Hedef kelimeyi metinde bulup tıklayın. Hepsini bulun!'}
-            {aktifEgzersiz === 'ters-kelime' && 'Kelimenin orijinalini yazıp Enter\'a basın.'}
-            {aktifEgzersiz === 'eksik-harf' && 'Eksik harfi bulup yazın. Otomatik kontrol edilir.'}
-            {aktifEgzersiz === 'karisik-cumle' && 'Kelimelere doğru sırayla tıklayarak cümleyi oluşturun.'}
-          </div>
+          </EgzersizDuzen>
         </div>
       )}
     </div>
