@@ -138,5 +138,9 @@
   {
     "name": "meb_kelime",
     "active": true
+  },
+  {
+    "name": "instagram_beslemesi",
+    "active": true
   }
 ]
