@@ -86,12 +86,11 @@ async def run():
         check("elma" in onizleme and "defter" in onizleme, "beklenen kelimeler var")
 
         # ── AI mock'u onayla'dan ÖNCE kur (arka plan görevi mock ile çalışsın) ──
-        async def sahte_ai(system, user, model="sonnet", max_tokens=2000):
+        async def sahte_ai(system, user, model="sonnet", max_tokens=3500):
             import re
-            # İlk satırda son ':' sonrası kelime listesi (prompt ifadesinden bağımsız)
-            liste = user.split("\n")[0].split(":")[-1]
-            kls = re.findall(r"[a-zçğıöşü]+", liste)
-            return {"parsed": {"sonuclar": [{"kelime": k, "anlam": f"{k} anlamı", "ornek_cumle": f"Bir {k}.", "etiketler": ["test"]} for k in kls]}, "text": "", "error": None}
+            # Yeni prompt: her kelime "- kelime (X. sınıf, Ders)" satırında; DÜZ DİZİ döndür
+            kls = re.findall(r"^- ([a-zçğıöşü]+)", user, re.MULTILINE)
+            return {"parsed": [{"kelime": k, "anlam": f"{k} anlamı", "ornek_cumle": f"Bir {k}.", "etiketler": ["test"]} for k in kls], "text": "", "error": None}
         mk.call_claude = sahte_ai
         mk.AI_BEKLEME_SN = 0  # testte bekleme yok
 
@@ -105,11 +104,11 @@ async def run():
                           json={"kelimeler": onizleme, "sinif": 1, "kaynak_dosya": "liste.docx"})
         check(r.json()["yeni_eklenen"] == 0 and r.json()["mevcut_atlanan"] == 8, "tekrar onayda hepsi atlandı")
 
-        # Arka plan AI görevinin bitmesini bekle
-        for _ in range(100):
-            if 1 not in mk._ai_aktif:
+        # Arka plan AI görevlerinin bitmesini bekle (guard anahtarı (sinif,ders))
+        for _ in range(200):
+            if not mk._ai_aktif:
                 break
-            await asyncio.sleep(0.05)
+            await asyncio.sleep(0.02)
         dolu = await server.db.meb_kelimeleri.count_documents({"sinif": 1, "anlam": {"$nin": [None, ""]}})
         check(dolu == 8, f"AI 8 kelimeye anlam üretti (gelen {dolu})")
         ornek = await server.db.meb_kelimeleri.find_one({"sinif": 1, "kelime": "elma"})
@@ -174,6 +173,28 @@ async def run():
         check("ders_bazli" in st and "ders_x_sinif" in st, "istatistik ders_bazli + ders_x_sinif var")
         check(st["ders_bazli"].get("sosyal_bilgiler", {}).get("toplam", 0) >= 1, "sosyal_bilgiler istatistiği")
         check(st["ders_x_sinif"].get("sosyal_bilgiler_4", 0) >= 1, "ders_x_sinif sosyal_bilgiler_4")
+
+        # ── DEDUPE: aynı kelime çoklu sınıfta TEK AI çağrısı ──
+        cagri_promptlari = []
+        async def sayan_ai(system, user, model="sonnet", max_tokens=3500):
+            cagri_promptlari.append(user)
+            import re
+            kls = re.findall(r"^- ([a-zçğıöşü]+)", user, re.MULTILINE)
+            return {"parsed": [{"kelime": k, "anlam": f"{k} anlamı", "ornek_cumle": f"Bir {k}."} for k in kls], "text": "", "error": None}
+        mk.call_claude = sayan_ai
+        for s in (1, 2, 3):
+            await server.db.meb_kelimeleri.insert_one({"id": str(uuid.uuid4()), "kelime": "iletisim", "sinif": s, "ders": "turkce", "anlam": "", "ornek_cumle": "", "durum": "aktif", "kullanim_sayisi": 0})
+        await mk._ai_kuyrugu_isle(None, "turkce")
+        ilet_docs = await server.db.meb_kelimeleri.find({"kelime": "iletisim"}).to_list(length=10)
+        check(len(ilet_docs) == 3 and all(d.get("anlam") == "iletisim anlamı" for d in ilet_docs), "dedupe: 3 iletisim dokümanı da dolduruldu")
+        ilet_cagri = sum(1 for p in cagri_promptlari if "- iletisim" in p)
+        check(ilet_cagri == 1, f"dedupe: iletisim TEK AI çağrısında (gelen {ilet_cagri})")
+
+        # ── toplu-ai-yenile ilerleme alanları ──
+        r = await ac.post("/api/meb-kelime/toplu-ai-yenile", headers=HA, json={"ders": "turkce"})
+        pd = r.json()
+        check(all(k in pd for k in ("toplam_batch", "tamamlanan_batch", "tahmini_kalan_sure_sn", "benzersiz_kelime")),
+              f"toplu-ai-yenile ilerleme alanları mevcut (gelen {list(pd.keys())})")
 
         # ── Migration idempotency (mantık testi) ──
         await server.db.meb_kelimeleri.insert_one({"id": str(uuid.uuid4()), "kelime": "eski", "sinif": 1, "durum": "aktif", "anlam": "x", "kullanim_sayisi": 0})
