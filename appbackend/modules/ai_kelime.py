@@ -109,9 +109,27 @@ async def kelime_evrimi_cevapla(payload: dict, current_user=Depends(get_current_
 
 @router.post("/ai/kelime-evrimi/ekle")
 async def kelime_evrimi_ekle(payload: dict, current_user=Depends(get_current_user)):
-    """Öğrenciye kelime tekrar programına kelime ekler."""
+    """Öğrenciye kelime tekrar programına kelime ekler.
+
+    `kelimeler` açıkça verilirse aynen eklenir (mevcut davranış). Verilmez ama
+    `adet` verilirse, kelimeler MEB müfredatı ÖNCELİKLİ (core/kelime_secici) olarak
+    otomatik seçilir — böylece Leitner havuzu MEB kelimelerini önceler.
+    """
     ogrenci_id = payload.get("ogrenci_id", current_user["id"])
     kelimeler = payload.get("kelimeler", [])  # [{"kelime": "...", "anlam": "...", "sinif": 3}]
+
+    # Otomatik doldurma (MEB > genel havuz önceliğiyle)
+    if not kelimeler and payload.get("adet"):
+        try:
+            from core.kelime_secici import kelime_sec
+            sinif = int(payload.get("sinif", 3))
+            secilenler = await kelime_sec(sinif, int(payload["adet"]))
+            kelimeler = [{
+                "kelime": s["kelime"], "anlam": s.get("anlam", ""),
+                "ornek_cumle": s.get("ornek_cumle", ""), "sinif": sinif,
+            } for s in secilenler]
+        except Exception as ex:
+            logging.warning(f"[ai_kelime] otomatik doldurma hatası: {ex}")
 
     eklenen = 0
     for k in kelimeler[:20]:  # max 20 kelime bir seferde

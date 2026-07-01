@@ -41,6 +41,13 @@ YENILEME_ESIGI = 20
 # Aynı (tip, sınıf) için aynı anda birden fazla arka plan üretimi tetiklenmesin.
 _yenileme_aktif: set = set()
 
+# Kelime-odaklı egzersiz tipleri: AI içeriğinde MEB müfredat kelimelerine öncelik ver.
+_MEB_KELIME_TIPLERI = {
+    "kelime_anlam_eslestirme", "es_karsit_anlamli", "anagram", "bulmaca",
+    "kelime_yagmuru", "kelime_merdiveni", "baglam_ipucu", "frayer",
+    "anlam_haritasi", "sight_words", "hafiza_karti",
+}
+
 
 # ─────────────────────────────────────────────
 # Yardımcılar
@@ -49,6 +56,16 @@ def _temizle(doc: dict) -> dict:
     if doc:
         doc.pop("_id", None)
     return doc
+
+
+async def _meb_kelimeler(sinif: int, sadece_anlamli: bool = False, limit: int = 500) -> list[str]:
+    """MEB müfredat kelimelerini güvenli biçimde getirir (hata → boş liste)."""
+    try:
+        from core.kelime_secici import meb_kelime_stringleri
+        return await meb_kelime_stringleri(sinif, sadece_anlamli=sadece_anlamli, limit=limit)
+    except Exception as ex:
+        logging.warning(f"[egzersiz_motoru] MEB kelime getirme hatası: {ex}")
+        return []
 
 
 def _toplam_soru(meta: dict, icerik: dict) -> int:
@@ -71,12 +88,21 @@ async def _icerik_uret(tip: str, sinif: int, konu: str | None, zorluk: str | Non
 
     # Kelime Gezmece (ve "bulmaca" üreticili tipler): içerik AI ile değil,
     # core/bulmaca_olusturucu.py ile yerel üretilir. Mock değildir.
+    # MEB müfredat kelimeleri varsa bulmaca onların önceliğiyle kurulur.
     if meta.get("icerik_uretici") == "bulmaca":
-        return bulmaca_uret(sinif), False
+        meb = await _meb_kelimeler(sinif)
+        return bulmaca_uret(sinif, meb_kelimeler=meb or None), False
 
     system, user_msg = prompt_uret(tip, sinif, konu, soru_sayisi, zorluk)
     if not user_msg:
         return mock_uret(tip, sinif, konu, soru_sayisi), True
+
+    # MEB önceliği: kelime-odaklı tiplerde AI'a MEB kelimelerini kullanmasını söyle
+    if tip in _MEB_KELIME_TIPLERI:
+        meb = await _meb_kelimeler(sinif, sadece_anlamli=True, limit=40)
+        if meb:
+            user_msg += ("\n\nÖNCELİK: Mümkün olduğunca şu MEB müfredat "
+                         f"kelimelerini kullan: {', '.join(meb[:25])}.")
 
     for deneme in range(2):
         try:
@@ -486,7 +512,8 @@ async def kelime_gezmece_seviye(data: dict, current_user=Depends(get_current_use
         return {"icerik_id": mevcut["id"], "icerik": mevcut.get("icerik", {}),
                 "seviye_no": seviye_no}
 
-    icerik = bulmaca_uret(sinif, seviye_no)
+    meb = await _meb_kelimeler(sinif)
+    icerik = bulmaca_uret(sinif, seviye_no, meb_kelimeler=meb or None)
     olusturan = {
         "id": current_user.get("id"),
         "ad": _kullanici_ad(current_user),

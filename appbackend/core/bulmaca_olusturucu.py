@@ -105,13 +105,21 @@ def _turetilebilir_mi(kelime: str, havuz_sayac: Counter) -> bool:
     return True
 
 
-def _adaylari_bul(harf_havuzu: list[str], sinif: int) -> list[str]:
-    """Havuz harflerinden türetilebilen, sınıf-uygun tüm kelimeler (uzun→kısa)."""
+def _adaylari_bul(harf_havuzu: list[str], sinif: int, meb_set: set | None = None) -> list[str]:
+    """Havuz harflerinden türetilebilen, sınıf-uygun tüm kelimeler.
+
+    MEB kelimeleri (meb_set) verilirse: evrene katılır (havuzda olmasalar da) ve
+    grid'e öncelikle yerleşmeleri için ÖNE sıralanır; ardından uzun→kısa.
+    """
     sayac = Counter(harf_havuzu)
-    adaylar = [k for k in sinif_kelimeleri(sinif) if _turetilebilir_mi(k, sayac)]
-    # Uzun kelimeler önce (grid omurgası), eşit uzunlukta rastgele çeşitlilik
+    evren = list(sinif_kelimeleri(sinif))
+    if meb_set:
+        evren.extend(w for w in meb_set if 2 <= len(w) <= 12)
+        evren = list(dict.fromkeys(evren))  # tekilleştir (sıra korunur)
+    adaylar = [k for k in evren if _turetilebilir_mi(k, sayac)]
     random.shuffle(adaylar)
-    adaylar.sort(key=len, reverse=True)
+    # Öncelik: MEB kelimeleri önce, sonra uzun→kısa (omurga uzun MEB kelimesi olur)
+    adaylar.sort(key=lambda k: (0 if (meb_set and k in meb_set) else 1, -len(k)))
     return adaylar
 
 
@@ -155,17 +163,23 @@ def _seviye_parametreleri(sinif: int, seviye_no: int):
 
 
 def _tohum_sec(sinif: int, hedef_aday: int,
-               havuz_uzunluk: tuple[int, int] | None = None) -> tuple[list[str], list[str]]:
+               havuz_uzunluk: tuple[int, int] | None = None,
+               meb_set: set | None = None) -> tuple[list[str], list[str]]:
     """Bol sayıda alt kelime türeten bir tohum seçer.
 
     Dönüş: (harf_havuzu, adaylar). Birçok rastgele tohum denenir; en çok aday
     üreten seçilir. `havuz_uzunluk` verilirse tohum kelime uzunluğu bununla
-    (aksi halde ZORLUK varsayılanıyla) sınırlanır.
+    (aksi halde ZORLUK varsayılanıyla) sınırlanır. `meb_set` verilir ve uygun
+    uzunlukta MEB kelimesi varsa tohum ONLARDAN seçilir (MEB-merkezli bulmaca).
     """
     havuz_min, havuz_max = havuz_uzunluk or ZORLUK.get(sinif, ZORLUK[3])["havuz"]
     kelimeler = sinif_kelimeleri(sinif)
     # Tohum adayları: havuz uzunluk aralığındaki kelimeler
     tohum_adaylari = [k for k in kelimeler if havuz_min <= len(k) <= havuz_max]
+    if meb_set:
+        meb_tohum = [k for k in meb_set if havuz_min <= len(k) <= havuz_max]
+        if meb_tohum:
+            tohum_adaylari = meb_tohum  # MEB kelimesi etrafında kur
     if not tohum_adaylari:
         tohum_adaylari = [k for k in kelimeler if len(k) <= havuz_max] or kelimeler
 
@@ -175,7 +189,7 @@ def _tohum_sec(sinif: int, hedef_aday: int,
     for _ in range(denemeler):
         tohum = random.choice(tohum_adaylari)
         havuz = list(tohum)
-        adaylar = _adaylari_bul(havuz, sinif)
+        adaylar = _adaylari_bul(havuz, sinif, meb_set)
         skor = len(adaylar)
         if skor > en_iyi_skor:
             en_iyi_skor = skor
@@ -327,26 +341,29 @@ def _baska_kelime_kullaniyor(izgara: _Izgara, r: int, c: int) -> bool:
 # ─────────────────────────────────────────────────────────────
 # Genel API
 # ─────────────────────────────────────────────────────────────
-def bulmaca_uret(sinif: int = 3, seviye_no: int = 1) -> dict:
+def bulmaca_uret(sinif: int = 3, seviye_no: int = 1,
+                 meb_kelimeler: list[str] | None = None) -> dict:
     """Sınıf seviyesine ve seviye numarasına uygun bir Kelime Gezmece bulmacası üretir.
 
     `seviye_no` arttıkça zorluk artar (bkz. _seviye_parametreleri); sınıf tavanları
-    korunur. Çıktıya `seviye_no` ve `sinif` alanları eklenir (frontend ilerleme
-    takibi için).
+    korunur. `meb_kelimeler` verilirse (MEB müfredat kelimeleri) bulmaca bu
+    kelimeler etrafında/önceliğiyle kurulur. Çıktıya `seviye_no`, `sinif` ve
+    `meb_oncelik` alanları eklenir.
     """
     sinif = max(1, min(8, int(sinif)))
     seviye_no = max(1, int(seviye_no))
+    meb_set = {tr_kucuk(w) for w in (meb_kelimeler or []) if w} or None
     (havuz_min, havuz_max), (grid_min, grid_max), (bonus_min, bonus_max) = \
         _seviye_parametreleri(sinif, seviye_no)
 
     harf_havuzu, adaylar = _tohum_sec(
         sinif, hedef_aday=grid_max + bonus_max + 2,
-        havuz_uzunluk=(havuz_min, havuz_max))
+        havuz_uzunluk=(havuz_min, havuz_max), meb_set=meb_set)
 
     # Tohum başarısızsa (çok az aday) basit geri dönüş: en kısa kelimelerle dene.
     if len(adaylar) < 2:
         harf_havuzu = list("elma")
-        adaylar = _adaylari_bul(harf_havuzu, sinif) or ["elma", "ela", "lam", "mal"]
+        adaylar = _adaylari_bul(harf_havuzu, sinif, meb_set) or ["elma", "ela", "lam", "mal"]
 
     grid, kelimeler, yerlesen = _bulmaca_kur(adaylar, grid_min, grid_max)
 
@@ -367,6 +384,7 @@ def bulmaca_uret(sinif: int = 3, seviye_no: int = 1) -> dict:
         "tema": _tema_sec(sinif),
         "seviye_no": seviye_no,
         "sinif": sinif,
+        "meb_oncelik": bool(meb_set),
     }
 
 
