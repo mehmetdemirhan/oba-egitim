@@ -17,7 +17,7 @@ import { useToast } from "./hooks/use-toast";
 import { Toaster } from "./components/ui/toaster";
 import ModulYonetimi from "./components/ModulYonetimi";
 import ExerciseStarter from "./components/ExerciseStarter";
-import EgzersizKutuphanesi from "./components/exercises/EgzersizKutuphanesi";
+import UnifiedExerciseGrid from "./components/exercises/UnifiedExerciseGrid";
 import ExerciseLibrary from "./components/exercises/ExerciseLibrary";
 import HaftalikTakvim from "./components/program/HaftalikTakvim";
 import { FullscreenExerciseProvider, useFullscreenExercise } from "./context/FullscreenExerciseContext";
@@ -5901,46 +5901,22 @@ function OgrenciPaneli({ user, logout }) {
           </>)}
 
           {/* Egzersizler — Klasik (kartlar) + Yeni Kütüphane (grid) ayrımı */}
-          {gelisimAltSekme === "egzersizler" && (<>
-            {/* ═══ 🎯 KLASİK EGZERSİZLER ═══ */}
-            <div>
-              <div className="flex items-center gap-2 mb-2 px-1">
-                <span className="text-lg">🎯</span>
-                <h3 className="text-sm font-bold text-gray-800">Klasik Egzersizler</h3>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  {id:"kelime_evrimi", emoji:"🧠", l:"Kelime Evrimi",     d:"Leitner ile aralıklı tekrar",       oz:"ogrenci_kelime_evrimi", grad:"from-cyan-500 to-blue-600",     go:()=>setGelisimAltSekme("kelime_evrimi")},
-                  {id:"sokratik",      emoji:"🤖", l:"Sokratik Okuma",    d:"Okuma koçun soru sorar",            oz:"ogrenci_gelisim",       grad:"from-sky-500 to-cyan-600",      go:()=>setGelisimAltSekme("sokratik")},
-                  {id:"speech",        emoji:"🎤", l:"Sesli Okuma",       d:"AI telaffuzunu analiz eder",        oz:"ogrenci_speech_ai",     grad:"from-purple-500 to-indigo-600", go:()=>setAktifEkran("speech")},
-                  {id:"arkadas",       emoji:"🦉", l:"AI Okuma Arkadaşı", d:"Sohbet et, birlikte keşfet",        oz:"ogrenci_ai_arkadas",    grad:"from-amber-500 to-orange-600",  go:()=>setGelisimAltSekme("arkadas")},
-                  {id:"hikayem",       emoji:"✨", l:"Hikâyem",           d:"Sana özel AI hikâye + Bloom",       oz:"ogrenci_hikaye",        grad:"from-pink-500 to-purple-600",   go:()=>setGelisimAltSekme("hikayem")},
-                  {id:"goz",           emoji:"👁️", l:"Göz Egzersizleri",   d:"Göz takip, Schulte, hızlı okuma",   oz:"ogrenci_egzersizler",   grad:"from-emerald-500 to-teal-600",  go:()=>setGelisimAltSekme("goz")},
-                  {id:"kitap_dersi",   emoji:"📖", l:"Kitap Dersi",       d:"Bloom ile derinlemesine işle",      oz:"ogrenci_gelisim",       grad:"from-indigo-500 to-blue-600",   go:()=>setGelisimAltSekme("kitap_dersi")},
-                  {id:"evren",         emoji:"🌌", l:"Okuma Evreni",      d:"XP, lig ve anlama testleri",        oz:"ogrenci_xp_lig",        grad:"from-violet-500 to-fuchsia-600",go:()=>setGelisimAltSekme("evren")},
-                ].filter(k => ozellikAktif(k.oz)).map(k => (
-                  <button key={k.id} onClick={k.go}
-                    className="bg-white rounded-2xl p-3 border shadow-sm text-left hover:shadow-md hover:border-indigo-300 transition-all active:scale-[0.97] group">
-                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${k.grad} flex items-center justify-center text-xl mb-2 shadow-sm`}>{k.emoji}</div>
-                    <div className="text-[12px] font-bold text-gray-800 group-hover:text-indigo-700 leading-tight">{k.l}</div>
-                    <div className="text-[10px] text-gray-400 mt-0.5 leading-tight">{k.d}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* ═══ 🎮 YENİ EGZERSİZ KÜTÜPHANESİ ═══ */}
-            <div className="pt-1">
-              <div className="flex items-center gap-2 mb-2 px-1">
-                <span className="text-lg">🎮</span>
-                <h3 className="text-sm font-bold text-gray-800">Yeni Egzersiz Kütüphanesi</h3>
-              </div>
-              <ExerciseStarter title="Yeni Egzersiz Kütüphanesi" icon="🎯"
-                description="Kelime, okuduğunu anlama, oyun ve fonolojik farkındalık egzersizleri — sınıf seviyene göre.">
-                <EgzersizKutuphanesi apiBase={API} sinif={user.sinif || 3} />
-              </ExerciseStarter>
-            </div>
-          </>)}
+          {gelisimAltSekme === "egzersizler" && (
+            <ExerciseStarter title="Egzersizler" icon="🎯"
+              description="Tüm egzersizler tek yerde — kategorilere göre keşfet.">
+              <UnifiedExerciseGrid apiBase={API} sinif={user.sinif || 3}
+                klasikler={[
+                  {id:"kelime_evrimi", ikon:"🧠", ad:"Kelime Evrimi",     aciklama:"Leitner ile aralıklı tekrar",     kategoriKey:"kelime", oz:"ogrenci_kelime_evrimi", onClick:()=>setGelisimAltSekme("kelime_evrimi")},
+                  {id:"sokratik",      ikon:"🤖", ad:"Sokratik Okuma",    aciklama:"Okuma koçun soru sorar",          kategoriKey:"anlama", oz:"ogrenci_gelisim",       onClick:()=>setGelisimAltSekme("sokratik")},
+                  {id:"speech",        ikon:"🎤", ad:"Sesli Okuma",       aciklama:"AI telaffuzunu analiz eder",       kategoriKey:"sesli",  oz:"ogrenci_speech_ai",     onClick:()=>setAktifEkran("speech")},
+                  {id:"arkadas",       ikon:"🦉", ad:"AI Okuma Arkadaşı", aciklama:"Sohbet et, birlikte keşfet",       kategoriKey:"sesli",  oz:"ogrenci_ai_arkadas",    onClick:()=>setGelisimAltSekme("arkadas")},
+                  {id:"hikayem",       ikon:"✨", ad:"Hikâyem",           aciklama:"Sana özel AI hikâye + Bloom",      kategoriKey:"diger",  oz:"ogrenci_hikaye",        onClick:()=>setGelisimAltSekme("hikayem")},
+                  {id:"goz",           ikon:"👁️", ad:"Göz Egzersizleri",   aciklama:"Göz takip, Schulte, hızlı okuma",  kategoriKey:"goz",    oz:"ogrenci_egzersizler",   onClick:()=>setGelisimAltSekme("goz")},
+                  {id:"kitap_dersi",   ikon:"📖", ad:"Kitap Dersi",       aciklama:"Bloom ile derinlemesine işle",     kategoriKey:"diger",  oz:"ogrenci_gelisim",       onClick:()=>setGelisimAltSekme("kitap_dersi")},
+                  {id:"evren",         ikon:"🌌", ad:"Okuma Evreni",      aciklama:"XP, lig ve anlama testleri",       kategoriKey:"diger",  oz:"ogrenci_xp_lig",        onClick:()=>setGelisimAltSekme("evren")},
+                ].filter(k => ozellikAktif(k.oz))} />
+            </ExerciseStarter>
+          )}
 
           {/* ── GÖZ VE OKUMA EGZERSİZLERİ (klasik egzersiz kartından erişilir) ── */}
           {gelisimAltSekme === "goz" && (
@@ -11351,6 +11327,8 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
   const [egzersizPuanlari, setEgzersizPuanlari] = useState({});
   // Egzersizler alt-sekmesi görünümü (öğretmen): egzersizler | yonetim (üst tab'dan birleştirildi)
   const [egzGorunum, setEgzGorunum] = useState("egzersizler");
+  // Birleşik grid'den açılan klasik egzersiz (ör. "goz" → inline Göz modülü)
+  const [acikKlasik, setAcikKlasik] = useState(null);
   // Admin AI araç state'leri
   const [adminAiModal, setAdminAiModal] = useState(null); // { kitap, mod: "materyal"|"scaffold" }
   const [adminAiYukleniyor, setAdminAiYukleniyor] = useState(false);
@@ -12676,13 +12654,35 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
           </ExerciseStarter>
         );
 
-        // Öğretmen dışındaki roller (admin vb.) için eski davranış korunur: sadece Göz egzersizleri.
-        if (user.role !== 'teacher') return gozModul;
+        // Klasik "Göz Egzersizleri" kartına tıklanınca inline aç (öğretmen + admin).
+        if (acikKlasik === 'goz') {
+          return (
+            <div className="space-y-3">
+              {!isFullscreen && (
+                <button onClick={() => setAcikKlasik(null)} className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">← Egzersizlere Dön</button>
+              )}
+              {gozModul}
+            </div>
+          );
+        }
 
-        // ── ÖĞRETMEN: birleştirilmiş egzersiz alanı (üst "Egzersizler" sekmesi buraya taşındı) ──
+        // Öğretmen/admin panelinde wired olan klasik egzersiz: şimdilik yalnızca Göz.
+        const klasikler = [
+          { id:"goz", ikon:"👁️", ad:"Göz Egzersizleri", aciklama:"Göz takip, Schulte, hızlı okuma", kategoriKey:"goz", onClick:()=>setAcikKlasik('goz') },
+        ];
+        const birlesikGrid = (
+          <ExerciseStarter title="Egzersizler" icon="🎯"
+            description="Tüm egzersizler tek yerde — kategorilere göre keşfet.">
+            <UnifiedExerciseGrid apiBase={API} sinif={3} ogretmenModu={true} klasikler={klasikler} />
+          </ExerciseStarter>
+        );
+
+        // Admin vb. — yalnızca birleşik grid (Kütüphane Yönetimi toggle'ı öğretmene özel).
+        if (user.role !== 'teacher') return birlesikGrid;
+
+        // ── ÖĞRETMEN: görünüm seçici (Egzersizler | Kütüphane Yönetimi) + birleşik grid ──
         return (
           <div className="space-y-4">
-            {/* Görünüm seçici: Egzersizler | Kütüphane Yönetimi */}
             {!isFullscreen && (
               <div className="flex gap-2">
                 {[{ v: "egzersizler", l: "🎯 Egzersizler" }, { v: "yonetim", l: "📚 Kütüphane Yönetimi" }].map((t) => (
@@ -12693,35 +12693,9 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                 ))}
               </div>
             )}
-
             {egzGorunum === 'yonetim' ? (
               <ExerciseLibrary apiBase={API} userRole={user.role} />
-            ) : (<>
-              {/* ═══ 🎯 KLASİK EGZERSİZLER ═══ */}
-              <div>
-                {!isFullscreen && (
-                  <div className="flex items-center gap-2 mb-2 px-1">
-                    <span className="text-lg">🎯</span>
-                    <h3 className="text-sm font-bold text-gray-800">Klasik Egzersizler</h3>
-                  </div>
-                )}
-                {gozModul}
-              </div>
-
-              {/* ═══ 🎮 YENİ EGZERSİZ KÜTÜPHANESİ ═══ */}
-              <div className="pt-1">
-                {!isFullscreen && (
-                  <div className="flex items-center gap-2 mb-2 px-1">
-                    <span className="text-lg">🎮</span>
-                    <h3 className="text-sm font-bold text-gray-800">Yeni Egzersiz Kütüphanesi</h3>
-                  </div>
-                )}
-                <ExerciseStarter title="Yeni Egzersiz Kütüphanesi" icon="🎯"
-                  description="Tüm egzersiz tipleri — sınıf seviyesine göre filtrele ya da 'Tümü' ile hepsini gör.">
-                  <EgzersizKutuphanesi apiBase={API} sinif={3} ogretmenModu={true} />
-                </ExerciseStarter>
-              </div>
-            </>)}
+            ) : birlesikGrid}
           </div>
         );
       })()}
