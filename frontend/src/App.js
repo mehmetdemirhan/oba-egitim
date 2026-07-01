@@ -3706,7 +3706,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
               <Label>Öğrenci Seç</Label>
               <Select value={seciliOgrenci?.id || ""} onValueChange={v => { setSeciliOgrenci(students.find(s => s.id === v)); setSeciliMetin(null); }}>
                 <SelectTrigger><SelectValue placeholder="Öğrenci seçin..." /></SelectTrigger>
-                <SelectContent position="popper" sideOffset={4} className="max-h-60 overflow-y-auto z-50">
+                <SelectContent position="popper" sideOffset={4} className="max-h-60 overflow-y-auto z-[60] bg-white">
                   {(students || []).map(s => <SelectItem key={s.id} value={s.id}>{s.ad} {s.soyad} — {s.sinif}</SelectItem>)}
                 </SelectContent>
               </Select>
