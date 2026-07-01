@@ -204,15 +204,24 @@ export default function OgretmenBasarilarim({ apiBase }) {
         </div>
       )}
 
-      {/* ── EN ALT: Puan Rehberi ── */}
+      {/* ── EN ALT: Puan Rehberi (XP nasıl hesaplanır) ── */}
       <div className="rounded-2xl shadow-md bg-gradient-to-br from-orange-50 to-yellow-50 p-5">
-        <h4 className="font-semibold text-gray-800 mb-3">🎯 Puan Rehberi</h4>
+        <h4 className="font-semibold text-gray-800 mb-1">🎯 Puanın (XP) Nasıl Hesaplanır?</h4>
+        <p className="text-xs text-gray-500 mb-3">
+          Toplam XP'n = <span className="font-medium text-gray-700">etkinlik puanların</span> +
+          <span className="font-medium text-gray-700"> kazandığın rozet puanları</span>. Öğretmenler arası sıralaman bu toplama göre belirlenir.
+        </p>
         <div className="space-y-2 text-sm text-gray-600">
           <div className="flex justify-between"><span>✅ İçerik tamamla</span><span className="font-bold text-orange-600">+1</span></div>
           <div className="flex justify-between"><span>📝 Test çöz (tam puan)</span><span className="font-bold text-orange-600">+10</span></div>
           <div className="flex justify-between"><span>🗳️ Oylama katıl</span><span className="font-bold text-orange-600">+2</span></div>
           <div className="flex justify-between"><span>🌟 İçeriğin yayına girdi</span><span className="font-bold text-orange-600">+5</span></div>
+          <div className="flex justify-between"><span>🎖️ Rozet kazan</span><span className="font-bold text-orange-600">+ rozet puanı</span></div>
         </div>
+        <p className="text-[11px] text-gray-400 mt-3 pt-3 border-t border-orange-100">
+          💡 Şu anki toplamın <span className="font-semibold text-gray-600">{fmt(pb.toplam_xp)} XP</span> — bunun bir kısmı
+          etkinliklerden, bir kısmı {veri.rozetler?.kazanilan_sayisi ?? 0} rozetinden geliyor.
+        </p>
       </div>
     </div>
   );
