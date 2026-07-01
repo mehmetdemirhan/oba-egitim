@@ -564,6 +564,43 @@ async def ogretmen_basarilarim(current_user=Depends(get_current_user)):
     }
 
 
+@router.get("/gelisim/peer-rozet")
+async def get_peer_rozet(current_user=Depends(get_current_user)):
+    """Kullanıcının haftalık oy sayısı ve toplam peer-review rozeti.
+
+    (Eskiden pasif arşivdeydi; frontend arka planda çağırdığı için 404 dönüyordu.
+    Aktif modüle taşındı; hata durumunda güvenli varsayılan döner.)
+    """
+    try:
+        haftanin_basi = datetime.utcnow() - timedelta(days=datetime.utcnow().weekday())
+        haftanin_basi = haftanin_basi.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        haftalik = await db.gelisim_oylar.count_documents({
+            "kullanici_id": current_user["id"],
+            "tarih": {"$gte": haftanin_basi},
+        })
+        toplam = await db.gelisim_oylar.count_documents({"kullanici_id": current_user["id"]})
+
+        rozet = "Bronz Onaycı"
+        if toplam >= 50:
+            rozet = "Platin Uzman"
+        elif toplam >= 20:
+            rozet = "Altın Moderatör"
+        elif toplam >= 5:
+            rozet = "Gümüş Değerlendirici"
+
+        return {
+            "haftalik_oy": haftalik,
+            "haftalik_limit": 5,
+            "toplam_oy": toplam,
+            "rozet": rozet,
+            "kalan": max(0, 5 - haftalik),
+        }
+    except Exception as e:
+        logging.warning(f"[peer-rozet] {e}")
+        return {"haftalik_oy": 0, "haftalik_limit": 5, "toplam_oy": 0, "rozet": "Bronz Onaycı", "kalan": 5}
+
+
 @router.get("/rozetler/tanim")
 async def rozet_tanimlari():
     return {"ogretmen": await get_ogretmen_rozetleri(), "ogrenci": await get_ogrenci_rozetleri()}
