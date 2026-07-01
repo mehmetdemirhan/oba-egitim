@@ -63,6 +63,24 @@ export default function OgretmenBasarilarim({ apiBase }) {
     },
   ];
 
+  // Öğrenci çıktısı / bağlılık / kalite metrikleri
+  const em = veri.ek_metrikler || {};
+  const og = em.okuma_gelisim || {}, an = em.anlama || {}, gr = em.gorev || {}, bg = em.baglilik || {}, ik = em.icerik_kalitesi || {}, vl = em.veli || {};
+  const etkiKartlar = [
+    { emoji: "📈", buyuk: og.olculen_ogrenci ? `${og.wpm_artis > 0 ? "+" : ""}${og.wpm_artis} kel/dk` : "—",
+      alt: og.olculen_ogrenci ? `Okuma hızı gelişimi (${og.olculen_ogrenci} öğrenci)` : "Okuma hızı — yeterli ölçüm yok", renk: "border-l-indigo-400", soluk: !og.olculen_ogrenci },
+    { emoji: "🧠", buyuk: an.test_sayisi ? `%${an.ortalama_yuzde}` : "—",
+      alt: an.test_sayisi ? `Anlama ortalaması (${an.test_sayisi} test)` : "Anlama — henüz test yok", renk: "border-l-sky-400", soluk: !an.test_sayisi },
+    { emoji: "🎯", buyuk: gr.atanan ? `%${gr.oran}` : "—",
+      alt: gr.atanan ? `Görev tamamlama (${gr.tamamlanan}/${gr.atanan})` : "Henüz görev atamadın", renk: "border-l-teal-400", soluk: !gr.atanan },
+    { emoji: "🔥", buyuk: `%${bg.aktif_oran ?? 0}`, alt: "Son 7 günde aktif öğrenci", renk: "border-l-orange-400" },
+    { emoji: "🚨", buyuk: `${bg.risk_ogrenci ?? 0}`, alt: "2 haftadır okumayan öğrenci", renk: "border-l-red-400", soluk: (bg.risk_ogrenci ?? 0) === 0 },
+    { emoji: "💥", buyuk: `${ik.etki_ogrenci_sayisi ?? 0}`, alt: "İçeriğini tamamlayan öğrenci", renk: "border-l-fuchsia-400", soluk: (ik.etki_ogrenci_sayisi ?? 0) === 0 },
+    { emoji: "📅", buyuk: `${bg.ortalama_streak ?? 0}`, alt: "Ort. okuma serisi (gün)", renk: "border-l-lime-500" },
+    { emoji: "🤝", buyuk: `%${vl.yanit_orani ?? 0}`, alt: "Veli anket yanıt oranı", renk: "border-l-rose-400", soluk: (vl.yanit_orani ?? 0) === 0 },
+  ];
+  const ipuclari = veri.ipuclari || [];
+
   return (
     <div className="space-y-5">
       {/* ── ÜST: Hero kart ── */}
@@ -87,15 +105,32 @@ export default function OgretmenBasarilarim({ apiBase }) {
         </div>
       </div>
 
-      {/* ── ORTA: 6 KPI kart ── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        {kpiKartlar.map((k, i) => (
-          <div key={i} className={`bg-white rounded-2xl shadow-md p-5 border-l-4 ${k.renk} flex flex-col`}>
-            <div className="text-3xl mb-1">{k.emoji}</div>
-            <div className={`text-[28px] font-bold leading-tight ${k.soluk ? "text-gray-300" : "text-gray-800"}`}>{k.buyuk}</div>
-            <div className="text-xs text-gray-500 mt-1 leading-snug">{k.alt}</div>
-          </div>
-        ))}
+      {/* ── ORTA: Etkinliğin (6 KPI) ── */}
+      <div>
+        <h4 className="text-sm font-bold text-gray-500 mb-2 px-1">📌 Etkinliğin</h4>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          {kpiKartlar.map((k, i) => (
+            <div key={i} className={`bg-white rounded-2xl shadow-md p-5 border-l-4 ${k.renk} flex flex-col`}>
+              <div className="text-3xl mb-1">{k.emoji}</div>
+              <div className={`text-[28px] font-bold leading-tight ${k.soluk ? "text-gray-300" : "text-gray-800"}`}>{k.buyuk}</div>
+              <div className="text-xs text-gray-500 mt-1 leading-snug">{k.alt}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Öğrenci Etkisi & Bağlılık (çıktı odaklı metrikler) ── */}
+      <div>
+        <h4 className="text-sm font-bold text-gray-500 mb-2 px-1">🚀 Öğrenci Etkisi & Bağlılık</h4>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {etkiKartlar.map((k, i) => (
+            <div key={i} className={`bg-white rounded-2xl shadow-md p-4 border-l-4 ${k.renk} flex flex-col`}>
+              <div className="text-2xl mb-1">{k.emoji}</div>
+              <div className={`text-[22px] font-bold leading-tight ${k.soluk ? "text-gray-300" : "text-gray-800"}`}>{k.buyuk}</div>
+              <div className="text-[11px] text-gray-500 mt-1 leading-snug">{k.alt}</div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* ── ORTA-ALT: Zaman grafiği ── */}
@@ -144,6 +179,24 @@ export default function OgretmenBasarilarim({ apiBase }) {
                 <div className="text-[11px] font-semibold text-gray-700 mt-1 leading-tight line-clamp-2">{r.ad}</div>
                 <div className="text-[10px] text-gray-400 mt-0.5">
                   {r.kazanma_tarihi ? new Date(r.kazanma_tarihi).toLocaleDateString("tr-TR") : ""}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Başarını artıracak ipuçları (dinamik) ── */}
+      {ipuclari.length > 0 && (
+        <div className="rounded-2xl shadow-md bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 p-5">
+          <h4 className="font-semibold text-gray-800 mb-3">💡 Başarını Artıracak İpuçları</h4>
+          <div className="space-y-2.5">
+            {ipuclari.map((t, i) => (
+              <div key={i} className="flex items-start gap-3 bg-white/70 rounded-xl p-3">
+                <span className="text-xl leading-none mt-0.5">{t.ikon}</span>
+                <div className="min-w-0">
+                  <div className="text-sm font-bold text-gray-800">{t.baslik}</div>
+                  <div className="text-xs text-gray-600 leading-snug mt-0.5">{t.mesaj}</div>
                 </div>
               </div>
             ))}
