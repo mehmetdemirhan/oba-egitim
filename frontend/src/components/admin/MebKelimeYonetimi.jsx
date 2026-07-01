@@ -86,6 +86,14 @@ export default function MebKelimeYonetimi({ apiBase }) {
   const dersToplam = (dk) => istatistik?.ders_bazli?.[dk]?.toplam ?? 0;
   const aktifDersStat = istatistik?.ders_bazli?.[aktifDers];
 
+  // Bekleyen kelime varken istatistiği 5sn'de bir tazele (AI üretimi ilerlemesi)
+  const bekleyenSayisi = aktifDersStat?.ai_bekleyen || 0;
+  useEffect(() => {
+    if (bekleyenSayisi <= 0) return;
+    const t = setInterval(() => istatistikGetir(), 5000);
+    return () => clearInterval(t);
+  }, [bekleyenSayisi, istatistikGetir]);
+
   // ── Yükle → önizle ──
   const onizle = async () => {
     if (!dosya) { toastGoster("hata", "Önce dosya seçin."); return; }
@@ -186,15 +194,30 @@ export default function MebKelimeYonetimi({ apiBase }) {
         </div>
       </div>
 
-      {/* ── İstatistik (aktif ders) ── */}
+      {/* ── İstatistik + ilerleme (aktif ders) ── */}
       {aktifDersStat && (
-        <div className="bg-indigo-50 border border-indigo-100 rounded-2xl px-4 py-3 text-sm text-indigo-800 flex flex-wrap gap-x-6 gap-y-1">
-          <span>📊 {dersler[aktifDers]?.ad}: <b>{aktifDersStat.toplam}</b> kelime</span>
-          <span>✅ <b>{aktifDersStat.ai_hazir}</b> AI hazır</span>
-          <span>⏳ <b>{aktifDersStat.ai_bekleyen}</b> bekliyor</span>
-          {aktifDersStat.ai_bekleyen > 0 && (
-            <button onClick={aiYenile} className="ml-auto text-indigo-600 underline text-xs">🔄 Bekleyenler için AI üret</button>
-          )}
+        <div className="bg-indigo-50 border border-indigo-100 rounded-2xl px-4 py-3 text-sm text-indigo-800 space-y-2">
+          <div className="flex flex-wrap gap-x-6 gap-y-1 items-center">
+            <span>📊 {dersler[aktifDers]?.ad}: <b>{aktifDersStat.toplam}</b> kelime</span>
+            <span>✅ <b>{aktifDersStat.ai_hazir}</b> AI hazır</span>
+            <span>⏳ <b>{aktifDersStat.ai_bekleyen}</b> bekliyor</span>
+            {aktifDersStat.ai_bekleyen > 0 && (
+              <button onClick={aiYenile} className="ml-auto text-indigo-600 underline text-xs">🔄 Bekleyenler için AI üret</button>
+            )}
+          </div>
+          {aktifDersStat.toplam > 0 && (() => {
+            const yuzde = Math.round((aktifDersStat.ai_hazir / aktifDersStat.toplam) * 100);
+            return (
+              <div>
+                <div className="h-2 rounded-full bg-indigo-100 overflow-hidden">
+                  <div className="h-full bg-indigo-500 transition-all duration-500" style={{ width: `${yuzde}%` }} />
+                </div>
+                <div className="text-[11px] text-indigo-500 mt-1">
+                  %{yuzde} tamamlandı{aktifDersStat.ai_bekleyen > 0 ? " • AI üretimi sürüyor…" : ""}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
