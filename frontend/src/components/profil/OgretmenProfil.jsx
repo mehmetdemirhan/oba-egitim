@@ -127,7 +127,9 @@ export default function OgretmenProfil({ apiBase }) {
   const fotoSrc = form.profil_fotografi ? `${backendUrl}${form.profil_fotografi}` : null;
   const bio = form.kisa_biyografi || "";
 
-  const Girdi = ({ label, k, tip = "text", readonly = false, ph = "" }) => (
+  // Not: bileşen olarak değil FONKSİYON olarak — inline component her render'da
+  // remount edip input focus'unu kaybettirir.
+  const girdi = (label, k, tip = "text", readonly = false) => (
     <div>
       <label className="text-xs font-medium text-gray-500">{label}</label>
       <input
@@ -135,7 +137,6 @@ export default function OgretmenProfil({ apiBase }) {
         value={form[k] ?? ""}
         onChange={(e) => alan(k, e.target.value)}
         readOnly={readonly}
-        placeholder={ph}
         className={`w-full mt-1 px-3 py-2 rounded-xl border text-sm ${readonly ? "bg-gray-100 text-gray-500 border-gray-200" : "border-gray-200 focus:border-indigo-400 outline-none"}`}
       />
     </div>
@@ -180,12 +181,12 @@ export default function OgretmenProfil({ apiBase }) {
       {/* ── KİŞİSEL ── */}
       {tab === "kisisel" && (
         <div className="bg-white rounded-2xl shadow-sm border p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Girdi label="Ad" k="ad" />
-          <Girdi label="Soyad" k="soyad" />
-          <Girdi label="E-posta (değiştirilemez)" k="email" readonly />
-          <Girdi label="Telefon" k="telefon" />
-          <Girdi label="Doğum Tarihi" k="dogum_tarihi" tip="date" />
-          <Girdi label="Şehir" k="sehir" />
+          {girdi("Ad", "ad")}
+          {girdi("Soyad", "soyad")}
+          {girdi("E-posta (değiştirilemez)", "email", "text", true)}
+          {girdi("Telefon", "telefon")}
+          {girdi("Doğum Tarihi", "dogum_tarihi", "date")}
+          {girdi("Şehir", "sehir")}
           <div className="md:col-span-2">
             <label className="text-xs font-medium text-gray-500">Adres</label>
             <textarea value={form.adres || ""} onChange={(e) => alan("adres", e.target.value)} rows={2}
@@ -198,8 +199,8 @@ export default function OgretmenProfil({ apiBase }) {
       {tab === "profesyonel" && (
         <div className="bg-white rounded-2xl shadow-sm border p-5 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Girdi label="Branş" k="brans" />
-            <Girdi label="Deneyim Yılı" k="deneyim_yili" tip="number" />
+            {girdi("Branş", "brans")}
+            {girdi("Deneyim Yılı", "deneyim_yili", "number")}
           </div>
           <div>
             <label className="text-xs font-medium text-gray-500">Kısa Biyografi <span className="text-gray-400">({bio.length}/500)</span></label>

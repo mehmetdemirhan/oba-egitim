@@ -19,6 +19,8 @@ import ModulYonetimi from "./components/ModulYonetimi";
 import ExerciseStarter from "./components/ExerciseStarter";
 import UnifiedExerciseGrid from "./components/exercises/UnifiedExerciseGrid";
 import OgretmenBasarilarim from "./components/gelisim/OgretmenBasarilarim";
+import OgretmenProfil from "./components/profil/OgretmenProfil";
+import ProfilGorunurlukAyarlari from "./components/admin/ProfilGorunurlukAyarlari";
 import ExerciseLibrary from "./components/exercises/ExerciseLibrary";
 import HaftalikTakvim from "./components/program/HaftalikTakvim";
 import { FullscreenExerciseProvider, useFullscreenExercise } from "./context/FullscreenExerciseContext";
@@ -3964,6 +3966,7 @@ function OgretmenPaneli({ user, logout }) {
     ozellikAktif("ogretmen_gelisim")       && { id: "gelisim",      label: "Gelişim",      icon: "🎓" },
     { id: "program", label: "Program", icon: "📅" },
     ozellikAktif("ogretmen_mesajlar")      && { id: "mesajlar",     label: "Mesajlar",     icon: "✉️", badge: okunmamisSayisi || null },
+    { id: "profilim", label: "Profilim", icon: "👤" },
   ].filter(Boolean);
 
   // ── ÖĞRENCİ DETAY ──
@@ -4793,6 +4796,9 @@ function OgretmenPaneli({ user, logout }) {
             <HaftalikTakvim apiBase={API} user={user} ogrenciler={ogrenciler} />
           </div>
         )}
+
+        {/* ═══ PROFİLİM ═══ */}
+        {aktifSekme === "profilim" && (<OgretmenProfil apiBase={API} />)}
 
         {/* ═══ MESAJLAR ═══ */}
         {aktifSekme === "mesajlar" && (<div className="space-y-4">
@@ -7613,7 +7619,7 @@ function SistemAyarlari({ user }) {
       <p className="text-gray-500 text-sm">Rozet, XP, lig ve anket ayarlarını buradan yönetin. Değişiklikler anında uygulanır.</p>
 
       <div className="flex gap-2 flex-wrap">
-        {[{id:"ozellikler",l:"🎛️ Özellik Yönetimi"},{id:"xp",l:"💰 XP Değerleri"},{id:"ogretmen_xp",l:"👨‍🏫 Öğretmen XP"},{id:"lig",l:"🏆 Lig Eşikleri"},{id:"ogretmen_rozet",l:"🏅 Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"🎓 Öğrenci Rozetleri"},{id:"anket",l:"⭐ Anket Soruları"},{id:"kvkk",l:"🔒 Veri & KVKK"},{id:"sezon",l:"🔄 Sezonluk Reset"}].map(s => (
+        {[{id:"ozellikler",l:"🎛️ Özellik Yönetimi"},{id:"xp",l:"💰 XP Değerleri"},{id:"ogretmen_xp",l:"👨‍🏫 Öğretmen XP"},{id:"lig",l:"🏆 Lig Eşikleri"},{id:"ogretmen_rozet",l:"🏅 Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"🎓 Öğrenci Rozetleri"},{id:"anket",l:"⭐ Anket Soruları"},{id:"profil_gorunurluk",l:"👁️ Profil Görünürlüğü"},{id:"kvkk",l:"🔒 Veri & KVKK"},{id:"sezon",l:"🔄 Sezonluk Reset"}].map(s => (
           <button key={s.id} onClick={() => setAyarSekme(s.id)}
             className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${ayarSekme === s.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200'}`}>{s.l}</button>
         ))}
@@ -7720,6 +7726,8 @@ function SistemAyarlari({ user }) {
           </CardContent>
         </Card>
       )}
+
+      {ayarSekme === "profil_gorunurluk" && (<ProfilGorunurlukAyarlari apiBase={API} />)}
 
       {ayarSekme === "kvkk" && (
         <KvkkVeriPaneli user={user} />
