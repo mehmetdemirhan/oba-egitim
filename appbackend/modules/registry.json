@@ -134,5 +134,9 @@
   {
     "name": "ogretmen_profil",
     "active": true
+  },
+  {
+    "name": "meb_kelime",
+    "active": true
   }
 ]
