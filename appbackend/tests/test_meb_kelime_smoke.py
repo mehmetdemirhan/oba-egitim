@@ -48,7 +48,7 @@ async def run():
     import server
     import modules.meb_kelime as mk
     from core.auth import create_access_token
-    from core.kelime_secici import kelime_sec
+    from core.kelime_secici import kelime_sec, meb_kelime_stringleri
     from httpx import AsyncClient, ASGITransport
 
     await server.client.drop_database(TEST_DB)
@@ -195,6 +195,17 @@ async def run():
         pd = r.json()
         check(all(k in pd for k in ("toplam_batch", "tamamlanan_batch", "tahmini_kalan_sure_sn", "benzersiz_kelime")),
               f"toplu-ai-yenile ilerleme alanları mevcut (gelen {list(pd.keys())})")
+
+        # ── KÖPRÜ: AI Eğit (meb_kelime_haritasi) kelimeleri egzersizde de öncelikli ──
+        await server.db.meb_kelime_haritasi.insert_one({
+            "id": str(uuid.uuid4()), "sinif": 6, "kelime": "fotosentez",
+            "anlam": "bitkilerin besin üretmesi", "ornek_cumle": "Yaprak fotosentez yapar.",
+        })
+        s6 = await kelime_sec(6, 1)  # sınıf 6'da meb_kelimeleri yok → harita'dan gelmeli
+        check(len(s6) == 1 and s6[0]["kelime"] == "fotosentez" and s6[0]["kaynak"] == "meb",
+              f"köprü: harita kelimesi egzersizde MEB önceliğinde (gelen {s6})")
+        s6_str = await meb_kelime_stringleri(6, sadece_anlamli=False)
+        check("fotosentez" in s6_str, "köprü: harita kelimesi bulmaca kelime listesinde")
 
         # ── Migration idempotency (mantık testi) ──
         await server.db.meb_kelimeleri.insert_one({"id": str(uuid.uuid4()), "kelime": "eski", "sinif": 1, "durum": "aktif", "anlam": "x", "kullanim_sayisi": 0})

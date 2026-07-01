@@ -1,10 +1,12 @@
 """Kelime seçici — kelime egzersizleri için ortak öncelik mantığı.
 
 Öncelik sırası:
-  1. MEB müfredat kelimeleri (meb_kelimeleri koleksiyonu; o sınıf, durum=aktif,
-     anlamı dolu) — yönetici tarafından yüklenen resmi liste.
-  2. Genel Türkçe havuz (core/turkce_kelime_havuzu) ile tamamlanır.
-  3. AI ile üretim (bu katmanda YOK) — çağıran modülün son çaresi.
+  1. MEB müfredat kelimeleri (meb_kelimeleri; o sınıf, durum=aktif, anlamı dolu)
+     — yönetici tarafından yüklenen resmi liste.
+  2. AI Eğit / kitap kelimeleri (meb_kelime_haritasi) — öğretmenin yüklediği
+     kitaplardan çıkarılan/hafızaya alınan kelimeler (köprülenmiştir).
+  3. Genel Türkçe havuz (core/turkce_kelime_havuzu) ile tamamlanır.
+  4. AI ile üretim (bu katmanda YOK) — çağıran modülün son çaresi.
 
 Bu modül egzersiz modüllerinin İÇ mantığına dokunmadan, yalnızca "kelime seçim"
 noktasında çağrılır.
@@ -20,11 +22,20 @@ from core.turkce_kelime_havuzu import sinif_kelimeleri, tr_kucuk
 
 async def meb_kelime_kayitlari(sinif: int, sadece_anlamli: bool = True,
                                limit: int = 500, ders_filtre: list | None = None) -> list[dict]:
-    """MEB kelime kayıtlarını (dict) döndürür. En az kullanılan önce.
+    """MEB kelime kayıtlarını (dict) döndürür — İKİ havuz köprülü, öncelik sırasıyla:
 
-    ders_filtre: None → tüm dersler; ["turkce"] veya ["turkce","sosyal_bilgiler"]
-    → yalnızca bu derslerden.
+      1. meb_kelimeleri  — yönetici MEB müfredatı (durum=aktif); en az kullanılan önce.
+      2. meb_kelime_haritasi — AI Eğit / kitaptan çıkarılan kelimeler (ders alanı yok,
+         Türkçe/genel sayılır; durum alanı yok, hepsi aktif kabul edilir).
+
+    Kelime bazında tekilleştirilir (müfredat kaydı önceliklidir). ders_filtre yalnızca
+    meb_kelimeleri'ne uygulanır; harita yalnızca ders_filtre None veya 'turkce'
+    içeriyorsa dahil edilir (harita kitap/Türkçe kaynaklıdır).
     """
+    out: list[dict] = []
+    gorulen: set[str] = set()
+
+    # 1) Müfredat (meb_kelimeleri)
     try:
         sorgu: dict = {"sinif": int(sinif), "durum": "aktif"}
         if sadece_anlamli:
@@ -33,11 +44,37 @@ async def meb_kelime_kayitlari(sinif: int, sadece_anlamli: bool = True,
             sorgu["ders"] = {"$in": list(ders_filtre)}
         docs = await db.meb_kelimeleri.find(sorgu).sort("kullanim_sayisi", 1).to_list(length=limit)
         for d in docs:
+            k = tr_kucuk(str(d.get("kelime", "")).strip())
+            if not k or k in gorulen:
+                continue
+            gorulen.add(k)
             d.pop("_id", None)
-        return docs
+            out.append(d)
     except Exception as ex:
-        logging.warning(f"[kelime_secici] MEB sorgu hatası: {ex}")
-        return []
+        logging.warning(f"[kelime_secici] meb_kelimeleri sorgu hatası: {ex}")
+
+    # 2) AI Eğit / kitap haritası (meb_kelime_haritasi) — Türkçe/genel kaynak
+    harita_dahil = (not ders_filtre) or ("turkce" in ders_filtre)
+    if harita_dahil and len(out) < limit:
+        try:
+            h_sorgu: dict = {"sinif": int(sinif)}
+            if sadece_anlamli:
+                h_sorgu["anlam"] = {"$nin": [None, ""]}
+            h_docs = await db.meb_kelime_haritasi.find(h_sorgu).to_list(length=limit)
+            for d in h_docs:
+                k = tr_kucuk(str(d.get("kelime", "")).strip())
+                if not k or k in gorulen:
+                    continue
+                gorulen.add(k)
+                d.pop("_id", None)
+                d.setdefault("ders", "turkce")
+                out.append(d)
+                if len(out) >= limit:
+                    break
+        except Exception as ex:
+            logging.warning(f"[kelime_secici] meb_kelime_haritasi sorgu hatası: {ex}")
+
+    return out
 
 
 async def meb_kelime_stringleri(sinif: int, sadece_anlamli: bool = False,
