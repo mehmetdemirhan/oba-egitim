@@ -6540,9 +6540,12 @@ function OgrenciPaneli({ user, logout }) {
           {xpDurum?.son_xp?.length > 0 && (<div className="bg-white rounded-2xl p-3 shadow-sm border"><div className="text-xs font-medium text-gray-500 mb-2">Son Kazanımlar</div>
             {xpDurum.son_xp.slice(0,5).map((x,i) => (<div key={i} className="flex items-center justify-between py-1 text-xs"><span className="text-gray-600">{({"okuma_gorevi":"📖 Okuma","anlama_testi":"📝 Test","egzersiz":"🎯 Egzersiz","gorev_tamamla":"✅ Görev","gelisim_tamamla":"🎓 Gelişim","kitap_bitirme":"📚 Kitap","gunluk_streak":"🔥 Streak"})[x.eylem] || x.eylem}</span><span className="font-bold text-green-600">+{x.xp} XP</span></div>))}
           </div>)}
-          <p className="text-xs text-gray-500">Toplam XP'ye göre sıralama</p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-gray-500">Toplam XP'ye göre sıralama</p>
+            <span className="text-[10px] font-medium text-orange-600 bg-orange-50 border border-orange-100 rounded-full px-2 py-0.5">🎓 Sadece öğrenciler</span>
+          </div>
           {ligSiralama && ligSiralama.siralama.length > 0 ? (<div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
-            {ligSiralama.siralama.map((s, i) => (<div key={i} className={`flex items-center justify-between px-4 py-3 ${s.ben ? 'bg-orange-50 border-l-4 border-l-orange-500 font-bold' : i%2===0 ? 'bg-white' : 'bg-gray-50'} ${i>0 ? 'border-t border-gray-100' : ''}`}>
+            {ligSiralama.siralama.filter(s => !s.role || s.role === "student").map((s, i) => (<div key={i} className={`flex items-center justify-between px-4 py-3 ${s.ben ? 'bg-orange-50 border-l-4 border-l-orange-500 font-bold' : i%2===0 ? 'bg-white' : 'bg-gray-50'} ${i>0 ? 'border-t border-gray-100' : ''}`}>
               <div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${s.sira<=3 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'}`}>{s.sira===1?"🥇":s.sira===2?"🥈":s.sira===3?"🥉":s.sira}</div><span className={`text-sm ${s.ben ? 'text-orange-700' : 'text-gray-700'}`}>{s.ad}</span><span className="text-xs">{s.lig_label}</span></div>
               <span className={`text-sm font-medium ${s.ben ? 'text-orange-600' : 'text-gray-500'}`}>{s.xp} XP</span>
             </div>))}
