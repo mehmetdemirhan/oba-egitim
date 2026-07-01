@@ -18,6 +18,7 @@ import { Toaster } from "./components/ui/toaster";
 import ModulYonetimi from "./components/ModulYonetimi";
 import ExerciseStarter from "./components/ExerciseStarter";
 import UnifiedExerciseGrid from "./components/exercises/UnifiedExerciseGrid";
+import OgretmenPuanTablosu from "./components/gelisim/OgretmenPuanTablosu";
 import ExerciseLibrary from "./components/exercises/ExerciseLibrary";
 import HaftalikTakvim from "./components/program/HaftalikTakvim";
 import { FullscreenExerciseProvider, useFullscreenExercise } from "./context/FullscreenExerciseContext";
@@ -13039,29 +13040,35 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
 
         {/* Puan Tablosu */}
         <div className="space-y-4">
-          <Card className="border-0 shadow-sm">
-            <CardHeader><CardTitle className="flex items-center gap-2"><Trophy className="h-5 w-5 text-yellow-500"/>Puan Tablosu</CardTitle></CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {puanTablosu.slice(0, 10).map((u, i) => (
-                  <div key={i} className={`flex items-center justify-between p-3 rounded-xl ${u.ad === user.ad && u.soyad === user.soyad ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50'}`}>
-                    <div className="flex items-center gap-2">
-                      <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold ${i===0?'bg-yellow-400 text-white':i===1?'bg-gray-300 text-gray-700':i===2?'bg-orange-300 text-white':'bg-gray-100 text-gray-600'}`}>{i+1}</span>
-                      <div>
-                        <div className="text-sm font-medium">{u.ad} {u.soyad}</div>
-                        <div className="text-xs text-gray-400">{roleLabel(u.role)} {u.rozet_sayisi > 0 && `• 🏅${u.rozet_sayisi}`}</div>
+          {user.role === 'teacher' ? (
+            /* Öğretmen: yalnızca öğretmenler arası, motive edici, isimsiz konum kartı */
+            <OgretmenPuanTablosu apiBase={API} />
+          ) : (
+            /* Admin/coordinator: mevcut birleşik (karışık) tablo korunur */
+            <Card className="border-0 shadow-sm">
+              <CardHeader><CardTitle className="flex items-center gap-2"><Trophy className="h-5 w-5 text-yellow-500"/>Puan Tablosu</CardTitle></CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {puanTablosu.slice(0, 10).map((u, i) => (
+                    <div key={i} className={`flex items-center justify-between p-3 rounded-xl ${u.ad === user.ad && u.soyad === user.soyad ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50'}`}>
+                      <div className="flex items-center gap-2">
+                        <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold ${i===0?'bg-yellow-400 text-white':i===1?'bg-gray-300 text-gray-700':i===2?'bg-orange-300 text-white':'bg-gray-100 text-gray-600'}`}>{i+1}</span>
+                        <div>
+                          <div className="text-sm font-medium">{u.ad} {u.soyad}</div>
+                          <div className="text-xs text-gray-400">{roleLabel(u.role)} {u.rozet_sayisi > 0 && `• 🏅${u.rozet_sayisi}`}</div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-bold text-orange-600">{u.toplam_puan} puan</span>
+                        {u.rozet_puan > 0 && <div className="text-[10px] text-gray-400">🏅{u.rozet_puan} + ✍️{u.gelisim_puan}</div>}
                       </div>
                     </div>
-                    <div className="text-right">
-                      <span className="font-bold text-orange-600">{u.toplam_puan} puan</span>
-                      {u.rozet_puan > 0 && <div className="text-[10px] text-gray-400">🏅{u.rozet_puan} + ✍️{u.gelisim_puan}</div>}
-                    </div>
-                  </div>
-                ))}
-                {puanTablosu.length === 0 && <p className="text-sm text-gray-400 text-center py-4">Henüz puan yok</p>}
-              </div>
-            </CardContent>
-          </Card>
+                  ))}
+                  {puanTablosu.length === 0 && <p className="text-sm text-gray-400 text-center py-4">Henüz puan yok</p>}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Puan Rehberi */}
           <Card className="border-0 shadow-sm bg-gradient-to-br from-orange-50 to-yellow-50">
