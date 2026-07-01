@@ -150,6 +150,21 @@ async def get_puan_ayarlari():
     return VARSAYILAN_PUANLAR
 
 
+# ── Öğretmen XP bileşen ağırlıkları (öğrenci / kur / veli çıktıları) ──
+OGRETMEN_PUAN_AGIRLIKLARI_DEFAULT = {
+    "ogrenci_basi": 20,   # alınan her öğrenci başına puan
+    "kur_basi": 50,       # her kur atlatma olayı başına puan
+    "veli_yildiz": 5,     # veli anketinde ortalama yıldız başına puan (5★ = +25/anket)
+}
+
+
+async def get_ogretmen_puan_agirliklari():
+    doc = await db.sistem_ayarlari.find_one({"tip": "ogretmen_puan_agirliklari"})
+    degerler = doc.get("degerler", {}) if doc else {}
+    # Eksik anahtarları varsayılanla tamamla
+    return {**OGRETMEN_PUAN_AGIRLIKLARI_DEFAULT, **(degerler or {})}
+
+
 # ── Özellik (feature-flag) ayarları ──
 OZELLIK_TANIMLARI = [
     # ── ÖĞRETMEN PANELİ ──

@@ -84,8 +84,12 @@ async def run():
         await server.db.kur_atlamalari.insert_one({"id": str(uuid.uuid4()), "ogretmen_id": t1, "ogrenci_id": s1, "eski_kur": eski, "yeni_kur": yeni, "tarih": now.isoformat()})
     await server.db.kur_atlamalari.insert_one({"id": str(uuid.uuid4()), "ogretmen_id": t1, "ogrenci_id": s2, "eski_kur": 1, "yeni_kur": 2, "tarih": now.isoformat()})
 
+    adm = str(uuid.uuid4())
+    await server.db.users.insert_one({"id": adm, "ad": "Admin", "soyad": "Yönetici", "role": "admin"})
+
     HT = {"Authorization": f"Bearer {create_access_token({'sub': t1})}"}
     HS = {"Authorization": f"Bearer {create_access_token({'sub': su})}"}
+    HA = {"Authorization": f"Bearer {create_access_token({'sub': adm})}"}
 
     transport = ASGITransport(app=server.app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
@@ -167,6 +171,20 @@ async def run():
         check(em["baglilik"]["risk_ogrenci"] == 1, f"1 risk öğrenci (gelen {em['baglilik']['risk_ogrenci']})")
         check(isinstance(d["ipuclari"], list) and len(d["ipuclari"]) >= 1, f"en az 1 ipucu (gelen {len(d.get('ipuclari', []))})")
         check(all("mesaj" in t and "baslik" in t and "ikon" in t for t in d["ipuclari"]), "ipuçları {ikon,baslik,mesaj} yapısında")
+
+        # ── Ağırlıklar admin panelinden ayarlanabilir ──
+        # Öğrenci başı 20→100 yap; öğrenci bonusu 40→200, toplam 5290→5450 olmalı.
+        r = await ac.put("/api/ayarlar/ogretmen_puan_agirliklari",
+                         json={"degerler": {"ogrenci_basi": 100, "kur_basi": 50, "veli_yildiz": 5}}, headers=HA)
+        check(r.status_code == 200, f"admin ağırlık kaydı 200 (status={r.status_code})")
+        # Öğretmen ağırlık değiştiremez (403)
+        r = await ac.put("/api/ayarlar/ogretmen_puan_agirliklari", json={"degerler": {"ogrenci_basi": 1}}, headers=HT)
+        check(r.status_code == 403, f"öğretmen ağırlık değiştiremez 403 (status={r.status_code})")
+
+        d2 = (await ac.get("/api/ogretmen/basarilarim", headers=HT)).json()
+        check(d2["puan_bilgisi"]["agirliklar"]["ogrenci_basi"] == 100, f"yeni öğrenci ağırlığı 100 (gelen {d2['puan_bilgisi']['agirliklar']['ogrenci_basi']})")
+        check(d2["puan_bilgisi"]["kirilim"]["ogrenci"] == 200, f"öğrenci bonusu 2×100=200 (gelen {d2['puan_bilgisi']['kirilim']['ogrenci']})")
+        check(d2["puan_bilgisi"]["toplam_xp"] == 5450, f"yeni toplam_xp 5450 (gelen {d2['puan_bilgisi']['toplam_xp']})")
 
     await server.client.drop_database(TEST_DB)
     print(f"\nSONUC: {_gecen}/{_gecen + _kalan} kontrol gecti")

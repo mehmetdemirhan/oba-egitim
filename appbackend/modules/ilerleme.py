@@ -30,7 +30,7 @@ from core.config import (
 )
 from core.sistem import (
     get_xp_tablosu, get_puan_ayarlari, get_lig_esikleri,
-    get_ogretmen_rozetleri, get_ogrenci_rozetleri,
+    get_ogretmen_rozetleri, get_ogrenci_rozetleri, get_ogretmen_puan_agirliklari,
     XP_TABLOSU_DEFAULT, LIG_ESIKLERI_DEFAULT, LIG_SIRA,
 )
 from core.ai import _gemini_call, call_claude, _mock_bilgi_tabani_response, get_ogrenci_ai_verileri
@@ -293,6 +293,12 @@ async def _ogretmen_puan_tablosu(current_user) -> dict:
     tum_rozetler = (await get_ogretmen_rozetleri()) + (await get_ogrenci_rozetleri())
     rozet_puan_map = {r["kod"]: r.get("puan", r.get("xp", 0)) for r in tum_rozetler}
 
+    # XP bileşen ağırlıkları (admin panelinden ayarlanabilir; yoksa varsayılan)
+    ag = await get_ogretmen_puan_agirliklari()
+    w_ogr = int(ag.get("ogrenci_basi", PUAN_OGRENCI_BASI))
+    w_kur = int(ag.get("kur_basi", PUAN_KUR_BASI))
+    w_veli = float(ag.get("veli_yildiz", PUAN_VELI_YILDIZ))
+
     teachers = await db.users.find({"role": "teacher"}).to_list(length=None)
 
     # ── Bileşen verileri: tek sorguyla çekilip Python'da gruplanır (öğretmen sayısı×sorgu değil) ──
@@ -327,7 +333,7 @@ async def _ogretmen_puan_tablosu(current_user) -> dict:
             continue
         py = [y.get("puan", 0) for y in a.get("yanitlar", []) if y.get("puan")]
         if py:
-            veli_bonus[tid] = veli_bonus.get(tid, 0) + (sum(py) / len(py)) * PUAN_VELI_YILDIZ
+            veli_bonus[tid] = veli_bonus.get(tid, 0) + (sum(py) / len(py)) * w_veli
 
     puanlar = []
     benim_kirilim = None
@@ -336,8 +342,8 @@ async def _ogretmen_puan_tablosu(current_user) -> dict:
         kirilim = {
             "etkinlik": u.get("puan", 0),
             "rozet": rozet_by_user.get(u["id"], 0),
-            "ogrenci": ogr_say.get(oid, 0) * PUAN_OGRENCI_BASI,
-            "kur": kur_say.get(oid, 0) * PUAN_KUR_BASI,
+            "ogrenci": ogr_say.get(oid, 0) * w_ogr,
+            "kur": kur_say.get(oid, 0) * w_kur,
             "veli": round(veli_bonus.get(oid, 0)),
         }
         toplam = sum(kirilim.values())
@@ -394,11 +400,7 @@ async def _ogretmen_puan_tablosu(current_user) -> dict:
         },
         "motivasyon_mesaji": mesaj,
         "puan_kirilim": benim_kirilim or {"etkinlik": 0, "rozet": 0, "ogrenci": 0, "kur": 0, "veli": 0},
-        "puan_agirliklari": {
-            "ogrenci_basi": PUAN_OGRENCI_BASI,
-            "kur_basi": PUAN_KUR_BASI,
-            "veli_yildiz": PUAN_VELI_YILDIZ,
-        },
+        "puan_agirliklari": {"ogrenci_basi": w_ogr, "kur_basi": w_kur, "veli_yildiz": w_veli},
     }
 
 

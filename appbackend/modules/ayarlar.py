@@ -32,7 +32,7 @@ from core.sistem import (
     get_xp_tablosu, get_puan_ayarlari, get_lig_esikleri,
     XP_TABLOSU_DEFAULT, LIG_ESIKLERI_DEFAULT, LIG_SIRA,
     OGRETMEN_ROZETLERI_DEFAULT, OGRENCI_ROZETLERI_DEFAULT, ANKET_SORULARI_DEFAULT,
-    OZELLIK_TANIMLARI, get_ozellik_ayarlari,
+    OZELLIK_TANIMLARI, get_ozellik_ayarlari, OGRETMEN_PUAN_AGIRLIKLARI_DEFAULT,
 )
 from core.ai import _gemini_call, call_claude, _mock_bilgi_tabani_response, get_ogrenci_ai_verileri
 
@@ -79,6 +79,7 @@ async def get_ayar(tip: str, current_user=Depends(get_current_user)):
         "ogretmen_rozetleri": OGRETMEN_ROZETLERI_DEFAULT,
         "ogrenci_rozetleri": OGRENCI_ROZETLERI_DEFAULT,
         "anket_sorulari": ANKET_SORULARI_DEFAULT,
+        "ogretmen_puan_agirliklari": OGRETMEN_PUAN_AGIRLIKLARI_DEFAULT,
     }
     return {"tip": tip, "degerler": defaults.get(tip, {})}
 
