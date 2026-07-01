@@ -33,9 +33,10 @@ from core.ai import call_claude
 router = APIRouter()
 
 MAX_DOSYA_BYTE = 5 * 1024 * 1024  # 5MB
-AI_BATCH = 8              # AI'a tek seferde gönderilecek kelime sayısı
-AI_BEKLEME_SN = 1.5      # batch'ler arası bekleme (kota koruması)
+AI_BATCH = 20             # AI'a TEK promptta gönderilecek BENZERSİZ kelime sayısı
+AI_BEKLEME_SN = 2.0      # batch'ler arası bekleme (büyük prompt → kota güvenlik payı)
 AI_MAX_DENEME = 3
+AI_BATCH_SANIYE = 5      # ilerleme tahmini: batch başına ~saniye (çağrı + bekleme)
 
 _YAZMA = require_role(UserRole.ADMIN)
 _OKUMA = require_role(UserRole.ADMIN, UserRole.COORDINATOR, UserRole.TEACHER)
@@ -134,39 +135,52 @@ def _zorluk(kelime: str, sinif: int) -> str:
 # ─────────────────────────────────────────────────────────────
 # AI üretimi (arka plan)
 # ─────────────────────────────────────────────────────────────
-def _ai_prompt(kelimeler: list[str], sinif: int, ders: str = VARSAYILAN_DERS) -> tuple[str, str]:
-    ders_ad = DERSLER.get(ders, {}).get("ad", "Türkçe")
+def _ai_prompt(items: list[dict]) -> tuple[str, str]:
+    """items: [{"kelime","sinif","ders_ad"}] → TEK promptta çoklu kelime."""
     system = (
-        f"Sen ilkokul/ortaokul {ders_ad} öğretmeni asistanısın. Çocuk dostu, TDK uyumlu, "
+        "Sen ilkokul/ortaokul öğretmeni asistanısın. Çocuk dostu, TDK uyumlu, "
         "kısa ve net tanımlar üretirsin."
     )
-    liste = ", ".join(kelimeler)
+    satirlar = "\n".join(
+        f'- {it["kelime"]} ({it.get("sinif", 1)}. sınıf, {it.get("ders_ad", "Türkçe")})'
+        for it in items
+    )
     user = (
-        f"Aşağıdaki kelimeler {sinif}. sınıf {ders_ad} dersinde geçen kavramlardır: {liste}\n"
-        "Her kelime için: (1) çocuk dostu Türkçe anlam (en fazla 15 kelime), "
-        "(2) o sınıf seviyesine uygun kısa bir örnek cümle, (3) 1-2 kısa etiket "
-        "(ör. 'duygu', 'günlük hayat', 'doğa').\n"
-        'SADECE şu JSON ile yanıt ver: {"sonuclar": [{"kelime": "...", "anlam": "...", '
-        '"ornek_cumle": "...", "etiketler": ["..."]}]}\n'
-        "Markdown veya kod bloğu ekleme."
+        "Aşağıdaki her kelime için: (1) çocuk dostu Türkçe anlam (en fazla 15 kelime), "
+        "(2) sınıf seviyesine uygun kısa örnek cümle, (3) 1-2 kısa etiket üret.\n"
+        f"Kelimeler (sınıf/ders bağlamıyla):\n{satirlar}\n"
+        'SADECE şu JSON DİZİSİNİ döndür: '
+        '[{"kelime":"...","anlam":"...","ornek_cumle":"...","etiketler":["..."]}]\n'
+        "Markdown, kod bloğu veya ek açıklama EKLEME."
     )
     return system, user
 
 
-async def _ai_batch_uret(kelimeler: list[str], sinif: int, ders: str = VARSAYILAN_DERS) -> dict:
-    """Bir batch için {kelime: {anlam, ornek_cumle, etiketler}} döndürür."""
-    system, user = _ai_prompt(kelimeler, sinif, ders)
+async def _ai_batch_uret(items: list[dict]) -> dict:
+    """Bir batch (benzersiz kelimeler) için {kelime: {anlam, ornek_cumle, etiketler}}.
+
+    Yanıt hem düz dizi `[...]` hem `{"sonuclar":[...]}` biçimini kabul eder. Tek
+    kelimenin parse hatası batch'i düşürmez (yalnızca o kelime haritada olmaz)."""
+    system, user = _ai_prompt(items)
     for deneme in range(AI_MAX_DENEME):
         try:
-            res = await call_claude(system, user, max_tokens=2000)
+            res = await call_claude(system, user, max_tokens=3500)
             parsed = res.get("parsed")
-            if isinstance(parsed, dict) and isinstance(parsed.get("sonuclar"), list):
+            sonuc_list = None
+            if isinstance(parsed, list):
+                sonuc_list = parsed
+            elif isinstance(parsed, dict):
+                sonuc_list = parsed.get("sonuclar") or parsed.get("kelimeler")
+            if isinstance(sonuc_list, list) and sonuc_list:
                 harita = {}
-                for s in parsed["sonuclar"]:
+                for s in sonuc_list:
+                    if not isinstance(s, dict):
+                        continue
                     k = _tr_kucuk(str(s.get("kelime", "")).strip())
-                    if k:
+                    anlam = str(s.get("anlam", "")).strip()
+                    if k and anlam:
                         harita[k] = {
-                            "anlam": str(s.get("anlam", "")).strip(),
+                            "anlam": anlam,
                             "ornek_cumle": str(s.get("ornek_cumle", "")).strip(),
                             "etiketler": [str(e).strip() for e in (s.get("etiketler") or []) if str(e).strip()][:3],
                         }
@@ -178,38 +192,73 @@ async def _ai_batch_uret(kelimeler: list[str], sinif: int, ders: str = VARSAYILA
     return {}
 
 
-async def _ai_kuyrugu_isle(sinif: int, ders: str = VARSAYILAN_DERS):
-    """Anlamı boş veya durum=onaysiz kelimeler için AI üretir (arka plan, sınıf+ders)."""
-    anahtar = (int(sinif), ders)
+def _bekleyen_sorgu(sinif=None, ders=None) -> dict:
+    sorgu: dict = {
+        "durum": {"$ne": "arsivli"},
+        "$or": [{"anlam": {"$in": [None, ""]}}, {"durum": "onaysiz"}],
+    }
+    if sinif is not None:
+        sorgu["sinif"] = int(sinif)
+    if ders:
+        sorgu["ders"] = ders
+    return sorgu
+
+
+async def _ai_kuyrugu_isle(sinif=None, ders=None):
+    """Anlamı boş/onaysiz kelimeler için AI üretir (arka plan).
+
+    DEDUPE: aynı `kelime` string'i birden fazla (sinif, ders) kombinasyonunda
+    bekliyorsa TEK AI isteğiyle üretilir; sonuç o kelimenin bekleyen TÜM
+    dokümanlarına yazılır (unique (kelime,sinif,ders) kırılmaz). Her turda en çok
+    AI_BATCH (20) BENZERSİZ kelime tek promptta gönderilir. Tam başarısızlıkta
+    (kota) döngü durur; kaldığı yerden sonraki tetiklemede devam eder — üretilmiş
+    kelimeler tekrar sorulmaz. Kısmi eksik kelimeler "bekliyor" kalır.
+    """
+    anahtar = (sinif, ders)
     if anahtar in _ai_aktif:
         return
     _ai_aktif.add(anahtar)
+    denenen: set = set()  # bu turda AI'a gönderilmiş kelimeler (tekrar denenmesin)
     try:
         while True:
-            bekleyen = await db.meb_kelimeleri.find({
-                "sinif": int(sinif),
-                "ders": ders,
-                "durum": {"$ne": "arsivli"},
-                "$or": [{"anlam": {"$in": [None, ""]}}, {"durum": "onaysiz"}],
-            }).limit(AI_BATCH).to_list(length=AI_BATCH)
-            if not bekleyen:
-                break
-            kelimeler = [b["kelime"] for b in bekleyen]
-            harita = await _ai_batch_uret(kelimeler, sinif, ders)
+            bekleyen = await db.meb_kelimeleri.find(_bekleyen_sorgu(sinif, ders)).limit(400).to_list(length=400)
+            gruplar: dict = {}
             for b in bekleyen:
-                k = b["kelime"]
+                k = b.get("kelime")
+                if not k or k in denenen:
+                    continue
+                gruplar.setdefault(k, []).append(b)
+            if not gruplar:
+                break
+            secilen = list(gruplar.keys())[:AI_BATCH]
+            items = [{
+                "kelime": k,
+                "sinif": gruplar[k][0].get("sinif", 1),
+                "ders_ad": DERSLER.get(gruplar[k][0].get("ders", VARSAYILAN_DERS), {}).get("ad", "Türkçe"),
+            } for k in secilen]
+
+            harita = await _ai_batch_uret(items)
+            if not harita:
+                # Tam başarısızlık (kota/servis) → dur; kaldığı yerden sonra devam edilir
+                break
+
+            now = datetime.utcnow().isoformat()
+            for k in secilen:
+                denenen.add(k)
                 veri = harita.get(k)
-                if veri and veri.get("anlam"):
-                    await db.meb_kelimeleri.update_one({"id": b["id"]}, {"$set": {
+                if not (veri and veri.get("anlam")):
+                    continue  # bu kelime "bekliyor" kalır (denenen'de → bu tur tekrar denenmez)
+                # DEDUPE yazımı: kelimenin bekleyen TÜM dokümanlarına aynı anlam/örnek
+                await db.meb_kelimeleri.update_many(
+                    {"kelime": k, **_bekleyen_sorgu(sinif, ders)},
+                    {"$set": {
                         "anlam": veri["anlam"],
                         "ornek_cumle": veri.get("ornek_cumle", ""),
                         "etiketler": veri.get("etiketler", []),
                         "durum": "aktif",
-                        "ai_uretim_tarihi": datetime.utcnow().isoformat(),
-                    }})
-                else:
-                    # Üretilemedi → onaysiz bırak (sonra toplu-ai-yenile ile denenir)
-                    await db.meb_kelimeleri.update_one({"id": b["id"]}, {"$set": {"durum": "onaysiz"}})
+                        "ai_uretim_tarihi": now,
+                    }},
+                )
             await asyncio.sleep(AI_BEKLEME_SN)
     except Exception as ex:
         logging.warning(f"[meb_kelime] AI kuyruk hatası (s{sinif}/{ders}): {ex}")
@@ -369,20 +418,28 @@ async def meb_kelime_toplu_ai(data: dict = None, current_user=Depends(_YAZMA)):
     ayrı kuyruk tetiklenir. Opsiyonel `sinif`/`ders` ile daraltılabilir.
     """
     data = data or {}
-    taban: dict = {
-        "durum": {"$ne": "arsivli"},
-        "$or": [{"anlam": {"$in": [None, ""]}}, {"durum": "onaysiz"}],
-    }
-    if data.get("sinif") is not None:
-        taban["sinif"] = int(data["sinif"])
-    if data.get("ders"):
-        taban["ders"] = data["ders"]
+    sinif = int(data["sinif"]) if data.get("sinif") is not None else None
+    ders = data.get("ders") or None
 
-    bekleyenler = await db.meb_kelimeleri.find(taban, {"sinif": 1, "ders": 1}).to_list(length=None)
-    ciftler = {(b.get("sinif"), b.get("ders", VARSAYILAN_DERS)) for b in bekleyenler if b.get("sinif") is not None}
-    for (s, d) in ciftler:
-        asyncio.create_task(_ai_kuyrugu_isle(int(s), d or VARSAYILAN_DERS))
-    return {"kuyruk_baslatilan": len(ciftler)}
+    bekleyenler = await db.meb_kelimeleri.find(_bekleyen_sorgu(sinif, ders), {"kelime": 1}).to_list(length=None)
+    bekleyen_kelime = len(bekleyenler)
+    benzersiz = len({b.get("kelime") for b in bekleyenler if b.get("kelime")})
+    # DEDUPE sonrası gerçek AI çağrı (batch) sayısı benzersiz kelimeye göre hesaplanır
+    toplam_batch = max(0, -(-benzersiz // AI_BATCH))  # ceil
+    tahmini_kalan_sure_sn = toplam_batch * AI_BATCH_SANIYE
+
+    if bekleyen_kelime:
+        # TEK görev: dedupe (sinif) ve varsa (ders) genelinde çalışır
+        asyncio.create_task(_ai_kuyrugu_isle(sinif, ders))
+
+    return {
+        "kuyruk_baslatildi": bool(bekleyen_kelime),
+        "bekleyen_kelime": bekleyen_kelime,
+        "benzersiz_kelime": benzersiz,
+        "toplam_batch": toplam_batch,
+        "tamamlanan_batch": 0,
+        "tahmini_kalan_sure_sn": tahmini_kalan_sure_sn,
+    }
 
 
 @router.get("/meb-kelime/istatistik")
