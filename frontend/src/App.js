@@ -17,6 +17,8 @@ import { useToast } from "./hooks/use-toast";
 import { Toaster } from "./components/ui/toaster";
 import ModulYonetimi from "./components/ModulYonetimi";
 import MebKelimeYonetimi from "./components/admin/MebKelimeYonetimi";
+import InstagramWidget from "./components/dashboard/InstagramWidget";
+import InstagramAyarlari from "./components/admin/InstagramAyarlari";
 import ExerciseStarter from "./components/ExerciseStarter";
 import UnifiedExerciseGrid from "./components/exercises/UnifiedExerciseGrid";
 import { GOZ_YENI_EGZERSIZLER, GOZ_YENI_RENDER } from "./components/exercises/goz";
@@ -347,7 +349,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto p-4">
+      <div className={isFullscreen ? "w-full px-2 py-2" : "container mx-auto p-4"}>
         {/* Header — tam ekran egzersiz modunda gizlenir */}
         {!isFullscreen && (
         <div className="bg-white rounded-3xl shadow-sm p-6 mb-6 border border-gray-100">
@@ -4244,6 +4246,9 @@ function OgretmenPaneli({ user, logout }) {
             );
           })()}
 
+          {/* 📱 Instagram beslemesi (öğretmene özel) */}
+          <InstagramWidget apiBase={API} />
+
           {/* Özet kartlar */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-4 text-white">
@@ -7649,7 +7654,7 @@ function SistemAyarlari({ user }) {
       <p className="text-gray-500 text-sm">Rozet, XP, lig ve anket ayarlarını buradan yönetin. Değişiklikler anında uygulanır.</p>
 
       <div className="flex gap-2 flex-wrap">
-        {[{id:"ozellikler",l:"🎛️ Özellik Yönetimi"},{id:"xp",l:"💰 XP Değerleri"},{id:"ogretmen_xp",l:"👨‍🏫 Öğretmen XP"},{id:"lig",l:"🏆 Lig Eşikleri"},{id:"ogretmen_rozet",l:"🏅 Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"🎓 Öğrenci Rozetleri"},{id:"anket",l:"⭐ Anket Soruları"},{id:"profil_gorunurluk",l:"👁️ Profil Görünürlüğü"},{id:"kvkk",l:"🔒 Veri & KVKK"},{id:"sezon",l:"🔄 Sezonluk Reset"}].map(s => (
+        {[{id:"ozellikler",l:"🎛️ Özellik Yönetimi"},{id:"xp",l:"💰 XP Değerleri"},{id:"ogretmen_xp",l:"👨‍🏫 Öğretmen XP"},{id:"lig",l:"🏆 Lig Eşikleri"},{id:"ogretmen_rozet",l:"🏅 Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"🎓 Öğrenci Rozetleri"},{id:"anket",l:"⭐ Anket Soruları"},{id:"profil_gorunurluk",l:"👁️ Profil Görünürlüğü"},{id:"instagram",l:"📱 Instagram"},{id:"kvkk",l:"🔒 Veri & KVKK"},{id:"sezon",l:"🔄 Sezonluk Reset"}].map(s => (
           <button key={s.id} onClick={() => setAyarSekme(s.id)}
             className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${ayarSekme === s.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200'}`}>{s.l}</button>
         ))}
@@ -7758,6 +7763,8 @@ function SistemAyarlari({ user }) {
       )}
 
       {ayarSekme === "profil_gorunurluk" && (<ProfilGorunurlukAyarlari apiBase={API} />)}
+
+      {ayarSekme === "instagram" && (<InstagramAyarlari apiBase={API} />)}
 
       {ayarSekme === "kvkk" && (
         <KvkkVeriPaneli user={user} />
