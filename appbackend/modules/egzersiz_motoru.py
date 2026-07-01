@@ -459,6 +459,103 @@ async def kelime_gezmece_dogrula(data: dict, current_user=Depends(get_current_us
     return {"kelime": kelime, "durum": durum, "puan_kazanildi": puan}
 
 
+@router.post("/egzersiz/kelime-gezmece/seviye")
+async def kelime_gezmece_seviye(data: dict, current_user=Depends(get_current_user)):
+    """Kelime Gezmece — belirli sınıf/seviye için bulmaca getirir veya üretir.
+
+    Body: { sinif, seviye_no }
+    Yanıt: { icerik_id, icerik, seviye_no }
+
+    Cache: (sinif, seviye_no) kombinasyonu daha önce üretildiyse aynı içerik
+    kullanılır (kullanim_sayisi += 1); yoksa bulmaca_olusturucu ile üretilip
+    egzersiz_icerikler koleksiyonuna kaydedilir (kaynak="otomatik_uretim").
+    """
+    sinif = max(1, min(8, int(data.get("sinif", 3))))
+    seviye_no = max(1, int(data.get("seviye_no", 1)))
+
+    mevcut = await db.egzersiz_icerikler.find_one({
+        "tip": "kelime_gezmece", "sinif": sinif,
+        "icerik.seviye_no": seviye_no, **_AKTIF,
+    })
+    if mevcut:
+        await db.egzersiz_icerikler.update_one(
+            {"id": mevcut["id"]},
+            {"$inc": {"kullanim_sayisi": 1},
+             "$set": {"son_kullanim_tarihi": datetime.utcnow().isoformat()}},
+        )
+        return {"icerik_id": mevcut["id"], "icerik": mevcut.get("icerik", {}),
+                "seviye_no": seviye_no}
+
+    icerik = bulmaca_uret(sinif, seviye_no)
+    olusturan = {
+        "id": current_user.get("id"),
+        "ad": _kullanici_ad(current_user),
+        "rol": current_user.get("role", ""),
+    }
+    doc = await _icerik_kaydet("kelime_gezmece", sinif, None, None, icerik,
+                              current_user.get("id"), False,
+                              kaynak="otomatik_uretim", olusturan=olusturan)
+    return {"icerik_id": doc["id"], "icerik": icerik, "seviye_no": seviye_no}
+
+
+@router.post("/egzersiz/kelime-gezmece/tamamla")
+async def kelime_gezmece_tamamla(data: dict, current_user=Depends(get_current_user)):
+    """Kelime Gezmece — çok seviyeli oturumu bitirir, XP + puanı sıralamaya işler.
+
+    Body: { sinif, seviye_sayisi, bonus_sayisi, toplam_puan, en_yuksek_seviye?, sure_sn? }
+    XP kuralı: tamamlanan her seviye +50 XP, her bonus kelime +15 XP.
+    (Yarım kalan seviye sayılmaz — frontend yalnızca tamamlanan seviyeleri iletir.)
+    """
+    sinif = max(1, min(8, int(data.get("sinif", 3))))
+    seviye_sayisi = max(0, int(data.get("seviye_sayisi", 0)))
+    bonus_sayisi = max(0, int(data.get("bonus_sayisi", 0)))
+    toplam_puan = max(0, int(data.get("toplam_puan", 0)))
+    en_yuksek_seviye = max(seviye_sayisi, int(data.get("en_yuksek_seviye", seviye_sayisi)))
+    sure_sn = int(data.get("sure_sn", 0))
+
+    xp = seviye_sayisi * 50 + bonus_sayisi * 15
+    ogrenci_id = _ogrenci_id(current_user)
+    now = datetime.utcnow().isoformat()
+
+    oturum = {
+        "id": str(uuid.uuid4()),
+        "ogrenci_id": ogrenci_id,
+        "tip": "kelime_gezmece",
+        "icerik_id": None,
+        "cevaplar": [],
+        "dogru_sayisi": seviye_sayisi,
+        "toplam_soru": max(1, seviye_sayisi),
+        "seviye_sayisi": seviye_sayisi,
+        "bonus_sayisi": bonus_sayisi,
+        "en_yuksek_seviye": en_yuksek_seviye,
+        "sure_sn": sure_sn,
+        "puan": toplam_puan,
+        "xp": xp,
+        "durum": "tamamlandi",
+        "baslama_t": now,
+        "bitis_t": now,
+    }
+    await db.egzersiz_oturumlari.insert_one(dict(oturum))
+
+    if xp > 0 and ogrenci_id:
+        await db.students.update_one({"id": ogrenci_id}, {"$inc": {"toplam_xp": xp}})
+        await db.xp_logs.insert_one({
+            "id": str(uuid.uuid4()),
+            "ogrenci_id": ogrenci_id,
+            "eylem": "egzersiz_kelime_gezmece",
+            "xp": xp,
+            "tarih": now,
+        })
+
+    return {
+        "xp": xp,
+        "seviye_sayisi": seviye_sayisi,
+        "bonus_sayisi": bonus_sayisi,
+        "toplam_puan": toplam_puan,
+        "en_yuksek_seviye": en_yuksek_seviye,
+    }
+
+
 @router.get("/egzersiz/gecmis/{ogrenci_id}")
 async def egzersiz_gecmis(ogrenci_id: str, current_user=Depends(get_current_user)):
     """Öğrencinin egzersiz oturum geçmişi (son 50)."""
