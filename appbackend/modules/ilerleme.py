@@ -366,6 +366,172 @@ async def get_puan_tablosu_rol(rol: str, current_user=Depends(get_current_user))
     return await _ogretmen_puan_tablosu(current_user)
 
 
+@router.get("/ogretmen/basarilarim")
+async def ogretmen_basarilarim(current_user=Depends(get_current_user)):
+    """Öğretmene özel başarı özeti: puan konumu, rozetler, veli değerlendirmesi,
+    öğrenci/içerik/kur özetleri ve son 12 haftalık zaman serisi. Yalnız teacher."""
+    if current_user.get("role", "") != "teacher":
+        raise HTTPException(status_code=403, detail="Bu sayfa yalnızca öğretmenler içindir.")
+
+    user_id = current_user["id"]
+    ogretmen_id = current_user.get("linked_id") or user_id
+    ad_soyad = f"{current_user.get('ad', '')} {current_user.get('soyad', '')}".strip()
+    simdi = datetime.utcnow()
+
+    # ── Puan bilgisi (mevcut hesaplayıcıdan) ──
+    pt = await _ogretmen_puan_tablosu(current_user)
+    ist = pt["istatistikler"]
+    puan_bilgisi = {
+        "toplam_xp": pt["kullanicinin_puani"],
+        "sira": pt["kullanicinin_sirasi"],
+        "toplam_ogretmen": pt["toplam_ogretmen"],
+        "ortalama_puan": ist["ortalama_puan_ogretmen"],
+        "en_yuksek": ist["en_yuksek_puan"],
+        "en_dusuk": ist["en_dusuk_puan"],
+        "motivasyon_mesaji": pt["motivasyon_mesaji"],
+    }
+
+    # ── Rozetler ──
+    ogretmen_rozet_list = await get_ogretmen_rozetleri()
+    rozet_def = {r["kod"]: r for r in ogretmen_rozet_list}
+    kazanilan = await db.kazanilan_rozetler.find({"kullanici_id": user_id}).to_list(length=None)
+    kazanilan_sirali = sorted(kazanilan, key=lambda r: r.get("kazanma_tarihi", ""), reverse=True)
+    son_kazanilanlar = []
+    for r in kazanilan_sirali[:5]:
+        d = rozet_def.get(r.get("rozet_kodu"), {})
+        son_kazanilanlar.append({
+            "ad": d.get("ad", r.get("rozet_kodu", "Rozet")),
+            "ikon": d.get("ikon") or d.get("emoji") or "🎖️",
+            "kazanma_tarihi": r.get("kazanma_tarihi"),
+        })
+    rozetler = {
+        "kazanilan_sayisi": len(kazanilan),
+        "toplam_rozet": len(ogretmen_rozet_list),
+        "son_kazanilanlar": son_kazanilanlar,
+    }
+
+    # ── Veli değerlendirmesi ──
+    anketler = await db.veli_anketleri.find({"ogretmen_id": ogretmen_id}).to_list(length=None)
+    anket_puanlari = []
+    for a in anketler:
+        py = [y.get("puan", 0) for y in a.get("yanitlar", []) if y.get("puan")]
+        if py:
+            anket_puanlari.append(sum(py) / len(py))
+    veli_degerlendirmesi = {
+        "ortalama": round(sum(anket_puanlari) / len(anket_puanlari), 1) if anket_puanlari else 0,
+        "toplam_anket": len(anketler),
+    }
+
+    # ── Öğrenci özet (aktif = son 7 gün okuma kaydı olan) ──
+    ogrenciler = await db.students.find({"ogretmen_id": ogretmen_id, "arsivli": {"$ne": True}}).to_list(length=None)
+    yedi_gun_once = (simdi - timedelta(days=7)).strftime("%Y-%m-%d")
+    aktif = 0
+    for s in ogrenciler:
+        son = await db.reading_logs.find({"ogrenci_id": s["id"]}).sort("tarih", -1).to_list(length=1)
+        if son and son[0].get("tarih", "")[:10] >= yedi_gun_once:
+            aktif += 1
+    ogrenci_ozet = {"toplam_ogrenci": len(ogrenciler), "aktif_ogrenci": aktif}
+
+    # ── İçerik özet ──
+    tum_icerik = await db.gelisim_icerik.find().to_list(length=None)
+    olusturulan = sum(1 for ic in tum_icerik if ic.get("ekleyen_id") == user_id)
+    onaylanan = sum(1 for ic in tum_icerik if ic.get("ekleyen_id") == user_id and ic.get("durum") == "yayinda")
+    oy_verdigi = sum(1 for ic in tum_icerik if user_id in (ic.get("oylar") or {}))
+    icerik_ozet = {"olusturulan_icerik": olusturulan, "onaylanan_icerik": onaylanan, "oy_verdigi_icerik": oy_verdigi}
+
+    # ── Kur başarıları (kur_atlamalari koleksiyonundan) ──
+    kurlar = await db.kur_atlamalari.find({"ogretmen_id": ogretmen_id}).to_list(length=None)
+    gruplar = {}
+    for k in kurlar:
+        gruplar.setdefault(k.get("ogrenci_id"), []).append(k)
+    en_uzun_takip = None
+    for oid, kayitlar in gruplar.items():
+        adet = len(kayitlar)
+        if en_uzun_takip is None or adet > en_uzun_takip["kur_sayisi"]:
+            eskiler = [k.get("eski_kur") for k in kayitlar if k.get("eski_kur") is not None]
+            yeniler = [k.get("yeni_kur") for k in kayitlar if k.get("yeni_kur") is not None]
+            st = await db.students.find_one({"id": oid})
+            en_uzun_takip = {
+                "kur_sayisi": adet,
+                "ogrenci_adi": f"{(st or {}).get('ad', '')} {(st or {}).get('soyad', '')}".strip() or "Öğrenci",
+                "baslangic_kur": min(eskiler) if eskiler else None,
+                "mevcut_kur": max(yeniler) if yeniler else None,
+            }
+    kur_basarilari = {"kur_atlatilan_ogrenci_sayisi": len(gruplar), "en_uzun_takip": en_uzun_takip}
+
+    # ── Zaman serisi (son 12 hafta) ──
+    # Öğretmenlerin xp_logs kaydı yoktur (xp_logs öğrenci-özeldir); bu yüzden seri,
+    # rozet kazanımları (kazanma_tarihi) ve öğretmenin eklediği içeriklerin tarihinden
+    # türetilir. Son nokta gerçek toplam puana sabitlenir (anchor).
+    HAFTA = 12
+    d_xp = [0] * HAFTA
+    d_rozet = [0] * HAFTA
+    base_xp = 0
+    base_rozet = 0
+    rozet_puan_map = {r["kod"]: r.get("puan", r.get("xp", 0)) for r in ogretmen_rozet_list}
+
+    def _parse_dt(s):
+        try:
+            return datetime.fromisoformat((s or "").replace("Z", ""))
+        except Exception:
+            return None
+
+    def _bucketle(d, xp_puan, rozet_mi):
+        nonlocal base_xp, base_rozet
+        if not d:
+            base_xp += xp_puan
+            if rozet_mi:
+                base_rozet += 1
+            return
+        wi = HAFTA - 1 - ((simdi - d).days // 7)
+        if wi < 0:
+            base_xp += xp_puan
+            if rozet_mi:
+                base_rozet += 1
+        elif wi <= HAFTA - 1:
+            d_xp[wi] += xp_puan
+            if rozet_mi:
+                d_rozet[wi] += 1
+
+    for r in kazanilan:
+        _bucketle(_parse_dt(r.get("kazanma_tarihi")), rozet_puan_map.get(r.get("rozet_kodu"), 0), True)
+    for ic in tum_icerik:
+        if ic.get("ekleyen_id") != user_id:
+            continue
+        d = _parse_dt(ic.get("tarih") or ic.get("olusturma_tarihi") or ic.get("created_at"))
+        _bucketle(d, 5 if ic.get("durum") == "yayinda" else 1, False)
+
+    # Son kümülatif değeri gerçek toplam puana sabitle
+    ofset = puan_bilgisi["toplam_xp"] - (base_xp + sum(d_xp))
+    if ofset > 0:
+        base_xp += ofset
+
+    xp_gelisim, rozet_gelisim = [], []
+    cx, cr = base_xp, base_rozet
+    for i in range(HAFTA):
+        cx += d_xp[i]
+        cr += d_rozet[i]
+        xp_gelisim.append(cx)
+        rozet_gelisim.append(cr)
+    zaman_serisi = {
+        "etiketler": [f"Hafta {i + 1}" for i in range(HAFTA)],
+        "xp_gelisim": xp_gelisim,
+        "rozet_gelisim": rozet_gelisim,
+    }
+
+    return {
+        "ogretmen_id": user_id,
+        "ad_soyad": ad_soyad,
+        "puan_bilgisi": puan_bilgisi,
+        "rozetler": rozetler,
+        "veli_degerlendirmesi": veli_degerlendirmesi,
+        "ogrenci_ozet": ogrenci_ozet,
+        "icerik_ozet": icerik_ozet,
+        "kur_basarilari": kur_basarilari,
+        "zaman_serisi": zaman_serisi,
+    }
+
+
 @router.get("/rozetler/tanim")
 async def rozet_tanimlari():
     return {"ogretmen": await get_ogretmen_rozetleri(), "ogrenci": await get_ogrenci_rozetleri()}
