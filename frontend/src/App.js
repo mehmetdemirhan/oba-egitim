@@ -16,6 +16,7 @@ import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, 
 import { useToast } from "./hooks/use-toast";
 import { Toaster } from "./components/ui/toaster";
 import ModulYonetimi from "./components/ModulYonetimi";
+import MebKelimeYonetimi from "./components/admin/MebKelimeYonetimi";
 import ExerciseStarter from "./components/ExerciseStarter";
 import UnifiedExerciseGrid from "./components/exercises/UnifiedExerciseGrid";
 import OgretmenBasarilarim from "./components/gelisim/OgretmenBasarilarim";
@@ -388,6 +389,7 @@ function AppContent() {
             {user.role === "admin" && <TabsTrigger value="yedekleme" className={tabClass}><Database className="h-4 w-4 mr-2" />Yedekleme</TabsTrigger>}
             {user.role === "admin" && <TabsTrigger value="guncelleme" className={tabClass}><GitBranch className="h-4 w-4 mr-2" />Güncelleme</TabsTrigger>}
             {user.role === "admin" && <TabsTrigger value="moduller" className={tabClass}><Package className="h-4 w-4 mr-2" />Modüller</TabsTrigger>}
+            {user.role === "admin" && <TabsTrigger value="meb-kelime" className={tabClass}>📖 MEB Kelimeleri</TabsTrigger>}
             <TabsTrigger value="ai-merkezi" className={tabClass}>🧠 AI Merkezi</TabsTrigger>
           </TabsList>
           )}
@@ -396,6 +398,13 @@ function AppContent() {
           {user.role === "admin" && (
             <TabsContent value="moduller">
               <ModulYonetimi />
+            </TabsContent>
+          )}
+
+          {/* MEB Kelime Yönetimi */}
+          {user.role === "admin" && (
+            <TabsContent value="meb-kelime">
+              <MebKelimeYonetimi apiBase={API} />
             </TabsContent>
           )}
 
