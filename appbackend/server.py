@@ -273,6 +273,16 @@ from core.registry import register_routers
 register_routers(api_router)
 app.include_router(api_router)
 
+# ── Statik dosyalar (öğretmen profil fotoğrafları vb.) ──
+# /uploads/... altındaki dosyalar doğrudan servis edilir (API prefix'i olmadan).
+try:
+    from fastapi.staticfiles import StaticFiles
+    _uploads_dir = Path(__file__).resolve().parent / "uploads"
+    _uploads_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory=str(_uploads_dir)), name="uploads")
+except Exception as _ex:
+    logging.warning(f"[server] uploads statik mount başarısız: {_ex}")
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 

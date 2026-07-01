@@ -130,5 +130,9 @@
   {
     "name": "ders_programi",
     "active": true
+  },
+  {
+    "name": "ogretmen_profil",
+    "active": true
   }
 ]

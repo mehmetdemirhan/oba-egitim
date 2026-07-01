@@ -1,3 +1,6 @@
 
 # Modül Yöneticisi runtime verileri
 eski_versiyonlar/
+
+# Yüklenen dosyalar (profil fotoğrafları vb.)
+uploads/
