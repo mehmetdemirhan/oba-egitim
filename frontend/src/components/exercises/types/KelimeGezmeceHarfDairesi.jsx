@@ -171,6 +171,7 @@ export default function KelimeGezmeceHarfDairesi({
             strokeLinecap="round"
             strokeLinejoin="round"
             opacity={0.85}
+            style={{ filter: "drop-shadow(0 2px 4px rgba(199,184,234,0.5))" }}
           />
         )}
       </svg>
@@ -196,6 +197,7 @@ export default function KelimeGezmeceHarfDairesi({
               boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
               fontWeight: 700,
               fontSize: tasBoyut * 0.42,
+              fontFamily: "'Fredoka', 'Inter', system-ui, sans-serif",
             }}
             className="flex items-center justify-center uppercase pointer-events-none"
           >
