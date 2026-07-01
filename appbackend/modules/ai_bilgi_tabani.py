@@ -56,6 +56,8 @@ TUM_KELIME_MAKS = 8000  # tek yüklemede güvenlik tavanı
 _TR_BUYUK = "ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZ"
 _TR_KUCUK = "abcçdefgğhıijklmnoöprsştuüvyz"
 _TR_CEV = {b: k for b, k in zip(_TR_BUYUK, _TR_KUCUK)}
+# Şapkalı/uzatmalı harfleri sadeleştir (millî→milli, kâğıt→kağıt, âlem→alem)
+_TR_CEV.update({"â": "a", "Â": "a", "î": "i", "Î": "i", "û": "u", "Û": "u", "ê": "e", "Ê": "e"})
 
 
 def _bt_tr_kucuk(s: str) -> str:
@@ -122,6 +124,18 @@ def _turkce_kok(kelime: str) -> str:
 
 _UNLU = set("aeıioöuü")
 
+# Türkçe işlev kelimeleri / bağlaç / edat / zamir — "öğrenilecek kelime" değildir, elenir.
+_STOPWORDS = {
+    "ve", "ile", "veya", "ya", "yada", "ama", "fakat", "ancak", "lakin", "çünkü", "zira",
+    "yani", "hem", "de", "da", "ki", "mi", "mı", "mu", "mü", "ne", "ni", "nı", "nu", "nü",
+    "na", "ye", "bu", "şu", "bunu", "şunu", "onu", "ben", "sen", "biz", "siz", "onlar",
+    "bir", "her", "hiç", "çok", "az", "daha", "en", "gibi", "için", "ise", "dahi", "bile",
+    "kadar", "göre", "sadece", "yalnız", "artık", "henüz", "zaten", "belki", "sanki",
+    "tabii", "evet", "hayır", "nasıl", "neden", "niçin", "niye", "hangi", "kaç", "kim",
+    "işte", "hep", "bazı", "kimi", "ayrıca", "hatta", "hala", "hâlâ", "ya da", "eğer",
+    "ancak", "böyle", "şöyle", "öyle", "yine", "gene", "hiçbir", "birçok",
+}
+
 
 def _tum_kelimeleri_cikar(metin: str) -> list:
     """Metindeki benzersiz, TEMİZ Türkçe kelime KÖKLERİNİ döndürür.
@@ -136,7 +150,7 @@ def _tum_kelimeleri_cikar(metin: str) -> list:
     """
     from collections import Counter
     metin = metin or ""
-    tokenlar = re.findall(r"[A-Za-zÇĞIİÖŞÜçğıiöşü]+", metin)
+    tokenlar = re.findall(r"[A-Za-zÇĞIİÖŞÜçğıiöşüâÂîÎûÛêÊ]+", metin)
 
     # Özel isim tespiti: hep büyük-harf-başı görülen, hiç tamamen küçük görülmeyen
     kucuk_gorulen, buyuk_gorulen = set(), set()
@@ -159,8 +173,10 @@ def _tum_kelimeleri_cikar(metin: str) -> list:
             continue
         if w in ozel_isim:              # özel isim
             continue
+        if w in _STOPWORDS:             # işlev kelimesi (çekimsiz hâli)
+            continue
         k = _turkce_kok(w)
-        if len(k) < 2 or not (set(k) & _UNLU):
+        if len(k) < 2 or not (set(k) & _UNLU) or k in _STOPWORDS:
             continue
         kok_frek[k] += 1
 

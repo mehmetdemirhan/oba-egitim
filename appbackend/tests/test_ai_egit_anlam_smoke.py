@@ -67,6 +67,10 @@ async def run():
     # Min sıklık (büyük metin → eşik 2): tek geçen kelime elenir
     c3 = bt._tum_kelimeleri_cikar("kalem defter " * 210 + " nadirkelimeburada")
     check("kalem" in c3 and "nadirkelimeburada" not in c3, "min sıklık: tek geçen kelime elendi (büyük metin)")
+    # Stopword + şapkalı harf normalizasyonu
+    check(bt._turkce_kok("millî") == "milli", f"şapkalı: millî→milli (gelen {bt._turkce_kok('millî')})")
+    c4 = bt._tum_kelimeleri_cikar("ve kitap ve kalem ve millî millî bayram bayram")
+    check("ve" not in c4 and "milli" in c4, f"stopword elendi + şapkalı normalize (gelen {c4})")
 
     # Ham kelimeler (anlam boş) — iletisim iki sınıfta, sorumluluk bir sınıfta
     for s in (3, 5):
