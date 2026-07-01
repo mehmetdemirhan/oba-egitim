@@ -551,6 +551,183 @@ async def ogretmen_basarilarim(current_user=Depends(get_current_user)):
         "rozet_gelisim": rozet_gelisim,
     }
 
+    # ── EK METRİKLER (çıktı / bağlılık / kalite) + dinamik ipuçları ──
+    # Hepsi mevcut koleksiyonlardan; her adım güvenli (bölme/tip hataları yutulur).
+    ek_metrikler = {}
+    ipuclari = []
+    try:
+        ogrenci_ids = [s["id"] for s in ogrenciler]
+        n_ogr = len(ogrenci_ids)
+
+        # reading_logs (tek sorgu) → aktif oran, risk, streak, haftalık dakika
+        loglar = await db.reading_logs.find({"ogrenci_id": {"$in": ogrenci_ids}}).to_list(length=None) if ogrenci_ids else []
+        log_by = {}
+        for l in loglar:
+            log_by.setdefault(l.get("ogrenci_id"), []).append(l)
+        yedi = (simdi - timedelta(days=7)).strftime("%Y-%m-%d")
+        ondort = (simdi - timedelta(days=14)).strftime("%Y-%m-%d")
+        aktif_say = risk_say = streak_top = haftalik_dk_top = 0
+        for oid in ogrenci_ids:
+            ls = log_by.get(oid, [])
+            gunler = sorted({(l.get("tarih", "") or "")[:10] for l in ls if l.get("tarih")}, reverse=True)
+            son_gun = gunler[0] if gunler else ""
+            if son_gun >= yedi:
+                aktif_say += 1
+            if not son_gun or son_gun < ondort:
+                risk_say += 1
+            st = 0
+            for i in range(60):
+                g = (simdi - timedelta(days=i)).strftime("%Y-%m-%d")
+                if g in gunler:
+                    st += 1
+                elif i > 0:
+                    break
+            streak_top += st
+            haftalik_dk_top += sum(l.get("sure_dakika", 0) for l in ls if (l.get("tarih", "") or "")[:10] >= yedi)
+        baglilik = {
+            "aktif_oran": round(aktif_say / n_ogr * 100) if n_ogr else 0,
+            "risk_ogrenci": risk_say,
+            "ortalama_streak": round(streak_top / n_ogr, 1) if n_ogr else 0,
+            "haftalik_ort_dakika": round(haftalik_dk_top / n_ogr) if n_ogr else 0,
+        }
+
+        # Okuma gelişimi (diagnostic_oturumlar: ilk vs son wpm/doğruluk)
+        wpm_artis, dog_artis = [], []
+        if ogrenci_ids:
+            diag = await db.diagnostic_oturumlar.find({"ogrenci_id": {"$in": ogrenci_ids}, "durum": "tamamlandi"}).to_list(length=None)
+            diag_by = {}
+            for dd in diag:
+                diag_by.setdefault(dd.get("ogrenci_id"), []).append(dd)
+            for _oid, ses in diag_by.items():
+                ses.sort(key=lambda x: x.get("tamamlama_tarihi", "") or "")
+                if len(ses) >= 2:
+                    wpm_artis.append((ses[-1].get("wpm", 0) or 0) - (ses[0].get("wpm", 0) or 0))
+                    dog_artis.append((ses[-1].get("dogruluk_yuzde", 0) or 0) - (ses[0].get("dogruluk_yuzde", 0) or 0))
+        okuma_gelisim = {
+            "wpm_artis": round(sum(wpm_artis) / len(wpm_artis), 1) if wpm_artis else 0,
+            "dogruluk_artis": round(sum(dog_artis) / len(dog_artis), 1) if dog_artis else 0,
+            "olculen_ogrenci": len(wpm_artis),
+        }
+
+        # Anlama (gelisim_tamamlama; öğrenci user-id eşlemesiyle)
+        anlama_yuzde, anlama_test = 0, 0
+        if ogrenci_ids:
+            ogr_users = await db.users.find({"role": "student", "linked_id": {"$in": ogrenci_ids}}).to_list(length=None)
+            ogr_user_ids = [u["id"] for u in ogr_users]
+            if ogr_user_ids:
+                tamamlar = await db.gelisim_tamamlama.find({"kullanici_id": {"$in": ogr_user_ids}, "test_yapildi": True}).to_list(length=None)
+                td = sum(t.get("dogru_sayisi", 0) for t in tamamlar)
+                ts = sum(t.get("toplam_soru", 0) for t in tamamlar)
+                anlama_test = len(tamamlar)
+                anlama_yuzde = round(td / ts * 100) if ts else 0
+        anlama = {"ortalama_yuzde": anlama_yuzde, "test_sayisi": anlama_test}
+
+        # Görev tamamlama oranı
+        gorevlerim = await db.gorevler.find({"atayan_id": user_id}).to_list(length=None)
+        g_atanan = len(gorevlerim)
+        g_tamam = sum(1 for g in gorevlerim if g.get("durum") == "tamamlandi")
+        gorev = {"atanan": g_atanan, "tamamlanan": g_tamam, "oran": round(g_tamam / g_atanan * 100) if g_atanan else 0}
+
+        # İçerik kalitesi + etki
+        benim_icerikler = [ic for ic in tum_icerik if ic.get("ekleyen_id") == user_id]
+        oy_oranlari = []
+        for ic in benim_icerikler:
+            oylar = ic.get("oylar") or {}
+            if oylar:
+                onay = sum(1 for o in oylar.values() if (o or {}).get("onay"))
+                oy_oranlari.append(onay / len(oylar) * 100)
+        benim_icerik_ids = [ic.get("id") for ic in benim_icerikler if ic.get("id")]
+        etki_ogr = set()
+        if benim_icerik_ids:
+            etki_t = await db.gelisim_tamamlama.find({"icerik_id": {"$in": benim_icerik_ids}}).to_list(length=None)
+            etki_ogr = {t.get("kullanici_id") for t in etki_t if t.get("kullanici_id")}
+        icerik_kalitesi = {
+            "onay_orani": round(onaylanan / olusturulan * 100) if olusturulan else 0,
+            "ortalama_oy": round(sum(oy_oranlari) / len(oy_oranlari)) if oy_oranlari else 0,
+            "etki_ogrenci_sayisi": len(etki_ogr),
+        }
+
+        # Veli ilişkisi (yanıt oranı + tavsiye oranı)
+        veli_ids = {s.get("veli_id") for s in ogrenciler if s.get("veli_id")}
+        yanitlayan = len({a.get("veli_id") for a in anketler if a.get("veli_id")}) or len(anketler)
+        tavsiye_say = sum(1 for a in anketler if a.get("tavsiye"))
+        veli = {
+            "yanit_orani": round(min(yanitlayan, len(veli_ids)) / len(veli_ids) * 100) if veli_ids else 0,
+            "tavsiye_orani": round(tavsiye_say / len(anketler) * 100) if anketler else 0,
+        }
+
+        # İletişim (cevaplanan gönderen oranı)
+        gelen = await db.mesajlar.find({"alici_id": user_id}).to_list(length=None)
+        giden = await db.mesajlar.find({"gonderen_id": user_id}).to_list(length=None)
+        gelen_kisi = {m.get("gonderen_id") for m in gelen if m.get("gonderen_id")}
+        giden_kisi = {m.get("alici_id") for m in giden if m.get("alici_id")}
+        iletisim = {
+            "yanit_orani": round(len(gelen_kisi & giden_kisi) / len(gelen_kisi) * 100) if gelen_kisi else 0,
+            "gelen_mesaj": len(gelen),
+        }
+
+        # Kur hızı (ardışık atlamalar arası ortalama gün) — bağımsız sorgu
+        kur_gaplar = []
+        kur_kayit = await db.kur_atlamalari.find({"ogretmen_id": ogretmen_id}).to_list(length=None)
+        kur_grup = {}
+        for k in kur_kayit:
+            kur_grup.setdefault(k.get("ogrenci_id"), []).append(k)
+        for _oid, kayitlar in kur_grup.items():
+            tarihli = sorted(d for d in (_parse_dt(k.get("tarih")) for k in kayitlar) if d)
+            for a, b in zip(tarihli, tarihli[1:]):
+                kur_gaplar.append((b - a).days)
+        kur_hizi = {"ortalama_gun": round(sum(kur_gaplar) / len(kur_gaplar)) if kur_gaplar else 0}
+
+        ek_metrikler = {
+            "okuma_gelisim": okuma_gelisim,
+            "anlama": anlama,
+            "gorev": gorev,
+            "baglilik": baglilik,
+            "icerik_kalitesi": icerik_kalitesi,
+            "veli": veli,
+            "iletisim": iletisim,
+            "kur_hizi": kur_hizi,
+        }
+
+        # ── Dinamik ipuçları (öncelik puanına göre en zayıf noktalar önce) ──
+        aday = []
+        if baglilik["risk_ogrenci"] > 0:
+            aday.append((90, {"ikon": "🚨", "baslik": "Riskli öğrencilere ulaş",
+                "mesaj": f"{baglilik['risk_ogrenci']} öğrencin 2 haftadır okuma yapmadı. Kısa bir mesaj ya da küçük bir görev onları geri kazanabilir."}))
+        if g_atanan > 0 and gorev["oran"] < 60:
+            aday.append((80, {"ikon": "📌", "baslik": "Görevleri küçült",
+                "mesaj": f"Atadığın görevlerin yalnızca %{gorev['oran']}'ı tamamlanmış. Daha kısa ve ulaşılabilir görevler tamamlanma oranını yükseltir."}))
+        if n_ogr > 0 and baglilik["aktif_oran"] < 60:
+            aday.append((75, {"ikon": "🔥", "baslik": "Sürekliliği artır",
+                "mesaj": f"Aktif öğrenci oranın %{baglilik['aktif_oran']}. Günlük 10 dakikalık küçük okuma hedefleri aktifliği ve seriyi büyütür."}))
+        if olusturulan >= 3 and icerik_kalitesi["onay_orani"] < 70:
+            aday.append((70, {"ikon": "📝", "baslik": "İçerik kalitesini yükselt",
+                "mesaj": f"İçeriklerinin %{icerik_kalitesi['onay_orani']}'i yayında. Reddedilenleri gözden geçirmek hem puan hem etki kazandırır."}))
+        if okuma_gelisim["olculen_ogrenci"] > 0 and okuma_gelisim["wpm_artis"] <= 0:
+            aday.append((68, {"ikon": "📈", "baslik": "Okuma hızını çalıştır",
+                "mesaj": "Öğrencilerinin okuma hızında belirgin artış görünmüyor. Tekrarlı okuma ve sesli okuma egzersizleri hızı yükseltir."}))
+        if veli_ids and veli["yanit_orani"] < 50:
+            aday.append((60, {"ikon": "⭐", "baslik": "Veli görüşü topla",
+                "mesaj": f"Velilerin %{veli['yanit_orani']}'i anket doldurmuş. Veli geri bildirimi güven oluşturur ve rozet kazandırır."}))
+        if n_ogr > 0 and baglilik["ortalama_streak"] < 3:
+            aday.append((55, {"ikon": "📅", "baslik": "Günlük alışkanlık kur",
+                "mesaj": "Öğrencilerinin ortalama okuma serisi düşük. Kısa günlük hatırlatmalar seriyi belirgin şekilde büyütür."}))
+        if gelen_kisi and iletisim["yanit_orani"] < 70:
+            aday.append((50, {"ikon": "💬", "baslik": "Mesajlara dönüş yap",
+                "mesaj": f"Sana yazanların %{iletisim['yanit_orani']}'ine dönüş yapmışsın. Hızlı geri bildirim öğrenci/veli bağını güçlendirir."}))
+        # Evergreen öneriler (liste asla boş kalmasın)
+        aday.append((20, {"ikon": "🧠", "baslik": "Sokratik sorular sor",
+            "mesaj": "Okuma sonrası 'neden/nasıl' soruları anlama derinliğini artırır — Kitap Dersi ve Sokratik araçlarını dene."}))
+        aday.append((15, {"ikon": "🎯", "baslik": "Küçük hedefler koy",
+            "mesaj": "Haftalık ölçülebilir küçük hedefler (2 kitap, 3 egzersiz) hem öğrenciyi hem metriklerini ileri taşır."}))
+        aday.sort(key=lambda x: x[0], reverse=True)
+        ipuclari = [t for _, t in aday[:5]]
+    except Exception as ex:
+        logging.warning(f"[basarilarim] ek metrik/ipucu hatası: {ex}")
+        if not ipuclari:
+            ipuclari = [{"ikon": "🎯", "baslik": "Küçük hedefler koy",
+                         "mesaj": "Haftalık küçük ve ölçülebilir hedefler öğrenci gelişimini hızlandırır."}]
+
     return {
         "ogretmen_id": user_id,
         "ad_soyad": ad_soyad,
@@ -561,6 +738,8 @@ async def ogretmen_basarilarim(current_user=Depends(get_current_user)):
         "icerik_ozet": icerik_ozet,
         "kur_basarilari": kur_basarilari,
         "zaman_serisi": zaman_serisi,
+        "ek_metrikler": ek_metrikler,
+        "ipuclari": ipuclari,
     }
 
 

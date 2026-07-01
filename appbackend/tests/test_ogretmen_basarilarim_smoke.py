@@ -71,6 +71,14 @@ async def run():
     # t1'in oy verdiği bir içerik
     await server.db.gelisim_icerik.insert_one({"id": str(uuid.uuid4()), "ekleyen_id": t2, "durum": "oylama", "tarih": now.isoformat(), "oylar": {t1: {"onay": True}}})
 
+    # Diagnostic oturumları (s1): okuma hızı gelişimi 40 → 70 wpm (+30)
+    await server.db.diagnostic_oturumlar.insert_one({"id": str(uuid.uuid4()), "ogrenci_id": s1, "durum": "tamamlandi", "wpm": 40, "dogruluk_yuzde": 80, "tamamlama_tarihi": (now - timedelta(days=40)).isoformat()})
+    await server.db.diagnostic_oturumlar.insert_one({"id": str(uuid.uuid4()), "ogrenci_id": s1, "durum": "tamamlandi", "wpm": 70, "dogruluk_yuzde": 92, "tamamlama_tarihi": now.isoformat()})
+
+    # Görevler (t1 atadı): 2 atanan, 1 tamamlandı → %50
+    await server.db.gorevler.insert_one({"id": str(uuid.uuid4()), "atayan_id": t1, "hedef_id": s1, "durum": "tamamlandi", "baslik": "Oku"})
+    await server.db.gorevler.insert_one({"id": str(uuid.uuid4()), "atayan_id": t1, "hedef_id": s2, "durum": "beklemede", "baslik": "Oku 2"})
+
     # Kur atlamaları (t1) — s1: 3 atlama (kur 1→4), s2: 1 atlama
     for eski, yeni in [(1, 2), (2, 3), (3, 4)]:
         await server.db.kur_atlamalari.insert_one({"id": str(uuid.uuid4()), "ogretmen_id": t1, "ogrenci_id": s1, "eski_kur": eski, "yeni_kur": yeni, "tarih": now.isoformat()})
@@ -138,6 +146,19 @@ async def run():
         check(zs["xp_gelisim"] == sorted(zs["xp_gelisim"]), "xp_gelisim kümülatif (azalmayan)")
         check(zs["xp_gelisim"][-1] == pb["toplam_xp"], f"xp serisi gerçek toplama sabitlendi (son={zs['xp_gelisim'][-1]}, toplam={pb['toplam_xp']})")
         check(zs["rozet_gelisim"][-1] == 2, f"rozet serisi sonu 2 (gelen {zs['rozet_gelisim'][-1]})")
+
+        # ── Ek metrikler ──
+        check("ek_metrikler" in d and "ipuclari" in d, "ek_metrikler + ipuclari alanları var")
+        em = d.get("ek_metrikler", {})
+        for alan in ["okuma_gelisim", "anlama", "gorev", "baglilik", "icerik_kalitesi", "veli", "iletisim", "kur_hizi"]:
+            check(alan in em, f"ek_metrikler.{alan} var")
+        check(em["okuma_gelisim"]["wpm_artis"] == 30 and em["okuma_gelisim"]["olculen_ogrenci"] == 1,
+              f"okuma hızı gelişimi +30 (gelen {em['okuma_gelisim']})")
+        check(em["gorev"]["atanan"] == 2 and em["gorev"]["oran"] == 50, f"görev tamamlama %50 (gelen {em['gorev']})")
+        check(em["baglilik"]["aktif_oran"] == 50, f"aktif oran %50 (gelen {em['baglilik']['aktif_oran']})")
+        check(em["baglilik"]["risk_ogrenci"] == 1, f"1 risk öğrenci (gelen {em['baglilik']['risk_ogrenci']})")
+        check(isinstance(d["ipuclari"], list) and len(d["ipuclari"]) >= 1, f"en az 1 ipucu (gelen {len(d.get('ipuclari', []))})")
+        check(all("mesaj" in t and "baslik" in t and "ikon" in t for t in d["ipuclari"]), "ipuçları {ikon,baslik,mesaj} yapısında")
 
     await server.client.drop_database(TEST_DB)
     print(f"\nSONUC: {_gecen}/{_gecen + _kalan} kontrol gecti")
