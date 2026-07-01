@@ -45,6 +45,10 @@ ZORLUK = {
 
 GRID_MAX = 13  # Güvenlik tavanı — grid bu boyutu aşarsa kelime bonusa düşer.
 
+# Sınıf bazlı harf havuzu uzunluk TAVANI (seviye artsa da aşılmaz).
+#   1-2. sınıf → 5, 3-4 → 6, 5-6 → 7, 7-8 → 8
+HAVUZ_TAVAN = {1: 5, 2: 5, 3: 6, 4: 6, 5: 7, 6: 7, 7: 8, 8: 8}
+
 # Sınıf gruplarına göre tema seçenekleri (yalnızca isim+emoji+ana renk).
 # Renkler core paletinden: mint, pembe, lavanta, sky, şeftali.
 TEMALAR = {
@@ -111,13 +115,42 @@ def _adaylari_bul(harf_havuzu: list[str], sinif: int) -> list[str]:
     return adaylar
 
 
-def _tohum_sec(sinif: int, hedef_aday: int) -> tuple[list[str], list[str]]:
+def _seviye_parametreleri(sinif: int, seviye_no: int):
+    """Sınıf + seviye numarasına göre zorluk parametrelerini hesaplar.
+
+    Zorluk artışı (sınıf tavanları korunarak):
+      - seviye 1-3: temel harf sayısı, farklı temalar
+      - seviye 4-6: +1 harf
+      - seviye 7+ : +1 harf ve daha fazla grid kelimesi
+
+    Dönüş: ((havuz_min, havuz_max), (grid_min, grid_max), (bonus_min, bonus_max))
+    """
+    z = ZORLUK.get(sinif, ZORLUK[3])
+    hmin, hmax = z["havuz"]
+    gmin, gmax = z["grid"]
+    bmin, bmax = z["bonus"]
+
+    ek = 0 if seviye_no <= 3 else (1 if seviye_no <= 6 else 2)
+    tavan = HAVUZ_TAVAN.get(sinif, 7)
+    yeni_hmax = min(hmax + ek, tavan)
+    yeni_hmin = min(hmin + (1 if ek > 0 else 0), yeni_hmax)
+
+    if seviye_no >= 7:
+        gmin += 1
+        gmax += 2
+
+    return (yeni_hmin, yeni_hmax), (gmin, gmax), (bmin, bmax)
+
+
+def _tohum_sec(sinif: int, hedef_aday: int,
+               havuz_uzunluk: tuple[int, int] | None = None) -> tuple[list[str], list[str]]:
     """Bol sayıda alt kelime türeten bir tohum seçer.
 
     Dönüş: (harf_havuzu, adaylar). Birçok rastgele tohum denenir; en çok aday
-    üreten seçilir.
+    üreten seçilir. `havuz_uzunluk` verilirse tohum kelime uzunluğu bununla
+    (aksi halde ZORLUK varsayılanıyla) sınırlanır.
     """
-    havuz_min, havuz_max = ZORLUK.get(sinif, ZORLUK[3])["havuz"]
+    havuz_min, havuz_max = havuz_uzunluk or ZORLUK.get(sinif, ZORLUK[3])["havuz"]
     kelimeler = sinif_kelimeleri(sinif)
     # Tohum adayları: havuz uzunluk aralığındaki kelimeler
     tohum_adaylari = [k for k in kelimeler if havuz_min <= len(k) <= havuz_max]
@@ -282,14 +315,21 @@ def _baska_kelime_kullaniyor(izgara: _Izgara, r: int, c: int) -> bool:
 # ─────────────────────────────────────────────────────────────
 # Genel API
 # ─────────────────────────────────────────────────────────────
-def bulmaca_uret(sinif: int = 3) -> dict:
-    """Sınıf seviyesine uygun bir Kelime Gezmece bulmacası üretir."""
-    sinif = max(1, min(8, int(sinif)))
-    z = ZORLUK.get(sinif, ZORLUK[3])
-    grid_min, grid_max = z["grid"]
-    bonus_min, bonus_max = z["bonus"]
+def bulmaca_uret(sinif: int = 3, seviye_no: int = 1) -> dict:
+    """Sınıf seviyesine ve seviye numarasına uygun bir Kelime Gezmece bulmacası üretir.
 
-    harf_havuzu, adaylar = _tohum_sec(sinif, hedef_aday=grid_max + bonus_max + 2)
+    `seviye_no` arttıkça zorluk artar (bkz. _seviye_parametreleri); sınıf tavanları
+    korunur. Çıktıya `seviye_no` ve `sinif` alanları eklenir (frontend ilerleme
+    takibi için).
+    """
+    sinif = max(1, min(8, int(sinif)))
+    seviye_no = max(1, int(seviye_no))
+    (havuz_min, havuz_max), (grid_min, grid_max), (bonus_min, bonus_max) = \
+        _seviye_parametreleri(sinif, seviye_no)
+
+    harf_havuzu, adaylar = _tohum_sec(
+        sinif, hedef_aday=grid_max + bonus_max + 2,
+        havuz_uzunluk=(havuz_min, havuz_max))
 
     # Tohum başarısızsa (çok az aday) basit geri dönüş: en kısa kelimelerle dene.
     if len(adaylar) < 2:
@@ -313,6 +353,8 @@ def bulmaca_uret(sinif: int = 3) -> dict:
         "kelimeler": kelimeler,
         "bonus_kelimeler": bonus_kelimeler,
         "tema": _tema_sec(sinif),
+        "seviye_no": seviye_no,
+        "sinif": sinif,
     }
 
 
