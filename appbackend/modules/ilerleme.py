@@ -434,7 +434,13 @@ async def ogretmen_basarilarim(current_user=Depends(get_current_user)):
         son = await db.reading_logs.find({"ogrenci_id": s["id"]}).sort("tarih", -1).to_list(length=1)
         if son and son[0].get("tarih", "")[:10] >= yedi_gun_once:
             aktif += 1
-    ogrenci_ozet = {"toplam_ogrenci": len(ogrenciler), "aktif_ogrenci": aktif}
+    # Şimdiye kadar alınan toplam öğrenci (arşivlenmiş/ayrılmış dahil)
+    toplam_tum = await db.students.count_documents({"ogretmen_id": ogretmen_id})
+    ogrenci_ozet = {
+        "toplam_ogrenci": len(ogrenciler),       # şu an aktif kayıtlı
+        "toplam_ogrenci_tum": toplam_tum,        # tüm zamanlar (arşivli dahil)
+        "aktif_ogrenci": aktif,                  # son 7 günde okuma yapan
+    }
 
     # ── İçerik özet ──
     tum_icerik = await db.gelisim_icerik.find().to_list(length=None)
@@ -474,10 +480,14 @@ async def ogretmen_basarilarim(current_user=Depends(get_current_user)):
                     "baslangic_kur": _guvenli_uc(eskiler, True),
                     "mevcut_kur": _guvenli_uc(yeniler, False),
                 }
-        kur_basarilari = {"kur_atlatilan_ogrenci_sayisi": len(gruplar), "en_uzun_takip": en_uzun_takip}
+        kur_basarilari = {
+            "toplam_kur_atlatma": len(kurlar),                 # tüm kur atlatma olaylarının toplamı
+            "kur_atlatilan_ogrenci_sayisi": len(gruplar),      # kaç farklı öğrenci
+            "en_uzun_takip": en_uzun_takip,
+        }
     except Exception as ex:
         logging.warning(f"[basarilarim] kur başarıları hatası: {ex}")
-        kur_basarilari = {"kur_atlatilan_ogrenci_sayisi": 0, "en_uzun_takip": None}
+        kur_basarilari = {"toplam_kur_atlatma": 0, "kur_atlatilan_ogrenci_sayisi": 0, "en_uzun_takip": None}
 
     # ── Zaman serisi (son 12 hafta) ──
     # Öğretmenlerin xp_logs kaydı yoktur (xp_logs öğrenci-özeldir); bu yüzden seri,

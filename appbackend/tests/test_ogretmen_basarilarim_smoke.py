@@ -121,7 +121,8 @@ async def run():
 
         # Öğrenci özet
         oo = d["ogrenci_ozet"]
-        check(oo["toplam_ogrenci"] == 2, f"2 öğrenci (gelen {oo['toplam_ogrenci']})")
+        check(oo["toplam_ogrenci"] == 2, f"2 aktif kayıtlı öğrenci (gelen {oo['toplam_ogrenci']})")
+        check(oo["toplam_ogrenci_tum"] == 2, f"tüm zamanlar toplam öğrenci 2 (gelen {oo.get('toplam_ogrenci_tum')})")
         check(oo["aktif_ogrenci"] == 1, f"1 aktif öğrenci (gelen {oo['aktif_ogrenci']})")
 
         # İçerik özet
@@ -133,6 +134,7 @@ async def run():
         # Kur başarıları — alan HER ZAMAN mevcut
         kb = d["kur_basarilari"]
         check("kur_atlatilan_ogrenci_sayisi" in kb and "en_uzun_takip" in kb, "kur_basarilari alanları mevcut")
+        check(kb.get("toplam_kur_atlatma") == 4, f"toplam kur atlatma 4 (3+1) (gelen {kb.get('toplam_kur_atlatma')})")
         check(kb["kur_atlatilan_ogrenci_sayisi"] == 2, f"2 öğrenciye kur atlatıldı (gelen {kb['kur_atlatilan_ogrenci_sayisi']})")
         eu = kb["en_uzun_takip"]
         check(eu and eu["kur_sayisi"] == 3, f"en uzun takip 3 kur (gelen {eu and eu['kur_sayisi']})")

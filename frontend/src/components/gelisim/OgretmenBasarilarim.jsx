@@ -51,9 +51,9 @@ export default function OgretmenBasarilarim({ apiBase }) {
   const kpiKartlar = [
     { emoji: "🎖️", buyuk: `${veri.rozetler?.kazanilan_sayisi ?? 0}/${veri.rozetler?.toplam_rozet ?? 0}`, alt: "Kazanılan rozet", renk: "border-l-amber-400" },
     { emoji: "⭐", buyuk: `${veri.veli_degerlendirmesi?.ortalama ?? 0}/5`, alt: `Veli değerlendirmesi (${veri.veli_degerlendirmesi?.toplam_anket ?? 0} anket)`, renk: "border-l-pink-400" },
-    { emoji: "👥", buyuk: `${veri.ogrenci_ozet?.toplam_ogrenci ?? 0}`, alt: `Toplam öğrenci (${veri.ogrenci_ozet?.aktif_ogrenci ?? 0} aktif)`, renk: "border-l-blue-400" },
+    { emoji: "👥", buyuk: `${veri.ogrenci_ozet?.toplam_ogrenci_tum ?? veri.ogrenci_ozet?.toplam_ogrenci ?? 0}`, alt: `Şimdiye kadar aldığın öğrenci (${veri.ogrenci_ozet?.aktif_ogrenci ?? 0} aktif)`, renk: "border-l-blue-400" },
     { emoji: "📝", buyuk: `${veri.icerik_ozet?.olusturulan_icerik ?? 0}`, alt: `Oluşturdum (${veri.icerik_ozet?.onaylanan_icerik ?? 0} onaylı)`, renk: "border-l-green-400" },
-    { emoji: "🎓", buyuk: `${veri.kur_basarilari?.kur_atlatilan_ogrenci_sayisi ?? 0}`, alt: "Öğrenciye kur atlattın", renk: "border-l-violet-400" },
+    { emoji: "🎓", buyuk: `${veri.kur_basarilari?.toplam_kur_atlatma ?? 0}`, alt: `Toplam kur atlatma (${veri.kur_basarilari?.kur_atlatilan_ogrenci_sayisi ?? 0} öğrenci)`, renk: "border-l-violet-400" },
     {
       emoji: "🏅",
       buyuk: eu ? `${eu.kur_sayisi} kur` : "—",
