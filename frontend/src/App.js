@@ -19,6 +19,7 @@ import ModulYonetimi from "./components/ModulYonetimi";
 import MebKelimeYonetimi from "./components/admin/MebKelimeYonetimi";
 import ExerciseStarter from "./components/ExerciseStarter";
 import UnifiedExerciseGrid from "./components/exercises/UnifiedExerciseGrid";
+import { GOZ_YENI_EGZERSIZLER, GOZ_YENI_RENDER } from "./components/exercises/goz";
 import OgretmenBasarilarim from "./components/gelisim/OgretmenBasarilarim";
 import OgretmenProfil from "./components/profil/OgretmenProfil";
 import ProfilGorunurlukAyarlari from "./components/admin/ProfilGorunurlukAyarlari";
@@ -3098,6 +3099,20 @@ function EgzersizlerModul({ user, egzersizPuanlari = {}, onTamamla }) {
     { id: 'ters-kelime', baslik: 'Ters Kelime Okuma', icon: '🔄', aciklama: 'Kelimeleri tersten okuyun. Beyin jimnastiği ve harf farkındalığı.', renk: 'from-violet-500 to-indigo-500', kat: 'okuma' },
     { id: 'eksik-harf', baslik: 'Eksik Harf Tamamlama', icon: '✏️', aciklama: 'Eksik harfleri tamamlayın. Kelime tanıma ve tahmin becerisini geliştirir.', renk: 'from-cyan-500 to-teal-500', kat: 'okuma' },
     { id: 'karisik-cumle', baslik: 'Karışık Cümle Düzenleme', icon: '🧩', aciklama: 'Karışık kelimeleri doğru sıraya dizin. Anlama becerisini güçlendirir.', renk: 'from-red-500 to-rose-500', kat: 'okuma' },
+    // Yeni göz/görme/tarama egzersizleri (components/exercises/goz/) — kendi
+    // başlat/durdur/ayar mantığını yönetir; aşağıda GOZ_YENI_RENDER ile çizilir.
+    ...GOZ_YENI_EGZERSIZLER,
+  ];
+
+  // Aktif egzersiz yeni (goz/) modüllerinden biri mi?
+  const yeniRender = aktifEgzersiz ? GOZ_YENI_RENDER[aktifEgzersiz] : null;
+
+  // Kart listesi için kategori başlıkları ve gösterim sırası.
+  const KATEGORILER = [
+    { key: 'goz',    baslik: '👁️ Göz Egzersizleri' },
+    { key: 'gorme',  baslik: '🔭 Görme Alanı' },
+    { key: 'okuma',  baslik: '📖 Okuma ve Tarama Egzersizleri' },
+    { key: 'dikkat', baslik: '🎯 Dikkat ve Ayırt Etme' },
   ];
 
   const durdur = () => {
@@ -3346,36 +3361,38 @@ function EgzersizlerModul({ user, egzersizPuanlari = {}, onTamamla }) {
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold flex items-center gap-2"><Eye className="h-6 w-6" /> Egzersiz Merkezi</h2>
           </div>
-          <h3 className="text-sm font-bold text-gray-500 mb-3 uppercase tracking-wide">👁️ Göz Egzersizleri</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-            {egzersizler.filter(e => e.kat === 'goz').map(eg => (
-              <div key={eg.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onClick={() => setAktifEgzersiz(eg.id)}>
-                <div className={`bg-gradient-to-r ${eg.renk} p-6 text-center`}>
-                  <span className="text-5xl">{eg.icon}</span>
-                </div>
-                <div className="p-4">
-                  <h3 className="font-bold text-sm mb-1">{eg.baslik}</h3>
-                  <p className="text-xs text-gray-500">{eg.aciklama}</p>
-                  {egzersizPuanlari[eg.id] > 0 && <span className="inline-block mt-2 text-xs font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded-full">🏆 +{egzersizPuanlari[eg.id]} puan</span>}
-                </div>
-              </div>
-            ))}
-          </div>
-          <h3 className="text-sm font-bold text-gray-500 mb-3 uppercase tracking-wide">📖 Okuma Egzersizleri</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {egzersizler.filter(e => e.kat === 'okuma').map(eg => (
-              <div key={eg.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onClick={() => setAktifEgzersiz(eg.id)}>
-                <div className={`bg-gradient-to-r ${eg.renk} p-6 text-center`}>
-                  <span className="text-5xl">{eg.icon}</span>
-                </div>
-                <div className="p-4">
-                  <h3 className="font-bold text-sm mb-1">{eg.baslik}</h3>
-                  <p className="text-xs text-gray-500">{eg.aciklama}</p>
-                  {egzersizPuanlari[eg.id] > 0 && <span className="inline-block mt-2 text-xs font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded-full">🏆 +{egzersizPuanlari[eg.id]} puan</span>}
+          {KATEGORILER.map(({ key, baslik }) => {
+            const liste = egzersizler.filter(e => e.kat === key);
+            if (!liste.length) return null;
+            return (
+              <div key={key} className="mb-8">
+                <h3 className="text-sm font-bold text-gray-500 mb-3 uppercase tracking-wide">{baslik}</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {liste.map(eg => (
+                    <div key={eg.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onClick={() => setAktifEgzersiz(eg.id)}>
+                      <div className={`bg-gradient-to-r ${eg.renk} p-6 text-center`}>
+                        <span className="text-5xl">{eg.icon}</span>
+                      </div>
+                      <div className="p-4">
+                        <h3 className="font-bold text-sm mb-1">{eg.baslik}</h3>
+                        <p className="text-xs text-gray-500">{eg.aciklama}</p>
+                        {egzersizPuanlari[eg.id] > 0 && <span className="inline-block mt-2 text-xs font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded-full">🏆 +{egzersizPuanlari[eg.id]} puan</span>}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            ))}
+            );
+          })}
+        </div>
+      ) : yeniRender ? (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <Button variant="outline" onClick={() => setAktifEgzersiz(null)}>← Geri</Button>
+            <h2 className="font-bold">{egzersizler.find(e => e.id === aktifEgzersiz)?.baslik}</h2>
+            <span className="w-16" />
           </div>
+          {yeniRender(() => onTamamla && onTamamla(aktifEgzersiz))}
         </div>
       ) : (
         <div>
