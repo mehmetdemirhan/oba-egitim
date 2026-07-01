@@ -18,7 +18,7 @@ import { Toaster } from "./components/ui/toaster";
 import ModulYonetimi from "./components/ModulYonetimi";
 import ExerciseStarter from "./components/ExerciseStarter";
 import UnifiedExerciseGrid from "./components/exercises/UnifiedExerciseGrid";
-import OgretmenPuanTablosu from "./components/gelisim/OgretmenPuanTablosu";
+import OgretmenBasarilarim from "./components/gelisim/OgretmenBasarilarim";
 import ExerciseLibrary from "./components/exercises/ExerciseLibrary";
 import HaftalikTakvim from "./components/program/HaftalikTakvim";
 import { FullscreenExerciseProvider, useFullscreenExercise } from "./context/FullscreenExerciseContext";
@@ -11327,7 +11327,8 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
   const [adminForm, setAdminForm] = useState({ baslik: "", tur: "hizmetici", aciklama: "", hedef_kitle: "hepsi", sorular: [], makale_link: "", makale_dosya_turu: "link", kitap_yazar: "", kitap_isbn: "", kitap_yayinevi: "", kitap_sayfa: "", kitap_yas_grubu: "", kitap_link: "", kitap_kapak: "", dosya_b64: "", dosya_adi: "", dosya_turu: "", okuma_metni: "", okuma_seviye: "orta", okuma_sure: 5, neden_bu_icerik: "" });
   const [kitapYukleniyor, setKitapYukleniyor] = useState(false);
   const [yeniSoru, setYeniSoru] = useState({ soru: "", secenekler: ["", "", "", ""], dogru_cevap: 0, taksonomi: "kavrama" });
-  const [gelisimSekme, setGelisimSekme] = useState("icerikler");
+  // Öğretmende varsayılan alt-sekme "Başarılarım"; diğer roller (admin) "İçerikler".
+  const [gelisimSekme, setGelisimSekme] = useState(user.role === 'teacher' ? "basarilarim" : "icerikler");
   const [egzersizPuanlari, setEgzersizPuanlari] = useState({});
   // Egzersizler alt-sekmesi görünümü (öğretmen): egzersizler | yonetim (üst tab'dan birleştirildi)
   const [egzGorunum, setEgzGorunum] = useState("egzersizler");
@@ -12149,7 +12150,10 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
     <div className="space-y-6">
       {/* Alt sekme: İçerikler / Egzersizler — tam ekran egzersiz modunda gizlenir */}
       {!isFullscreen && (
-      <div className="flex gap-2 mb-2">
+      <div className="flex gap-2 mb-2 flex-wrap">
+        {user.role === 'teacher' && (
+          <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'basarilarim' ? 'bg-purple-600 text-white shadow' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`} onClick={() => setGelisimSekme('basarilarim')}>🏆 Başarılarım</button>
+        )}
         <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'icerikler' ? 'bg-orange-500 text-white shadow' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`} onClick={() => setGelisimSekme('icerikler')}>📚 İçerikler</button>
         <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'egzersizler' ? 'bg-blue-500 text-white shadow' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`} onClick={() => setGelisimSekme('egzersizler')}>👁️ Egzersizler</button>
         <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'gorevler' ? 'bg-green-500 text-white shadow' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`} onClick={() => setGelisimSekme('gorevler')}>📌 Görevler</button>
@@ -12160,6 +12164,11 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
           <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'puan-ayar' ? 'bg-purple-500 text-white shadow' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`} onClick={() => setGelisimSekme('puan-ayar')}>⚙️ Egzersiz Puanları</button>
         )}
       </div>
+      )}
+
+      {/* 🏆 Başarılarım (öğretmene özel, tam genişlik) */}
+      {gelisimSekme === 'basarilarim' && user.role === 'teacher' && (
+        <OgretmenBasarilarim apiBase={API} />
       )}
 
       {/* Görevler alt sekmesi */}
@@ -13041,13 +13050,9 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
           )}
         </div>
 
-        {/* Puan Tablosu */}
+        {/* Puan Tablosu — öğretmende '🏆 Başarılarım' sekmesine taşındı; admin/coordinator'da kalır */}
+        {user.role !== 'teacher' && (
         <div className="space-y-4">
-          {user.role === 'teacher' ? (
-            /* Öğretmen: yalnızca öğretmenler arası, motive edici, isimsiz konum kartı */
-            <OgretmenPuanTablosu apiBase={API} />
-          ) : (
-            /* Admin/coordinator: mevcut birleşik (karışık) tablo korunur */
             <Card className="border-0 shadow-sm">
               <CardHeader><CardTitle className="flex items-center gap-2"><Trophy className="h-5 w-5 text-yellow-500"/>Puan Tablosu</CardTitle></CardHeader>
               <CardContent>
@@ -13071,7 +13076,6 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                 </div>
               </CardContent>
             </Card>
-          )}
 
           {/* Puan Rehberi */}
           <Card className="border-0 shadow-sm bg-gradient-to-br from-orange-50 to-yellow-50">
@@ -13086,6 +13090,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
             </CardContent>
           </Card>
         </div>
+        )}
       </div>
       )} {/* /gelisimSekme === icerikler */}
 
