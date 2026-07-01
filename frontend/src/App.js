@@ -3142,7 +3142,9 @@ function EgzersizlerModul({ user, egzersizPuanlari = {}, onTamamla }) {
       const renkler = [{ad:'KIRMIZI',hex:'#ef4444'},{ad:'MAVİ',hex:'#3b82f6'},{ad:'YEŞİL',hex:'#22c55e'},{ad:'SARI',hex:'#eab308'},{ad:'TURUNCU',hex:'#f97316'},{ad:'MOR',hex:'#a855f7'}];
       const r1 = renkler[Math.floor(Math.random()*renkler.length)];
       const r2 = renkler[Math.floor(Math.random()*renkler.length)];
-      setRenkSoru({yazi: r1.ad, renk: r2.hex, dogruRenk: r2.ad, secenekler: renkler.sort(() => Math.random()-0.5).slice(0,4)});
+      // Doğru renk (r2) her zaman seçenekler arasında olsun; kalan 3'ü diğerlerinden rastgele seç.
+      const secenekler = [r2, ...renkler.filter(r => r.ad !== r2.ad).sort(() => Math.random()-0.5).slice(0,3)].sort(() => Math.random()-0.5);
+      setRenkSoru({yazi: r1.ad, renk: r2.hex, dogruRenk: r2.ad, secenekler});
       setInterSkor(0);
     } else if (tip === 'kelime-avcisi') {
       const metin = []; for (let i = 0; i < 60; i++) metin.push(turkceKelimeler[Math.floor(Math.random()*turkceKelimeler.length)]);
@@ -3460,7 +3462,9 @@ function EgzersizlerModul({ user, egzersizPuanlari = {}, onTamamla }) {
                         const renkler = [{ad:'KIRMIZI',hex:'#ef4444'},{ad:'MAVİ',hex:'#3b82f6'},{ad:'YEŞİL',hex:'#22c55e'},{ad:'SARI',hex:'#eab308'},{ad:'TURUNCU',hex:'#f97316'},{ad:'MOR',hex:'#a855f7'}];
                         const r1 = renkler[Math.floor(Math.random()*renkler.length)];
                         const r2 = renkler[Math.floor(Math.random()*renkler.length)];
-                        setRenkSoru({yazi:r1.ad, renk:r2.hex, dogruRenk:r2.ad, secenekler:renkler.sort(()=>Math.random()-0.5).slice(0,4)});
+                        // Doğru renk (r2) her zaman seçeneklerde bulunsun.
+                        const secenekler = [r2, ...renkler.filter(r => r.ad !== r2.ad).sort(()=>Math.random()-0.5).slice(0,3)].sort(()=>Math.random()-0.5);
+                        setRenkSoru({yazi:r1.ad, renk:r2.hex, dogruRenk:r2.ad, secenekler});
                       }
                     }}>{r.ad}</button>
                 ))}
