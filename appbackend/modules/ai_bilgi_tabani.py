@@ -80,30 +80,43 @@ _KOK_EKLER = sorted([
 
 
 _KOK_UNSUZ = set("bcçdfgğhjklmnprsştvyz")
+_KOK_UNLU = set("aeıioöuü")
+# İyelik/belirtme/yönelme ekleri — yalnızca önü ÜNLÜ olduğunda soyulur. Ünlüyle biten
+# köklerde ünsüz yumuşaması/ünlü düşmesi olmaz → güvenli (haritası→harita, kapıyı→kapı,
+# kapıya→kapı). Ünsüz-önü durumlarda (papatya, dünya) DOKUNULMAZ.
+_KOK_POSS_UNLU = ("sı", "si", "su", "sü", "yı", "yi", "yu", "yü", "ya", "ye")
 
 
 def _turkce_kok(kelime: str) -> str:
     k = _bt_tr_kucuk(kelime or "")
     if len(k) <= 4:
         return k
-    for _ in range(2):
-        soyuldu = False
+    for _ in range(3):
+        onceki = k
+        # 1) Uzun ekler (>=3 harf): çoğul + hâl + iyelik-çoğul (kök en az 2 harf)
         for ek in _KOK_EKLER:
-            if not k.endswith(ek):
-                continue
-            kalan = len(k) - len(ek)
             if len(ek) == 2:
-                # da/de/ta/te (hâl eki) — yalnızca önü ünsüzse ve kök >= 3 harf
-                # (salata/harita/oda korunur; kitapta→kitap, bahçede→bahçe)
-                if kalan < 3 or k[kalan - 1] not in _KOK_UNSUZ:
-                    continue
-            elif kalan < 2:
                 continue
-            k = k[:kalan]
-            soyuldu = True
-            break
-        if not soyuldu:
-            break
+            if k.endswith(ek) and len(k) - len(ek) >= 2:
+                k = k[:-len(ek)]
+                break
+        if k != onceki:
+            continue
+        # 2) Hâl eki da/de/ta/te — yalnızca önü ÜNSÜZ (kitapta→kitap; salata/harita korunur)
+        for ek in ("da", "de", "ta", "te"):
+            if k.endswith(ek) and len(k) - 2 >= 3 and k[-3] in _KOK_UNSUZ:
+                k = k[:-2]
+                break
+        if k != onceki:
+            continue
+        # 3) İyelik/belirtme/yönelme — yalnızca önü ÜNLÜ (haritası→harita; papatya korunur)
+        for ek in _KOK_POSS_UNLU:
+            if k.endswith(ek) and len(k) - 2 >= 3 and k[-3] in _KOK_UNLU:
+                k = k[:-2]
+                break
+        if k != onceki:
+            continue
+        break
     return k
 
 
