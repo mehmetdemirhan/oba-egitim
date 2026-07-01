@@ -207,6 +207,23 @@ async def run():
         s6_str = await meb_kelime_stringleri(6, sadece_anlamli=False)
         check("fotosentez" in s6_str, "köprü: harita kelimesi bulmaca kelime listesinde")
 
+        # ── KÜMÜLATİF SINIF: kitap kelimesi yüklendiği sınıf VE üstünde kullanılır, altında değil ──
+        await server.db.meb_kelime_haritasi.insert_one({
+            "id": str(uuid.uuid4()), "sinif": 3, "kelime": "gozlem", "anlam": "dikkatle bakma"})
+        g1 = await meb_kelime_stringleri(1, sadece_anlamli=True)
+        g3 = await meb_kelime_stringleri(3, sadece_anlamli=True)
+        g5 = await meb_kelime_stringleri(5, sadece_anlamli=True)
+        check("gozlem" not in g1, "3. sınıf kitap kelimesi 1. sınıfta YOK")
+        check("gozlem" in g3, "3. sınıf kitap kelimesi 3. sınıfta VAR")
+        check("gozlem" in g5, "3. sınıf kitap kelimesi üst sınıfta (5) VAR")
+        # Aynı kelime 1. sınıf kitabında da varsa → 1. sınıfta kullanılabilir
+        await server.db.meb_kelime_haritasi.insert_one({
+            "id": str(uuid.uuid4()), "sinif": 1, "kelime": "ayna", "anlam": "yansıtan cam"})
+        await server.db.meb_kelime_haritasi.insert_one({
+            "id": str(uuid.uuid4()), "sinif": 3, "kelime": "ayna", "anlam": "yansıtan cam"})
+        g1b = await meb_kelime_stringleri(1, sadece_anlamli=True)
+        check("ayna" in g1b, "kelime 1. sınıf kitabında da varsa 1. sınıfta kullanılabilir")
+
         # ── Migration idempotency (mantık testi) ──
         await server.db.meb_kelimeleri.insert_one({"id": str(uuid.uuid4()), "kelime": "eski", "sinif": 1, "durum": "aktif", "anlam": "x", "kullanim_sayisi": 0})
         m1 = await server.db.meb_kelimeleri.update_many({"$or": [{"ders": {"$exists": False}}, {"ders": None}, {"ders": ""}]}, {"$set": {"ders": "turkce"}})

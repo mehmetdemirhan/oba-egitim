@@ -31,6 +31,12 @@ async def meb_kelime_kayitlari(sinif: int, sadece_anlamli: bool = True,
     Kelime bazında tekilleştirilir (müfredat kaydı önceliklidir). ders_filtre yalnızca
     meb_kelimeleri'ne uygulanır; harita yalnızca ders_filtre None veya 'turkce'
     içeriyorsa dahil edilir (harita kitap/Türkçe kaynaklıdır).
+
+    KÜMÜLATİF SINIF (kitap kelimeleri): meb_kelime_haritasi'ndan bir öğrenci için
+    yüklendiği sınıf `sinif`'ten KÜÇÜK VEYA EŞİT (<=) kelimeler alınır. Yani 3. sınıf
+    kitabındaki kelime 3. sınıf ve ÜSTÜNDE kullanılabilir, 1-2. sınıfta kullanılamaz;
+    ama aynı kelime 1. sınıf kitabında da varsa 1. sınıfta da kullanılabilir.
+    (meb_kelimeleri müfredatı ise TAM sınıf eşleşmesiyle kalır.)
     """
     out: list[dict] = []
     gorulen: set[str] = set()
@@ -57,7 +63,8 @@ async def meb_kelime_kayitlari(sinif: int, sadece_anlamli: bool = True,
     harita_dahil = (not ders_filtre) or ("turkce" in ders_filtre)
     if harita_dahil and len(out) < limit:
         try:
-            h_sorgu: dict = {"sinif": int(sinif)}
+            # Kümülatif: yüklendiği sınıf <= öğrenci sınıfı (üst sınıflar da kullanır)
+            h_sorgu: dict = {"sinif": {"$lte": int(sinif)}}
             if sadece_anlamli:
                 h_sorgu["anlam"] = {"$nin": [None, ""]}
             h_docs = await db.meb_kelime_haritasi.find(h_sorgu).to_list(length=limit)
