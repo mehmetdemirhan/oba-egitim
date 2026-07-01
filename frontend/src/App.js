@@ -4238,36 +4238,47 @@ function OgretmenPaneli({ user, logout }) {
             const gunIndex = Math.floor(Date.now() / (1000 * 60 * 60)) % motivasyonlar.length;
             const m = motivasyonlar[gunIndex];
             return (
-              <div className={`bg-gradient-to-r ${m.renk} rounded-2xl p-4 border`}>
-                <div className="flex items-start gap-3">
-                  <span className="text-2xl">{m.emoji}</span>
-                  <p className="text-sm text-gray-700 italic leading-relaxed">{m.cumle}</p>
-                </div>
+              <div className="flex items-center gap-2.5 border-l-2 border-indigo-300 pl-3 py-1">
+                <span className="text-base">{m.emoji}</span>
+                <p className="text-xs text-gray-500 italic leading-snug line-clamp-2">{m.cumle}</p>
               </div>
             );
           })()}
 
-          {/* 📱 Instagram beslemesi (öğretmene özel) */}
-          <InstagramWidget apiBase={API} />
-
-          {/* Özet kartlar */}
+          {/* Özet kartlar — soft: beyaz + sol accent şerit */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-4 text-white">
-              <div className="text-3xl font-bold">{ogrenciler.length}</div>
-              <div className="text-xs opacity-80">👥 Toplam Öğrenci</div>
+            <div className="bg-white rounded-2xl p-4 shadow-sm border-l-4 border-l-blue-400">
+              <div className="text-3xl font-bold text-blue-600">{ogrenciler.length}</div>
+              <div className="text-xs text-gray-500">👥 Toplam Öğrenci</div>
             </div>
-            <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl p-4 text-white">
-              <div className="text-3xl font-bold">{riskler.filter(r => r.aktif_gunler_7 >= 4).length}</div>
-              <div className="text-xs opacity-80">✅ Hedefte ({riskler.length > 0 ? Math.round(riskler.filter(r => r.aktif_gunler_7 >= 4).length / riskler.length * 100) : 0}%)</div>
+            <div className="bg-white rounded-2xl p-4 shadow-sm border-l-4 border-l-emerald-400">
+              <div className="text-3xl font-bold text-emerald-600">{riskler.filter(r => r.aktif_gunler_7 >= 4).length}</div>
+              <div className="text-xs text-gray-500">✅ Hedefte ({riskler.length > 0 ? Math.round(riskler.filter(r => r.aktif_gunler_7 >= 4).length / riskler.length * 100) : 0}%)</div>
             </div>
-            <div className="bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl p-4 text-white">
-              <div className="text-3xl font-bold">{atadiklarim.filter(g => g.durum === "bekliyor").length}</div>
-              <div className="text-xs opacity-80">📌 Bekleyen Görev</div>
+            <div className="bg-white rounded-2xl p-4 shadow-sm border-l-4 border-l-orange-400">
+              <div className="text-3xl font-bold text-orange-600">{atadiklarim.filter(g => g.durum === "bekliyor").length}</div>
+              <div className="text-xs text-gray-500">📌 Bekleyen Görev</div>
             </div>
-            <div className="bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl p-4 text-white">
-              <div className="text-3xl font-bold">{okunmamisSayisi}</div>
-              <div className="text-xs opacity-80">✉️ Okunmamış Mesaj</div>
+            <div className="bg-white rounded-2xl p-4 shadow-sm border-l-4 border-l-purple-400">
+              <div className="text-3xl font-bold text-purple-600">{okunmamisSayisi}</div>
+              <div className="text-xs text-gray-500">✉️ Okunmamış Mesaj</div>
             </div>
+          </div>
+
+          {/* Hızlı eylemler — istatistiklerden hemen sonra (sık kullanılan aksiyonlar) */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <button onClick={() => setAktifSekme("ogrencilerim")} className="bg-white rounded-2xl p-4 shadow-sm border text-left hover:shadow-md transition-all">
+              <div className="text-lg mb-1">👥</div><div className="text-sm font-semibold text-gray-800">Öğrencileri Gör</div><div className="text-[10px] text-gray-500">Detaylı profil ve takip</div>
+            </button>
+            <button onClick={() => { setAktifSekme("ogrencilerim"); setGorevAtaGoster(true); }} className="bg-white rounded-2xl p-4 shadow-sm border text-left hover:shadow-md transition-all">
+              <div className="text-lg mb-1">📌</div><div className="text-sm font-semibold text-gray-800">Görev Ata</div><div className="text-[10px] text-gray-500">Toplu veya tekli görev</div>
+            </button>
+            <button onClick={() => setAktifSekme("giris-analizi")} className="bg-white rounded-2xl p-4 shadow-sm border text-left hover:shadow-md transition-all">
+              <div className="text-lg mb-1">🔬</div><div className="text-sm font-semibold text-gray-800">Analiz Yap</div><div className="text-[10px] text-gray-500">Giriş analizi başlat</div>
+            </button>
+            <button onClick={() => setAktifSekme("mesajlar")} className="bg-white rounded-2xl p-4 shadow-sm border text-left hover:shadow-md transition-all">
+              <div className="text-lg mb-1">✉️</div><div className="text-sm font-semibold text-gray-800">Mesajlar</div><div className="text-[10px] text-gray-500">{okunmamisSayisi > 0 ? `${okunmamisSayisi} okunmamış` : "Tüm mesajlar"}</div>
+            </button>
           </div>
 
           {/* Risk dağılımı */}
@@ -4380,6 +4391,8 @@ function OgretmenPaneli({ user, logout }) {
             </Card>
           )}
 
+          {/* Rozetlerim + Veli Değerlendirmesi — yan yana 2 kolon */}
+          <div className="grid md:grid-cols-2 gap-3 items-start">
           {/* Rozetlerim — kompakt, son kazanılanlar + tıkla-aç */}
           {rozetTanimlari.length > 0 && (() => {
             const kazanilanlar = rozetTanimlari.filter(r => rozetlerim.some(k => k.rozet_kodu === r.kod));
@@ -4604,22 +4617,8 @@ function OgretmenPaneli({ user, logout }) {
               })()}
             </div>
           )}
-
-          {/* Hızlı eylemler */}
-          <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => setAktifSekme("ogrencilerim")} className="bg-white rounded-2xl p-4 shadow-sm border text-left hover:shadow-md transition-all">
-              <div className="text-lg mb-1">👥</div><div className="text-sm font-bold text-gray-900">Öğrencileri Gör</div><div className="text-[10px] text-gray-500">Detaylı profil ve takip</div>
-            </button>
-            <button onClick={() => { setAktifSekme("ogrencilerim"); setGorevAtaGoster(true); }} className="bg-white rounded-2xl p-4 shadow-sm border text-left hover:shadow-md transition-all">
-              <div className="text-lg mb-1">📌</div><div className="text-sm font-bold text-gray-900">Görev Ata</div><div className="text-[10px] text-gray-500">Toplu veya tekli görev</div>
-            </button>
-            <button onClick={() => setAktifSekme("giris-analizi")} className="bg-white rounded-2xl p-4 shadow-sm border text-left hover:shadow-md transition-all">
-              <div className="text-lg mb-1">🔬</div><div className="text-sm font-bold text-gray-900">Analiz Yap</div><div className="text-[10px] text-gray-500">Giriş analizi başlat</div>
-            </button>
-            <button onClick={() => setAktifSekme("mesajlar")} className="bg-white rounded-2xl p-4 shadow-sm border text-left hover:shadow-md transition-all">
-              <div className="text-lg mb-1">✉️</div><div className="text-sm font-bold text-gray-900">Mesajlar</div><div className="text-[10px] text-gray-500">{okunmamisSayisi > 0 ? `${okunmamisSayisi} okunmamış` : "Tüm mesajlar"}</div>
-            </button>
           </div>
+
           {/* Hedeflerim — kompakt ilerleme kartı */}
           <div className="bg-white rounded-2xl p-4 shadow-sm border">
             <div className="flex items-center justify-between mb-3">
@@ -4705,6 +4704,9 @@ function OgretmenPaneli({ user, logout }) {
               </div>
             )}
           </div>
+
+          {/* 📱 Instagram beslemesi — kompakt, en altta */}
+          <InstagramWidget apiBase={API} compact />
 
         </>)}
 

@@ -8,7 +8,7 @@ import axios from "axios";
  *
  * Props: apiBase — `${BACKEND_URL}/api`
  */
-export default function InstagramWidget({ apiBase }) {
+export default function InstagramWidget({ apiBase, compact = false }) {
   const [durum, setDurum] = useState("yukleniyor"); // yukleniyor | ok | bos | hata | pasif
   const [postlar, setPostlar] = useState([]);
   const [idx, setIdx] = useState(0);
@@ -69,6 +69,37 @@ export default function InstagramWidget({ apiBase }) {
 
   // Pasif → hiç render etme
   if (durum === "pasif") return null;
+
+  // ── Kompakt varyant: tek satırlık soft kart (dashboard'da en altta) ──
+  if (compact) {
+    const sonPost = postlar[0];
+    const sonTarih = sonPost?.yayin_tarihi
+      ? new Date(sonPost.yayin_tarihi).toLocaleDateString("tr-TR", { day: "numeric", month: "short" })
+      : "";
+    return (
+      <div className="bg-gray-50 rounded-2xl border border-gray-100 px-4 py-2.5 flex items-center gap-3">
+        <span className="text-lg opacity-70">📷</span>
+        <div className="flex-1 min-w-0">
+          <div className="text-xs font-semibold text-gray-500">Doğadaki Öğretmenim</div>
+          {durum === "ok" && sonPost ? (
+            <div className="text-[11px] text-gray-400 truncate">
+              Son paylaşım{sonPost.baslik ? `: ${sonPost.baslik}` : ""}{sonTarih ? ` · ${sonTarih}` : ""}
+            </div>
+          ) : durum === "hata" ? (
+            <div className="text-[11px] text-gray-400">Besleme geçici olarak kullanılamıyor</div>
+          ) : durum === "yukleniyor" ? (
+            <div className="text-[11px] text-gray-300">Yükleniyor…</div>
+          ) : (
+            <div className="text-[11px] text-gray-400">Henüz paylaşım yok</div>
+          )}
+        </div>
+        {durum === "ok" && sonPost && (
+          <a href={sonPost.post_url} target="_blank" rel="noreferrer"
+            className="text-[11px] text-pink-500 font-medium shrink-0 hover:underline">Aç →</a>
+        )}
+      </div>
+    );
+  }
 
   const Cerceve = ({ children }) => (
     <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden"
