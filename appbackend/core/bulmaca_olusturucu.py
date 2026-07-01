@@ -115,13 +115,21 @@ def _adaylari_bul(harf_havuzu: list[str], sinif: int) -> list[str]:
     return adaylar
 
 
+# Zorluk kaç seviyede bir artsın (aynı zorlukta en az bu kadar bulmaca gelir).
+SEVIYE_BASINA_ZORLUK = 3
+
+
 def _seviye_parametreleri(sinif: int, seviye_no: int):
     """Sınıf + seviye numarasına göre zorluk parametrelerini hesaplar.
 
-    Zorluk artışı (sınıf tavanları korunarak):
-      - seviye 1-3: temel harf sayısı, farklı temalar
-      - seviye 4-6: +1 harf
-      - seviye 7+ : +1 harf ve daha fazla grid kelimesi
+    Zorluk her `SEVIYE_BASINA_ZORLUK` (=3) seviyede bir artar ("tier"); böylece
+    aynı zorlukta EN AZ 3 bulmaca gelir. Bir tier içinde hem harf havuzu uzunluğu
+    hem grid kelime hedefi SABİTtir (yalnızca tema/kelimeler değişir); tier atlayınca
+    yumuşakça +1 artar. Sınıf tavanları korunur.
+
+      - seviye 1-3 : temel zorluk (en kolay)
+      - seviye 4-6 : +1 harf, +1 grid kelimesi
+      - seviye 7-9 : +1 harf daha, +1 grid kelimesi daha … (tavanlara kadar)
 
     Dönüş: ((havuz_min, havuz_max), (grid_min, grid_max), (bonus_min, bonus_max))
     """
@@ -130,16 +138,20 @@ def _seviye_parametreleri(sinif: int, seviye_no: int):
     gmin, gmax = z["grid"]
     bmin, bmax = z["bonus"]
 
-    ek = 0 if seviye_no <= 3 else (1 if seviye_no <= 6 else 2)
+    seviye_no = max(1, seviye_no)
+    tier = (seviye_no - 1) // SEVIYE_BASINA_ZORLUK  # 0: sv1-3, 1: sv4-6, 2: sv7-9…
+
     tavan = HAVUZ_TAVAN.get(sinif, 7)
-    yeni_hmax = min(hmax + ek, tavan)
-    yeni_hmin = min(hmin + (1 if ek > 0 else 0), yeni_hmax)
+    # Harf havuzu uzunluğu: temel alt sınırdan başlar, her tier +1 (tavana kadar).
+    # Tier içinde SABİT olması için tek bir hedef uzunluk kullanılır.
+    hedef_uzunluk = min(hmin + tier, tavan)
+    havuz_araligi = (hedef_uzunluk, hedef_uzunluk)
 
-    if seviye_no >= 7:
-        gmin += 1
-        gmax += 2
+    # Grid kelime hedefi: temel alt sınırdan başlar, her tier +1 (üst sınıra kadar).
+    hedef_grid = min(gmin + tier, gmax)
+    grid_araligi = (hedef_grid, hedef_grid)
 
-    return (yeni_hmin, yeni_hmax), (gmin, gmax), (bmin, bmax)
+    return havuz_araligi, grid_araligi, (bmin, bmax)
 
 
 def _tohum_sec(sinif: int, hedef_aday: int,
