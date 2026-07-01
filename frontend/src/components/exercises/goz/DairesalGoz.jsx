@@ -1,7 +1,7 @@
 // Dairesel Göz Egzersizi — nokta yumuşak dairesel yörüngede döner.
 // Göz kaslarının döngüsel koordinasyonunu ve yumuşak takibi geliştirir.
 import React, { useState } from "react";
-import { CanvasSahne, KontrolBar, Slider, Sahne, Ipucu, useEgzersizOturum } from "./ortak";
+import { CanvasSahne, EgzersizDuzen, Slider, useEgzersizOturum } from "./ortak";
 
 export default function DairesalGoz({ onTamamla }) {
   const [hiz, setHiz] = useState(1.5);
@@ -29,8 +29,9 @@ export default function DairesalGoz({ onTamamla }) {
   };
 
   return (
-    <div>
-      <KontrolBar calisiyor={calisiyor} kalan={kalan} sure={sure} baslat={baslat} durdur={durdur}>
+    <EgzersizDuzen calisiyor={calisiyor} kalan={kalan} sure={sure} baslat={baslat} durdur={durdur}
+      aciklama="Noktayı dairesel yörünge boyunca yumuşakça takip edin; başınızı oynatmayın."
+      ayarlar={<>
         <Slider etiket="Hız" deger={hiz} min={0.5} max={4} step={0.5} birim="x" onChange={setHiz} />
         <Slider etiket="Çap" deger={cap} min={30} max={95} step={5} birim="%" onChange={setCap} />
         <Slider etiket="Süre" deger={sure} min={10} max={120} step={10} birim="sn" onChange={setSure} />
@@ -41,11 +42,8 @@ export default function DairesalGoz({ onTamamla }) {
             {yon === 1 ? "↻ Saat yönü" : "↺ Ters yön"}
           </button>
         </div>
-      </KontrolBar>
-      <Sahne>
-        <CanvasSahne ciz={ciz} calisiyor={calisiyor} hiz={hiz} />
-      </Sahne>
-      <Ipucu>Noktayı dairesel yörünge boyunca yumuşakça takip edin; başınızı oynatmayın.</Ipucu>
-    </div>
+      </>}>
+      <CanvasSahne ciz={ciz} calisiyor={calisiyor} hiz={hiz} />
+    </EgzersizDuzen>
   );
 }

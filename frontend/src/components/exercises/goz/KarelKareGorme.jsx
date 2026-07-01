@@ -3,7 +3,7 @@
 // işaretli harfin merkezdekiyle AYNI mı FARKLI mı olduğunu yanıtlar.
 // Çevresel görüş ve görme alanı genişletme.
 import React, { useEffect, useMemo, useState } from "react";
-import { KontrolBar, Slider, Ipucu, Skor, TR_HARFLER, dogruSes, yanlisSes, useEgzersizOturum } from "./ortak";
+import { EgzersizDuzen, Slider, Skor, TR_HARFLER, dogruSes, yanlisSes, useEgzersizOturum } from "./ortak";
 
 export default function KarelKareGorme({ onTamamla }) {
   const [boyut, setBoyut] = useState(9);   // grid NxN (tek sayı)
@@ -38,12 +38,13 @@ export default function KarelKareGorme({ onTamamla }) {
   };
 
   return (
-    <div>
-      <KontrolBar calisiyor={calisiyor} kalan={kalan} sure={sure} baslat={baslat} durdur={durdur}>
+    <EgzersizDuzen calisiyor={calisiyor} kalan={kalan} sure={sure} baslat={baslat} durdur={durdur} koyu={false}
+      aciklama="Gözünüzü merkeze sabitleyip yalnızca çevresel görüşle işaretli harfi tanımaya çalışın — başınızı çevirmeyin."
+      ayarlar={<>
         <Slider etiket="Grid Boyutu" deger={boyut} min={5} max={11} step={2} birim="" onChange={setBoyut} />
         <Slider etiket="Süre" deger={sure} min={20} max={120} step={10} birim="sn" onChange={setSure} />
-      </KontrolBar>
-      <div className="rounded-2xl border border-gray-200 bg-white p-4 flex flex-col items-center" style={{ minHeight: 420 }}>
+      </>}>
+      <div className="h-full overflow-auto p-4 flex flex-col items-center">
         {!calisiyor ? (
           <div className="flex-1 flex items-center justify-center text-gray-400 text-sm text-center px-6">
             ▶ Başlat'a basın. Gözünüzü <strong className="mx-1">merkez kırmızı noktaya</strong> sabitleyin,
@@ -76,7 +77,6 @@ export default function KarelKareGorme({ onTamamla }) {
           </>
         )}
       </div>
-      <Ipucu>Gözünüzü merkeze sabitleyip yalnızca çevresel görüşle işaretli harfi tanımaya çalışın — başınızı çevirmeyin.</Ipucu>
-    </div>
+    </EgzersizDuzen>
   );
 }

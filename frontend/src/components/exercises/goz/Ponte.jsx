@@ -1,7 +1,7 @@
 // PONTE: Dairesel/Sinüs Göz Egzersizi — dikey sinüs dalgası boyunca aşağı
 // yukarı hareket eden nokta. Yumuşak takip (pursuit) becerisini geliştirir.
 import React, { useState } from "react";
-import { CanvasSahne, KontrolBar, Slider, Sahne, Ipucu, useEgzersizOturum } from "./ortak";
+import { CanvasSahne, EgzersizDuzen, Slider, useEgzersizOturum } from "./ortak";
 
 export default function Ponte({ onTamamla }) {
   const [hiz, setHiz] = useState(1.5);
@@ -36,16 +36,14 @@ export default function Ponte({ onTamamla }) {
   };
 
   return (
-    <div>
-      <KontrolBar calisiyor={calisiyor} kalan={kalan} sure={sure} baslat={baslat} durdur={durdur}>
+    <EgzersizDuzen calisiyor={calisiyor} kalan={kalan} sure={sure} baslat={baslat} durdur={durdur}
+      aciklama="Noktayı sinüs dalgası boyunca yumuşakça takip edin; başınızı sabit tutun."
+      ayarlar={<>
         <Slider etiket="Hız" deger={hiz} min={0.5} max={4} step={0.5} birim="x" onChange={setHiz} />
         <Slider etiket="Genişlik" deger={genlik} min={20} max={80} step={5} birim="%" onChange={setGenlik} />
         <Slider etiket="Süre" deger={sure} min={10} max={120} step={10} birim="sn" onChange={setSure} />
-      </KontrolBar>
-      <Sahne>
-        <CanvasSahne ciz={ciz} calisiyor={calisiyor} hiz={hiz} />
-      </Sahne>
-      <Ipucu>Noktayı sinüs dalgası boyunca yumuşakça takip edin; başınızı sabit tutun.</Ipucu>
-    </div>
+      </>}>
+      <CanvasSahne ciz={ciz} calisiyor={calisiyor} hiz={hiz} />
+    </EgzersizDuzen>
   );
 }

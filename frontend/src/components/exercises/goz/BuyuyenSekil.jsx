@@ -2,7 +2,7 @@
 // Şekil merkezden dışa doğru halkalar hâlinde büyür; kullanıcı gözünü
 // oynatmadan tüm kenarları görmeye çalışır → görme alanı genişletme.
 import React, { useState } from "react";
-import { CanvasSahne, KontrolBar, Slider, Sahne, Ipucu, useEgzersizOturum } from "./ortak";
+import { CanvasSahne, EgzersizDuzen, Slider, useEgzersizOturum } from "./ortak";
 
 const SEKILLER = {
   altigen:    { ad: "Büyüyen Altıgen",    renk: "56,189,248" },  // sky
@@ -60,16 +60,14 @@ export default function BuyuyenSekil({ tip = "daire", onTamamla }) {
   };
 
   return (
-    <div>
-      <KontrolBar calisiyor={calisiyor} kalan={kalan} sure={sure} baslat={baslat} durdur={durdur}>
+    <EgzersizDuzen calisiyor={calisiyor} kalan={kalan} sure={sure} baslat={baslat} durdur={durdur}
+      aciklama={`Merkezdeki kırmızı noktaya sabit bakın; gözünüzü oynatmadan büyüyen ${meta.ad.toLowerCase().replace("büyüyen ", "")}in tüm kenarlarını görmeye çalışın.`}
+      ayarlar={<>
         <Slider etiket="Hız" deger={hiz} min={0.5} max={4} step={0.5} birim="x" onChange={setHiz} />
         <Slider etiket="Halka Sayısı" deger={halka} min={2} max={8} onChange={setHalka} />
         <Slider etiket="Süre" deger={sure} min={10} max={120} step={10} birim="sn" onChange={setSure} />
-      </KontrolBar>
-      <Sahne>
-        <CanvasSahne ciz={ciz} calisiyor={calisiyor} hiz={hiz} />
-      </Sahne>
-      <Ipucu>Merkezdeki kırmızı noktaya sabit bakın; gözünüzü oynatmadan büyüyen {meta.ad.toLowerCase().replace("büyüyen ", "")}in tüm kenarlarını görmeye çalışın.</Ipucu>
-    </div>
+      </>}>
+      <CanvasSahne ciz={ciz} calisiyor={calisiyor} hiz={hiz} />
+    </EgzersizDuzen>
   );
 }

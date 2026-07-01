@@ -2,7 +2,7 @@
 // boyunca çevresel harfler dizilir. Kullanıcı merkeze bakıp gözünü oynatmadan
 // uçlardaki harfleri okur. Çevresel görüşü ve görme alanını genişletir.
 import React, { useRef, useState } from "react";
-import { CanvasSahne, KontrolBar, Slider, Sahne, Ipucu, TR_HARFLER, useEgzersizOturum } from "./ortak";
+import { CanvasSahne, EgzersizDuzen, Slider, TR_HARFLER, useEgzersizOturum } from "./ortak";
 
 export default function KumSaati({ onTamamla }) {
   const [seviye, setSeviye] = useState(4);  // her kolda harf sayısı
@@ -56,16 +56,14 @@ export default function KumSaati({ onTamamla }) {
   };
 
   return (
-    <div>
-      <KontrolBar calisiyor={calisiyor} kalan={kalan} sure={sure} baslat={baslat} durdur={durdur}>
+    <EgzersizDuzen calisiyor={calisiyor} kalan={kalan} sure={sure} baslat={baslat} durdur={durdur} koyu={false}
+      aciklama="Merkezdeki kırmızı noktaya sabit bakın; başınızı oynatmadan kum saati kollarındaki harfleri okumaya çalışın."
+      ayarlar={<>
         <Slider etiket="Seviye (harf/kol)" deger={seviye} min={2} max={7} onChange={setSeviye} />
         <Slider etiket="Yenileme Hızı" deger={tempo} min={0.5} max={3} step={0.5} birim="x" onChange={setTempo} />
         <Slider etiket="Süre" deger={sure} min={10} max={120} step={10} birim="sn" onChange={setSure} />
-      </KontrolBar>
-      <Sahne koyu={false}>
-        <CanvasSahne ciz={ciz} calisiyor={calisiyor} hiz={1} />
-      </Sahne>
-      <Ipucu>Merkezdeki kırmızı noktaya sabit bakın; başınızı oynatmadan kum saati kollarındaki harfleri okumaya çalışın.</Ipucu>
-    </div>
+      </>}>
+      <CanvasSahne ciz={ciz} calisiyor={calisiyor} hiz={1} />
+    </EgzersizDuzen>
   );
 }

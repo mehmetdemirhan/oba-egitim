@@ -2,7 +2,7 @@
 // kolonda yukarıdan aşağıya iner. Kolonlar arası ritmik göz hareketiyle
 // okuma temposunu ve satır atlama becerisini geliştirir.
 import React, { useEffect, useMemo, useState } from "react";
-import { KontrolBar, Slider, Ipucu, rastgele, TR_KELIMELER, useEgzersizOturum } from "./ortak";
+import { EgzersizDuzen, Slider, rastgele, TR_KELIMELER, useEgzersizOturum } from "./ortak";
 
 const SATIR = 10; // her kolonda satır sayısı
 
@@ -32,13 +32,14 @@ export default function Kolonlar({ onTamamla }) {
   const aktifSatir = aktif % SATIR;
 
   return (
-    <div>
-      <KontrolBar calisiyor={calisiyor} kalan={kalan} sure={sure} baslat={baslat} durdur={durdur}>
+    <EgzersizDuzen calisiyor={calisiyor} kalan={kalan} sure={sure} baslat={baslat} durdur={durdur} koyu={false}
+      aciklama="Vurgulanan kelimeye odaklanın; kolon bitince gözünüzü hızla bir sonraki kolonun başına atlatın."
+      ayarlar={<>
         <Slider etiket="Kolon" deger={kolon} min={2} max={4} onChange={setKolon} />
         <Slider etiket="Tempo (hücre/dk)" deger={tempo} min={40} max={300} step={10} onChange={setTempo} />
         <Slider etiket="Süre" deger={sure} min={10} max={120} step={10} birim="sn" onChange={setSure} />
-      </KontrolBar>
-      <div className="rounded-2xl border border-gray-200 bg-white p-4" style={{ minHeight: 420 }}>
+      </>}>
+      <div className="h-full overflow-auto p-4">
         <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${kolon}, 1fr)` }}>
           {Array.from({ length: kolon }).map((_, c) => (
             <div key={c} className="flex flex-col gap-1">
@@ -55,7 +56,6 @@ export default function Kolonlar({ onTamamla }) {
           ))}
         </div>
       </div>
-      <Ipucu>Vurgulanan kelimeye odaklanın; kolon bitince gözünüzü hızla bir sonraki kolonun başına atlatın.</Ipucu>
-    </div>
+    </EgzersizDuzen>
   );
 }

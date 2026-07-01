@@ -2,6 +2,8 @@
 // Tüm yeni göz/görme egzersizleri bu yardımcıları kullanır — tek tasarım dili,
 // tek başlat/durdur/süre mantığı, tek ses motoru (WebAudio, dış dosya yok).
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { AyarPaneli, YardimBaloncugu } from "../ExerciseAyarlar";
+import { useFullscreenExercise } from "../../../context/FullscreenExerciseContext";
 
 // ── WebAudio metronom / bip ─────────────────────────────────────────────
 // Dış ses dosyası yok; kısa sinüs tonu üretir. 13 Nokta gibi metronomlu
@@ -88,6 +90,13 @@ export function CanvasSahne({ ciz, calisiyor, hiz = 1, className = "", style }) 
     };
     resize();
     window.addEventListener("resize", resize);
+    // Tam ekran/panel geçişlerinde pencere boyutu değişmeden yükseklik değişebilir;
+    // ResizeObserver ile canvas'ı kendi kutusuna göre yeniden ölçekle.
+    let ro = null;
+    if (typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(() => resize());
+      ro.observe(canvas);
+    }
 
     let t = 0;
     const loop = () => {
@@ -102,6 +111,7 @@ export function CanvasSahne({ ciz, calisiyor, hiz = 1, className = "", style }) 
 
     return () => {
       window.removeEventListener("resize", resize);
+      if (ro) ro.disconnect();
       if (animRef.current) cancelAnimationFrame(animRef.current);
     };
   }, [calisiyor, hiz]);
@@ -109,24 +119,51 @@ export function CanvasSahne({ ciz, calisiyor, hiz = 1, className = "", style }) 
   return <canvas ref={canvasRef} className={`w-full h-full ${className}`} style={style} />;
 }
 
-// ── Ortak UI parçaları ──────────────────────────────────────────────────
-export function KontrolBar({ calisiyor, kalan, sure, baslat, durdur, children }) {
+// ── Merkezi egzersiz düzeni ──────────────────────────────────────────────
+// Üst ince kontrol satırı (Başlat/Durdur + süre + ⚙️ ayar + ? yardım) ve
+// altında MAKSİMUM alanı kaplayan sahne. Ayarlar sağdan slide-in panelde;
+// açıklama "?" popover'ında. Tam ekran modunda sahne viewport'u doldurur.
+//
+// Props:
+//   calisiyor, kalan, sure, baslat, durdur — oturum kontrolü (useEgzersizOturum)
+//   ayarlar   — ayar paneli içeriği (JSX: Slider/SesToggle...). Yoksa ⚙️ gizlenir.
+//   aciklama  — "?" popover metni. Yoksa ? gizlenir.
+//   koyu      — sahne zemini koyu mu (canvas için true, grid için false)
+//   children  — sahne içeriği (canvas veya grid)
+export function EgzersizDuzen({ calisiyor, kalan, sure = 0, baslat, durdur, ayarlar, aciklama, koyu = true, children }) {
+  const [ayarAcik, setAyarAcik] = useState(false);
+  const { isFullscreen } = useFullscreenExercise();
+  const yukseklik = isFullscreen ? "calc(100vh - 110px)" : "clamp(360px, 62vh, 760px)";
+
   return (
-    <div className="mb-4 p-4 bg-white rounded-xl border border-gray-200">
-      <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
-        <h4 className="text-sm font-semibold flex items-center gap-2">⚙️ Ayarlar</h4>
-        <div className="flex items-center gap-3">
-          {sure > 0 && (
-            <span className={`text-lg font-bold ${kalan <= 5 ? "text-red-500" : "text-gray-700"}`}>{kalan}s</span>
-          )}
-          <button
-            onClick={() => (calisiyor ? durdur() : baslat())}
+    <div>
+      {/* Üst ince kontrol satırı */}
+      <div className="flex items-center justify-end gap-2 mb-2">
+        {sure > 0 && (
+          <span className={`mr-1 text-lg font-bold ${kalan <= 5 ? "text-red-500" : "text-gray-700"}`}>{kalan}s</span>
+        )}
+        {baslat && (
+          <button onClick={() => (calisiyor ? durdur() : baslat())}
             className={`px-4 py-1.5 rounded-lg text-sm font-semibold text-white transition ${calisiyor ? "bg-red-500 hover:bg-red-600" : "bg-green-500 hover:bg-green-600"}`}>
             {calisiyor ? "⏸ Durdur" : "▶ Başlat"}
           </button>
-        </div>
+        )}
+        {ayarlar && (
+          <button onClick={() => setAyarAcik(true)} title="Ayarlar"
+            className="w-9 h-9 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 flex items-center justify-center">⚙️</button>
+        )}
+        {aciklama && <YardimBaloncugu metin={aciklama} />}
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">{children}</div>
+
+      {/* Sahne — maksimum alan */}
+      <div className={`rounded-2xl border overflow-hidden ${koyu ? "bg-gray-900 border-gray-800" : "bg-gray-50 border-gray-200"}`}
+        style={{ height: yukseklik }}>
+        {children}
+      </div>
+
+      {ayarlar && (
+        <AyarPaneli acik={ayarAcik} onKapat={() => setAyarAcik(false)}>{ayarlar}</AyarPaneli>
+      )}
     </div>
   );
 }
@@ -150,21 +187,6 @@ export function SesToggle({ acik, onChange }) {
       🔔 Metronom sesi
     </label>
   );
-}
-
-// Canvas tabanlı egzersizler için standart sahne kutusu (koyu zemin).
-export function Sahne({ koyu = true, children, style }) {
-  return (
-    <div className={`rounded-2xl border overflow-hidden ${koyu ? "bg-gray-900 border-gray-800" : "bg-gray-50 border-gray-200"}`}
-      style={{ height: 420, ...style }}>
-      {children}
-    </div>
-  );
-}
-
-// İpucu satırı (egzersiz altındaki açıklama).
-export function Ipucu({ children }) {
-  return <div className="mt-3 text-center text-sm text-gray-500">{children}</div>;
 }
 
 // Skor rozeti.

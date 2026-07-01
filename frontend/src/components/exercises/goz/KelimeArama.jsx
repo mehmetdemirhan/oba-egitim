@@ -2,7 +2,7 @@
 // dikey yerleştirilir; kullanıcı kelimenin ilk ve son harfine tıklayarak seçer.
 // Görsel tarama hızını ve dikkati geliştirir.
 import React, { useEffect, useMemo, useState } from "react";
-import { KontrolBar, Slider, Ipucu, Skor, TR_HARFLER, dogruSes, yanlisSes, useEgzersizOturum } from "./ortak";
+import { EgzersizDuzen, Slider, Skor, TR_HARFLER, dogruSes, yanlisSes, useEgzersizOturum } from "./ortak";
 
 const HAVUZ = ["KİTAP", "OKUMA", "KALEM", "DEFTER", "HARF", "SAYFA", "METİN", "ANLAM", "MASA", "OKUL", "ÖĞRENCI", "SATIR"];
 const yon = [[0, 1], [1, 0]]; // yatay, dikey
@@ -84,12 +84,13 @@ export default function KelimeArama({ onTamamla }) {
   };
 
   return (
-    <div>
-      <KontrolBar calisiyor={calisiyor} kalan={kalan} sure={sure} baslat={baslat} durdur={durdur}>
+    <EgzersizDuzen calisiyor={calisiyor} kalan={kalan} sure={sure} baslat={baslat} durdur={durdur} koyu={false}
+      aciklama="Kelimeleri gözünüzle tarayın; bulduğunuzda ilk ve son harfine tıklayın."
+      ayarlar={<>
         <Slider etiket="Grid Boyutu" deger={boyut} min={7} max={12} onChange={setBoyut} />
         <Slider etiket="Süre" deger={sure} min={30} max={180} step={10} birim="sn" onChange={setSure} />
-      </KontrolBar>
-      <div className="rounded-2xl border border-gray-200 bg-white p-4" style={{ minHeight: 420 }}>
+      </>}>
+      <div className="h-full overflow-auto p-4">
         {!calisiyor ? (
           <div className="h-[380px] flex items-center justify-center text-gray-400 text-sm text-center px-6">
             ▶ Başlat'a basın. Gizli kelimenin <strong className="mx-1">ilk ve son harfine</strong> tıklayarak seçin (yatay/dikey).
@@ -123,7 +124,6 @@ export default function KelimeArama({ onTamamla }) {
           </div>
         )}
       </div>
-      <Ipucu>Kelimeleri gözünüzle tarayın; bulduğunuzda ilk ve son harfine tıklayın.</Ipucu>
-    </div>
+    </EgzersizDuzen>
   );
 }

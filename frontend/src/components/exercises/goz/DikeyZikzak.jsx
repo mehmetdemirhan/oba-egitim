@@ -1,7 +1,7 @@
 // Dikey Zikzak Göz Egzersizi — top yukarıdan aşağıya zikzak çizerek iner.
 // Sütunlar arası dikey tarama ve satır geçiş becerisini geliştirir.
 import React, { useState } from "react";
-import { CanvasSahne, KontrolBar, Slider, Sahne, Ipucu, useEgzersizOturum } from "./ortak";
+import { CanvasSahne, EgzersizDuzen, Slider, useEgzersizOturum } from "./ortak";
 
 export default function DikeyZikzak({ onTamamla }) {
   const [hiz, setHiz] = useState(1.5);
@@ -45,16 +45,14 @@ export default function DikeyZikzak({ onTamamla }) {
   };
 
   return (
-    <div>
-      <KontrolBar calisiyor={calisiyor} kalan={kalan} sure={sure} baslat={baslat} durdur={durdur}>
+    <EgzersizDuzen calisiyor={calisiyor} kalan={kalan} sure={sure} baslat={baslat} durdur={durdur}
+      aciklama="Topu dikey zikzak yol boyunca gözlerinizle takip edin. Başınızı sabit tutun."
+      ayarlar={<>
         <Slider etiket="Hız" deger={hiz} min={0.5} max={4} step={0.5} birim="x" onChange={setHiz} />
         <Slider etiket="Sütun" deger={kolon} min={2} max={6} onChange={setKolon} />
         <Slider etiket="Süre" deger={sure} min={10} max={120} step={10} birim="sn" onChange={setSure} />
-      </KontrolBar>
-      <Sahne>
-        <CanvasSahne ciz={ciz} calisiyor={calisiyor} hiz={hiz} />
-      </Sahne>
-      <Ipucu>Topu dikey zikzak yol boyunca gözlerinizle takip edin. Başınızı sabit tutun.</Ipucu>
-    </div>
+      </>}>
+      <CanvasSahne ciz={ciz} calisiyor={calisiyor} hiz={hiz} />
+    </EgzersizDuzen>
   );
 }

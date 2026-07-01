@@ -2,7 +2,7 @@
 // birebir aynıdır; bir kutuda çift birbirinden (tek harf) farklıdır.
 // Kullanıcı FARKLI olan kutuyu bulur. Hızlı ayırt etme ve tarama becerisi.
 import React, { useEffect, useMemo, useState } from "react";
-import { KontrolBar, Slider, Ipucu, Skor, TR_HARFLER, TR_KELIMELER, rastgele, dogruSes, yanlisSes, useEgzersizOturum } from "./ortak";
+import { EgzersizDuzen, Slider, Skor, TR_HARFLER, TR_KELIMELER, rastgele, dogruSes, yanlisSes, useEgzersizOturum } from "./ortak";
 
 // Bir kelimeyi tek harf değiştirerek "benzer ama farklı" üret.
 function benzerYap(kelime) {
@@ -41,11 +41,12 @@ export default function BenzerKelimeler({ onTamamla }) {
   };
 
   return (
-    <div>
-      <KontrolBar calisiyor={calisiyor} kalan={kalan} sure={sure} baslat={baslat} durdur={durdur}>
+    <EgzersizDuzen calisiyor={calisiyor} kalan={kalan} sure={sure} baslat={baslat} durdur={durdur} koyu={false}
+      aciklama="Kutulardaki kelime çiftlerini hızlıca karşılaştırın; harfleri farklı olan çifti seçin."
+      ayarlar={<>
         <Slider etiket="Süre" deger={sure} min={20} max={120} step={10} birim="sn" onChange={setSure} />
-      </KontrolBar>
-      <div className="rounded-2xl border border-gray-200 bg-white p-4 flex flex-col items-center justify-center" style={{ minHeight: 420 }}>
+      </>}>
+      <div className="h-full overflow-auto p-4 flex flex-col items-center justify-center">
         {!calisiyor ? (
           <div className="text-gray-400 text-sm text-center px-6">▶ Başlat'a basın. İki kelimesi <strong>farklı</strong> olan kutuyu bulun.</div>
         ) : (
@@ -70,7 +71,6 @@ export default function BenzerKelimeler({ onTamamla }) {
           </>
         )}
       </div>
-      <Ipucu>Kutulardaki kelime çiftlerini hızlıca karşılaştırın; harfleri farklı olan çifti seçin.</Ipucu>
-    </div>
+    </EgzersizDuzen>
   );
 }

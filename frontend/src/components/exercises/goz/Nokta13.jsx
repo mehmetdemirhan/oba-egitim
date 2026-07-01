@@ -2,7 +2,7 @@
 // (saccade). İşaretçi noktadan noktaya zıplar; her sıçramada metronom sesi
 // (opsiyonel). Göz kaslarını ve sıçrama hızını güçlendirir.
 import React, { useRef, useState } from "react";
-import { CanvasSahne, KontrolBar, Slider, SesToggle, Sahne, Ipucu, bipCal, useEgzersizOturum } from "./ortak";
+import { CanvasSahne, EgzersizDuzen, Slider, SesToggle, bipCal, useEgzersizOturum } from "./ortak";
 
 // Yıldız/tarama deseni oluşturan sıçrama sırası (normalize -1..1).
 const NOKTALAR = [
@@ -50,16 +50,14 @@ export default function Nokta13({ onTamamla }) {
   };
 
   return (
-    <div>
-      <KontrolBar calisiyor={calisiyor} kalan={kalan} sure={sure} baslat={baslat} durdur={durdur}>
+    <EgzersizDuzen calisiyor={calisiyor} kalan={kalan} sure={sure} baslat={baslat} durdur={durdur}
+      aciklama="Sarı işaretçiyi başınızı oynatmadan yalnızca gözlerinizle takip edin. Her sıçramada bir vuruş duyulur."
+      ayarlar={<>
         <Slider etiket="Tempo (bpm)" deger={tempo} min={40} max={200} step={10} onChange={setTempo} />
         <Slider etiket="Süre" deger={sure} min={10} max={120} step={10} birim="sn" onChange={setSure} />
         <SesToggle acik={ses} onChange={setSes} />
-      </KontrolBar>
-      <Sahne>
-        <CanvasSahne ciz={ciz} calisiyor={calisiyor} hiz={1} />
-      </Sahne>
-      <Ipucu>Sarı işaretçiyi başınızı oynatmadan yalnızca gözlerinizle takip edin. Her sıçramada bir vuruş duyulur.</Ipucu>
-    </div>
+      </>}>
+      <CanvasSahne ciz={ciz} calisiyor={calisiyor} hiz={1} />
+    </EgzersizDuzen>
   );
 }

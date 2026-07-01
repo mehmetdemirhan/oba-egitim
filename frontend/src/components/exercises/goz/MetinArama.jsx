@@ -2,7 +2,7 @@
 // Kullanıcı metni hızlıca tarayıp hedef kelimenin her kopyasına tıklar.
 // Hızlı tarama (skimming) ve seçici dikkat becerisini geliştirir.
 import React, { useEffect, useMemo, useState } from "react";
-import { KontrolBar, Slider, Ipucu, Skor, TR_KELIMELER, rastgele, dogruSes, yanlisSes, useEgzersizOturum } from "./ortak";
+import { EgzersizDuzen, Slider, Skor, TR_KELIMELER, rastgele, dogruSes, yanlisSes, useEgzersizOturum } from "./ortak";
 
 function metinUret(kelimeSayi, hedef, gecis) {
   const dizi = Array.from({ length: kelimeSayi }, () => rastgele(TR_KELIMELER));
@@ -44,12 +44,13 @@ export default function MetinArama({ onTamamla }) {
   };
 
   return (
-    <div>
-      <KontrolBar calisiyor={calisiyor} kalan={kalan} sure={sure} baslat={baslat} durdur={durdur}>
+    <EgzersizDuzen calisiyor={calisiyor} kalan={kalan} sure={sure} baslat={baslat} durdur={durdur} koyu={false}
+      aciklama="Metni satır satır hızlıca tarayın; hedef kelimeyi gördüğünüzde üstüne tıklayın."
+      ayarlar={<>
         <Slider etiket="Metin Uzunluğu" deger={uzunluk} min={60} max={260} step={20} onChange={setUzunluk} />
         <Slider etiket="Süre" deger={sure} min={30} max={180} step={10} birim="sn" onChange={setSure} />
-      </KontrolBar>
-      <div className="rounded-2xl border border-gray-200 bg-white p-4" style={{ minHeight: 420 }}>
+      </>}>
+      <div className="h-full overflow-auto p-4">
         {!calisiyor ? (
           <div className="h-[380px] flex items-center justify-center text-gray-400 text-sm text-center px-6">
             ▶ Başlat'a basın. Metinde belirtilen hedef kelimenin tüm geçtiği yerleri bulup tıklayın.
@@ -75,7 +76,6 @@ export default function MetinArama({ onTamamla }) {
           </>
         )}
       </div>
-      <Ipucu>Metni satır satır hızlıca tarayın; hedef kelimeyi gördüğünüzde üstüne tıklayın.</Ipucu>
-    </div>
+    </EgzersizDuzen>
   );
 }

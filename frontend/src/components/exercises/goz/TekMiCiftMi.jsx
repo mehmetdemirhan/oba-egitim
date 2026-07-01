@@ -1,7 +1,7 @@
 // Tek mi? Çift mi? — bir rakam gridinde ÇİFT sayıların tümünü bul ve işaretle.
 // Hızlı sayısal ayırt etme, tarama ve dikkat becerisini geliştirir.
 import React, { useEffect, useMemo, useState } from "react";
-import { KontrolBar, Slider, Ipucu, Skor, dogruSes, yanlisSes, useEgzersizOturum } from "./ortak";
+import { EgzersizDuzen, Slider, Skor, dogruSes, yanlisSes, useEgzersizOturum } from "./ortak";
 
 function gridUret(adet) {
   return Array.from({ length: adet }, () => Math.floor(Math.random() * 90) + 10);
@@ -35,12 +35,13 @@ export default function TekMiCiftMi({ onTamamla }) {
   };
 
   return (
-    <div>
-      <KontrolBar calisiyor={calisiyor} kalan={kalan} sure={sure} baslat={baslat} durdur={durdur}>
+    <EgzersizDuzen calisiyor={calisiyor} kalan={kalan} sure={sure} baslat={baslat} durdur={durdur} koyu={false}
+      aciklama="Gözünüzü satır satır gezdirerek çift sayıları hızlıca seçin; tek sayılara dokunmayın."
+      ayarlar={<>
         <Slider etiket="Grid Boyutu" deger={boyut} min={4} max={8} onChange={setBoyut} />
         <Slider etiket="Süre" deger={sure} min={20} max={120} step={10} birim="sn" onChange={setSure} />
-      </KontrolBar>
-      <div className="rounded-2xl border border-gray-200 bg-white p-4 flex flex-col items-center" style={{ minHeight: 420 }}>
+      </>}>
+      <div className="h-full overflow-auto p-4 flex flex-col items-center">
         {!calisiyor ? (
           <div className="flex-1 flex items-center justify-center text-gray-400 text-sm text-center px-6">
             ▶ Başlat'a basın. Griddeki tüm <strong className="mx-1">ÇİFT</strong> sayıları bulup tıklayın.
@@ -65,7 +66,6 @@ export default function TekMiCiftMi({ onTamamla }) {
           </>
         )}
       </div>
-      <Ipucu>Gözünüzü satır satır gezdirerek çift sayıları hızlıca seçin; tek sayılara dokunmayın.</Ipucu>
-    </div>
+    </EgzersizDuzen>
   );
 }

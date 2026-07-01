@@ -3,7 +3,7 @@
 // "açılır". Kullanıcı merkeze bakarken çevresel görüşle iki nesneyi de okur.
 // Algı genişliğini (görme açıklığı) artırır.
 import React, { useRef, useState } from "react";
-import { CanvasSahne, KontrolBar, Slider, Sahne, Ipucu, TR_HARFLER, useEgzersizOturum } from "./ortak";
+import { CanvasSahne, EgzersizDuzen, Slider, TR_HARFLER, useEgzersizOturum } from "./ortak";
 
 function rastgeleJeton() {
   // Yarı sayı yarı harf çifti üret.
@@ -55,16 +55,14 @@ export default function AcilanNesneler({ yon = "dikey", onTamamla }) {
   };
 
   return (
-    <div>
-      <KontrolBar calisiyor={calisiyor} kalan={kalan} sure={sure} baslat={baslat} durdur={durdur}>
+    <EgzersizDuzen calisiyor={calisiyor} kalan={kalan} sure={sure} baslat={baslat} durdur={durdur} koyu={false}
+      aciklama={`Merkezdeki kırmızı noktaya bakın; gözünüzü oynatmadan ${dikey ? "yukarı ve aşağı" : "sağ ve sol"} açılan iki nesneyi de okumaya çalışın.`}
+      ayarlar={<>
         <Slider etiket="Hız" deger={hiz} min={0.5} max={3} step={0.5} birim="x" onChange={setHiz} />
         <Slider etiket="Açılma" deger={mesafe} min={30} max={100} step={5} birim="%" onChange={setMesafe} />
         <Slider etiket="Süre" deger={sure} min={10} max={120} step={10} birim="sn" onChange={setSure} />
-      </KontrolBar>
-      <Sahne koyu={false}>
-        <CanvasSahne ciz={ciz} calisiyor={calisiyor} hiz={hiz} />
-      </Sahne>
-      <Ipucu>Merkezdeki kırmızı noktaya bakın; gözünüzü oynatmadan {dikey ? "yukarı ve aşağı" : "sağ ve sol"} açılan iki nesneyi de okumaya çalışın.</Ipucu>
-    </div>
+      </>}>
+      <CanvasSahne ciz={ciz} calisiyor={calisiyor} hiz={hiz} />
+    </EgzersizDuzen>
   );
 }
