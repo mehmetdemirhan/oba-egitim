@@ -47,6 +47,61 @@ AI_EGITIM_PUANLARI = {
 
 DESTEKLENEN_FORMATLAR = [".pdf", ".docx", ".doc"]
 
+# ── "Tüm kelimeleri tara" modu ──
+# AI yalnızca 5-15 hedef kelime seçer; bu mod metindeki TÜM benzersiz kelimeleri
+# (anlamsız/ham olarak) meb_kelime_haritasi'na kaydeder. AI'ın anlam ürettiği
+# kelimeler zaten kayıtlıdır ve ÜZERİNE YAZILMAZ (kaynak_tip="tam_tarama" işaretli).
+TUM_KELIME_MAKS = 8000  # tek yüklemede güvenlik tavanı
+
+_TR_BUYUK = "ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZ"
+_TR_KUCUK = "abcçdefgğhıijklmnoöprsştuüvyz"
+_TR_CEV = {b: k for b, k in zip(_TR_BUYUK, _TR_KUCUK)}
+
+
+def _bt_tr_kucuk(s: str) -> str:
+    return "".join(_TR_CEV.get(ch, ch.lower()) for ch in (s or ""))
+
+
+def _tum_kelimeleri_cikar(metin: str) -> list:
+    """Metindeki benzersiz Türkçe kelimeleri (küçük harf, 2-20 harf) döndürür."""
+    kucuk = _bt_tr_kucuk(metin or "")
+    ham = re.findall(r"[a-zçğıöşü]+", kucuk)
+    gorulen, out = set(), []
+    for k in ham:
+        if 2 <= len(k) <= 20 and k not in gorulen:
+            gorulen.add(k)
+            out.append(k)
+            if len(out) >= TUM_KELIME_MAKS:
+                break
+    return out
+
+
+async def _tam_kelime_kaydet(ham_metin: str, sinif: int, kitap_adi: str, yukleyen_id: str) -> int:
+    """Metindeki tüm benzersiz kelimeleri meb_kelime_haritasi'na toplu ekler.
+
+    Zaten kayıtlı (kelime, sinif) atlanır → AI'ın anlam ürettiği kelimeler korunur.
+    Dönüş: yeni eklenen ham kelime sayısı.
+    """
+    kelimeler = _tum_kelimeleri_cikar(ham_metin)
+    if not kelimeler:
+        return 0
+    mevcut = set(await db.meb_kelime_haritasi.distinct("kelime", {"sinif": sinif}))
+    now = datetime.utcnow().isoformat()
+    yeni = []
+    for k in kelimeler:
+        if k in mevcut:
+            continue
+        mevcut.add(k)
+        yeni.append({
+            "id": str(uuid.uuid4()), "sinif": sinif, "kelime": k,
+            "anlam": "", "ornek_cumle": "", "zorluk": 5,
+            "kaynak": kitap_adi, "kaynak_tip": "tam_tarama",
+            "yukleyen_id": yukleyen_id, "tarih": now,
+        })
+    if yeni:
+        await db.meb_kelime_haritasi.insert_many(yeni)
+    return len(yeni)
+
 
 @router.post("/ai/bilgi-tabani/dosya-onizle")
 async def ai_bilgi_tabani_dosya_onizle(
@@ -670,9 +725,11 @@ async def ai_bilgi_tabani_yukle(
     temalar: str = Form(""),
     ders_adi: str = Form(""),
     basim_yili: str = Form(""),
+    tam_tarama: str = Form("true"),
     current_user=Depends(get_current_user)
 ):
     import os, hashlib, io
+    tam_tarama_aktif = str(tam_tarama).lower() in ("true", "1", "evet", "on")
     ext = os.path.splitext(dosya.filename)[1].lower()
     if ext not in DESTEKLENEN_FORMATLAR:
         raise HTTPException(status_code=400, detail=f"Desteklenmeyen format: {ext}. Desteklenen: {', '.join(DESTEKLENEN_FORMATLAR)}")
@@ -717,6 +774,7 @@ async def ai_bilgi_tabani_yukle(
         "yukleyen_rol": current_user.get("role", ""),
         "durum": "isleniyor",
         "ilerleme": 5,
+        "tam_tarama": tam_tarama_aktif,
         "onayli": current_user.get("role") in ["admin", "coordinator"],
         "guven_skoru": None,
         "okuma_seviyesi": None,
@@ -892,6 +950,11 @@ Kurallar:
             })
             eklenen_kelime += 1
 
+    # ── TÜM KELİMELERİ TARA (opsiyonel): metindeki her benzersiz kelimeyi hafızaya al ──
+    tam_kelime = 0
+    if tam_tarama_aktif:
+        tam_kelime = await _tam_kelime_kaydet(ham_metin, sinif, gercek_kitap_adi, current_user["id"])
+
     for p in tum_parcalar:
         await db.ai_okuma_parcalari.insert_one({
             "id": str(uuid.uuid4()), "yukleme_id": yukleme_id,
@@ -921,7 +984,8 @@ Kurallar:
     sonuc = {
         "sayfa_sayisi": sayfa_sayisi, "kelime_sayisi": kelime_sayisi,
         "chunk_sayisi": len(chunks), "cikarilan_kelime": len(tum_kelimeler),
-        "eklenen_kelime": eklenen_kelime, "okuma_parcasi": len(tum_parcalar),
+        "eklenen_kelime": eklenen_kelime, "tam_kelime": tam_kelime,
+        "okuma_parcasi": len(tum_parcalar),
         "uretilen_soru": len(tum_sorular), "bonus_puan": bonus,
         "mock": not bool(GEMINI_API_KEY),
         "kelimeler": tum_kelimeler, "parcalar": tum_parcalar, "sorular": tum_sorular,
@@ -932,11 +996,12 @@ Kurallar:
         "sonuc": {k: v for k, v in sonuc.items() if k not in ["kelimeler", "parcalar", "sorular"]},
     }})
 
+    tam_metin_mesaj = f" • 📚 {tam_kelime} ham kelime hafızaya alındı" if tam_kelime else ""
     yukleme.pop("_id", None)
     return {
         "yukleme": {**yukleme, "durum": "tamamlandi"},
         "puan_kazanilan": puan,
-        "mesaj": f"✅ +{puan} puan! AI öğrendi: {eklenen_kelime} kelime, {len(tum_parcalar)} parça, {len(tum_sorular)} soru.",
+        "mesaj": f"✅ +{puan} puan! AI öğrendi: {eklenen_kelime} kelime, {len(tum_parcalar)} parça, {len(tum_sorular)} soru.{tam_metin_mesaj}",
         **sonuc
     }
 
@@ -1107,6 +1172,11 @@ Kurallar:
             })
             eklenen_kelime += 1
 
+    # ── TÜM KELİMELERİ TARA (opsiyonel): metindeki her benzersiz kelimeyi hafızaya al ──
+    tam_kelime = 0
+    if yukleme.get("tam_tarama", True):
+        tam_kelime = await _tam_kelime_kaydet(ham_metin, sinif, kitap_adi, current_user["id"])
+
     # Okuma parçalarını kaydet
     for p in tum_parcalar:
         await db.ai_okuma_parcalari.insert_one({
@@ -1154,6 +1224,7 @@ Kurallar:
         "chunk_sayisi": len(chunks),
         "cikarilan_kelime": len(tum_kelimeler),
         "eklenen_kelime": eklenen_kelime,
+        "tam_kelime": tam_kelime,
         "okuma_parcasi": len(tum_parcalar),
         "uretilen_soru": len(tum_sorular),
         "bonus_puan": bonus,

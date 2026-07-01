@@ -12388,7 +12388,8 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                 setAiIlerleme(100); setAiIslemDurum("✅ Tamamlandı!");
                 setAiSonuc(isleR.data);
                 const mockUyariUrl = isleR.data.mock ? " (Demo mod — API key olmadan)" : "";
-                toast({ title: `🎉 AI öğrendi!${mockUyariUrl} ${isleR.data.cikarilan_kelime || 0} kelime, ${isleR.data.okuma_parcasi || 0} parça, ${isleR.data.uretilen_soru || 0} soru` });
+                const tamUyariUrl = isleR.data.tam_kelime ? ` • 📚 ${isleR.data.tam_kelime} ham kelime hafızada` : "";
+                toast({ title: `🎉 AI öğrendi!${mockUyariUrl} ${isleR.data.cikarilan_kelime || 0} kelime, ${isleR.data.okuma_parcasi || 0} parça, ${isleR.data.uretilen_soru || 0} soru${tamUyariUrl}` });
               }
               setYukleForm({ sinif: "3", tur: "ders_kitabi", kitap_adi: "", yazar: "", temalar: "", _mod: "url", _url: "" });
               try { const r2 = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setAiYuklemeler(Array.isArray(r2.data) ? r2.data : []); } catch(e) {}
@@ -12415,6 +12416,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
             fd.append("temalar", yukleForm.temalar || "");
             fd.append("ders_adi", yukleForm.ders_adi || "");
             fd.append("basim_yili", yukleForm.basim_yili || "");
+            fd.append("tam_tarama", yukleForm.tam_tarama === false ? "false" : "true");
             setAiIslemDurum("📤 Dosya yükleniyor ve AI işliyor...");
             const r = await axios.post(`${API}/ai/bilgi-tabani/yukle`, fd, {
               headers: { "Content-Type": "multipart/form-data" },
@@ -12424,7 +12426,8 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
             setAiIlerleme(100); setAiIslemDurum("✅ Tamamlandı!");
             setAiSonuc(r.data);
             const mockUyari = r.data.mock ? " (Demo mod — API key olmadan)" : "";
-            toast({ title: `🎉 AI öğrendi!${mockUyari} ${r.data.eklenen_kelime || 0} kelime, ${r.data.okuma_parcasi || 0} parça, ${r.data.uretilen_soru || 0} soru` });
+            const tamUyari = r.data.tam_kelime ? ` • 📚 ${r.data.tam_kelime} ham kelime hafızada` : "";
+            toast({ title: `🎉 AI öğrendi!${mockUyari} ${r.data.eklenen_kelime || 0} kelime, ${r.data.okuma_parcasi || 0} parça, ${r.data.uretilen_soru || 0} soru${tamUyari}` });
             dosyaRef.current.value = "";
             setYukleForm({ sinif: "3", tur: "ders_kitabi", kitap_adi: "", yazar: "", temalar: "", _mod: "dosya" });
             try { const r2 = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setAiYuklemeler(Array.isArray(r2.data) ? r2.data : []); } catch(e) {}
@@ -12523,6 +12526,10 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                 <div><Label className="text-xs">Ders Adı</Label><Input value={yukleForm.ders_adi} onChange={e => setYukleForm({...yukleForm, ders_adi: e.target.value})} placeholder="Türkçe, Matematik..." /></div>
                 <div><Label className="text-xs">Basım Yılı</Label><Input type="number" min="2000" max="2030" value={yukleForm.basim_yili} onChange={e => setYukleForm({...yukleForm, basim_yili: e.target.value})} placeholder="2024" /></div>
               </div>
+              <label className="flex items-start gap-2 text-xs text-gray-600 mb-2 cursor-pointer">
+                <input type="checkbox" checked={yukleForm.tam_tarama !== false} onChange={e => setYukleForm({...yukleForm, tam_tarama: e.target.checked})} className="w-4 h-4 mt-0.5 accent-cyan-600" />
+                <span>📚 <b>Tüm kelimeleri tara ve hafızaya al</b> <span className="text-gray-400">— AI'ın seçtiği anlamlı kelimelere ek olarak, metindeki her benzersiz kelimeyi de kaydeder.</span></span>
+              </label>
               <Button onClick={dosyaYukle} disabled={aiBilgiYukleniyor} className="w-full bg-cyan-600 text-white">{aiBilgiYukleniyor ? "⏳ Yükleniyor..." : "🧠 Yükle ve AI'a Öğret (+20 puan)"}</Button>
 
               {/* İlerleme Çubuğu */}
