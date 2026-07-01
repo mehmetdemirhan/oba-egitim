@@ -2,8 +2,9 @@
 // Tüm yeni göz/görme egzersizleri bu yardımcıları kullanır — tek tasarım dili,
 // tek başlat/durdur/süre mantığı, tek ses motoru (WebAudio, dış dosya yok).
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { AyarPaneli, YardimBaloncugu } from "../ExerciseAyarlar";
+import { YardimBaloncugu } from "../ExerciseAyarlar";
 import { useFullscreenExercise } from "../../../context/FullscreenExerciseContext";
+import { Settings } from "lucide-react";
 
 // ── WebAudio metronom / bip ─────────────────────────────────────────────
 // Dış ses dosyası yok; kısa sinüs tonu üretir. 13 Nokta gibi metronomlu
@@ -132,8 +133,20 @@ export function CanvasSahne({ ciz, calisiyor, hiz = 1, className = "", style }) 
 //   children  — sahne içeriği (canvas veya grid)
 export function EgzersizDuzen({ calisiyor, kalan, sure = 0, baslat, durdur, ayarlar, aciklama, koyu = true, children }) {
   const [ayarAcik, setAyarAcik] = useState(false);
+  const menuRef = useRef(null);
   const { isFullscreen } = useFullscreenExercise();
-  const yukseklik = isFullscreen ? "calc(100vh - 110px)" : "clamp(360px, 62vh, 760px)";
+  // Sahne mümkün olan en büyük alanı kaplasın; alttaki boşluk kalmasın.
+  const yukseklik = isFullscreen ? "calc(100vh - 88px)" : "clamp(440px, 82vh, 1200px)";
+
+  // Dışarı tıklama / ESC ile ayar menüsünü kapat.
+  useEffect(() => {
+    if (!ayarAcik) return;
+    const disaTikla = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setAyarAcik(false); };
+    const esc = (e) => { if (e.key === "Escape") setAyarAcik(false); };
+    document.addEventListener("mousedown", disaTikla);
+    document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("mousedown", disaTikla); document.removeEventListener("keydown", esc); };
+  }, [ayarAcik]);
 
   return (
     <div>
@@ -149,8 +162,22 @@ export function EgzersizDuzen({ calisiyor, kalan, sure = 0, baslat, durdur, ayar
           </button>
         )}
         {ayarlar && (
-          <button onClick={() => setAyarAcik(true)} title="Ayarlar"
-            className="w-9 h-9 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 flex items-center justify-center">⚙️</button>
+          <div className="relative" ref={menuRef}>
+            <button onClick={() => setAyarAcik((a) => !a)} title="Ayarlar" aria-label="Ayarlar"
+              className={`w-9 h-9 rounded-lg border flex items-center justify-center transition ${ayarAcik ? "bg-indigo-50 border-indigo-300 text-indigo-600" : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"}`}>
+              <Settings className="w-5 h-5" />
+            </button>
+            {/* Çarka tıklayınca sağdan aşağı açılan ayar menüsü */}
+            {ayarAcik && (
+              <div className="absolute right-0 top-full mt-2 z-[71] w-72 max-w-[90vw] max-h-[72vh] overflow-y-auto bg-white rounded-xl border border-gray-200 shadow-2xl p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-bold text-gray-800 flex items-center gap-1.5"><Settings className="w-4 h-4" /> Ayarlar</h4>
+                  <button onClick={() => setAyarAcik(false)} className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-400">✕</button>
+                </div>
+                {ayarlar}
+              </div>
+            )}
+          </div>
         )}
         {aciklama && <YardimBaloncugu metin={aciklama} />}
       </div>
@@ -160,10 +187,6 @@ export function EgzersizDuzen({ calisiyor, kalan, sure = 0, baslat, durdur, ayar
         style={{ height: yukseklik }}>
         {children}
       </div>
-
-      {ayarlar && (
-        <AyarPaneli acik={ayarAcik} onKapat={() => setAyarAcik(false)}>{ayarlar}</AyarPaneli>
-      )}
     </div>
   );
 }
