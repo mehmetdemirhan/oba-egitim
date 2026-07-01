@@ -88,7 +88,9 @@ async def run():
         # ── AI mock'u onayla'dan ÖNCE kur (arka plan görevi mock ile çalışsın) ──
         async def sahte_ai(system, user, model="sonnet", max_tokens=2000):
             import re
-            kls = re.findall(r"[a-zçğıöşü]+", user.split("içindir:")[1].split("\n")[0]) if "içindir:" in user else []
+            # İlk satırda son ':' sonrası kelime listesi (prompt ifadesinden bağımsız)
+            liste = user.split("\n")[0].split(":")[-1]
+            kls = re.findall(r"[a-zçğıöşü]+", liste)
             return {"parsed": {"sonuclar": [{"kelime": k, "anlam": f"{k} anlamı", "ornek_cumle": f"Bir {k}.", "etiketler": ["test"]} for k in kls]}, "text": "", "error": None}
         mk.call_claude = sahte_ai
         mk.AI_BEKLEME_SN = 0  # testte bekleme yok
@@ -114,9 +116,12 @@ async def run():
         check(ornek.get("anlam") and ornek.get("durum") == "aktif", "elma anlam+aktif")
 
         # ── kelime_secici önceliği ──
-        secim = await kelime_sec(1, 5)
+        secim = await kelime_sec(1, 5, meb_orani=1.0)
         check(len(secim) == 5, "kelime_sec 5 döndürdü")
-        check(all(s["kaynak"] == "meb" for s in secim), "hepsi MEB kaynaklı (öncelik)")
+        check(all(s["kaynak"] == "meb" for s in secim), "meb_orani=1.0 → hepsi MEB (öncelik)")
+        # Varsayılan meb_orani (0.7) → çoğunluk MEB, kalan havuz
+        karisik = await kelime_sec(1, 5)
+        check(sum(1 for s in karisik if s["kaynak"] == "meb") >= 3, "varsayılan oranda MEB çoğunlukta")
         # sınıf 2'de MEB yok → havuzdan
         secim2 = await kelime_sec(2, 3)
         check(len(secim2) == 3 and all(s["kaynak"] == "havuz" for s in secim2), "MEB yoksa havuzdan tamamlandı")
@@ -136,6 +141,45 @@ async def run():
         check(r.status_code == 200 and r.json()["durum"] == "arsivli", "soft delete arsivli")
         r = await ac.delete(f"/api/meb-kelime/{kid}", headers=HT)
         check(r.status_code == 403, f"öğretmen silemez 403 (status={r.status_code})")
+
+        # ── 5 DERS DESTEĞİ ──
+        r = await ac.get("/api/meb-kelime/dersler", headers=HA)
+        check(r.status_code == 200 and len(r.json().get("dersler", {})) == 5, "5 ders sabiti dönüyor")
+
+        # Türkçe s4 'vatan' + Sosyal Bilgiler s4 'vatan' → ikisi de kabul (unique kelime+sinif+ders)
+        r = await ac.post("/api/meb-kelime/onayla", headers=HA, json={"kelimeler": ["vatan"], "sinif": 4, "ders": "turkce"})
+        check(r.json().get("yeni_eklenen") == 1, "türkçe s4 'vatan' eklendi")
+        r = await ac.post("/api/meb-kelime/onayla", headers=HA, json={"kelimeler": ["vatan"], "sinif": 4, "ders": "sosyal_bilgiler"})
+        check(r.json().get("yeni_eklenen") == 1, "sosyal bilgiler s4 'vatan' eklendi (çakışmadı)")
+        say = await server.db.meb_kelimeleri.count_documents({"kelime": "vatan", "sinif": 4})
+        check(say == 2, f"vatan 2 kayıt (türkçe + sosyal) (gelen {say})")
+
+        # Hayat Bilgisi 5. sınıf → 400 (sınıf uyumsuz)
+        r = await ac.post("/api/meb-kelime/onayla", headers=HA, json={"kelimeler": ["oyun"], "sinif": 5, "ders": "hayat_bilgisi"})
+        check(r.status_code == 400, f"onayla hayat bilgisi s5 → 400 (status={r.status_code})")
+        r = await ac.post("/api/meb-kelime/yukle", headers=HA,
+                          files={"dosya": ("x.docx", docx, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+                          data={"sinif": "5", "ders": "hayat_bilgisi"})
+        check(r.status_code == 400, f"yukle hayat bilgisi s5 → 400 (status={r.status_code})")
+
+        # ders_filtre: sadece sosyal_bilgiler MEB döner
+        await server.db.meb_kelimeleri.update_many({"kelime": "vatan", "sinif": 4}, {"$set": {"anlam": "yurt"}})
+        s_flt = await kelime_sec(4, 1, ders_filtre=["sosyal_bilgiler"])
+        check(len(s_flt) == 1 and s_flt[0]["kaynak"] == "meb" and s_flt[0]["ders"] == "sosyal_bilgiler",
+              f"ders_filtre sosyal_bilgiler çalışıyor (gelen {s_flt})")
+
+        # istatistik ders_bazli + ders_x_sinif
+        r = await ac.get("/api/meb-kelime/istatistik", headers=HA)
+        st = r.json()
+        check("ders_bazli" in st and "ders_x_sinif" in st, "istatistik ders_bazli + ders_x_sinif var")
+        check(st["ders_bazli"].get("sosyal_bilgiler", {}).get("toplam", 0) >= 1, "sosyal_bilgiler istatistiği")
+        check(st["ders_x_sinif"].get("sosyal_bilgiler_4", 0) >= 1, "ders_x_sinif sosyal_bilgiler_4")
+
+        # ── Migration idempotency (mantık testi) ──
+        await server.db.meb_kelimeleri.insert_one({"id": str(uuid.uuid4()), "kelime": "eski", "sinif": 1, "durum": "aktif", "anlam": "x", "kullanim_sayisi": 0})
+        m1 = await server.db.meb_kelimeleri.update_many({"$or": [{"ders": {"$exists": False}}, {"ders": None}, {"ders": ""}]}, {"$set": {"ders": "turkce"}})
+        m2 = await server.db.meb_kelimeleri.update_many({"$or": [{"ders": {"$exists": False}}, {"ders": None}, {"ders": ""}]}, {"$set": {"ders": "turkce"}})
+        check(m1.modified_count >= 1 and m2.modified_count == 0, f"migration idempotent (1.={m1.modified_count}, 2.={m2.modified_count})")
 
 
 if __name__ == "__main__":

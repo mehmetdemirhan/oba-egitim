@@ -40,8 +40,26 @@ AI_MAX_DENEME = 3
 _YAZMA = require_role(UserRole.ADMIN)
 _OKUMA = require_role(UserRole.ADMIN, UserRole.COORDINATOR, UserRole.TEACHER)
 
-# Aynı (sınıf) için eşzamanlı birden çok AI kuyruğu tetiklenmesin
+# Aynı (sınıf, ders) için eşzamanlı birden çok AI kuyruğu tetiklenmesin
 _ai_aktif: set = set()
+
+# ── Ders sabitleri (5 ders) ──
+DERSLER = {
+    "turkce": {"ad": "Türkçe", "siniflar": [1, 2, 3, 4, 5, 6, 7, 8], "emoji": "📖"},
+    "hayat_bilgisi": {"ad": "Hayat Bilgisi", "siniflar": [1, 2, 3], "emoji": "🌱"},
+    "sosyal_bilgiler": {"ad": "Sosyal Bilgiler", "siniflar": [4, 5, 6, 7], "emoji": "🌍"},
+    "din_kulturu": {"ad": "Din Kültürü ve Ahlak Bilgisi", "siniflar": [4, 5, 6, 7, 8], "emoji": "☪️"},
+    "inkilap_tarihi": {"ad": "T.C. İnkılap Tarihi ve Atatürkçülük", "siniflar": [8], "emoji": "🇹🇷"},
+}
+VARSAYILAN_DERS = "turkce"
+
+
+def _ders_gecerli(ders: str) -> bool:
+    return ders in DERSLER
+
+
+def _sinif_derste(ders: str, sinif: int) -> bool:
+    return int(sinif) in DERSLER.get(ders, {}).get("siniflar", [])
 
 # Türkçe küçük harf
 _TR_BUYUK = "ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZ"
@@ -116,14 +134,15 @@ def _zorluk(kelime: str, sinif: int) -> str:
 # ─────────────────────────────────────────────────────────────
 # AI üretimi (arka plan)
 # ─────────────────────────────────────────────────────────────
-def _ai_prompt(kelimeler: list[str], sinif: int) -> tuple[str, str]:
+def _ai_prompt(kelimeler: list[str], sinif: int, ders: str = VARSAYILAN_DERS) -> tuple[str, str]:
+    ders_ad = DERSLER.get(ders, {}).get("ad", "Türkçe")
     system = (
-        "Sen ilkokul/ortaokul Türkçe öğretmeni asistanısın. Çocuk dostu, TDK uyumlu, "
+        f"Sen ilkokul/ortaokul {ders_ad} öğretmeni asistanısın. Çocuk dostu, TDK uyumlu, "
         "kısa ve net tanımlar üretirsin."
     )
     liste = ", ".join(kelimeler)
     user = (
-        f"Aşağıdaki kelimeler {sinif}. sınıf öğrencisi içindir: {liste}\n"
+        f"Aşağıdaki kelimeler {sinif}. sınıf {ders_ad} dersinde geçen kavramlardır: {liste}\n"
         "Her kelime için: (1) çocuk dostu Türkçe anlam (en fazla 15 kelime), "
         "(2) o sınıf seviyesine uygun kısa bir örnek cümle, (3) 1-2 kısa etiket "
         "(ör. 'duygu', 'günlük hayat', 'doğa').\n"
@@ -134,9 +153,9 @@ def _ai_prompt(kelimeler: list[str], sinif: int) -> tuple[str, str]:
     return system, user
 
 
-async def _ai_batch_uret(kelimeler: list[str], sinif: int) -> dict:
+async def _ai_batch_uret(kelimeler: list[str], sinif: int, ders: str = VARSAYILAN_DERS) -> dict:
     """Bir batch için {kelime: {anlam, ornek_cumle, etiketler}} döndürür."""
-    system, user = _ai_prompt(kelimeler, sinif)
+    system, user = _ai_prompt(kelimeler, sinif, ders)
     for deneme in range(AI_MAX_DENEME):
         try:
             res = await call_claude(system, user, max_tokens=2000)
@@ -159,9 +178,9 @@ async def _ai_batch_uret(kelimeler: list[str], sinif: int) -> dict:
     return {}
 
 
-async def _ai_kuyrugu_isle(sinif: int):
-    """Anlamı boş veya durum=onaysiz olan kelimeler için AI üretir (arka plan)."""
-    anahtar = int(sinif)
+async def _ai_kuyrugu_isle(sinif: int, ders: str = VARSAYILAN_DERS):
+    """Anlamı boş veya durum=onaysiz kelimeler için AI üretir (arka plan, sınıf+ders)."""
+    anahtar = (int(sinif), ders)
     if anahtar in _ai_aktif:
         return
     _ai_aktif.add(anahtar)
@@ -169,13 +188,14 @@ async def _ai_kuyrugu_isle(sinif: int):
         while True:
             bekleyen = await db.meb_kelimeleri.find({
                 "sinif": int(sinif),
+                "ders": ders,
                 "durum": {"$ne": "arsivli"},
                 "$or": [{"anlam": {"$in": [None, ""]}}, {"durum": "onaysiz"}],
             }).limit(AI_BATCH).to_list(length=AI_BATCH)
             if not bekleyen:
                 break
             kelimeler = [b["kelime"] for b in bekleyen]
-            harita = await _ai_batch_uret(kelimeler, sinif)
+            harita = await _ai_batch_uret(kelimeler, sinif, ders)
             for b in bekleyen:
                 k = b["kelime"]
                 veri = harita.get(k)
@@ -192,7 +212,7 @@ async def _ai_kuyrugu_isle(sinif: int):
                     await db.meb_kelimeleri.update_one({"id": b["id"]}, {"$set": {"durum": "onaysiz"}})
             await asyncio.sleep(AI_BEKLEME_SN)
     except Exception as ex:
-        logging.warning(f"[meb_kelime] AI kuyruk hatası (s{sinif}): {ex}")
+        logging.warning(f"[meb_kelime] AI kuyruk hatası (s{sinif}/{ders}): {ex}")
     finally:
         _ai_aktif.discard(anahtar)
 
@@ -200,10 +220,21 @@ async def _ai_kuyrugu_isle(sinif: int):
 # ─────────────────────────────────────────────────────────────
 # Endpoint'ler
 # ─────────────────────────────────────────────────────────────
+@router.get("/meb-kelime/dersler")
+async def meb_kelime_dersler(current_user=Depends(get_current_user)):
+    """Desteklenen 5 dersi döndürür (frontend dropdown/kart için)."""
+    return {"dersler": DERSLER}
+
+
 @router.post("/meb-kelime/yukle")
 async def meb_kelime_yukle(dosya: UploadFile = File(...), sinif: int = Form(...),
+                           ders: str = Form(VARSAYILAN_DERS),
                            current_user=Depends(_YAZMA)):
     """PDF/DOCX'i parse eder, kelime önizlemesi döner (DB'ye YAZMAZ)."""
+    if not _ders_gecerli(ders):
+        raise HTTPException(status_code=400, detail="Geçersiz ders.")
+    if not _sinif_derste(ders, sinif):
+        raise HTTPException(status_code=400, detail="Bu ders bu sınıfta öğretilmiyor.")
     icerik = await dosya.read()
     if len(icerik) > MAX_DOSYA_BYTE:
         raise HTTPException(status_code=400, detail="Dosya en fazla 5MB olabilir.")
@@ -214,6 +245,7 @@ async def meb_kelime_yukle(dosya: UploadFile = File(...), sinif: int = Form(...)
         "toplam": len(kelimeler),
         "dosya_adi": dosya.filename or "",
         "sinif": int(sinif),
+        "ders": ders,
     }
 
 
@@ -222,9 +254,14 @@ async def meb_kelime_onayla(data: dict, current_user=Depends(_YAZMA)):
     """Önizlenen kelimeleri kaydeder ve arka planda AI üretimini başlatır."""
     kelimeler = data.get("kelimeler") or []
     sinif = int(data.get("sinif", 1))
+    ders = data.get("ders", VARSAYILAN_DERS)
     kaynak = data.get("kaynak_dosya", "")
     if not isinstance(kelimeler, list) or not kelimeler:
         raise HTTPException(status_code=400, detail="Kelime listesi boş.")
+    if not _ders_gecerli(ders):
+        raise HTTPException(status_code=400, detail="Geçersiz ders.")
+    if not _sinif_derste(ders, sinif):
+        raise HTTPException(status_code=400, detail="Bu ders bu sınıfta öğretilmiyor.")
 
     ad = f"{current_user.get('ad', '')} {current_user.get('soyad', '')}".strip() or "Yönetici"
     now = datetime.utcnow().isoformat()
@@ -233,7 +270,7 @@ async def meb_kelime_onayla(data: dict, current_user=Depends(_YAZMA)):
         k = _tr_kucuk(str(ham).strip())
         if len(k) < 2:
             continue
-        mevcut = await db.meb_kelimeleri.find_one({"kelime": k, "sinif": sinif})
+        mevcut = await db.meb_kelimeleri.find_one({"kelime": k, "sinif": sinif, "ders": ders})
         if mevcut:
             atlanan += 1
             continue
@@ -241,6 +278,7 @@ async def meb_kelime_onayla(data: dict, current_user=Depends(_YAZMA)):
             "id": str(uuid.uuid4()),
             "kelime": k,
             "sinif": sinif,
+            "ders": ders,
             "kaynak_dosya": kaynak,
             "anlam": "",
             "ornek_cumle": "",
@@ -258,7 +296,7 @@ async def meb_kelime_onayla(data: dict, current_user=Depends(_YAZMA)):
 
     # Arka planda AI üretimi (kullanıcıyı bekletmez)
     if yeni > 0:
-        asyncio.create_task(_ai_kuyrugu_isle(sinif))
+        asyncio.create_task(_ai_kuyrugu_isle(sinif, ders))
 
     return {"yeni_eklenen": yeni, "mevcut_atlanan": atlanan, "ai_kuyrukta": yeni}
 
@@ -266,6 +304,7 @@ async def meb_kelime_onayla(data: dict, current_user=Depends(_YAZMA)):
 @router.get("/meb-kelime/liste")
 async def meb_kelime_liste(
     sinif: int | None = Query(None),
+    ders: str | None = Query(None),
     durum: str = Query("aktif"),
     kelime: str | None = Query(None),
     sayfa: int = Query(1, ge=1),
@@ -275,6 +314,8 @@ async def meb_kelime_liste(
     sorgu: dict = {}
     if sinif is not None:
         sorgu["sinif"] = int(sinif)
+    if ders:
+        sorgu["ders"] = ders
     if durum and durum != "hepsi":
         sorgu["durum"] = durum
     if kelime:
@@ -322,40 +363,62 @@ async def meb_kelime_sil(kelime_id: str, current_user=Depends(_YAZMA)):
 
 @router.post("/meb-kelime/toplu-ai-yenile")
 async def meb_kelime_toplu_ai(data: dict = None, current_user=Depends(_YAZMA)):
-    """Anlamı boş veya onaysız kelimeler için AI'ı tekrar dener (arka plan)."""
+    """Anlamı boş veya onaysız kelimeler için AI'ı tekrar dener (arka plan).
+
+    Bekleyen kelimeler (sınıf, ders) çiftlerine göre gruplanır; her çift için
+    ayrı kuyruk tetiklenir. Opsiyonel `sinif`/`ders` ile daraltılabilir.
+    """
     data = data or {}
-    siniflar = []
+    taban: dict = {
+        "durum": {"$ne": "arsivli"},
+        "$or": [{"anlam": {"$in": [None, ""]}}, {"durum": "onaysiz"}],
+    }
     if data.get("sinif") is not None:
-        siniflar = [int(data["sinif"])]
-    else:
-        siniflar = await db.meb_kelimeleri.distinct("sinif")
-    baslatilan = 0
-    for s in siniflar:
-        bekleyen = await db.meb_kelimeleri.count_documents({
-            "sinif": int(s), "durum": {"$ne": "arsivli"},
-            "$or": [{"anlam": {"$in": [None, ""]}}, {"durum": "onaysiz"}],
-        })
-        if bekleyen > 0:
-            asyncio.create_task(_ai_kuyrugu_isle(int(s)))
-            baslatilan += 1
-    return {"kuyruk_baslatilan_sinif": baslatilan}
+        taban["sinif"] = int(data["sinif"])
+    if data.get("ders"):
+        taban["ders"] = data["ders"]
+
+    bekleyenler = await db.meb_kelimeleri.find(taban, {"sinif": 1, "ders": 1}).to_list(length=None)
+    ciftler = {(b.get("sinif"), b.get("ders", VARSAYILAN_DERS)) for b in bekleyenler if b.get("sinif") is not None}
+    for (s, d) in ciftler:
+        asyncio.create_task(_ai_kuyrugu_isle(int(s), d or VARSAYILAN_DERS))
+    return {"kuyruk_baslatilan": len(ciftler)}
 
 
 @router.get("/meb-kelime/istatistik")
-async def meb_kelime_istatistik(sinif: int | None = Query(None), current_user=Depends(_YAZMA)):
+async def meb_kelime_istatistik(sinif: int | None = Query(None),
+                                ders: str | None = Query(None),
+                                current_user=Depends(_YAZMA)):
     taban: dict = {"durum": {"$ne": "arsivli"}}
     if sinif is not None:
         taban["sinif"] = int(sinif)
+    if ders:
+        taban["ders"] = ders
     toplam = await db.meb_kelimeleri.count_documents(taban)
     ai_tamam = await db.meb_kelimeleri.count_documents({**taban, "anlam": {"$nin": [None, ""]}})
     ai_bekleyen = toplam - ai_tamam
 
     en_cok = await db.meb_kelimeleri.find(taban).sort("kullanim_sayisi", -1).limit(10).to_list(length=10)
     hic = await db.meb_kelimeleri.find({**taban, "kullanim_sayisi": 0}).limit(20).to_list(length=20)
+
+    # Ders bazlı ve ders×sınıf dağılımı (arşivli hariç, tüm dersler)
+    ders_bazli: dict = {}
+    ders_x_sinif: dict = {}
+    for dk in DERSLER:
+        d_taban = {"durum": {"$ne": "arsivli"}, "ders": dk}
+        d_toplam = await db.meb_kelimeleri.count_documents(d_taban)
+        d_hazir = await db.meb_kelimeleri.count_documents({**d_taban, "anlam": {"$nin": [None, ""]}})
+        ders_bazli[dk] = {"toplam": d_toplam, "ai_hazir": d_hazir, "ai_bekleyen": d_toplam - d_hazir}
+        for s in DERSLER[dk]["siniflar"]:
+            ders_x_sinif[f"{dk}_{s}"] = await db.meb_kelimeleri.count_documents(
+                {"durum": {"$ne": "arsivli"}, "ders": dk, "sinif": s})
+
     return {
         "toplam_kelime": toplam,
         "ai_uretimi_tamamlanan": ai_tamam,
         "ai_bekleyen": ai_bekleyen,
+        "ders_bazli": ders_bazli,
+        "ders_x_sinif": ders_x_sinif,
         "en_cok_kullanilan": [{"kelime": d.get("kelime"), "kullanim": d.get("kullanim_sayisi", 0)} for d in en_cok],
         "hic_kullanilmayan": [d.get("kelime") for d in hic],
     }
