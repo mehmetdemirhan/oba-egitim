@@ -107,26 +107,52 @@ def _turkce_kok(kelime: str) -> str:
     return k
 
 
-def _tum_kelimeleri_cikar(metin: str) -> list:
-    """Metindeki benzersiz Türkçe kelime KÖKLERİNİ döndürür (küçük harf, 2-20 harf).
+_UNLU = set("aeıioöuü")
 
-    Kelimeler köke indirilir (yansımasını→yansıma, kelebekler→kelebek) ve köke göre
-    tekilleştirilir; böylece aynı kelimenin çekimli hâlleri tek kayıt olur.
+
+def _tum_kelimeleri_cikar(metin: str) -> list:
+    """Metindeki benzersiz, TEMİZ Türkçe kelime KÖKLERİNİ döndürür.
+
+    Filtreler (ders kitabı gürültüsünü — yazar isimleri, künye, PDF artefaktı — eler):
+      1. KÖK BULMA: kelimeler köke indirilir (kelebekler→kelebek) ve tekilleştirilir.
+      2. ÖZEL İSİM: metinde YALNIZCA büyük harfle başlayıp hiç küçük görülmeyen
+         tokenlar (Ali, Betül, Türkoğlu…) elenir.
+      3. MİN. SIKLIK: kitapta en az 2 kez geçen kökler alınır (tek geçen isim/artefakt
+         düşer). Kısa metinlerde (≤400 token) eşik 1'e iner.
+      4. ARTEFAKT: ünlü içermeyen parçalar (şif, kfç) elenir.
     """
-    kucuk = _bt_tr_kucuk(metin or "")
-    ham = re.findall(r"[a-zçğıöşü]+", kucuk)
-    gorulen, out = set(), []
-    for w in ham:
+    from collections import Counter
+    metin = metin or ""
+    tokenlar = re.findall(r"[A-Za-zÇĞIİÖŞÜçğıiöşü]+", metin)
+
+    # Özel isim tespiti: hep büyük-harf-başı görülen, hiç tamamen küçük görülmeyen
+    kucuk_gorulen, buyuk_gorulen = set(), set()
+    for t in tokenlar:
+        tl = _bt_tr_kucuk(t)
+        ilk = t[0]
+        if ilk == _bt_tr_kucuk(ilk):
+            kucuk_gorulen.add(tl)
+        else:
+            buyuk_gorulen.add(tl)
+    ozel_isim = buyuk_gorulen - kucuk_gorulen
+
+    esik = 2 if len(tokenlar) > 400 else 1
+    kok_frek = Counter()
+    for t in tokenlar:
+        w = _bt_tr_kucuk(t)
         if not (2 <= len(w) <= 20):
             continue
-        k = _turkce_kok(w)
-        if len(k) < 2 or k in gorulen:
+        if not (set(w) & _UNLU):        # ünlüsüz artefakt
             continue
-        gorulen.add(k)
-        out.append(k)
-        if len(out) >= TUM_KELIME_MAKS:
-            break
-    return out
+        if w in ozel_isim:              # özel isim
+            continue
+        k = _turkce_kok(w)
+        if len(k) < 2 or not (set(k) & _UNLU):
+            continue
+        kok_frek[k] += 1
+
+    out = [k for k, n in kok_frek.items() if n >= esik]
+    return out[:TUM_KELIME_MAKS]
 
 
 async def _tam_kelime_kaydet(ham_metin: str, sinif: int, kitap_adi: str, yukleyen_id: str) -> int:

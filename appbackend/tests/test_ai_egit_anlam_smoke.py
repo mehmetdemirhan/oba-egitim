@@ -56,6 +56,14 @@ async def run():
     # _tum_kelimeleri_cikar köke indirip tekilleştiriyor
     cikan = bt._tum_kelimeleri_cikar("kelebekler kelebeği kelebek ilkbaharda ilkbahar")
     check(cikan.count("kelebek") == 1 and "ilkbahar" in cikan, f"tarama köke indirip tekilleştiriyor (gelen {cikan})")
+    # Filtreler: özel isim + ünlüsüz artefakt (küçük metin eşiği)
+    c2 = bt._tum_kelimeleri_cikar("Ali kitap okudu. Ali kitap sever. Betül geldi. kfç xyz kalem kalem.")
+    check("ali" not in c2 and "betül" not in c2, f"özel isimler elendi (gelen {c2})")
+    check("kfç" not in c2 and "xyz" not in c2, "ünlüsüz artefaktlar elendi")
+    check("kitap" in c2 and "kalem" in c2, "gerçek kelimeler kaldı")
+    # Min sıklık (büyük metin → eşik 2): tek geçen kelime elenir
+    c3 = bt._tum_kelimeleri_cikar("kalem defter " * 210 + " nadirkelimeburada")
+    check("kalem" in c3 and "nadirkelimeburada" not in c3, "min sıklık: tek geçen kelime elendi (büyük metin)")
 
     # Ham kelimeler (anlam boş) — iletisim iki sınıfta, sorumluluk bir sınıfta
     for s in (3, 5):
