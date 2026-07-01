@@ -42,6 +42,21 @@ async def run():
 
     await server.client.drop_database(TEST_DB)
 
+    # ── Türkçe kök bulma (stemmer) birim testleri ──
+    kok = bt._turkce_kok
+    check(kok("yansımasını") == "yansıma", f"kök: yansımasını→yansıma (gelen {kok('yansımasını')})")
+    check(kok("ilkbaharda") == "ilkbahar", f"kök: ilkbaharda→ilkbahar (gelen {kok('ilkbaharda')})")
+    check(kok("kelebekler") == "kelebek", f"kök: kelebekler→kelebek (gelen {kok('kelebekler')})")
+    check(kok("evlerinden") == "ev", f"kök: evlerinden→ev (gelen {kok('evlerinden')})")
+    # Korunması gerekenler (over-stemming YOK)
+    check(kok("kelime") == "kelime", f"koru: kelime (gelen {kok('kelime')})")
+    check(kok("papatya") == "papatya", f"koru: papatya (gelen {kok('papatya')})")
+    check(kok("doğa") == "doğa", f"koru: doğa (gelen {kok('doğa')})")
+    check(kok("oda") == "oda", f"koru: oda (gelen {kok('oda')})")
+    # _tum_kelimeleri_cikar köke indirip tekilleştiriyor
+    cikan = bt._tum_kelimeleri_cikar("kelebekler kelebeği kelebek ilkbaharda ilkbahar")
+    check(cikan.count("kelebek") == 1 and "ilkbahar" in cikan, f"tarama köke indirip tekilleştiriyor (gelen {cikan})")
+
     # Ham kelimeler (anlam boş) — iletisim iki sınıfta, sorumluluk bir sınıfta
     for s in (3, 5):
         await db.meb_kelime_haritasi.insert_one({"id": str(uuid.uuid4()), "sinif": s, "kelime": "iletisim", "anlam": "", "kaynak_tip": "tam_tarama"})

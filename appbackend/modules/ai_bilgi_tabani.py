@@ -62,17 +62,70 @@ def _bt_tr_kucuk(s: str) -> str:
     return "".join(_TR_CEV.get(ch, ch.lower()) for ch in (s or ""))
 
 
+# ── Hafif Türkçe kök bulma (kural-tabanlı çekim eki soyma) ──
+# Tam morfolojik çözümleme DEĞİL. Yaygın İSİM çekim eklerini (çoğul + hâl) güvenli
+# soyar; kök en az 3 harf kalır, ≤4 harfli kelimeler korunur. Over-stemming'i
+# önlemek için tek-ünlü ekler (-a/-e/-ı/-i) ve -ya/-yı gibi riskli ekler SOYULMAZ
+# (ör. "papatya", "dünya", "kelime" korunur). En fazla 2 kat ek soyulur.
+_KOK_EKLER = sorted([
+    "larından", "lerinden", "larında", "lerinde", "sından", "sinden",
+    "larını", "lerini", "ların", "lerin", "ları", "leri",
+    "sının", "sinin", "sunun", "sünün", "sını", "sini", "sunu", "sünü",
+    "ından", "inden", "undan", "ünden", "ında", "inde", "unda", "ünde",
+    "nın", "nin", "nun", "nün",
+    "dan", "den", "tan", "ten",
+    "ler", "lar",
+    "da", "de", "ta", "te",
+], key=len, reverse=True)
+
+
+_KOK_UNSUZ = set("bcçdfgğhjklmnprsştvyz")
+
+
+def _turkce_kok(kelime: str) -> str:
+    k = _bt_tr_kucuk(kelime or "")
+    if len(k) <= 4:
+        return k
+    for _ in range(2):
+        soyuldu = False
+        for ek in _KOK_EKLER:
+            if not k.endswith(ek):
+                continue
+            kalan = len(k) - len(ek)
+            if len(ek) == 2:
+                # da/de/ta/te (hâl eki) — yalnızca önü ünsüzse ve kök >= 3 harf
+                # (salata/harita/oda korunur; kitapta→kitap, bahçede→bahçe)
+                if kalan < 3 or k[kalan - 1] not in _KOK_UNSUZ:
+                    continue
+            elif kalan < 2:
+                continue
+            k = k[:kalan]
+            soyuldu = True
+            break
+        if not soyuldu:
+            break
+    return k
+
+
 def _tum_kelimeleri_cikar(metin: str) -> list:
-    """Metindeki benzersiz Türkçe kelimeleri (küçük harf, 2-20 harf) döndürür."""
+    """Metindeki benzersiz Türkçe kelime KÖKLERİNİ döndürür (küçük harf, 2-20 harf).
+
+    Kelimeler köke indirilir (yansımasını→yansıma, kelebekler→kelebek) ve köke göre
+    tekilleştirilir; böylece aynı kelimenin çekimli hâlleri tek kayıt olur.
+    """
     kucuk = _bt_tr_kucuk(metin or "")
     ham = re.findall(r"[a-zçğıöşü]+", kucuk)
     gorulen, out = set(), []
-    for k in ham:
-        if 2 <= len(k) <= 20 and k not in gorulen:
-            gorulen.add(k)
-            out.append(k)
-            if len(out) >= TUM_KELIME_MAKS:
-                break
+    for w in ham:
+        if not (2 <= len(w) <= 20):
+            continue
+        k = _turkce_kok(w)
+        if len(k) < 2 or k in gorulen:
+            continue
+        gorulen.add(k)
+        out.append(k)
+        if len(out) >= TUM_KELIME_MAKS:
+            break
     return out
 
 
