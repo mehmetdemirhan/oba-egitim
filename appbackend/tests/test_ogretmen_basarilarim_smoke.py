@@ -106,7 +106,13 @@ async def run():
         # Puan bilgisi
         pb = d["puan_bilgisi"]
         check(pb["sira"] == 2 and pb["toplam_ogretmen"] == 2, f"sıra 2/2 (gelen {pb['sira']}/{pb['toplam_ogretmen']})")
-        check(pb["toplam_xp"] >= 5000, f"toplam_xp >= 5000 (puan+rozet) (gelen {pb['toplam_xp']})")
+        # XP = etkinlik(5000) + rozet(8) + öğrenci(2×20=40) + kur(4×50=200) + veli(~42) = 5290
+        check(pb["toplam_xp"] == 5290, f"toplam_xp bileşenli = 5290 (gelen {pb['toplam_xp']})")
+        kir = pb.get("kirilim", {})
+        check(kir.get("ogrenci") == 40, f"öğrenci bonusu 2×20=40 (gelen {kir.get('ogrenci')})")
+        check(kir.get("kur") == 200, f"kur bonusu 4×50=200 (gelen {kir.get('kur')})")
+        check(kir.get("veli") == 42, f"veli bonusu ~42 (gelen {kir.get('veli')})")
+        check(sum(v for v in kir.values()) == pb["toplam_xp"], "kırılım toplamı = toplam_xp")
         check(bool(pb["motivasyon_mesaji"]), "motivasyon mesajı dolu")
 
         # Rozetler

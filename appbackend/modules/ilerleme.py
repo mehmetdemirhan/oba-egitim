@@ -37,6 +37,13 @@ from core.ai import _gemini_call, call_claude, _mock_bilgi_tabani_response, get_
 
 router = APIRouter()
 
+# ── Öğretmen XP bileşen ağırlıkları ──
+# Etkinlik puanı (içerik/test/oylama) ve rozet puanına EK olarak; öğretmenin
+# gerçek çıktıları (aldığı öğrenci, kur atlattığı, veli memnuniyeti) de XP'ye etki eder.
+PUAN_OGRENCI_BASI = 20   # alınan her öğrenci başına
+PUAN_KUR_BASI = 50       # her kur atlatma olayı başına
+PUAN_VELI_YILDIZ = 5     # veli anketinde ortalama yıldız başına (5 yıldız = +25/anket)
+
 
 async def _get_toplam_xp(ogrenci_id):
     student = await db.students.find_one({"id": ogrenci_id})
@@ -287,11 +294,56 @@ async def _ogretmen_puan_tablosu(current_user) -> dict:
     rozet_puan_map = {r["kod"]: r.get("puan", r.get("xp", 0)) for r in tum_rozetler}
 
     teachers = await db.users.find({"role": "teacher"}).to_list(length=None)
+
+    # ── Bileşen verileri: tek sorguyla çekilip Python'da gruplanır (öğretmen sayısı×sorgu değil) ──
+    def _ogr_id(u):
+        return u.get("linked_id") or u["id"]
+
+    # Rozet puanı (kullanici_id bazlı)
+    rozet_by_user = {}
+    for r in await db.kazanilan_rozetler.find({}).to_list(length=None):
+        uid = r.get("kullanici_id")
+        rozet_by_user[uid] = rozet_by_user.get(uid, 0) + rozet_puan_map.get(r.get("rozet_kodu"), 0)
+
+    # Alınan öğrenci sayısı (ogretmen_id bazlı)
+    ogr_say = {}
+    for s in await db.students.find({}, {"ogretmen_id": 1}).to_list(length=None):
+        tid = s.get("ogretmen_id")
+        if tid:
+            ogr_say[tid] = ogr_say.get(tid, 0) + 1
+
+    # Kur atlatma sayısı (ogretmen_id bazlı)
+    kur_say = {}
+    for k in await db.kur_atlamalari.find({}, {"ogretmen_id": 1}).to_list(length=None):
+        tid = k.get("ogretmen_id")
+        if tid:
+            kur_say[tid] = kur_say.get(tid, 0) + 1
+
+    # Veli anket bonusu (ogretmen_id bazlı) = Σ (anketin ortalama yıldızı × PUAN_VELI_YILDIZ)
+    veli_bonus = {}
+    for a in await db.veli_anketleri.find({}).to_list(length=None):
+        tid = a.get("ogretmen_id")
+        if not tid:
+            continue
+        py = [y.get("puan", 0) for y in a.get("yanitlar", []) if y.get("puan")]
+        if py:
+            veli_bonus[tid] = veli_bonus.get(tid, 0) + (sum(py) / len(py)) * PUAN_VELI_YILDIZ
+
     puanlar = []
+    benim_kirilim = None
     for u in teachers:
-        rozetler = await db.kazanilan_rozetler.find({"kullanici_id": u["id"]}).to_list(length=None)
-        rozet_puan = sum(rozet_puan_map.get(r.get("rozet_kodu"), 0) for r in rozetler)
-        puanlar.append({"id": u["id"], "toplam": u.get("puan", 0) + rozet_puan})
+        oid = _ogr_id(u)
+        kirilim = {
+            "etkinlik": u.get("puan", 0),
+            "rozet": rozet_by_user.get(u["id"], 0),
+            "ogrenci": ogr_say.get(oid, 0) * PUAN_OGRENCI_BASI,
+            "kur": kur_say.get(oid, 0) * PUAN_KUR_BASI,
+            "veli": round(veli_bonus.get(oid, 0)),
+        }
+        toplam = sum(kirilim.values())
+        puanlar.append({"id": u["id"], "toplam": toplam})
+        if u["id"] == current_user.get("id"):
+            benim_kirilim = kirilim
     puanlar.sort(key=lambda x: x["toplam"], reverse=True)
 
     M = len(puanlar)
@@ -341,6 +393,12 @@ async def _ogretmen_puan_tablosu(current_user) -> dict:
             "medyan": medyan,
         },
         "motivasyon_mesaji": mesaj,
+        "puan_kirilim": benim_kirilim or {"etkinlik": 0, "rozet": 0, "ogrenci": 0, "kur": 0, "veli": 0},
+        "puan_agirliklari": {
+            "ogrenci_basi": PUAN_OGRENCI_BASI,
+            "kur_basi": PUAN_KUR_BASI,
+            "veli_yildiz": PUAN_VELI_YILDIZ,
+        },
     }
 
 
@@ -389,6 +447,8 @@ async def ogretmen_basarilarim(current_user=Depends(get_current_user)):
         "en_yuksek": ist["en_yuksek_puan"],
         "en_dusuk": ist["en_dusuk_puan"],
         "motivasyon_mesaji": pt["motivasyon_mesaji"],
+        "kirilim": pt.get("puan_kirilim"),
+        "agirliklar": pt.get("puan_agirliklari"),
     }
 
     # ── Rozetler ──
