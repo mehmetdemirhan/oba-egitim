@@ -247,6 +247,125 @@ async def get_birlesik_puan_tablosu(current_user=Depends(get_current_user)):
     return tablo
 
 
+# ── Role göre puan tablosu (her rol kendi kategorisinde sıralanır) ──
+def _norm_rol(rol: str) -> Optional[str]:
+    r = (rol or "").strip().lower()
+    if r in ("ogrenci", "öğrenci", "student"):
+        return "student"
+    if r in ("ogretmen", "öğretmen", "teacher"):
+        return "teacher"
+    return None
+
+
+async def _ogrenci_puan_tablosu(current_user) -> dict:
+    """role=student olan tüm kullanıcıları XP'ye göre sıralar (isimli, kendini vurgular)."""
+    ogrenci_id = current_user.get("linked_id") or current_user.get("id")
+    students = await db.students.find({"arsivli": {"$ne": True}}).to_list(length=None)
+    students.sort(key=lambda s: s.get("toplam_xp", 0), reverse=True)
+    liste = []
+    for i, s in enumerate(students):
+        xp = s.get("toplam_xp", 0)
+        ad = f"{s.get('ad', '')} {s.get('soyad', '')}".strip() or "Öğrenci"
+        liste.append({
+            "sira": i + 1,
+            "id": s.get("id"),
+            "ad_soyad": ad,
+            "puan": xp,
+            "xp": xp,
+            "streak": s.get("streak", 0),
+            "rol": "student",
+            "ben": s.get("id") == ogrenci_id,
+        })
+    return {"rol": "ogrenci", "toplam": len(liste), "siralama": liste}
+
+
+async def _ogretmen_puan_tablosu(current_user) -> dict:
+    """role=teacher olanları puana göre sıralar; İSİM/SIRA LİSTESİ DÖNMEZ.
+    Sadece kendi konumun + isimsiz agrega istatistikler + motivasyon mesajı."""
+    # Rozet tanımlarını bir kez çek (birlesik endpoint'iyle aynı puanlama)
+    tum_rozetler = (await get_ogretmen_rozetleri()) + (await get_ogrenci_rozetleri())
+    rozet_puan_map = {r["kod"]: r.get("puan", r.get("xp", 0)) for r in tum_rozetler}
+
+    teachers = await db.users.find({"role": "teacher"}).to_list(length=None)
+    puanlar = []
+    for u in teachers:
+        rozetler = await db.kazanilan_rozetler.find({"kullanici_id": u["id"]}).to_list(length=None)
+        rozet_puan = sum(rozet_puan_map.get(r.get("rozet_kodu"), 0) for r in rozetler)
+        puanlar.append({"id": u["id"], "toplam": u.get("puan", 0) + rozet_puan})
+    puanlar.sort(key=lambda x: x["toplam"], reverse=True)
+
+    M = len(puanlar)
+    benim_id = current_user.get("id")
+    benim_sira = None
+    benim_puan = 0
+    for i, p in enumerate(puanlar):
+        if p["id"] == benim_id:
+            benim_sira = i + 1
+            benim_puan = p["toplam"]
+            break
+
+    degerler = [p["toplam"] for p in puanlar]
+    if M > 0:
+        ortalama = round(sum(degerler) / M)
+        en_yuksek = max(degerler)
+        en_dusuk = min(degerler)
+        sirali = sorted(degerler)
+        mid = M // 2
+        medyan = sirali[mid] if M % 2 == 1 else round((sirali[mid - 1] + sirali[mid]) / 2)
+    else:
+        ortalama = en_yuksek = en_dusuk = medyan = 0
+
+    # Motivasyon mesajı (isim vermeden, konuma göre)
+    if M <= 1:
+        mesaj = "Sen tek öğretmensin, harika iş çıkarıyorsun! 🌟"
+    elif benim_sira:
+        yuzde = benim_sira / M  # küçük = üst
+        if yuzde <= 0.25:
+            mesaj = "Harika iş çıkarıyorsun! Öğretmenlerin ilk %25'indesin. 🏆"
+        elif yuzde <= 0.75:
+            mesaj = "İyi gidiyorsun. Öğretmenlerin ortalamasının civarındasın — biraz daha içerikle üste çıkabilirsin. 💪"
+        else:
+            mesaj = "Küçük adımlarla ilerlemek büyük fark yaratır. İçerik ekleyerek puanını hızla artırabilirsin. 🚀"
+    else:
+        mesaj = "Puan tablosunda yerini almak için içerik ekleyip oylamalara katıl. 🚀"
+
+    return {
+        "rol": "ogretmen",
+        "kullanicinin_sirasi": benim_sira,
+        "toplam_ogretmen": M,
+        "kullanicinin_puani": benim_puan,
+        "istatistikler": {
+            "ortalama_puan_ogretmen": ortalama,
+            "en_yuksek_puan": en_yuksek,
+            "en_dusuk_puan": en_dusuk,
+            "medyan": medyan,
+        },
+        "motivasyon_mesaji": mesaj,
+    }
+
+
+@router.get("/puan-tablosu")
+async def get_puan_tablosu_rol(rol: str, current_user=Depends(get_current_user)):
+    """Role göre puan tablosu.
+      rol=ogrenci → öğrenciler arası isimli sıralama (öğrenci/admin/coordinator)
+      rol=ogretmen → öğretmenler arası agrega (isimsiz); yalnız kendi konum (öğretmen/admin/coordinator)
+    """
+    hedef = _norm_rol(rol)
+    if not hedef:
+        raise HTTPException(status_code=400, detail="Geçersiz rol. 'ogrenci' veya 'ogretmen' olmalı.")
+
+    kullanici_rol = current_user.get("role", "")
+    hepsine_yetkili = kullanici_rol in ("admin", "coordinator")
+    if hedef == "student" and not (hepsine_yetkili or kullanici_rol == "student"):
+        raise HTTPException(status_code=403, detail="Bu tabloya erişim yetkiniz yok.")
+    if hedef == "teacher" and not (hepsine_yetkili or kullanici_rol == "teacher"):
+        raise HTTPException(status_code=403, detail="Bu tabloya erişim yetkiniz yok.")
+
+    if hedef == "student":
+        return await _ogrenci_puan_tablosu(current_user)
+    return await _ogretmen_puan_tablosu(current_user)
+
+
 @router.get("/rozetler/tanim")
 async def rozet_tanimlari():
     return {"ogretmen": await get_ogretmen_rozetleri(), "ogrenci": await get_ogrenci_rozetleri()}
