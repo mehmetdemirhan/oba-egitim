@@ -12465,6 +12465,20 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
             </div>
           )}
 
+          {/* Ham kelimelere AI anlam üret (kitaptan taranan boş kelimeler) */}
+          <button
+            onClick={async () => {
+              try {
+                const r = await axios.post(`${API}/ai/bilgi-tabani/anlam-uret`, {});
+                toast({ title: r.data.bekleyen_kelime
+                  ? `🧠 ${r.data.benzersiz_kelime} kelimeye anlam üretiliyor (~${Math.max(1, Math.round((r.data.tahmini_kalan_sure_sn || 0) / 60))} dk, arka planda)`
+                  : "✅ Tüm kelimelerin anlamı zaten mevcut" });
+              } catch (e) { toast({ title: "Başlatılamadı", variant: "destructive" }); }
+            }}
+            className="w-full text-xs bg-cyan-50 text-cyan-700 border border-cyan-200 rounded-xl py-2 hover:bg-cyan-100 transition-all">
+            🧠 Kitaptan taranan ham kelimelere AI ile anlam üret
+          </button>
+
           {/* Top katkıcılar */}
           {aiStat?.top_contributors?.length > 0 && (
             <div className="bg-white rounded-xl p-3 border"><div className="text-xs font-bold text-gray-700 mb-2">🏆 En Çok Katkı Yapanlar</div>

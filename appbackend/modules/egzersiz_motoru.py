@@ -97,12 +97,14 @@ async def _icerik_uret(tip: str, sinif: int, konu: str | None, zorluk: str | Non
     if not user_msg:
         return mock_uret(tip, sinif, konu, soru_sayisi), True
 
-    # MEB önceliği: kelime-odaklı tiplerde AI'a MEB kelimelerini kullanmasını söyle
+    # MEB/kitap önceliği: kelime-odaklı tiplerde AI'a bu kelimelerden üretmesini söyle.
+    # (Liste, köprü sayesinde müfredat + AI Eğit ile yüklenen kitap kelimelerini içerir.)
     if tip in _MEB_KELIME_TIPLERI:
-        meb = await _meb_kelimeler(sinif, sadece_anlamli=True, limit=40)
+        meb = await _meb_kelimeler(sinif, sadece_anlamli=True, limit=60)
         if meb:
-            user_msg += ("\n\nÖNCELİK: Mümkün olduğunca şu MEB müfredat "
-                         f"kelimelerini kullan: {', '.join(meb[:25])}.")
+            user_msg += ("\n\nZORUNLU KAYNAK: Bu egzersizi ÖNCELİKLE aşağıdaki kelimelerden üret "
+                         "(öğrencinin okulda/kitaplarında öğrendiği kelimeler). Mümkün olduğunca "
+                         f"YALNIZCA bu listeden seç:\n{', '.join(meb[:40])}.")
 
     for deneme in range(2):
         try:

@@ -103,6 +103,108 @@ async def _tam_kelime_kaydet(ham_metin: str, sinif: int, kitap_adi: str, yukleye
     return len(yeni)
 
 
+# ── Ham kelimelere AI ile anlam üretimi (batch + dedupe) ──
+AI_HARITA_BATCH = 20       # tek promptta benzersiz kelime
+AI_HARITA_BEKLEME = 2.0    # batch arası bekleme (kota)
+AI_HARITA_DENEME = 3
+_harita_ai_aktif: set = set()  # (sinif,) eşzamanlılık kilidi
+
+
+def _harita_anlam_prompt(items: list) -> tuple:
+    system = ("Sen ilkokul/ortaokul öğretmeni asistanısın. Çocuk dostu, TDK uyumlu, "
+              "kısa ve net tanımlar üretirsin.")
+    satirlar = "\n".join(f'- {it["kelime"]} ({it.get("sinif", 3)}. sınıf)' for it in items)
+    user = ("Aşağıdaki her kelime için (1) çocuk dostu Türkçe anlam (en fazla 15 kelime), "
+            "(2) sınıf seviyesine uygun kısa örnek cümle, (3) zorluk (1-10) üret.\n"
+            f"Kelimeler:\n{satirlar}\n"
+            'SADECE şu JSON DİZİSİNİ döndür: '
+            '[{"kelime":"...","anlam":"...","ornek_cumle":"...","zorluk":5}]\n'
+            "Markdown, kod bloğu veya ek açıklama EKLEME.")
+    return system, user
+
+
+async def _harita_ai_batch(items: list) -> dict:
+    system, user = _harita_anlam_prompt(items)
+    for _ in range(AI_HARITA_DENEME):
+        try:
+            res = await call_claude(system, user, model="sonnet", max_tokens=3500)
+            parsed = res.get("parsed")
+            lst = parsed if isinstance(parsed, list) else (
+                (parsed.get("sonuclar") or parsed.get("kelimeler")) if isinstance(parsed, dict) else None)
+            if isinstance(lst, list) and lst:
+                out = {}
+                for s in lst:
+                    if not isinstance(s, dict):
+                        continue
+                    k = _bt_tr_kucuk(str(s.get("kelime", "")).strip())
+                    anlam = str(s.get("anlam", "")).strip()
+                    if k and anlam:
+                        out[k] = {
+                            "anlam": anlam,
+                            "ornek_cumle": str(s.get("ornek_cumle", "")).strip(),
+                            "zorluk": s.get("zorluk", 5),
+                        }
+                if out:
+                    return out
+        except Exception as ex:
+            logging.warning(f"[harita_anlam] AI batch hatası: {ex}")
+        await asyncio.sleep(AI_HARITA_BEKLEME)
+    return {}
+
+
+async def _harita_anlam_uret(sinif=None):
+    """meb_kelime_haritasi'ndaki anlamı BOŞ kelimelere batch+dedupe AI ile anlam üretir.
+
+    Aynı kelime birden çok sınıfta boşsa TEK AI isteğiyle üretilir ve o kelimenin
+    boş TÜM kayıtlarına yazılır. Tam başarısızlıkta (kota) durur; kaldığı yerden
+    sonraki tetiklemede devam eder (üretilmiş kelime tekrar sorulmaz).
+    """
+    anahtar = sinif
+    if anahtar in _harita_ai_aktif:
+        return
+    _harita_ai_aktif.add(anahtar)
+    denenen: set = set()
+    try:
+        while True:
+            sorgu = {"anlam": {"$in": [None, ""]}}
+            if sinif is not None:
+                sorgu["sinif"] = int(sinif)
+            bekleyen = await db.meb_kelime_haritasi.find(sorgu).limit(400).to_list(length=400)
+            gruplar: dict = {}
+            for b in bekleyen:
+                k = b.get("kelime")
+                if not k or k in denenen:
+                    continue
+                gruplar.setdefault(k, []).append(b)
+            if not gruplar:
+                break
+            secilen = list(gruplar.keys())[:AI_HARITA_BATCH]
+            items = [{"kelime": k, "sinif": gruplar[k][0].get("sinif", 3)} for k in secilen]
+            harita = await _harita_ai_batch(items)
+            if not harita:
+                break
+            now = datetime.utcnow().isoformat()
+            for k in secilen:
+                denenen.add(k)
+                veri = harita.get(k)
+                if not (veri and veri.get("anlam")):
+                    continue
+                await db.meb_kelime_haritasi.update_many(
+                    {"kelime": k, "anlam": {"$in": [None, ""]}},
+                    {"$set": {
+                        "anlam": veri["anlam"],
+                        "ornek_cumle": veri.get("ornek_cumle", ""),
+                        "zorluk": veri.get("zorluk", 5),
+                        "ai_anlam_tarihi": now,
+                    }},
+                )
+            await asyncio.sleep(AI_HARITA_BEKLEME)
+    except Exception as ex:
+        logging.warning(f"[harita_anlam] kuyruk hatası (s{sinif}): {ex}")
+    finally:
+        _harita_ai_aktif.discard(anahtar)
+
+
 @router.post("/ai/bilgi-tabani/dosya-onizle")
 async def ai_bilgi_tabani_dosya_onizle(
     dosya: UploadFile = File(...),
@@ -954,6 +1056,8 @@ Kurallar:
     tam_kelime = 0
     if tam_tarama_aktif:
         tam_kelime = await _tam_kelime_kaydet(ham_metin, sinif, gercek_kitap_adi, current_user["id"])
+        if tam_kelime:
+            asyncio.create_task(_harita_anlam_uret(sinif))  # ham kelimelere arka planda anlam üret
 
     for p in tum_parcalar:
         await db.ai_okuma_parcalari.insert_one({
@@ -1176,6 +1280,8 @@ Kurallar:
     tam_kelime = 0
     if yukleme.get("tam_tarama", True):
         tam_kelime = await _tam_kelime_kaydet(ham_metin, sinif, kitap_adi, current_user["id"])
+        if tam_kelime:
+            asyncio.create_task(_harita_anlam_uret(sinif))  # ham kelimelere arka planda anlam üret
 
     # Okuma parçalarını kaydet
     for p in tum_parcalar:
@@ -1510,6 +1616,34 @@ async def ai_bilgi_tabani_onayla(yukleme_id: str, current_user=Depends(require_r
 async def ai_bilgi_tabani_sil(yukleme_id: str, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     await db.ai_yuklemeler.delete_one({"id": yukleme_id})
     return {"ok": True}
+
+
+@router.post("/ai/bilgi-tabani/anlam-uret")
+async def ai_harita_anlam_uret_endpoint(payload: dict = None, current_user=Depends(get_current_user)):
+    """Kitaptan alınan ham kelimelere (anlamı boş) AI ile toplu anlam üretir (arka plan).
+
+    Opsiyonel {sinif}. Batch+dedupe; aynı kelime tüm boş kayıtlara tek çağrıyla yazılır.
+    Yetki: öğretmen/koordinatör/admin.
+    """
+    if current_user.get("role") not in ("teacher", "admin", "coordinator"):
+        raise HTTPException(status_code=403, detail="Yetkiniz yok.")
+    payload = payload or {}
+    sinif = int(payload["sinif"]) if payload.get("sinif") is not None else None
+    sorgu = {"anlam": {"$in": [None, ""]}}
+    if sinif is not None:
+        sorgu["sinif"] = sinif
+    bekleyenler = await db.meb_kelime_haritasi.find(sorgu, {"kelime": 1}).to_list(length=None)
+    benzersiz = len({b.get("kelime") for b in bekleyenler if b.get("kelime")})
+    toplam_batch = max(0, -(-benzersiz // AI_HARITA_BATCH))
+    if bekleyenler:
+        asyncio.create_task(_harita_anlam_uret(sinif))
+    return {
+        "kuyruk_baslatildi": bool(bekleyenler),
+        "bekleyen_kelime": len(bekleyenler),
+        "benzersiz_kelime": benzersiz,
+        "toplam_batch": toplam_batch,
+        "tahmini_kalan_sure_sn": toplam_batch * 5,
+    }
 
 
 @router.get("/ai/bilgi-tabani/puanlarim")
