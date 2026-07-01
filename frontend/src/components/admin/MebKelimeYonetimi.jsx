@@ -1,58 +1,90 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 
 /**
- * MebKelimeYonetimi — yönetici MEB kelime listesi yönetimi.
- * Yükle (PDF/DOCX) → önizle → onayla → arka planda AI anlam/örnek üretir.
- * İstatistik + filtreli/sayfalı tablo + düzenleme + arşivleme.
+ * MebKelimeYonetimi — yönetici MEB kelime listesi yönetimi (5 ders destekli).
+ * Üstte 5 ders kartı; seçili ders için yükle (PDF/DOCX) → önizle → onayla →
+ * arka planda AI anlam/örnek. İstatistik + filtreli/sayfalı tablo + düzenleme.
  *
  * Props: apiBase — `${BACKEND_URL}/api`
  */
-const SINIFLAR = [1, 2, 3, 4, 5, 6, 7, 8];
+const DERSLER_FALLBACK = {
+  turkce: { ad: "Türkçe", siniflar: [1, 2, 3, 4, 5, 6, 7, 8], emoji: "📖" },
+  hayat_bilgisi: { ad: "Hayat Bilgisi", siniflar: [1, 2, 3], emoji: "🌱" },
+  sosyal_bilgiler: { ad: "Sosyal Bilgiler", siniflar: [4, 5, 6, 7], emoji: "🌍" },
+  din_kulturu: { ad: "Din Kültürü ve Ahlak Bilgisi", siniflar: [4, 5, 6, 7, 8], emoji: "☪️" },
+  inkilap_tarihi: { ad: "T.C. İnkılap Tarihi ve Atatürkçülük", siniflar: [8], emoji: "🇹🇷" },
+};
 const DURUM_ETIKET = { aktif: "Aktif", onaysiz: "AI bekliyor", arsivli: "Arşivli" };
 const ZORLUK_RENK = { kolay: "bg-green-100 text-green-700", orta: "bg-amber-100 text-amber-700", zor: "bg-red-100 text-red-700" };
 
+function sinifAralik(siniflar) {
+  if (!siniflar || !siniflar.length) return "—";
+  return siniflar.length === 1 ? `${siniflar[0]}. sınıf` : `${siniflar[0]}-${siniflar[siniflar.length - 1]}. sınıf`;
+}
+
 export default function MebKelimeYonetimi({ apiBase }) {
+  const [dersler, setDersler] = useState(DERSLER_FALLBACK);
+  const [aktifDers, setAktifDers] = useState("turkce");
+
+  const dersSiniflar = useMemo(() => dersler[aktifDers]?.siniflar || [1, 2, 3, 4, 5, 6, 7, 8], [dersler, aktifDers]);
+
   const [sinif, setSinif] = useState(1);
   const [dosya, setDosya] = useState(null);
-  const [onizleme, setOnizleme] = useState(null); // {onizleme:[], toplam, dosya_adi, sinif}
+  const [onizleme, setOnizleme] = useState(null);
   const [yukleniyor, setYukleniyor] = useState(false);
   const [onayIsleniyor, setOnayIsleniyor] = useState(false);
   const [toast, setToast] = useState(null);
 
-  const [istatistik, setIstatistik] = useState(null);
+  const [istatistik, setIstatistik] = useState(null); // global (ders_bazli dahil)
   const [filtreSinif, setFiltreSinif] = useState("");
   const [filtreDurum, setFiltreDurum] = useState("aktif");
   const [arama, setArama] = useState("");
   const [sayfa, setSayfa] = useState(1);
   const [veri, setVeri] = useState({ kelimeler: [], toplam: 0, sayfa_sayisi: 1 });
   const [tabloYukleniyor, setTabloYukleniyor] = useState(false);
-  const [duzenle, setDuzenle] = useState(null); // {id, kelime, anlam, ornek_cumle}
+  const [duzenle, setDuzenle] = useState(null);
 
   const toastGoster = (tip, metin) => { setToast({ tip, metin }); setTimeout(() => setToast(null), 3500); };
+
+  // Dersleri çek (bir kez)
+  useEffect(() => {
+    axios.get(`${apiBase}/meb-kelime/dersler`).then((r) => {
+      if (r.data?.dersler) setDersler(r.data.dersler);
+    }).catch(() => {});
+  }, [apiBase]);
+
+  // Ders değişince yükleme sınıfını o dersin ilk sınıfına ayarla + filtreleri sıfırla
+  useEffect(() => {
+    setSinif(dersSiniflar[0] || 1);
+    setFiltreSinif("");
+    setSayfa(1);
+  }, [aktifDers]); // eslint-disable-line
 
   const listele = useCallback(async (gidilecek = sayfa) => {
     setTabloYukleniyor(true);
     try {
       const r = await axios.get(`${apiBase}/meb-kelime/liste`, {
-        params: { sinif: filtreSinif || undefined, durum: filtreDurum, kelime: arama || undefined, sayfa: gidilecek, limit: 20 },
+        params: { ders: aktifDers, sinif: filtreSinif || undefined, durum: filtreDurum, kelime: arama || undefined, sayfa: gidilecek, limit: 20 },
       });
       setVeri(r.data || { kelimeler: [], toplam: 0, sayfa_sayisi: 1 });
     } catch (e) {
       toastGoster("hata", "Liste yüklenemedi.");
     } finally { setTabloYukleniyor(false); }
-  }, [apiBase, filtreSinif, filtreDurum, arama, sayfa]);
+  }, [apiBase, aktifDers, filtreSinif, filtreDurum, arama, sayfa]);
 
   const istatistikGetir = useCallback(async () => {
     try {
-      const r = await axios.get(`${apiBase}/meb-kelime/istatistik`, { params: { sinif: filtreSinif || undefined } });
+      const r = await axios.get(`${apiBase}/meb-kelime/istatistik`); // global — ders_bazli kartlar için
       setIstatistik(r.data);
     } catch { setIstatistik(null); }
-  }, [apiBase, filtreSinif]);
+  }, [apiBase]);
 
-  useEffect(() => { listele(sayfa); /* eslint-disable-next-line */ }, [sayfa, filtreDurum]);
-  useEffect(() => { istatistikGetir(); /* eslint-disable-next-line */ }, [filtreSinif]);
-  useEffect(() => { listele(1); istatistikGetir(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => { listele(sayfa); /* eslint-disable-next-line */ }, [sayfa, filtreDurum, aktifDers]);
+  useEffect(() => { istatistikGetir(); listele(1); /* eslint-disable-next-line */ }, []);
+
+  const dersToplam = (dk) => istatistik?.ders_bazli?.[dk]?.toplam ?? 0;
+  const aktifDersStat = istatistik?.ders_bazli?.[aktifDers];
 
   // ── Yükle → önizle ──
   const onizle = async () => {
@@ -61,6 +93,7 @@ export default function MebKelimeYonetimi({ apiBase }) {
     const fd = new FormData();
     fd.append("dosya", dosya);
     fd.append("sinif", String(sinif));
+    fd.append("ders", aktifDers);
     setYukleniyor(true);
     try {
       const r = await axios.post(`${apiBase}/meb-kelime/yukle`, fd, { headers: { "Content-Type": "multipart/form-data" } });
@@ -77,20 +110,20 @@ export default function MebKelimeYonetimi({ apiBase }) {
     setOnayIsleniyor(true);
     try {
       const r = await axios.post(`${apiBase}/meb-kelime/onayla`, {
-        kelimeler: onizleme.onizleme, sinif: onizleme.sinif, kaynak_dosya: onizleme.dosya_adi,
+        kelimeler: onizleme.onizleme, sinif: onizleme.sinif, ders: onizleme.ders || aktifDers, kaynak_dosya: onizleme.dosya_adi,
       });
       toastGoster("ok", `✅ ${r.data.yeni_eklenen} kelime eklendi, ${r.data.mevcut_atlanan} atlandı. AI üretimi arka planda başladı.`);
       setOnizleme(null); setDosya(null);
       setFiltreSinif(String(onizleme.sinif)); setSayfa(1);
       setTimeout(() => { listele(1); istatistikGetir(); }, 500);
     } catch (e) {
-      toastGoster("hata", "Onaylama başarısız.");
+      toastGoster("hata", e?.response?.data?.detail || "Onaylama başarısız.");
     } finally { setOnayIsleniyor(false); }
   };
 
   const aiYenile = async () => {
     try {
-      await axios.post(`${apiBase}/meb-kelime/toplu-ai-yenile`, filtreSinif ? { sinif: Number(filtreSinif) } : {});
+      await axios.post(`${apiBase}/meb-kelime/toplu-ai-yenile`, { ders: aktifDers, ...(filtreSinif ? { sinif: Number(filtreSinif) } : {}) });
       toastGoster("ok", "🔄 AI üretimi başlatıldı (bekleyen kelimeler için).");
     } catch { toastGoster("hata", "AI yenileme başlatılamadı."); }
   };
@@ -112,22 +145,39 @@ export default function MebKelimeYonetimi({ apiBase }) {
     <div className="space-y-4">
       <div>
         <h3 className="text-lg font-bold text-gray-800">📖 MEB Kelimeleri</h3>
-        <p className="text-sm text-gray-500">Sınıf bazlı MEB kelime listelerini yükleyin; kelimeler tüm kelime egzersizlerinde önceliklidir.</p>
+        <p className="text-sm text-gray-500">Ders ve sınıf bazlı MEB kelime/kavram listelerini yükleyin; kelimeler tüm kelime egzersizlerinde önceliklidir.</p>
       </div>
 
-      {/* ── Yükleme kartı ── */}
+      {/* ── 5 Ders kartı ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+        {Object.entries(dersler).map(([dk, d]) => {
+          const secili = dk === aktifDers;
+          return (
+            <button key={dk} onClick={() => setAktifDers(dk)}
+              className={`text-left p-3 rounded-2xl border transition-all ${secili ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200" : "border-gray-200 bg-white hover:border-indigo-300"}`}>
+              <div className="text-xl">{d.emoji}</div>
+              <div className="text-sm font-bold text-gray-800 leading-tight mt-0.5">{d.ad}</div>
+              <div className="text-[11px] text-gray-500 mt-0.5">{dersToplam(dk)} kelime</div>
+              <div className="text-[10px] text-gray-400">{sinifAralik(d.siniflar)}</div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── Yükleme kartı (aktif derse göre) ── */}
       <div className="bg-white rounded-2xl border shadow-sm p-5 space-y-3">
-        <div className="font-semibold text-gray-700">📄 Yeni MEB Kelime Listesi Yükle</div>
+        <div className="font-semibold text-gray-700">
+          📄 Yeni Liste Yükle — <span className="text-indigo-600">{dersler[aktifDers]?.emoji} {dersler[aktifDers]?.ad}</span>
+        </div>
         <div className="flex flex-wrap items-end gap-3">
           <label className="text-xs text-gray-600 flex flex-col gap-1">Sınıf
             <select value={sinif} onChange={(e) => setSinif(Number(e.target.value))}
               className="px-3 py-2 rounded-xl border border-gray-200 text-sm">
-              {SINIFLAR.map((s) => <option key={s} value={s}>{s}. sınıf</option>)}
+              {dersSiniflar.map((s) => <option key={s} value={s}>{s}. sınıf</option>)}
             </select>
           </label>
           <label className="text-xs text-gray-600 flex flex-col gap-1">Dosya (PDF/DOCX, max 5MB)
-            <input type="file" accept=".pdf,.docx" onChange={(e) => setDosya(e.target.files?.[0] || null)}
-              className="text-sm" />
+            <input type="file" accept=".pdf,.docx" onChange={(e) => setDosya(e.target.files?.[0] || null)} className="text-sm" />
           </label>
           <button onClick={onizle} disabled={yukleniyor || !dosya}
             className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50">
@@ -136,25 +186,25 @@ export default function MebKelimeYonetimi({ apiBase }) {
         </div>
       </div>
 
-      {/* ── İstatistik ── */}
-      {istatistik && (
+      {/* ── İstatistik (aktif ders) ── */}
+      {aktifDersStat && (
         <div className="bg-indigo-50 border border-indigo-100 rounded-2xl px-4 py-3 text-sm text-indigo-800 flex flex-wrap gap-x-6 gap-y-1">
-          <span>📊 {filtreSinif ? `${filtreSinif}. sınıf` : "Tümü"}: <b>{istatistik.toplam_kelime}</b> kelime</span>
-          <span>✅ <b>{istatistik.ai_uretimi_tamamlanan}</b> AI hazır</span>
-          <span>⏳ <b>{istatistik.ai_bekleyen}</b> bekliyor</span>
-          {istatistik.ai_bekleyen > 0 && (
+          <span>📊 {dersler[aktifDers]?.ad}: <b>{aktifDersStat.toplam}</b> kelime</span>
+          <span>✅ <b>{aktifDersStat.ai_hazir}</b> AI hazır</span>
+          <span>⏳ <b>{aktifDersStat.ai_bekleyen}</b> bekliyor</span>
+          {aktifDersStat.ai_bekleyen > 0 && (
             <button onClick={aiYenile} className="ml-auto text-indigo-600 underline text-xs">🔄 Bekleyenler için AI üret</button>
           )}
         </div>
       )}
 
-      {/* ── Filtreler ── */}
+      {/* ── Filtreler (ders üstteki karttan) ── */}
       <div className="flex flex-wrap items-end gap-2 bg-white rounded-2xl border p-3 shadow-sm">
         <label className="text-xs text-gray-600 flex flex-col gap-1">Sınıf
           <select value={filtreSinif} onChange={(e) => { setFiltreSinif(e.target.value); setSayfa(1); }}
             className="px-2 py-1.5 rounded-lg border border-gray-200 text-sm">
             <option value="">Tümü</option>
-            {SINIFLAR.map((s) => <option key={s} value={s}>{s}. sınıf</option>)}
+            {dersSiniflar.map((s) => <option key={s} value={s}>{s}. sınıf</option>)}
           </select>
         </label>
         <label className="text-xs text-gray-600 flex flex-col gap-1">Durum
@@ -207,7 +257,7 @@ export default function MebKelimeYonetimi({ apiBase }) {
                 <td className="px-3 py-2"><span className={`text-[10px] px-2 py-0.5 rounded-full ${k.durum === "aktif" ? "bg-green-100 text-green-700" : k.durum === "onaysiz" ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-500"}`}>{DURUM_ETIKET[k.durum] || k.durum}</span></td>
                 <td className="px-3 py-2">
                   <div className="flex items-center justify-end gap-1">
-                    <button onClick={() => setDuzenle({ id: k.id, kelime: k.kelime, anlam: k.anlam || "", ornek_cumle: k.ornek_cumle || "" })}
+                    <button onClick={() => setDuzenle({ id: k.id, kelime: k.kelime, ders: k.ders, anlam: k.anlam || "", ornek_cumle: k.ornek_cumle || "" })}
                       title="Düzenle" className="px-2 py-1 rounded-lg text-xs border border-gray-200 hover:bg-gray-100">✏️</button>
                     {k.durum !== "arsivli" && (
                       <button onClick={() => arsivle(k.id)} title="Arşivle"
@@ -237,8 +287,8 @@ export default function MebKelimeYonetimi({ apiBase }) {
         <div className="fixed inset-0 z-[70] bg-black/40 flex items-center justify-center p-4" onClick={() => setOnizleme(null)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[88vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-3 border-b sticky top-0 bg-white rounded-t-2xl">
-              <div className="font-bold text-gray-800">Bulunan Kelimeler ({onizleme.onizleme.length} adet) • {onizleme.sinif}. sınıf</div>
-              <div className="text-xs text-gray-400">{onizleme.dosya_adi}</div>
+              <div className="font-bold text-gray-800">Bulunan Kelimeler ({onizleme.onizleme.length} adet)</div>
+              <div className="text-xs text-gray-400">{dersler[onizleme.ders]?.ad || onizleme.ders} • {onizleme.sinif}. sınıf • {onizleme.dosya_adi}</div>
             </div>
             <div className="p-5 space-y-4">
               <div className="flex flex-wrap gap-1.5 max-h-72 overflow-y-auto">
@@ -270,6 +320,7 @@ export default function MebKelimeYonetimi({ apiBase }) {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-3 border-b font-bold text-gray-800">✏️ {duzenle.kelime}</div>
             <div className="p-5 space-y-3">
+              <div className="text-xs text-gray-500">Ders: <b>{dersler[duzenle.ders]?.ad || duzenle.ders || "Türkçe"}</b> <span className="text-gray-400">(değiştirilemez)</span></div>
               <div>
                 <label className="text-xs font-medium text-gray-500">Anlam</label>
                 <textarea value={duzenle.anlam} onChange={(e) => setDuzenle((d) => ({ ...d, anlam: e.target.value }))} rows={2}
