@@ -3,6 +3,10 @@
 Bu dosya, üzerinde çalışılan işlerin durumunu ve sıradaki adımları tutar.
 (Kod yapısı/geçmiş için git log'a bakın; burası "ne yarım kaldı, sırada ne var" notudur.)
 
+> **Stratejik geliştirme planı:** Sistemin baştan aşağı taranmasıyla çıkarılan
+> fazlı yol haritası **[YOL_HARITASI.md](YOL_HARITASI.md)**'de (kur onarımı,
+> admin kolaylığı, öğrenme kapalı döngüsü, güvenlik). 2026-07-02.
+
 ## Aktif iş: Kitap kelime taraması (PDF → temiz kelime havuzu)
 
 **Amaç:** Yüklenen ders kitabı PDF'inden gürültüsüz benzersiz kelime kökleri
