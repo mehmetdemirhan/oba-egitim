@@ -40,9 +40,9 @@ router = APIRouter()
 # ── Öğretmen XP bileşen ağırlıkları ──
 # Etkinlik puanı (içerik/test/oylama) ve rozet puanına EK olarak; öğretmenin
 # gerçek çıktıları (aldığı öğrenci, kur atlattığı, veli memnuniyeti) de XP'ye etki eder.
-PUAN_OGRENCI_BASI = 20   # alınan her öğrenci başına
-PUAN_KUR_BASI = 50       # her kur atlatma olayı başına
-PUAN_VELI_YILDIZ = 5     # veli anketinde ortalama yıldız başına (5 yıldız = +25/anket)
+PUAN_OGRENCI_BASI = 5    # alınan her öğrenci başına
+PUAN_KUR_BASI = 7        # her kur atlatma olayı başına
+PUAN_VELI_YILDIZ = 2     # veli anketinde ortalama yıldız başına (5 yıldız = +10/anket)
 
 
 async def _get_toplam_xp(ogrenci_id):

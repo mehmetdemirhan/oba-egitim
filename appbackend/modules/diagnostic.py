@@ -194,7 +194,7 @@ async def metin_admin_karar(metin_id: str, karar: dict, current_user=Depends(req
         puanlar = await get_puan_ayarlari()
         metin = await db.analiz_metinler.find_one({"id": metin_id})
         if metin and metin.get("ekleyen_id"):
-            await db.users.update_one({"id": metin["ekleyen_id"]}, {"$inc": {"puan": puanlar.get("metin_havuza_girme", 10)}})
+            await db.users.update_one({"id": metin["ekleyen_id"]}, {"$inc": {"puan": puanlar.get("metin_havuza_girme", 3)}})
     else:
         yeni_durum = "reddedildi"
     await db.analiz_metinler.update_one(
@@ -241,7 +241,7 @@ async def metin_oy_ver(oy: MetinOyCreate, current_user=Depends(get_current_user)
             # Metni ekleyene bonus puan (havuza girince - dinamik)
             ekleyen_id = metin.get("ekleyen_id")
             if ekleyen_id:
-                await db.users.update_one({"id": ekleyen_id}, {"$inc": {"puan": puanlar.get("metin_havuza_girme", 10)}})
+                await db.users.update_one({"id": ekleyen_id}, {"$inc": {"puan": puanlar.get("metin_havuza_girme", 3)}})
         elif oy_sayisi == toplam and onay_orani < 0.6:
             yeni_durum = "reddedildi"
             await db.analiz_metinler.update_one({"id": oy.metin_id}, {"$set": {"durum": "reddedildi"}})

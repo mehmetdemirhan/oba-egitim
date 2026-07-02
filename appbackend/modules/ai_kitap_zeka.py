@@ -334,7 +334,7 @@ SADECE JSON döndür:
       "aciklama": "Neden bu doğru?"
     }}
   ],
-  "xp": 10
+  "xp": 7
 }}"""
 
     elif oyun_turu == "eslestirme":

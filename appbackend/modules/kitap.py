@@ -149,7 +149,7 @@ async def create_kitap(payload: dict, current_user=Depends(get_current_user)):
     }
     await db.kitap_havuzu.insert_one(kitap)
     # Katkı puanı
-    await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": 15}})
+    await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": 4}})
     kitap.pop("_id", None)
     return kitap
 

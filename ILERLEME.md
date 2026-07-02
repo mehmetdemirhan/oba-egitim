@@ -96,6 +96,24 @@ kısa kelimelerle karışan birkaç fragman (`haf, met, nok, oyu, ın, ça`).
   gerçek kitapla uçtan uca (mock değil) bir kez çalıştırıp anlam/örnek kalitesini
   gözden geçirmek daha yüksek değerli olabilir.
 
+## 2026-07-02 (5) — Puan/XP deflasyonu (tüm ödül puanları tek haneli)
+
+Şişmiş puan totallerini önlemek için tüm **kazanılabilir** ödül değerleri monotonik
+harita (`2→1, 3→2, 5→2, 8→3, 10→3, 15→4, 20→5, 25→5, 30→6, 35→6, 40→7, 50→7,
+75→8, 100→9`) ile 1–9 aralığına indirildi. Değişen tanımlar:
+- `core/sistem.py`: `XP_TABLOSU_DEFAULT`, `OGRETMEN_ROZETLERI_DEFAULT` (puan),
+  `OGRENCI_ROZETLERI_DEFAULT` (xp), `VARSAYILAN_PUANLAR`, `OGRETMEN_PUAN_AGIRLIKLARI_DEFAULT`.
+- `LIG_ESIKLERI_DEFAULT`: biriktirilen hedef olduğu için orantılı küçültüldü →
+  bronz 0 / gümüş 20 / altın 50 / elmas 100 (kullanıcı onayı).
+- Sabit-kodlanmış ödüller: `ilerleme.py` PUAN_* yedekleri, `ai_bilgi_tabani.py`
+  `AI_EGITIM_PUANLARI`, `kitap.py` (15→4), `ai_uretim.py` adaptif hikaye xp (10→3),
+  `diagnostic.py` yedek (10→3), `ai_kitap_zeka.py` oyun prompt örneği (10→7).
+- **Test:** `test_ogretmen_basarilarim_smoke.py` beklenen XP'leri güncellendi;
+  **tüm 23 smoke dosyası yeşil**, route 288 değişmedi.
+- Not: Bunlar **varsayılan**; admin panelinden DB override'ı ile ayarlanabilir.
+  Mevcut kullanıcıların birikmiş `puan/toplam_xp` totalleri geriye dönük değişmez
+  (yalnızca bundan sonraki kazanımlar tek haneli).
+
 ## Bilinen teknik borç (kitap taramasından bağımsız)
 - **`modules/auth_api.py` şifre sıfırlama** — (2026-07-02 çözüldü) Geçici şifre artık
   yalnızca `SIFRE_SIFIRLAMA_DEBUG=1` iken (lokal geliştirme) yanıtta döner; prod

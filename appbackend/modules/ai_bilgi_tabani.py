@@ -38,11 +38,11 @@ router = APIRouter()
 
 
 AI_EGITIM_PUANLARI = {
-    "pdf_yukle": 20,
-    "docx_yukle": 20,
-    "onaylandi": 10,       # admin onayı sonrası ek puan
-    "kelime_zengin": 5,    # 50+ kelime çıkarılan yükleme bonusu
-    "soru_zengin": 5,      # 20+ soru çıkarılan yükleme bonusu
+    "pdf_yukle": 5,
+    "docx_yukle": 5,
+    "onaylandi": 3,        # admin onayı sonrası ek puan
+    "kelime_zengin": 2,    # 50+ kelime çıkarılan yükleme bonusu
+    "soru_zengin": 2,      # 20+ soru çıkarılan yükleme bonusu
 }
 
 DESTEKLENEN_FORMATLAR = [".pdf", ".docx", ".doc"]
@@ -1088,7 +1088,7 @@ async def ai_bilgi_tabani_yukle(
     await db.ai_yuklemeler.insert_one(yukleme)
 
     # Puan ver
-    puan = AI_EGITIM_PUANLARI.get(f"{ext.replace('.', '')}_yukle", 20)
+    puan = AI_EGITIM_PUANLARI.get(f"{ext.replace('.', '')}_yukle", 5)
     await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": puan}})
     await db.ai_egitim_puanlari.insert_one({
         "id": str(uuid.uuid4()),

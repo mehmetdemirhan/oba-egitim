@@ -110,12 +110,12 @@ async def run():
         # Puan bilgisi
         pb = d["puan_bilgisi"]
         check(pb["sira"] == 2 and pb["toplam_ogretmen"] == 2, f"sıra 2/2 (gelen {pb['sira']}/{pb['toplam_ogretmen']})")
-        # XP = etkinlik(5000) + rozet(8) + öğrenci(2×20=40) + kur(4×50=200) + veli(~42) = 5290
-        check(pb["toplam_xp"] == 5290, f"toplam_xp bileşenli = 5290 (gelen {pb['toplam_xp']})")
+        # XP = etkinlik(5000) + rozet(2+2=4) + öğrenci(2×5=10) + kur(4×7=28) + veli(~17) = 5059
+        check(pb["toplam_xp"] == 5059, f"toplam_xp bileşenli = 5059 (gelen {pb['toplam_xp']})")
         kir = pb.get("kirilim", {})
-        check(kir.get("ogrenci") == 40, f"öğrenci bonusu 2×20=40 (gelen {kir.get('ogrenci')})")
-        check(kir.get("kur") == 200, f"kur bonusu 4×50=200 (gelen {kir.get('kur')})")
-        check(kir.get("veli") == 42, f"veli bonusu ~42 (gelen {kir.get('veli')})")
+        check(kir.get("ogrenci") == 10, f"öğrenci bonusu 2×5=10 (gelen {kir.get('ogrenci')})")
+        check(kir.get("kur") == 28, f"kur bonusu 4×7=28 (gelen {kir.get('kur')})")
+        check(kir.get("veli") == 17, f"veli bonusu ~17 (gelen {kir.get('veli')})")
         check(sum(v for v in kir.values()) == pb["toplam_xp"], "kırılım toplamı = toplam_xp")
         check(bool(pb["motivasyon_mesaji"]), "motivasyon mesajı dolu")
 
@@ -173,7 +173,8 @@ async def run():
         check(all("mesaj" in t and "baslik" in t and "ikon" in t for t in d["ipuclari"]), "ipuçları {ikon,baslik,mesaj} yapısında")
 
         # ── Ağırlıklar admin panelinden ayarlanabilir ──
-        # Öğrenci başı 20→100 yap; öğrenci bonusu 40→200, toplam 5290→5450 olmalı.
+        # Öğrenci başı 5→100, kur 7→50, veli 2→5 yap; öğrenci 10→200, kur 28→200,
+        # veli 17→42, toplam 5059→5446 olmalı (admin ağırlıkları override ediyor).
         r = await ac.put("/api/ayarlar/ogretmen_puan_agirliklari",
                          json={"degerler": {"ogrenci_basi": 100, "kur_basi": 50, "veli_yildiz": 5}}, headers=HA)
         check(r.status_code == 200, f"admin ağırlık kaydı 200 (status={r.status_code})")
@@ -184,7 +185,7 @@ async def run():
         d2 = (await ac.get("/api/ogretmen/basarilarim", headers=HT)).json()
         check(d2["puan_bilgisi"]["agirliklar"]["ogrenci_basi"] == 100, f"yeni öğrenci ağırlığı 100 (gelen {d2['puan_bilgisi']['agirliklar']['ogrenci_basi']})")
         check(d2["puan_bilgisi"]["kirilim"]["ogrenci"] == 200, f"öğrenci bonusu 2×100=200 (gelen {d2['puan_bilgisi']['kirilim']['ogrenci']})")
-        check(d2["puan_bilgisi"]["toplam_xp"] == 5450, f"yeni toplam_xp 5450 (gelen {d2['puan_bilgisi']['toplam_xp']})")
+        check(d2["puan_bilgisi"]["toplam_xp"] == 5446, f"yeni toplam_xp 5446 (gelen {d2['puan_bilgisi']['toplam_xp']})")
 
     await server.client.drop_database(TEST_DB)
     print(f"\nSONUC: {_gecen}/{_gecen + _kalan} kontrol gecti")

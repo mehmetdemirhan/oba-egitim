@@ -873,7 +873,7 @@ SADECE JSON döndür:
     hikaye_id = str(__import__("uuid").uuid4())[:8]
     result["hikaye_id"] = hikaye_id
     await db.ai_hikaye_log.insert_one({**result})
-    await db.xp_logs.insert_one({"ogrenci_id": ogrenci_id, "xp": 10, "kaynak": "adaptif_hikaye", "tarih": datetime.utcnow().isoformat()})
+    await db.xp_logs.insert_one({"ogrenci_id": ogrenci_id, "xp": 3, "kaynak": "adaptif_hikaye", "tarih": datetime.utcnow().isoformat()})
     return result
 
 
