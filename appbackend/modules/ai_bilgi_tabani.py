@@ -71,14 +71,30 @@ def _bt_tr_kucuk(s: str) -> str:
 # (ör. "papatya", "dünya", "kelime" korunur). En fazla 2 kat ek soyulur.
 _KOK_EKLER = sorted([
     "larından", "lerinden", "larında", "lerinde", "sından", "sinden",
+    "lardaki", "lerdeki",
     "larını", "lerini", "ların", "lerin", "ları", "leri",
+    "lardan", "lerden", "larla", "lerle", "larda", "lerde", "lara", "lere",
     "sının", "sinin", "sunun", "sünün", "sını", "sini", "sunu", "sünü",
     "ından", "inden", "undan", "ünden", "ında", "inde", "unda", "ünde",
+    "ını", "ini", "unu", "ünü",  # iyelik+belirtme (adını→ad, kitabını→kitap)
     "nın", "nin", "nun", "nün",
+    "daki", "deki",
     "dan", "den", "tan", "ten",
     "ler", "lar",
     "da", "de", "ta", "te",
 ], key=len, reverse=True)
+
+
+# Ünsüz yumuşaması geri-döndürme: ünlüyle BAŞLAYAN bir ek soyulunca açığa çıkan
+# yumuşamış son sesi sertleştir (kitab→kitap, sözcüğ→sözcük, ağac→ağaç, kanad→kanat).
+# Türkçe kökler ötümlü b/c/d/g/ğ ile bitmez → yanlış-pozitif riski çok düşük.
+_KOK_SERT = {"b": "p", "c": "ç", "d": "t", "g": "k", "ğ": "k"}
+
+
+def _sert_geri(k: str) -> str:
+    if len(k) >= 3 and k[-1] in _KOK_SERT:
+        return k[:-1] + _KOK_SERT[k[-1]]
+    return k
 
 
 _KOK_UNSUZ = set("bcçdfgğhjklmnprsştvyz")
@@ -101,6 +117,8 @@ def _turkce_kok(kelime: str) -> str:
                 continue
             if k.endswith(ek) and len(k) - len(ek) >= 2:
                 k = k[:-len(ek)]
+                if ek[0] in _KOK_UNLU:      # ünlü-başlı ek → yumuşamayı geri al
+                    k = _sert_geri(k)
                 break
         if k != onceki:
             continue
@@ -134,6 +152,16 @@ _STOPWORDS = {
     "tabii", "evet", "hayır", "nasıl", "neden", "niçin", "niye", "hangi", "kaç", "kim",
     "işte", "hep", "bazı", "kimi", "ayrıca", "hatta", "hala", "hâlâ", "ya da", "eğer",
     "ancak", "böyle", "şöyle", "öyle", "yine", "gene", "hiçbir", "birçok",
+}
+
+# Kök gibi görünen ama gerçek kelime OLMAYAN ek/çekim fragmanları (PDF'de kelimeden
+# kopmuş ekler ya da eksik soyulan parçalar). Gerçek 1. sınıf kelimeleri (gün, göz,
+# söz, yol, yer, kız, kuş, baş, iyi, iki, ilk, ad, ay, el, iş…) bilinçli olarak DIŞTA.
+_KOK_FRAGMAN = {
+    "daki", "deki", "dan", "den", "tan", "ten", "nin", "nın", "nun", "nün",
+    "ini", "ını", "unu", "ünü", "lim", "lım", "rum", "rim", "rek", "relim",
+    "yelim", "yalım", "mek", "mak", "muş", "miş", "mış", "müş", "ken",
+    "cik", "cık", "gi", "gı", "ler", "lar", "leri", "ları", "lere", "lara",
 }
 
 
@@ -177,6 +205,10 @@ def _tum_kelimeleri_cikar(metin: str) -> list:
             continue
         k = _turkce_kok(w)
         if len(k) < 2 or not (set(k) & _UNLU) or k in _STOPWORDS:
+            continue
+        if k.endswith("ğ"):               # Türkçe kök ğ ile bitmez (geldiğ, olduğ → PDF/soyma artefaktı)
+            continue
+        if k in _KOK_FRAGMAN:             # ek/çekim fragmanı (daki, mek, ları…)
             continue
         kok_frek[k] += 1
 

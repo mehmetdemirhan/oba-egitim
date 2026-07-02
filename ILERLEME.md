@@ -41,13 +41,31 @@ doğru ama **üç tür gürültü** hâlâ sızıyor (bir sonraki iyileştirmeni
 **Doğrulama scripti (tek seferlik, repoya girmedi):** fitz ile PDF metni çıkarıp
 `_tum_kelimeleri_cikar`'a verir, kök sayısı + kısa/şüpheli kök listesi raporlar.
 
+### 2026-07-02 (2) — Stemmer güçlendirme (madde 1 & 2 kısmen çözüldü)
+
+`_turkce_kok` + `_tum_kelimeleri_cikar` iyileştirildi (`ai_bilgi_tabani.py`):
+- **Ünsüz yumuşaması geri-döndürme** (`_sert_geri`): ünlü-başlı ek soyulunca
+  b→p, c→ç, d→t, g/ğ→k (kitabından→kitap, sözcüğünü→sözcük, ağacından→ağaç).
+- **Yeni ekler:** çoğul+hâl/araç zincirleri (lere/lara/lerden/lardan/lerle/larla/
+  lerde/larda/lerdeki/lardaki/deki/daki) + iyelik-belirtme (ını/ini/unu/ünü).
+  → sözcük/görsel/bisiklet aileleri artık tek köke iniyor.
+- **Fragman + ğ-sonu elemesi:** `_KOK_FRAGMAN` (daki, mek, ları, lim…) ve
+  `ğ` ile biten kökler (geldiğ, olduğ) havuza girmiyor.
+- **Ölçüm (turkce_1_1.pdf):** 610 → **592 kök**; ≤3 harf gürültü 81 → 71.
+- **Test:** `test_ai_egit_anlam_smoke.py` **34/34** (9 yeni stemmer kontrolü eklendi).
+
+**Bilinçli SINIR (over-stem koruması):** Çıplak tek-ünlü belirtme eki (-ı/-i/-u/-ü)
+SOYULMUYOR; çünkü `milli`→`mill`, `kutu`→`kut`, `sürücü`→`sürüç` gibi gerçek
+kökleri kırardı (smoke `millî→milli` bunu koruyor). Bu yüzden `kelebeği`,
+`büyüteci`, `sözcüğe` gibi *çıplak* belirtme/yönelme formları hâlâ ayrı kalıyor.
+
 ### Sıradaki mantıklı adım
-- **Öncelik 1:** Stemmer'ı yukarıdaki 2. maddeye göre güçlendir (iyelik+hâl eki
-  zinciri + ünsüz yumuşaması geri-döndürme) ve 1. maddedeki fragman köklere karşı
-  bir "geçerli kök" beyaz/kara listesi veya min-uzunluk+ek-sözlüğü kontrolü ekle.
-  Her değişiklikte `test_ai_egit_anlam_smoke.py` yeşil kalmalı.
-- **Öncelik 2:** PDF metnini tokenize etmeden önce satır sonu tireleme/kırılma
-  birleştirme (3. madde) — kesik tokenları azaltır.
+- **Öncelik 1:** Kalan çıplak belirtme/yönelme formlarını (kelebeği→kelebek,
+  büyüteci→büyüteç) güvenle birleştirmek için **kök sözlüğü** yaklaşımı — çıplak
+  ünlü soymayı yalnızca "soyulan kök zaten havuzda/bilinen kök" ise uygula
+  (kural-tabanlı çıplak soyma over-stem yaptığından tek çözüm sözlük).
+- **Öncelik 2:** PDF metnini tokenize etmeden satır sonu tireleme/kırılma
+  birleştirme (madde 3: nekteki, hika, metn…) — kesik tokenları azaltır.
 
 ## Bilinen teknik borç (kitap taramasından bağımsız)
 - **`modules/auth_api.py` şifre sıfırlama** — (2026-07-02 çözüldü) Geçici şifre artık

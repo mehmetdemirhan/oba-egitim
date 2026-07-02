@@ -71,6 +71,22 @@ async def run():
     check(bt._turkce_kok("millî") == "milli", f"şapkalı: millî→milli (gelen {bt._turkce_kok('millî')})")
     c4 = bt._tum_kelimeleri_cikar("ve kitap ve kalem ve millî millî bayram bayram")
     check("ve" not in c4 and "milli" in c4, f"stopword elendi + şapkalı normalize (gelen {c4})")
+    # Ünsüz yumuşaması geri-döndürme (ünlü-başlı ek soyulunca): kitab→kitap, sözcüğ→sözcük
+    check(kok("kitabından") == "kitap", f"yumuşama: kitabından→kitap (gelen {kok('kitabından')})")
+    check(kok("ağacından") == "ağaç", f"yumuşama: ağacından→ağaç (gelen {kok('ağacından')})")
+    check(kok("kanadından") == "kanat", f"yumuşama: kanadından→kanat (gelen {kok('kanadından')})")
+    # İyelik+belirtme (-ını/-ini) ve çoğul+hâl (-lere/-lerle/-lerdeki) birleşmeleri
+    check(kok("adını") == "ad", f"ek: adını→ad (gelen {kok('adını')})")
+    check(kok("sözcüğünü") == "sözcük", f"ek: sözcüğünü→sözcük (gelen {kok('sözcüğünü')})")
+    check(kok("sözcüklere") == "sözcük" and kok("sözcüklerle") == "sözcük",
+          f"ek: sözcüklere/lerle→sözcük (gelen {kok('sözcüklere')}, {kok('sözcüklerle')})")
+    check(kok("görsellerdeki") == "görsel", f"ek: görsellerdeki→görsel (gelen {kok('görsellerdeki')})")
+    # Yeni eklerin over-stem YAPMADIĞI (loanword/kök korunur)
+    check(kok("kod") == "kod" and kok("cümle") == "cümle", f"koru: kod/cümle (gelen {kok('kod')}, {kok('cümle')})")
+    # Fragman kök + ğ-sonu elemesi (daki, mek, ları, geldiğ → havuza girmez)
+    c5 = bt._tum_kelimeleri_cikar("daki mek ları geldiğ kalem kalem defter defter")
+    check(all(f not in c5 for f in ("daki", "mek", "ları", "geldiğ")) and "kalem" in c5,
+          f"fragman/ğ-sonu elendi (gelen {c5})")
 
     # Ham kelimeler (anlam boş) — iletisim iki sınıfta, sorumluluk bir sınıfta
     for s in (3, 5):
