@@ -15,6 +15,11 @@ load_dotenv(ROOT_DIR / '.env')
 MONGO_URL = os.environ['MONGO_URL']
 DB_NAME = os.environ['DB_NAME']
 
+# ── Güvenlik / geliştirme bayrakları ──
+# Şifre sıfırlamada geçici şifreyi HTTP yanıtında GÖSTER (yalnızca lokal geliştirme).
+# Prod'da e-posta/SMS gönderimi olmadığından varsayılan KAPALI: şifre yanıtta dönmez.
+SIFRE_SIFIRLAMA_DEBUG = os.environ.get("SIFRE_SIFIRLAMA_DEBUG", "").lower() in ("1", "true", "yes", "on")
+
 # ── Backup (GridFS) & update-check config ──
 APP_VERSION = os.environ.get("APP_VERSION", "1.0.0")
 GITHUB_REPO_OWNER = os.environ.get("GITHUB_REPO_OWNER", "")

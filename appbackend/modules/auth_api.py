@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Body
 from pydantic import BaseModel
 
 from core.db import db
+from core.config import SIFRE_SIFIRLAMA_DEBUG
 from core.auth import (
     UserRole, get_current_user, require_role,
     hash_password, verify_password, create_access_token,
@@ -123,15 +124,18 @@ async def forgot_password(data: dict = Body(...)):
     gecici_sifre = str(random.randint(100000, 999999))
     new_hash = hash_password(gecici_sifre)
     await db.users.update_one({"id": user["id"]}, {"$set": {"password_hash": new_hash}})
-    # NOT: Gerçek uygulamada burada e-posta veya SMS gönderilir
-    # Şimdilik geçici şifreyi response'da döndürüyoruz (geliştirme aşaması)
-    return {
-        "message": f"Geçici şifre oluşturuldu",
-        "gecici_sifre": gecici_sifre,
+    # NOT: Gerçek uygulamada burada e-posta veya SMS gönderilir.
+    # Güvenlik: geçici şifre yalnızca lokal geliştirmede (SIFRE_SIFIRLAMA_DEBUG=1)
+    # yanıtta döner; prod varsayılanında SIZDIRILMAZ.
+    yanit = {
+        "message": "Geçici şifre oluşturuldu",
         "kullanici": f"{user['ad']} {user['soyad']}",
         "email": user.get("email", ""),
         "telefon": user.get("telefon", ""),
     }
+    if SIFRE_SIFIRLAMA_DEBUG:
+        yanit["gecici_sifre"] = gecici_sifre
+    return yanit
 
 @router.post("/auth/change-password")
 async def change_password(data: ChangePassword, current_user=Depends(get_current_user)):

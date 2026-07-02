@@ -3,6 +3,10 @@ __pycache__/
 .claude/
 node_modules/
 
+# test/deneme kitap PDF'leri (kelime tarama denemesi)
+turkce_1_1.pdf
+*_deneme.pdf
+
 # tek seferlik debug scriptleri
 metin_kontrol.py
 metin_kontrol_v2.py
