@@ -67,6 +67,28 @@ async def run():
         print(f"[{tip}] {durum}")
         print(f"    önce : {_ozet(eski)}")
         print(f"    sonra: {_ozet(yeni)}")
+
+    # ── db.ayarlar: egzersiz per-id ödülleri (admin ayarlı; varsayılan seed YOK) ──
+    # Doküman varsa iki haneli değerleri tek haneye çeker (egzersiz tarifesi ~2 →
+    # ~÷5). Yoksa atlanır (kod fallback'i zaten 2 kullanır).
+    ez = await db.ayarlar.find_one({"tip": "egzersiz_puanlari"})
+    if ez and ez.get("puanlar"):
+        eski = ez["puanlar"]
+        yeni = {
+            k: (v if not isinstance(v, (int, float)) or v <= 9 else max(1, min(9, round(v / 5))))
+            for k, v in eski.items()
+        }
+        if yeni != eski:
+            await db.ayarlar.update_one({"tip": "egzersiz_puanlari"}, {"$set": {"puanlar": yeni}})
+            print("[egzersiz_puanlari] güncellendi (db.ayarlar)")
+            for k in eski:
+                if eski[k] != yeni[k]:
+                    print(f"    {k}: {eski[k]} → {yeni[k]}")
+        else:
+            print("[egzersiz_puanlari] zaten tek haneli, değişiklik yok")
+    else:
+        print("[egzersiz_puanlari] db.ayarlar'da yok → atlandı (kod fallback'i 2 kullanır)")
+
     print("=" * 60)
     print("Bitti. Backend'i yeniden başlatmaya gerek yok (getter'lar DB'yi her istekte okur).")
     client.close()

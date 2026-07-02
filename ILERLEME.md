@@ -129,8 +129,9 @@ tüm değerler orantılı (1–9, "en küçük eylem=1") hale getirildi:
 - **Fallback literalleri** yeni varsayılanlara eşitlendi (gelisim/diagnostic).
 - Tüm 23 smoke dosyası yeşil; DB `puan_ayarlari` yeni anahtarlarla senkronlandı
   (`migrate_puan_deflasyon.py` VARSAYILAN_PUANLAR'ı okur, tekrar çalıştırıldı).
-- Not: egzersiz per-id ödülleri ayrı `db.ayarlar` dokümanında; admin oradan
-  iki haneli değer girmişse elle gözden geçirilmeli (kod fallback'i artık 2).
+- egzersiz per-id ödülleri ayrı `db.ayarlar/egzersiz_puanlari` dokümanında;
+  `migrate_puan_deflasyon.py` artık onu da (varsa) iki haneli→tek haneye çeker
+  (~÷5, egzersiz tarifesi 2; ör. 10→2, 20→4). Localhost'ta doküman yok, atlanır.
 
 ## Bilinen teknik borç (kitap taramasından bağımsız)
 - **`modules/auth_api.py` şifre sıfırlama** — (2026-07-02 çözüldü) Geçici şifre artık
