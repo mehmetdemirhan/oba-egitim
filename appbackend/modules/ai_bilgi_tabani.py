@@ -71,7 +71,7 @@ def _bt_tr_kucuk(s: str) -> str:
 # (ör. "papatya", "dünya", "kelime" korunur). En fazla 2 kat ek soyulur.
 _KOK_EKLER = sorted([
     "larından", "lerinden", "larında", "lerinde", "sından", "sinden",
-    "lardaki", "lerdeki",
+    "lardaki", "lerdeki", "taki", "teki",
     "larını", "lerini", "ların", "lerin", "ları", "leri",
     "lardan", "lerden", "larla", "lerle", "larda", "lerde", "lara", "lere",
     "sının", "sinin", "sunun", "sünün", "sını", "sini", "sunu", "sünü",
@@ -207,6 +207,24 @@ def _kanitli_kok_birlestir(kok_frek) -> None:
                 break
 
 
+# PDF satır-sonu tireleme desenleri (ör. 1. sınıf kitabı):
+#  - Soft hyphen (U+00AD) + satır sonu: "ör­\nnekteki" → "örnekteki" (yumuşak tire,
+#    her zaman tireleme noktası → koşulsuz birleştir).
+#  - Normal tire + satır sonu: "içe-\nriklere" → "içeriklere". ANCAK sözlük harf
+#    başlıklarını ("-A-\namaç" → "Aamaç") bozmamak için yalnızca tirenin ÖNÜNDE
+#    ≥2 küçük harf varsa birleştir (tek büyük harfli başlıklar korunur).
+_YUMUSAK_TIRE = "­"
+_TIRE_SATIR = re.compile(r"([a-zçğıöşüâîû]{2,})-[ \t]*\n[ \t]*([a-zçğıöşü])")
+
+
+def _pdf_metin_birlestir(metin: str) -> str:
+    """PDF metnindeki satır-sonu tireleme bölünmelerini onarır (tokenize öncesi)."""
+    metin = re.sub(_YUMUSAK_TIRE + r"[ \t]*\n[ \t]*", "", metin)  # soft-hyphen tireleme
+    metin = metin.replace(_YUMUSAK_TIRE, "")                       # kalan gizli soft-hyphen
+    metin = _TIRE_SATIR.sub(r"\1\2", metin)                        # normal tireleme (korumalı)
+    return metin
+
+
 def _tum_kelimeleri_cikar(metin: str) -> list:
     """Metindeki benzersiz, TEMİZ Türkçe kelime KÖKLERİNİ döndürür.
 
@@ -219,7 +237,7 @@ def _tum_kelimeleri_cikar(metin: str) -> list:
       4. ARTEFAKT: ünlü içermeyen parçalar (şif, kfç) elenir.
     """
     from collections import Counter
-    metin = metin or ""
+    metin = _pdf_metin_birlestir(metin or "")     # satır-sonu tireleme onarımı
     tokenlar = re.findall(r"[A-Za-zÇĞIİÖŞÜçğıiöşüâÂîÎûÛêÊ]+", metin)
 
     # Özel isim tespiti: hep büyük-harf-başı görülen, hiç tamamen küçük görülmeyen

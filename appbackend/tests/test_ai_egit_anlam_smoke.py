@@ -98,6 +98,15 @@ async def run():
     # Guard: kısa çift-kanıtlı biçim birleşmez (kapı ≠ kap)
     c8 = bt._tum_kelimeleri_cikar("kapı kapı kap kap")
     check("kapı" in c8 and "kap" in c8, f"guard: kapı≠kap (len<5) (gelen {c8})")
+    # PDF satır-sonu tireleme onarımı (_pdf_metin_birlestir)
+    nb = bt._pdf_metin_birlestir
+    check(nb("ör­\nnekteki") == "örnekteki", f"soft-hyphen birleşti (gelen {nb(chr(0x00ad))!r})")
+    check(nb("içe-\nriklere") == "içeriklere", "normal tireleme birleşti")
+    check(nb("-A-\namaç") == "-A-\namaç", "sözlük harf başlığı (-A-) korundu")
+    # Onarım sonrası kök: örnekteki→örnek, bölünmüş kelime köke iniyor
+    check(kok("örnekteki") == "örnek", f"ek: örnekteki→örnek (gelen {kok('örnekteki')})")
+    c9 = bt._tum_kelimeleri_cikar("belir­\nleyerek örnek örnek belirle belirle")
+    check("leyerek" not in c9, f"tireleme artefaktı (leyerek) havuza girmedi (gelen {c9})")
 
     # Ham kelimeler (anlam boş) — iletisim iki sınıfta, sorumluluk bir sınıfta
     for s in (3, 5):

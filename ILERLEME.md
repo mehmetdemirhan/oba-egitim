@@ -72,12 +72,29 @@ da geçiyorsa** birleştirilir:
 - **Ölçüm (turkce_1_1.pdf):** 592 → **577 kök** (kümülatif 610→577).
 - **Test:** `test_ai_egit_anlam_smoke.py` **38/38** (+4 kanıtlı-birleştirme kontrolü).
 
+### 2026-07-02 (4) — PDF satır-sonu tireleme onarımı (madde 3 tamam)
+
+`_pdf_metin_birlestir` eklendi (tokenize öncesi çağrılır):
+- **Soft hyphen (U+00AD) + satır sonu:** kitapta 106 kez, hepsi tireleme →
+  koşulsuz birleştirilir (`ör­\nnekteki`→`örnekteki`, `belir­\nleyerek`→`belirleyerek`).
+- **Normal tire + satır sonu:** yalnızca tirenin önünde ≥2 küçük harf varsa
+  (`içe-\nriklere`→`içeriklere`). Sözlük harf başlıkları (`-A-\namaç`) KORUNUR.
+- `teki/taki` eki eklendi (`örnekteki`→`örnek`, `çiftlikteki`→`çiftlik`).
+- Font mojibake (`÷`=ğ, 7 kez) ihmal edildi — tekil, sıklık filtresi eliyor.
+- **Ölçüm (turkce_1_1.pdf):** 577 → **569 kök**; ≤3 harf gürültü 72 → 63.
+- **Test:** `test_ai_egit_anlam_smoke.py` **43/43** (+5 tireleme kontrolü).
+
+**Kümülatif sonuç (610 → 569 kök, ≤3 harf gürültü 81 → 63):** kitap kelime havuzu
+tarama boru hattı temizlendi; kalan gürültü çoğunlukla tekil mojibake ve gerçek
+kısa kelimelerle karışan birkaç fragman (`haf, met, nok, oyu, ın, ça`).
+
 ### Sıradaki mantıklı adım
-- **Öncelik 1:** PDF metnini tokenize etmeden satır sonu tireleme/kırılma
-  birleştirme (madde 3: `nekteki`, `hika`, `metn`, `varl`…) — kesik tokenları azaltır.
-  fitz `get_text` çıktısında satır sonu `-`/kelime bölünmelerini birleştir.
-- **Öncelik 2:** Kalan kısa gürültü kökleri (`haf, met, nok, oyu, ın, ça…`) için
-  ek fragman/geçerlilik kontrolü — ama gerçek kısa kelimeleri (göz, söz, yol…) koru.
+- **Öncelik 1 (opsiyonel, düşük getiri):** Kalan kısa fragmanlar (`haf, met, nok,
+  oyu, ın, ça`) — gerçek kısa kelimeleri (göz, söz, yol, kız…) BOZMADAN elemek zor;
+  ancak istenirse elle küçük bir kara-liste genişletmesi yapılabilir.
+- **Öncelik 2:** Havuz kalitesi artık iyi → asıl AI anlam üretimini (`_harita_anlam_uret`)
+  gerçek kitapla uçtan uca (mock değil) bir kez çalıştırıp anlam/örnek kalitesini
+  gözden geçirmek daha yüksek değerli olabilir.
 
 ## Bilinen teknik borç (kitap taramasından bağımsız)
 - **`modules/auth_api.py` şifre sıfırlama** — (2026-07-02 çözüldü) Geçici şifre artık
