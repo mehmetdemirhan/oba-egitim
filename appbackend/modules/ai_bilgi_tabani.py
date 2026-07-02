@@ -164,6 +164,48 @@ _KOK_FRAGMAN = {
     "cik", "cık", "gi", "gı", "ler", "lar", "leri", "ları", "lere", "lara",
 }
 
+# Çıplak belirtme/iyelik (-ı/-i/-u/-ü) + yönelme (-e/-a) ünlü ekleri. Kural-tabanlı
+# çıplak soyma over-stem yapar (milli→mill, kutu→kut), bu yüzden YALNIZCA "kanıtlı
+# kök" birleştirmesinde kullanılır: soyulan biçim METİNDE bağımsız kök olarak da
+# geçiyorsa çekim sayılıp birleştirilir (kelebeği+kelebek→kelebek); geçmiyorsa dokunulmaz.
+_CIPLAK_UNLU = set("ıiuüea")
+
+
+def _ciplak_adaylar(R: str):
+    """R çekimli kök adayı ise soyulmuş HEDEF kök adaylarını (öncelik sırasıyla) üretir.
+
+    Kural-tabanlı olarak riskli (over-stem) soymalar; yalnızca kanıt kontrolünden
+    geçerse uygulanır. Adaylar:
+      - çıplak belirtme/iyelik/yönelme ünlüsü: kelebeği→kelebek, sözcüğe→sözcük
+      - araç/birliktelik -le/-la (ünsüz-önü): büyüteçle→büyüteç, kalemle→kalem
+      - araç -yle/-yla (ünlü-önü): arabayla→araba
+    """
+    if len(R) < 5:
+        return
+    if R[-1] in _CIPLAK_UNLU and R[-2] in _KOK_UNSUZ:      # çıplak ünlü (+yumuşama)
+        yield _sert_geri(R[:-1])
+    if R.endswith(("le", "la")) and R[-3] in _KOK_UNSUZ:   # -le/-la (kalemle→kalem)
+        yield R[:-2]
+    if R.endswith(("yle", "yla")):                         # -yle/-yla (arabayla→araba)
+        yield R[:-3]
+
+
+def _kanitli_kok_birlestir(kok_frek) -> None:
+    """kök→sıklık Counter'ında çıplak çekim biçimlerini KANITLI köke akıtır.
+
+    Örn. metinde hem "kelebeği" hem "kelebek" varsa; "kelebeği" çıplak -i soyulunca
+    (+ünsüz yumuşaması) "kelebek" olur ve o kök zaten mevcutsa sıklığı ona eklenir.
+    "milli"→"mill", "cümle"→"cüml" gibi KANITSIZ hedefler DOKUNULMAZ (over-stem YOK).
+    Uzundan kısaya işlenir ki çekim zincirleri (kelebeğini→kelebeği→kelebek) çözülsün.
+    """
+    for R in sorted(kok_frek, key=len, reverse=True):
+        if R not in kok_frek:               # önceki adımda taşındı
+            continue
+        for hedef in _ciplak_adaylar(R):
+            if len(hedef) >= 3 and hedef != R and hedef in kok_frek:
+                kok_frek[hedef] += kok_frek.pop(R)
+                break
+
 
 def _tum_kelimeleri_cikar(metin: str) -> list:
     """Metindeki benzersiz, TEMİZ Türkçe kelime KÖKLERİNİ döndürür.
@@ -212,6 +254,7 @@ def _tum_kelimeleri_cikar(metin: str) -> list:
             continue
         kok_frek[k] += 1
 
+    _kanitli_kok_birlestir(kok_frek)          # çıplak çekim biçimlerini kanıtlı köke akıt
     out = [k for k, n in kok_frek.items() if n >= esik]
     return out[:TUM_KELIME_MAKS]
 

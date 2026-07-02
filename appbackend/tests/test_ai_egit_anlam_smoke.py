@@ -87,6 +87,17 @@ async def run():
     c5 = bt._tum_kelimeleri_cikar("daki mek ları geldiğ kalem kalem defter defter")
     check(all(f not in c5 for f in ("daki", "mek", "ları", "geldiğ")) and "kalem" in c5,
           f"fragman/ğ-sonu elendi (gelen {c5})")
+    # KANITLI kök birleştirme: çıplak çekim biçimi, kök metinde varsa köke akıtılır
+    c6 = bt._tum_kelimeleri_cikar("kelebek kelebek kelebeği büyüteç büyüteç büyüteci büyüteçle")
+    check(c6.count("kelebek") == 1 and "kelebeği" not in c6, f"kanıtlı: kelebeği→kelebek (gelen {c6})")
+    check(c6.count("büyüteç") == 1 and "büyüteci" not in c6 and "büyüteçle" not in c6,
+          f"kanıtlı: büyüteci/büyüteçle→büyüteç (gelen {c6})")
+    # Kanıtsız hedef DOKUNULMAZ (over-stem yok): mill yok → milli korunur
+    c7 = bt._tum_kelimeleri_cikar("milli milli sürücü sürücü")
+    check("milli" in c7 and "sürücü" in c7 and "mill" not in c7, f"kanıtsız hedef korundu (gelen {c7})")
+    # Guard: kısa çift-kanıtlı biçim birleşmez (kapı ≠ kap)
+    c8 = bt._tum_kelimeleri_cikar("kapı kapı kap kap")
+    check("kapı" in c8 and "kap" in c8, f"guard: kapı≠kap (len<5) (gelen {c8})")
 
     # Ham kelimeler (anlam boş) — iletisim iki sınıfta, sorumluluk bir sınıfta
     for s in (3, 5):

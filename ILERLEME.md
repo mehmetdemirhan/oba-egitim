@@ -55,17 +55,29 @@ doğru ama **üç tür gürültü** hâlâ sızıyor (bir sonraki iyileştirmeni
 - **Test:** `test_ai_egit_anlam_smoke.py` **34/34** (9 yeni stemmer kontrolü eklendi).
 
 **Bilinçli SINIR (over-stem koruması):** Çıplak tek-ünlü belirtme eki (-ı/-i/-u/-ü)
-SOYULMUYOR; çünkü `milli`→`mill`, `kutu`→`kut`, `sürücü`→`sürüç` gibi gerçek
-kökleri kırardı (smoke `millî→milli` bunu koruyor). Bu yüzden `kelebeği`,
-`büyüteci`, `sözcüğe` gibi *çıplak* belirtme/yönelme formları hâlâ ayrı kalıyor.
+kural-tabanlı SOYULMUYOR; çünkü `milli`→`mill`, `kutu`→`kut`, `sürücü`→`sürüç` gibi
+gerçek kökleri kırardı (smoke `millî→milli` bunu koruyor). → Bu, aşağıdaki (3) adımda
+kanıt-tabanlı olarak çözüldü.
+
+### 2026-07-02 (3) — Kanıt-tabanlı çıplak çekim birleştirme (madde 2 tamam)
+
+`_kanitli_kok_birlestir` + `_ciplak_adaylar` eklendi. Çıplak ünlü (-ı/-i/-u/-ü/-e/-a)
+ve araç eki (-le/-la/-yle/-yla) yalnızca **soyulan hedef kök metinde bağımsız olarak
+da geçiyorsa** birleştirilir:
+- `kelebeği`+`kelebek`→`kelebek`, `büyüteci`/`büyüteçle`+`büyüteç`→`büyüteç`,
+  `sözcüğe`/`sözcüğü`→`sözcük`, `kitaba`/`kitabı`→`kitap` (yumuşamayla).
+- **Over-stem YOK:** hedef kanıtsızsa dokunulmaz — `milli`(mill yok), `cümle`(cüml
+  yok), `sürücü`(sürüç yok) korunur. Kısa çift-kanıtlı biçimler (`kapı`≠`kap`) len<5
+  guard'ıyla ayrı kalır.
+- **Ölçüm (turkce_1_1.pdf):** 592 → **577 kök** (kümülatif 610→577).
+- **Test:** `test_ai_egit_anlam_smoke.py` **38/38** (+4 kanıtlı-birleştirme kontrolü).
 
 ### Sıradaki mantıklı adım
-- **Öncelik 1:** Kalan çıplak belirtme/yönelme formlarını (kelebeği→kelebek,
-  büyüteci→büyüteç) güvenle birleştirmek için **kök sözlüğü** yaklaşımı — çıplak
-  ünlü soymayı yalnızca "soyulan kök zaten havuzda/bilinen kök" ise uygula
-  (kural-tabanlı çıplak soyma over-stem yaptığından tek çözüm sözlük).
-- **Öncelik 2:** PDF metnini tokenize etmeden satır sonu tireleme/kırılma
-  birleştirme (madde 3: nekteki, hika, metn…) — kesik tokenları azaltır.
+- **Öncelik 1:** PDF metnini tokenize etmeden satır sonu tireleme/kırılma
+  birleştirme (madde 3: `nekteki`, `hika`, `metn`, `varl`…) — kesik tokenları azaltır.
+  fitz `get_text` çıktısında satır sonu `-`/kelime bölünmelerini birleştir.
+- **Öncelik 2:** Kalan kısa gürültü kökleri (`haf, met, nok, oyu, ın, ça…`) için
+  ek fragman/geçerlilik kontrolü — ama gerçek kısa kelimeleri (göz, söz, yol…) koru.
 
 ## Bilinen teknik borç (kitap taramasından bağımsız)
 - **`modules/auth_api.py` şifre sıfırlama** — (2026-07-02 çözüldü) Geçici şifre artık
