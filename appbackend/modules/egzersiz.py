@@ -53,7 +53,7 @@ async def egzersiz_tamamla(data: dict, current_user=Depends(get_current_user)):
     # Puan hesapla
     ayar = await db.ayarlar.find_one({"tip": "egzersiz_puanlari"})
     puanlar = ayar.get("puanlar", {}) if ayar else {}
-    kazanilan = puanlar.get(egzersiz_id, 10)  # varsayılan 10 puan
+    kazanilan = puanlar.get(egzersiz_id, 2)  # varsayılan 2 puan (egzersiz XP tarifesi)
     # Kaydet
     await db.egzersiz_kayitlari.insert_one({
         "id": str(uuid.uuid4()),

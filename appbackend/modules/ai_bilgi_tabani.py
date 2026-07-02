@@ -1280,11 +1280,11 @@ Kurallar:
 
     bonus = 0
     if eklenen_kelime >= 50:
-        bonus += 5
-        await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": 5}})
+        bonus += AI_EGITIM_PUANLARI["kelime_zengin"]
+        await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": AI_EGITIM_PUANLARI["kelime_zengin"]}})
     if len(tum_sorular) >= 20:
-        bonus += 5
-        await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": 5}})
+        bonus += AI_EGITIM_PUANLARI["soru_zengin"]
+        await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": AI_EGITIM_PUANLARI["soru_zengin"]}})
 
     sonuc = {
         "sayfa_sayisi": sayfa_sayisi, "kelime_sayisi": kelime_sayisi,
@@ -1515,14 +1515,14 @@ Kurallar:
             "tarih": datetime.utcnow().isoformat(),
         })
 
-    # Bonus puanlar
+    # Bonus puanlar (merkezî AI_EGITIM_PUANLARI'ndan)
     bonus = 0
     if eklenen_kelime >= 50:
-        bonus += 5
-        await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": 5}})
+        bonus += AI_EGITIM_PUANLARI["kelime_zengin"]
+        await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": AI_EGITIM_PUANLARI["kelime_zengin"]}})
     if len(tum_sorular) >= 20:
-        bonus += 5
-        await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": 5}})
+        bonus += AI_EGITIM_PUANLARI["soru_zengin"]
+        await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": AI_EGITIM_PUANLARI["soru_zengin"]}})
 
     # Sonucu güncelle
     sonuc = {
@@ -1699,8 +1699,8 @@ async def ai_bilgi_tabani_yukle_url(payload: dict, current_user=Depends(get_curr
     }
     await db.ai_yuklemeler.insert_one(yukleme)
 
-    # Puan
-    puan = 20
+    # Puan (merkezî AI_EGITIM_PUANLARI'ndan; genel yükleme = pdf_yukle tarifesi)
+    puan = AI_EGITIM_PUANLARI.get("pdf_yukle", 5)
     await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": puan}})
     await db.ai_egitim_puanlari.insert_one({
         "id": str(uuid.uuid4()),

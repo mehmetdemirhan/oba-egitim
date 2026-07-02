@@ -168,17 +168,18 @@ async def create_icerik(icerik: IcerikCreate, current_user=Depends(get_current_u
     if data.get("yayin_tarihi"):
         data["yayin_tarihi"] = data["yayin_tarihi"].isoformat()
 
-    # "Neden bu kitap?" alanı → +3 puan bonusu
+    puanlar = await get_puan_ayarlari()
+    # "Neden bu kitap?" alanı → açıklama bonusu (merkezî tablodan)
     neden = data.get("neden_bu_icerik", "")
     if neden and len(neden.strip()) >= 20:
         data["neden_bonus"] = True
         try:
-            await db.users.update_one({"id": current_user["id"]}, {"$inc": {"toplam_puan": 3}})
+            await db.users.update_one({"id": current_user["id"]}, {"$inc": {"toplam_puan": puanlar.get("neden_bonus", 1)}})
         except: pass
 
-    # Test soruları bonusu → her soru +2 puan, max +20
+    # Test soruları bonusu → her soru +test_soru_basi, tavan test_soru_max (merkezî)
     sorular = data.get("sorular", [])
-    soru_bonus = min(len(sorular) * 2, 20)
+    soru_bonus = min(len(sorular) * puanlar.get("test_soru_basi", 1), puanlar.get("test_soru_max", 3))
     if soru_bonus > 0:
         data["soru_bonus"] = soru_bonus
         try:
@@ -257,7 +258,7 @@ async def admin_karar(icerik_id: str, karar: dict, current_user=Depends(require_
         icerik = await db.gelisim_icerik.find_one({"id": icerik_id})
         puanlar = await get_puan_ayarlari()
         if icerik and icerik.get("ekleyen_id"):
-            await db.users.update_one({"id": icerik["ekleyen_id"]}, {"$inc": {"puan": puanlar.get("icerik_ekleme", 5)}})
+            await db.users.update_one({"id": icerik["ekleyen_id"]}, {"$inc": {"puan": puanlar.get("icerik_ekleme", 2)}})
     else:
         yeni_durum = "oylama"
     await db.gelisim_icerik.update_one(
@@ -295,7 +296,7 @@ async def oy_ver(oy: OyCreate, current_user=Depends(get_current_user)):
     
     # Oy veren öğretmene puan (dinamik)
     puanlar = await get_puan_ayarlari()
-    await db.users.update_one({"id": user_id}, {"$inc": {"puan": puanlar.get("icerik_oylama", 2)}})
+    await db.users.update_one({"id": user_id}, {"$inc": {"puan": puanlar.get("icerik_oylama", 1)}})
     
     # %60 kontrolü
     ogretmenler = await db.users.find({"role": {"$in": ["teacher", "coordinator", "admin"]}}).to_list(length=None)
@@ -317,7 +318,7 @@ async def oy_ver(oy: OyCreate, current_user=Depends(get_current_user)):
             # İçerik ekleyene bonus puan (dinamik)
             ekleyen_id = icerik.get("ekleyen_id")
             if ekleyen_id:
-                await db.users.update_one({"id": ekleyen_id}, {"$inc": {"puan": puanlar.get("icerik_ekleme", 5)}})
+                await db.users.update_one({"id": ekleyen_id}, {"$inc": {"puan": puanlar.get("icerik_ekleme", 2)}})
         elif oy_sayisi == toplam_ogretmen and onay_orani < 0.6:
             yeni_durum = "reddedildi"
             await db.gelisim_icerik.update_one({"id": oy.icerik_id}, {"$set": {"durum": "reddedildi"}})
@@ -347,13 +348,14 @@ async def tamamla_icerik(data: TamamlamaCreate, current_user=Depends(get_current
     dogru = 0
     test_yapildi = False
     puan = 1
-    
+
     if data.test_cevaplari and toplam > 0:
         test_yapildi = True
         for i, cevap in enumerate(data.test_cevaplari):
             if i < toplam and cevap == sorular[i].get("dogru_cevap"):
                 dogru += 1
-        puan = max(1, round((dogru / toplam) * 10))
+        tamamla_max = (await get_puan_ayarlari()).get("icerik_tamamla_max", 5)
+        puan = max(1, round((dogru / toplam) * tamamla_max))
     
     tamamlama = TamamlamaModel(
         kullanici_id=data.kullanici_id,

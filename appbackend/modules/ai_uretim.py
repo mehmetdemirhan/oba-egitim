@@ -151,7 +151,7 @@ async def ai_mini_oyun(payload: dict, current_user=Depends(get_current_user)):
             "aciklama": "Her kelimeyi doğru anlamıyla eşleştir!",
             "kelimeler": [k.get("kelime", "") for k in karisik_kelimeler],
             "anlamlar": [k.get("anlam", "") for k in karisik_kelimeler],  # doğru sıralama (frontend karıştıracak)
-            "xp": 5,
+            "xp": 4,
         }}
 
     elif oyun_turu == "bosluk_doldurma":
@@ -175,7 +175,7 @@ async def ai_mini_oyun(payload: dict, current_user=Depends(get_current_user)):
             "baslik": "⬜ Boşluk Doldur",
             "aciklama": "Cümledeki boşluğa uygun kelimeyi bul!",
             "sorular": sorular,
-            "xp": 5,
+            "xp": 4,
         }}
 
     elif oyun_turu == "kelime_avi":
@@ -186,9 +186,9 @@ SADECE JSON: {{"grid": [["A","B",...], ...], "kelimeler": ["kelime1", ...], "yon
 
         result = await call_claude("Sen kelime oyunu tasarımcısısın.", prompt, model="haiku", max_tokens=500)
         if result.get("parsed"):
-            return {"oyun": {"tur": "kelime_avi", "baslik": "🔍 Kelime Avı", "aciklama": "Gizli kelimeleri bul!", **result["parsed"], "xp": 7}}
+            return {"oyun": {"tur": "kelime_avi", "baslik": "🔍 Kelime Avı", "aciklama": "Gizli kelimeleri bul!", **result["parsed"], "xp": 4}}
         else:
-            return {"oyun": {"tur": "kelime_avi", "baslik": "🔍 Kelime Avı", "aciklama": "Kelimeleri bul!", "kelimeler": [k.get("kelime","") for k in kelimeler[:6]], "xp": 7}}
+            return {"oyun": {"tur": "kelime_avi", "baslik": "🔍 Kelime Avı", "aciklama": "Kelimeleri bul!", "kelimeler": [k.get("kelime","") for k in kelimeler[:6]], "xp": 4}}
 
     elif oyun_turu == "cumle_kurma":
         sorular = []
@@ -204,7 +204,7 @@ SADECE JSON: {{"grid": [["A","B",...], ...], "kelimeler": ["kelime1", ...], "yon
             "baslik": "📝 Cümle Kurma",
             "aciklama": "Karışık kelimeleri doğru sıraya diz!",
             "sorular": sorular,
-            "xp": 5,
+            "xp": 4,
         }}
 
     return {"oyun": None, "mesaj": "Bilinmeyen oyun türü"}
@@ -218,7 +218,7 @@ async def ai_mini_oyun_tamamla(payload: dict, current_user=Depends(get_current_u
     toplam = payload.get("toplam", 1)
     basari = round(dogru_sayisi / max(toplam, 1) * 100)
 
-    xp = 3 if basari < 50 else 5 if basari < 80 else 7 if basari < 100 else 10
+    xp = 1 if basari < 50 else 2 if basari < 80 else 3 if basari < 100 else 4
 
     try:
         await db.users.update_one({"id": current_user["id"]}, {"$inc": {"toplam_xp": xp}})
@@ -764,7 +764,7 @@ async def materyal_uret(req: Request, current_user=Depends(get_current_user)):
 
     # Kaydet + XP
     await db.ai_materyal_log.insert_one({"ogrenci_id": ogrenci_id, "kitap_adi": kitap_adi, "tur": tur, "tarih": datetime.utcnow().isoformat()})
-    await db.xp_logs.insert_one({"ogrenci_id": ogrenci_id, "xp": 5, "kaynak": "materyal_uret", "tarih": datetime.utcnow().isoformat()})
+    await db.xp_logs.insert_one({"ogrenci_id": ogrenci_id, "xp": 3, "kaynak": "materyal_uret", "tarih": datetime.utcnow().isoformat()})
     return result
 
 

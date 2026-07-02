@@ -135,7 +135,7 @@ async def create_metin(data: MetinCreate, current_user=Depends(get_current_user)
 
     # Ekleyene puan ver (dinamik)
     puanlar = await get_puan_ayarlari()
-    await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": puanlar.get("metin_ekleme", 5)}})
+    await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": puanlar.get("metin_ekleme", 2)}})
 
     metin_doc.pop("_id", None)
     return metin_doc
@@ -223,7 +223,7 @@ async def metin_oy_ver(oy: MetinOyCreate, current_user=Depends(get_current_user)
     await db.analiz_metinler.update_one({"id": oy.metin_id}, {"$set": {"oylar": oylar}})
     # Oy veren öğretmene puan (dinamik)
     puanlar = await get_puan_ayarlari()
-    await db.users.update_one({"id": user_id}, {"$inc": {"puan": puanlar.get("oylama_katilim", 2)}})
+    await db.users.update_one({"id": user_id}, {"$inc": {"puan": puanlar.get("oylama_katilim", 1)}})
     # %60 kontrolü
     ogretmenler = await db.users.find({"role": {"$in": ["teacher", "coordinator", "admin"]}}).to_list(length=None)
     toplam = len(ogretmenler)

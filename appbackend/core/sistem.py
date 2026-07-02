@@ -140,6 +140,11 @@ VARSAYILAN_PUANLAR = {
     "ai_kitap_yukleme": 5,
     "ai_ders_kitabi_yukleme": 7,
     "ai_kitap_onaylandi": 4,
+    # İçerik ekleme ek bonusları (önceden koda gömülüydü → merkezîleştirildi)
+    "neden_bonus": 1,          # "neden bu içerik?" açıklaması (>=20 karakter)
+    "test_soru_basi": 1,       # eklenen test sorusu başına
+    "test_soru_max": 3,        # test sorusu bonus tavanı
+    "icerik_tamamla_max": 5,   # içerik tamamlama ödülü tavanı (test başarısına göre)
 }
 
 
