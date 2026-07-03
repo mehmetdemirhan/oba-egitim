@@ -1,3 +1,47 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * TEMA TOKEN KATMANI (FAZ 2)
+ * ---------------------------------------------------------------
+ * :root = light fallback (deniz). ThemeProvider bu değişkenleri çalışma
+ * anında seçili tema/mod'a göre EZER (document.documentElement.style).
+ * Buradaki değerler yalnızca JS yüklenene kadar FOUC'u önler.
+ * Nötr LIGHT değerleri mevcut gri iskeletle eşleşir → görünüm değişmez.
+ */
+:root {
+  --primary: #2563EB;
+  --primary-hover: #1D4ED8;
+  --secondary: #64748B;
+  --background: #F9FAFB;
+  --surface: #FFFFFF;
+  --text: #1F2937;
+  --text-secondary: #6B7280;
+  --border: #E5E7EB;
+  --accent: #0EA5E9;
+  --danger: #DC2626;
+  --success: #16A34A;
+  --warning: #D97706;
+  --radius: 0.5rem;
+}
+
+.dark {
+  --primary: #3B82F6;
+  --primary-hover: #2563EB;
+  --secondary: #94A3B8;
+  --background: #0F172A;
+  --surface: #1E293B;
+  --text: #F1F5F9;
+  --text-secondary: #94A3B8;
+  --border: #334155;
+  --accent: #38BDF8;
+  --danger: #EF4444;
+  --success: #22C55E;
+  --warning: #F59E0B;
+}
+
+/* Tema geçişlerinde yumuşak renk animasyonu (FAZ 5 polish için hazır) */
+:root {
+  --tema-gecis: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
+}

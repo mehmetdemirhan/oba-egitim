@@ -68,6 +68,10 @@
     "active": true
   },
   {
+    "name": "tema",
+    "active": true
+  },
+  {
     "name": "anketler",
     "active": true
   },

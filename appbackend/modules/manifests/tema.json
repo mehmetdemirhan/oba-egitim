@@ -1,0 +1,15 @@
+{
+  "name": "tema",
+  "version": "1.0.0",
+  "description": "Tema/görünüm modülü (/tema/*) — hazır temalar, kullanıcı tercihi, dark mode, admin CRUD + logo yükleme.",
+  "author": "OBA Çekirdek",
+  "type": "backend",
+  "core": false,
+  "active": true,
+  "backend_files": [
+    "tema.py"
+  ],
+  "frontend_files": [],
+  "installed_at": "2026-07-03T00:00:00+00:00",
+  "builtin": true
+}
