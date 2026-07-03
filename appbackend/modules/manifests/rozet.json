@@ -1,0 +1,15 @@
+{
+  "name": "rozet",
+  "version": "2.0.0",
+  "description": "Rozet yönetimi modülü (/rozet/*) — veri-odaklı rozet CRUD, manuel ver/geri-al, kazananlar, istatistik, JSON içe/dışa aktarma.",
+  "author": "OBA Çekirdek",
+  "type": "backend",
+  "core": false,
+  "active": true,
+  "backend_files": [
+    "rozet.py"
+  ],
+  "frontend_files": [],
+  "installed_at": "2026-07-03T00:00:00+00:00",
+  "builtin": true
+}

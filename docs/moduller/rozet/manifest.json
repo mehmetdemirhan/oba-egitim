@@ -1,0 +1,33 @@
+{
+  "ad": "rozet",
+  "versiyon": "2.0.0",
+  "core": true,
+  "aciklama": "Veri-odaklı, event-driven rozet sistemi. Tanımlar 'rozetler' koleksiyonunda; koşullar metrik/operator/eşik olarak yönetilir. Admin panelinden tam CRUD + manuel ödül + istatistik. Öğrenci/öğretmen/veli görünümleri.",
+  "yazar": "OBA Çekirdek",
+  "backend": [
+    "modules/rozet.py",
+    "core/rozet_motor.py",
+    "core/rozet_helpers.py",
+    "core/rozet_kosullari.py"
+  ],
+  "frontend_components": [
+    "RozetKarti",
+    "RozetGrid",
+    "RozetDetayPopup",
+    "RozetFormu",
+    "KazananlarDialog",
+    "RozetYonetimi"
+  ],
+  "koleksiyonlar": [
+    "rozetler",
+    "kazanilan_rozetler"
+  ],
+  "indexler": [
+    "rozetler: {rol:1, kod:1} unique",
+    "kazanilan_rozetler: {kullanici_id:1, rozet_kodu:1} unique"
+  ],
+  "migrationlar": [
+    "scripts/migrate_rozet_faz1.py",
+    "scripts/migrate_rozetler.py"
+  ]
+}

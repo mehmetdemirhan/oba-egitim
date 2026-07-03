@@ -62,6 +62,7 @@ async def create_reading_log(log: ReadingLogCreate, current_user=Depends(get_cur
     )
     data = model.dict()
     await db.reading_logs.insert_one(data)
+    data.pop("_id", None)  # insert_one'ın eklediği ObjectId JSON serileştirmede patlamasın
     # Event: okuma kaydı okuma/kitap/streak/orman rozetlerini tetikler (fire-and-forget)
     asyncio.create_task(rozet_tetikle(current_user["id"], "okuma_kaydi"))
     return data

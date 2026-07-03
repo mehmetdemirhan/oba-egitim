@@ -26,3 +26,16 @@ otomatik rollback + son 3 sürüm arşivi ile).
 
 Ayrıntılı geliştirme rehberi, manifest şeması ve örnek paket:
 **[docs/MODUL_GELISTIRME.md](docs/MODUL_GELISTIRME.md)** · örnek: `docs/ornek_modul.zip`
+
+## Rozet Sistemi (v2 — Veri-Odaklı)
+
+Rozet tanımları `rozetler` koleksiyonunda **veri** olarak durur; koşullar
+`metrik / operator / eşik` üçlüsüyle yönetilir. Ödüller hem **event-driven**
+(okuma kaydı, görev tamamlama, kur atlatma) hem de pull (`POST /rozetler/kontrol`,
+dashboard) yoluyla verilir ve kazanımda **bildirim** gönderilir. Admin panelindeki
+**🏅 Rozetler** sekmesinden tam CRUD, manuel ödül, kazananlar, istatistik ve
+JSON içe/dışa aktarma yapılabilir. Öğrenci, öğretmen ve **veli** (çocuğunun
+rozetleri) görünümleri paylaşılan `RozetGrid` bileşenini kullanır.
+
+Mimari, event akışı, yeni metrik ekleme, API referansı ve üretim migrasyonu:
+**[docs/ROZET_SISTEMI.md](docs/ROZET_SISTEMI.md)**

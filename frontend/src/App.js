@@ -3923,7 +3923,14 @@ function OgretmenPaneli({ user, logout }) {
     try { const r = await axios.get(`${API}/mesajlar`); setMesajlar(Array.isArray(r.data) ? r.data : []); } catch(e) { setMesajlar([]); }
     try { const r = await axios.get(`${API}/mesajlar/okunmamis-sayisi`); setOkunmamisSayisi(r.data?.sayi || 0); } catch(e) {}
     try { const r = await axios.get(`${API}/auth/users`); setKullanicilar(Array.isArray(r.data) ? r.data : []); } catch(e) { setKullanicilar([]); }
-    try { await axios.post(`${API}/rozetler/kontrol`); } catch(e) {}
+    try {
+      const rk = await axios.post(`${API}/rozetler/kontrol`);
+      const yr = rk.data?.yeni_rozetler || [];
+      if (yr.length > 0) {
+        const ilk = yr[0]?.rozet || {};
+        toast({ title: `🏅 Yeni rozet${yr.length > 1 ? ` +${yr.length}` : ""}!`, description: `${ilk.ikon || "🎖️"} ${ilk.ad || "Rozet"} kazandın!` });
+      }
+    } catch(e) {}
     try { const r = await axios.get(`${API}/rozetler/${user.id}`); setRozetlerim(Array.isArray(r.data) ? r.data : []); } catch(e) {}
     try { const r = await axios.get(`${API}/rozetler/tanim`); setRozetTanimlari(r.data?.ogretmen || []); } catch(e) {}
     try { const r = await axios.get(`${API}/anketler/ogretmen/${ogretmenId}/ozet`); setAnketOzet(r.data); } catch(e) {}
@@ -4974,7 +4981,14 @@ function OgrenciPaneli({ user, logout }) {
     try { const r = await axios.get(`${API}/egzersiz/puanlar`); setEgzersizPuanlari(r.data || {}); } catch(e) {}
     try { const r = await axios.get(`${API}/gelisim/icerik`); const d = Array.isArray(r.data) ? r.data : []; setGelisimIcerikleri(d.filter(i => i.durum === "yayinda" && (i.hedef_kitle === "hepsi" || i.hedef_kitle === "ogrenci"))); } catch(e) { setGelisimIcerikleri([]); }
     try { const r = await axios.get(`${API}/gelisim/tamamlama/${user.id}`); setGelisimTamamlananlar(Array.isArray(r.data) ? r.data : []); } catch(e) { setGelisimTamamlananlar([]); }
-    try { await axios.post(`${API}/rozetler/kontrol`); } catch(e) {}
+    try {
+      const rk = await axios.post(`${API}/rozetler/kontrol`);
+      const yr = rk.data?.yeni_rozetler || [];
+      if (yr.length > 0) {
+        const ilk = yr[0]?.rozet || {};
+        toast({ title: `🏅 Yeni rozet${yr.length > 1 ? ` +${yr.length}` : ""}!`, description: `${ilk.ikon || "🎖️"} ${ilk.ad || "Rozet"} kazandın!` });
+      }
+    } catch(e) {}
     try { const r = await axios.get(`${API}/rozetler/${user.id}`); setOgrenciRozetler(Array.isArray(r.data) ? r.data : []); } catch(e) {}
     try { const r = await axios.get(`${API}/rozetler/tanim`); setOgrenciRozetTanim(r.data?.ogrenci || []); } catch(e) {}
   }, [ogrenciId, user.id]);
