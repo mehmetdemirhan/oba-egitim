@@ -18,6 +18,7 @@ import { Toaster } from "./components/ui/toaster";
 import ModulYonetimi from "./components/ModulYonetimi";
 import RozetYonetimi from "./components/rozet/RozetYonetimi";
 import RozetGrid from "./components/rozet/RozetGrid";
+import TemaYonetimi from "./components/tema/TemaYonetimi";
 import MebKelimeYonetimi from "./components/admin/MebKelimeYonetimi";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
 import InstagramAyarlari from "./components/admin/InstagramAyarlari";
@@ -395,6 +396,7 @@ function AppContent() {
             {user.role === "admin" && <TabsTrigger value="yedekleme" className={tabClass}><Database className="h-4 w-4 mr-2" />Yedekleme</TabsTrigger>}
             {user.role === "admin" && <TabsTrigger value="guncelleme" className={tabClass}><GitBranch className="h-4 w-4 mr-2" />Güncelleme</TabsTrigger>}
             {user.role === "admin" && <TabsTrigger value="moduller" className={tabClass}><Package className="h-4 w-4 mr-2" />Modüller</TabsTrigger>}
+            {user.role === "admin" && <TabsTrigger value="tema-yonetimi" className={tabClass}>🎨 Tema</TabsTrigger>}
             {user.role === "admin" && <TabsTrigger value="rozet-yonetimi" className={tabClass}>🏅 Rozetler</TabsTrigger>}
             {user.role === "admin" && <TabsTrigger value="meb-kelime" className={tabClass}>📖 MEB Kelimeleri</TabsTrigger>}
             <TabsTrigger value="ai-merkezi" className={tabClass}>🧠 AI Merkezi</TabsTrigger>
@@ -405,6 +407,13 @@ function AppContent() {
           {user.role === "admin" && (
             <TabsContent value="moduller">
               <ModulYonetimi />
+            </TabsContent>
+          )}
+
+          {/* Tema Yönetimi (tema FAZ 3) */}
+          {user.role === "admin" && (
+            <TabsContent value="tema-yonetimi">
+              <TemaYonetimi />
             </TabsContent>
           )}
 
