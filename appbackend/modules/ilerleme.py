@@ -17,6 +17,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 
 import httpx
+from pymongo.errors import DuplicateKeyError
 from fastapi import APIRouter, Depends, HTTPException, Request, Body, UploadFile, File, Form
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel, Field
@@ -32,6 +33,9 @@ from core.sistem import (
     get_xp_tablosu, get_puan_ayarlari, get_lig_esikleri,
     get_ogretmen_rozetleri, get_ogrenci_rozetleri, get_ogretmen_puan_agirliklari,
     XP_TABLOSU_DEFAULT, LIG_ESIKLERI_DEFAULT, LIG_SIRA,
+)
+from core.rozet_helpers import (
+    rozet_odul_puan, rozet_puan_haritasi, rozet_bildirim_gonder,
 )
 from core.ai import _gemini_call, call_claude, _mock_bilgi_tabani_response, get_ogrenci_ai_verileri
 
@@ -221,6 +225,8 @@ async def kur_atla(payload: dict, current_user=Depends(get_current_user)):
 @router.get("/puan-tablosu/birlesik")
 async def get_birlesik_puan_tablosu(current_user=Depends(get_current_user)):
     users = await db.users.find().to_list(length=None)
+    # Rozet ödül puanı haritası (kod→puan) döngü dışında BİR kez çekilir
+    rozet_puan_map = await rozet_puan_haritasi()
     tablo = []
     for u in users:
         uid = u["id"]
@@ -229,16 +235,7 @@ async def get_birlesik_puan_tablosu(current_user=Depends(get_current_user)):
         # Rozet puanları
         rozetler = await db.kazanilan_rozetler.find({"kullanici_id": uid}).to_list(length=None)
         rozet_kodlar = [r["rozet_kodu"] for r in rozetler]
-
-        ogretmen_rozet_list = await get_ogretmen_rozetleri()
-        ogrenci_rozet_list = await get_ogrenci_rozetleri()
-        tum_rozetler = ogretmen_rozet_list + ogrenci_rozet_list
-
-        rozet_puan = 0
-        for rk in rozet_kodlar:
-            tanim = next((r for r in tum_rozetler if r["kod"] == rk), None)
-            if tanim:
-                rozet_puan += tanim.get("puan", tanim.get("xp", 0))
+        rozet_puan = sum(rozet_puan_map.get(rk, 0) for rk in rozet_kodlar)
 
         toplam = gelisim_puan + rozet_puan
 
@@ -289,9 +286,8 @@ async def _ogrenci_puan_tablosu(current_user) -> dict:
 async def _ogretmen_puan_tablosu(current_user) -> dict:
     """role=teacher olanları puana göre sıralar; İSİM/SIRA LİSTESİ DÖNMEZ.
     Sadece kendi konumun + isimsiz agrega istatistikler + motivasyon mesajı."""
-    # Rozet tanımlarını bir kez çek (birlesik endpoint'iyle aynı puanlama)
-    tum_rozetler = (await get_ogretmen_rozetleri()) + (await get_ogrenci_rozetleri())
-    rozet_puan_map = {r["kod"]: r.get("puan", r.get("xp", 0)) for r in tum_rozetler}
+    # Rozet ödül puanı haritası (birlesik endpoint'iyle aynı puanlama)
+    rozet_puan_map = await rozet_puan_haritasi()
 
     # XP bileşen ağırlıkları (admin panelinden ayarlanabilir; yoksa varsayılan)
     ag = await get_ogretmen_puan_agirliklari()
@@ -560,7 +556,7 @@ async def ogretmen_basarilarim(current_user=Depends(get_current_user)):
     d_rozet = [0] * HAFTA
     base_xp = 0
     base_rozet = 0
-    rozet_puan_map = {r["kod"]: r.get("puan", r.get("xp", 0)) for r in ogretmen_rozet_list}
+    rozet_puan_map = {r["kod"]: rozet_odul_puan(r) for r in ogretmen_rozet_list}
 
     def _parse_dt(s):
         """ISO tarihi NAIVE (tz-siz) datetime'a çevirir. tz-aware ise UTC'ye
@@ -947,8 +943,13 @@ async def rozet_kontrol(current_user=Depends(get_current_user)):
         for kod, kosul in checks:
             if kosul and kod not in mevcut_kodlar:
                 doc = {"id": str(uuid.uuid4()), "kullanici_id": user_id, "rozet_kodu": kod, "kazanma_tarihi": datetime.utcnow().isoformat()}
-                await db.kazanilan_rozetler.insert_one(doc)
+                try:
+                    await db.kazanilan_rozetler.insert_one(doc)
+                except DuplicateKeyError:
+                    continue  # yarış durumu: rozet zaten eklenmiş, atla
+                doc.pop("_id", None)  # insert_one'ın eklediği ObjectId JSON'a sızmasın
                 rozet_bilgi = next((r for r in (await get_ogretmen_rozetleri()) if r["kod"] == kod), None)
+                await rozet_bildirim_gonder(user_id, rozet_bilgi)
                 yeni_rozetler.append({**doc, "rozet": rozet_bilgi})
 
     elif role == "student":
@@ -984,8 +985,13 @@ async def rozet_kontrol(current_user=Depends(get_current_user)):
         for kod, kosul in checks:
             if kosul and kod not in mevcut_kodlar:
                 doc = {"id": str(uuid.uuid4()), "kullanici_id": user_id, "rozet_kodu": kod, "kazanma_tarihi": datetime.utcnow().isoformat()}
-                await db.kazanilan_rozetler.insert_one(doc)
+                try:
+                    await db.kazanilan_rozetler.insert_one(doc)
+                except DuplicateKeyError:
+                    continue  # yarış durumu: rozet zaten eklenmiş, atla
+                doc.pop("_id", None)  # insert_one'ın eklediği ObjectId JSON'a sızmasın
                 rozet_bilgi = next((r for r in (await get_ogrenci_rozetleri()) if r["kod"] == kod), None)
+                await rozet_bildirim_gonder(user_id, rozet_bilgi)
                 yeni_rozetler.append({**doc, "rozet": rozet_bilgi})
 
     return {"yeni_rozetler": yeni_rozetler, "toplam": len(mevcut_kodlar) + len(yeni_rozetler)}

@@ -4468,7 +4468,7 @@ function OgretmenPaneli({ user, logout }) {
                               <div className="flex items-center gap-2">
                                 <span className="font-bold text-sm">{seciliRozet.ad}</span>
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${seviyeRenk[seciliRozet.seviye] || "bg-gray-100"}`}>{seciliRozet.seviye}</span>
-                                <span className="text-xs text-orange-600 font-medium">+{seciliRozet.puan} puan</span>
+                                <span className="text-xs text-orange-600 font-medium">+{seciliRozet.odul_puan ?? seciliRozet.puan ?? seciliRozet.xp ?? 0} puan</span>
                               </div>
                               <p className="text-xs text-gray-600 mt-1">{seciliRozet.kriter}</p>
                               <div className="mt-2">{seciliRozet.kazandi
@@ -7715,7 +7715,7 @@ function SistemAyarlari({ user }) {
             <div className="flex items-center gap-2"><span className="text-xl">{r.ikon}</span><span className="font-medium text-sm">{r.ad}</span><span className={`text-xs px-2 py-0.5 rounded-full ${r.seviye === "elmas" ? "bg-purple-100 text-purple-700" : r.seviye === "altin" ? "bg-yellow-100 text-yellow-700" : r.seviye === "gumus" ? "bg-gray-100 text-gray-700" : "bg-orange-100 text-orange-700"}`}>{r.seviye}</span><span className="text-xs text-gray-400">{r.kategori}</span></div>
             <div className="grid grid-cols-3 gap-2">
               <div><Label className="text-[10px]">İkon</Label><Input className="text-center" value={r.ikon} onChange={e => { const n = [...ogretmenRozetler]; n[i] = {...n[i], ikon: e.target.value}; setOgretmenRozetler(n); }} /></div>
-              <div><Label className="text-[10px]">Puan</Label><Input type="number" value={r.puan} onChange={e => { const n = [...ogretmenRozetler]; n[i] = {...n[i], puan: parseInt(e.target.value) || 0}; setOgretmenRozetler(n); }} /></div>
+              <div><Label className="text-[10px]">Ödül Puanı</Label><Input type="number" value={r.odul_puan ?? r.puan ?? 0} onChange={e => { const n = [...ogretmenRozetler]; n[i] = {...n[i], odul_puan: parseInt(e.target.value) || 0}; setOgretmenRozetler(n); }} /></div>
               <div><Label className="text-[10px]">Seviye</Label><Select value={r.seviye} onValueChange={v => { const n = [...ogretmenRozetler]; n[i] = {...n[i], seviye: v}; setOgretmenRozetler(n); }}><SelectTrigger className="text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="bronz">Bronz</SelectItem><SelectItem value="gumus">Gümüş</SelectItem><SelectItem value="altin">Altın</SelectItem><SelectItem value="platin">Platin</SelectItem><SelectItem value="elmas">Elmas</SelectItem></SelectContent></Select></div>
             </div>
           </div>
@@ -7730,7 +7730,7 @@ function SistemAyarlari({ user }) {
             <div className="flex items-center gap-2"><span className="text-xl">{r.ikon}</span><span className="font-medium text-sm">{r.ad}</span><span className="text-xs text-gray-400">{r.kategori}</span></div>
             <div className="grid grid-cols-3 gap-2">
               <div><Label className="text-[10px]">İkon</Label><Input className="text-center" value={r.ikon} onChange={e => { const n = [...ogrenciRozetler]; n[i] = {...n[i], ikon: e.target.value}; setOgrenciRozetler(n); }} /></div>
-              <div><Label className="text-[10px]">XP</Label><Input type="number" value={r.xp || 0} onChange={e => { const n = [...ogrenciRozetler]; n[i] = {...n[i], xp: parseInt(e.target.value) || 0}; setOgrenciRozetler(n); }} /></div>
+              <div><Label className="text-[10px]">Ödül Puanı</Label><Input type="number" value={r.odul_puan ?? r.xp ?? 0} onChange={e => { const n = [...ogrenciRozetler]; n[i] = {...n[i], odul_puan: parseInt(e.target.value) || 0}; setOgrenciRozetler(n); }} /></div>
               <div><Label className="text-[10px]">Seviye</Label><Select value={r.seviye} onValueChange={v => { const n = [...ogrenciRozetler]; n[i] = {...n[i], seviye: v}; setOgrenciRozetler(n); }}><SelectTrigger className="text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="bronz">Bronz</SelectItem><SelectItem value="gumus">Gümüş</SelectItem><SelectItem value="altin">Altın</SelectItem><SelectItem value="elmas">Elmas</SelectItem></SelectContent></Select></div>
             </div>
           </div>

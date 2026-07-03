@@ -42,3 +42,49 @@ def parse_from_mongo(item):
             elif isinstance(value, list):
                 item[key] = [parse_from_mongo(s) if isinstance(s, dict) else s for s in value]
     return item
+
+
+# ─────────────────────────────────────────────
+# INDEX YÖNETİMİ (startup'ta çağrılır — idempotent)
+# ─────────────────────────────────────────────
+
+async def _dedup_kazanilan_rozetler():
+    """kazanilan_rozetler'de aynı (kullanici_id, rozet_kodu) çiftinin fazla
+    kopyalarını siler. Unique index oluşturmadan ÖNCE çağrılmalıdır; aksi halde
+    mevcut duplikeler yüzünden index kurulumu patlar."""
+    import logging
+    seen = set()
+    silinen = 0
+    async for r in db.kazanilan_rozetler.find(
+        {}, {"kullanici_id": 1, "rozet_kodu": 1}
+    ).sort("_id", 1):
+        anahtar = (r.get("kullanici_id"), r.get("rozet_kodu"))
+        if anahtar in seen:
+            await db.kazanilan_rozetler.delete_one({"_id": r["_id"]})
+            silinen += 1
+        else:
+            seen.add(anahtar)
+    if silinen:
+        logging.info(f"[db] kazanilan_rozetler: {silinen} duplike rozet temizlendi")
+    return silinen
+
+
+async def ensure_indexes():
+    """Kritik koleksiyon index'lerini oluşturur (idempotent).
+
+    server.py startup event'ine bağlanır. Hata olsa bile uygulama açılmaya
+    devam etsin diye tüm blok try/except ile sarılıdır.
+    """
+    import logging
+    try:
+        await _dedup_kazanilan_rozetler()
+        await db.kazanilan_rozetler.create_index(
+            [("kullanici_id", 1), ("rozet_kodu", 1)],
+            unique=True,
+            name="uq_kullanici_rozet",
+        )
+        # Rozet TANIM koleksiyonu (FAZ 2'de dolar) — kod benzersiz
+        await db.rozetler.create_index("kod", unique=True, name="uq_rozet_kod")
+        logging.info("[db] rozet index'leri hazır (uq_kullanici_rozet, uq_rozet_kod)")
+    except Exception as ex:
+        logging.error(f"[db] ensure_indexes hatası: {type(ex).__name__}: {ex}")

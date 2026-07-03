@@ -110,6 +110,10 @@ api_router = APIRouter(prefix="/api")
 from modules.seed import create_default_admin
 app.add_event_handler("startup", create_default_admin)
 
+# Kritik DB index'lerini oluştur (kazanilan_rozetler unique vb.) — FAZ 1
+from core.db import ensure_indexes
+app.add_event_handler("startup", ensure_indexes)
+
 # MEVCUT MODELLER (değişmeden korunuyor)
 
 # CRM modelleri (Teacher/Student/Course/Ders/Payment + Create/Update + ExportData)
