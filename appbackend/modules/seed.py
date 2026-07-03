@@ -222,7 +222,14 @@ async def create_default_admin():
         logging.info(f"ℹ️ Demo veli zaten var: {demo_parent_email}")
 
     # --- DEMO ROZET + ANKET VERİLERİ ---
-    existing_rozetler = await db.kazanilan_rozetler.find_one({"kullanici_id": {"$regex": "^demo-"}})
+    # NOT: Demo kullanıcı id'leri UUID'dir; eski "^demo-" regex guard'ı hiçbir zaman
+    # eşleşmiyordu → demo rozetler her açılışta yeniden ekleniyordu. Artık unique
+    # index (uq_kullanici_rozet) olduğu için bu DuplicateKeyError ile çökerdi.
+    # Guard'ı demo öğretmenin gerçek kazanımına göre yapıyoruz (idempotent).
+    _demo_ogr_user = await db.users.find_one({"email": demo_teacher_email})
+    existing_rozetler = None
+    if _demo_ogr_user:
+        existing_rozetler = await db.kazanilan_rozetler.find_one({"kullanici_id": _demo_ogr_user["id"]})
     if not existing_rozetler:
         logging.info("🏅 Demo rozet + anket verileri oluşturuluyor...")
 
