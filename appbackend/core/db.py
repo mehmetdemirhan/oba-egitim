@@ -83,8 +83,15 @@ async def ensure_indexes():
             unique=True,
             name="uq_kullanici_rozet",
         )
-        # Rozet TANIM koleksiyonu (FAZ 2'de dolar) — kod benzersiz
-        await db.rozetler.create_index("kod", unique=True, name="uq_rozet_kod")
-        logging.info("[db] rozet index'leri hazır (uq_kullanici_rozet, uq_rozet_kod)")
+        # Rozet TANIM koleksiyonu (FAZ 2'de dolar) — (rol, kod) benzersiz.
+        # NOT: kod tek başına benzersiz DEĞİL; gorev_ilk/egz_ilk gibi kodlar hem
+        # öğretmen hem öğrenci rozetlerinde bulunur, rol ile ayrışır.
+        try:
+            await db.rozetler.drop_index("uq_rozet_kod")  # eski (yanlış) index varsa kaldır
+        except Exception:
+            pass
+        await db.rozetler.create_index(
+            [("rol", 1), ("kod", 1)], unique=True, name="uq_rozet_rol_kod")
+        logging.info("[db] rozet index'leri hazır (uq_kullanici_rozet, uq_rozet_rol_kod)")
     except Exception as ex:
         logging.error(f"[db] ensure_indexes hatası: {type(ex).__name__}: {ex}")

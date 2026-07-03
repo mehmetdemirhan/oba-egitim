@@ -37,6 +37,7 @@ from core.sistem import (
 from core.rozet_helpers import (
     rozet_odul_puan, rozet_puan_haritasi, rozet_bildirim_gonder,
 )
+from core.rozet_motor import rozet_degerlendir, rozet_tetikle
 from core.ai import _gemini_call, call_claude, _mock_bilgi_tabani_response, get_ogrenci_ai_verileri
 
 router = APIRouter()
@@ -217,6 +218,9 @@ async def kur_atla(payload: dict, current_user=Depends(get_current_user)):
         "yeni_kur": yeni_kur,
         "tarih": datetime.utcnow().isoformat(),
     })
+
+    # Event: kur atlatma öğretmenin kur_* rozetlerini tetikler (fire-and-forget)
+    asyncio.create_task(rozet_tetikle(current_user["id"], "kur_atlama"))
 
     return {"ok": True, "yeni_kur": yeni_kur, "eski_kur": eski_kur}
 
@@ -863,138 +867,14 @@ async def get_rozetler(user_id: str, current_user=Depends(get_current_user)):
 
 @router.post("/rozetler/kontrol")
 async def rozet_kontrol(current_user=Depends(get_current_user)):
+    """Kullanicinin hak ettigi rozetleri degerlendirir (veri-odakli motor).
+
+    Geriye donuk uyumlu: eski frontend dashboard yuklemesinde cagirilir. Kosullar
+    artik sabit if-else yerine core.rozet_motor uzerinden veri-odakli islenir."""
     user_id = current_user["id"]
-    role = current_user.get("role", "")
-    linked_id = current_user.get("linked_id", "")
-
-    mevcut = await db.kazanilan_rozetler.find({"kullanici_id": user_id}).to_list(length=None)
-    mevcut_kodlar = set(r["rozet_kodu"] for r in mevcut)
-    yeni_rozetler = []
-
-    if role == "teacher":
-        ogretmen_id = linked_id or user_id
-        # İçerik sayısı
-        icerikler = await db.gelisim_icerik.count_documents({"ekleyen_id": user_id, "durum": "yayinda"})
-        # Oylama sayısı
-        tum_icerikler = await db.gelisim_icerik.find({"durum": {"$in": ["yayinda", "oylama"]}}).to_list(length=None)
-        oy_sayisi = sum(1 for ic in tum_icerikler if user_id in (ic.get("oylar") or {}))
-        # Görev atama
-        gorevler = await db.gorevler.find({"atayan_id": user_id}).to_list(length=None)
-        gorev_sayisi = len(gorevler)
-        tamamlanan_gorev = len([g for g in gorevler if g.get("durum") == "tamamlandi"])
-        # Öğrenci streak ortalaması
-        ogrenciler = await db.students.find({"ogretmen_id": ogretmen_id, "arsivli": {"$ne": True}}).to_list(length=None)
-        from datetime import timedelta
-        simdi = datetime.utcnow()
-        streakler = []
-        for s in ogrenciler:
-            logs = await db.reading_logs.find({"ogrenci_id": s["id"]}).to_list(length=None)
-            tarihler = sorted(set(l.get("tarih", "")[:10] for l in logs), reverse=True)
-            st = 0
-            for i in range(60):
-                gun = (simdi - timedelta(days=i)).strftime("%Y-%m-%d")
-                if gun in tarihler: st += 1
-                elif i > 0: break
-            streakler.append(st)
-        ort_streak = sum(streakler) / max(len(streakler), 1)
-        # Kur atlama
-        kur_sayisi = await db.kur_atlamalari.count_documents({"ogretmen_id": ogretmen_id})
-        # Gelişim tamamlama
-        gelisim_tam = await db.gelisim_tamamlama.count_documents({"kullanici_id": user_id})
-        # Mesaj
-        mesajlar = await db.mesajlar.find({"gonderen_id": user_id}).to_list(length=None)
-        mesaj_sayisi = len(mesajlar)
-        mesaj_roller = set(m.get("alici_rol", "") for m in mesajlar)
-        # Egzersiz
-        egz_tam = await db.egzersiz_tamamlama.find({"kullanici_id": user_id}).to_list(length=None)
-        egz_turler = set(e.get("egzersiz_id", "") for e in egz_tam)
-        # Veli anketi
-        anketler = await db.veli_anketleri.find({"ogretmen_id": ogretmen_id}).to_list(length=None)
-        anket_sayisi = len(anketler)
-        anket_ort = 0
-        tavsiye_oran = 0
-        if anket_sayisi > 0:
-            puanlar = []
-            tavsiyeler = 0
-            for a in anketler:
-                yanitlar = a.get("yanitlar", [])
-                puan_yanitlar = [y.get("puan", 0) for y in yanitlar if y.get("puan")]
-                if puan_yanitlar:
-                    puanlar.append(sum(puan_yanitlar) / len(puan_yanitlar))
-                if a.get("tavsiye"):
-                    tavsiyeler += 1
-            anket_ort = sum(puanlar) / max(len(puanlar), 1)
-            tavsiye_oran = (tavsiyeler / anket_sayisi) * 100
-
-        # Kontrol
-        checks = [
-            ("icerik_ilk", icerikler >= 1), ("icerik_5", icerikler >= 5), ("icerik_20", icerikler >= 20), ("icerik_50", icerikler >= 50),
-            ("oy_ilk", oy_sayisi >= 1), ("oy_20", oy_sayisi >= 20), ("oy_50", oy_sayisi >= 50),
-            ("gorev_ilk", gorev_sayisi >= 1), ("gorev_20", gorev_sayisi >= 20 and tamamlanan_gorev >= 10),
-            ("ilham_veren", ort_streak >= 7), ("yildiz_egitimci", ort_streak >= 10),
-            ("kur_ilk", kur_sayisi >= 1), ("kur_20", kur_sayisi >= 20), ("kur_30", kur_sayisi >= 30), ("kur_50", kur_sayisi >= 50), ("kur_100", kur_sayisi >= 100),
-            ("veli_ilk", anket_sayisi >= 1 and anket_ort >= 4), ("veli_20", anket_sayisi >= 20 and anket_ort >= 4.5),
-            ("veli_30", anket_sayisi >= 30 and anket_ort >= 4.5 and tavsiye_oran >= 90),
-            ("veli_100", anket_sayisi >= 100 and anket_ort >= 4.8 and tavsiye_oran >= 95),
-            ("gelisim_ilk", gelisim_tam >= 1), ("gelisim_10", gelisim_tam >= 10), ("gelisim_uzman", gelisim_tam >= 30),
-            ("mesaj_ilk", mesaj_sayisi >= 1), ("kopru_kurucu", "student" in mesaj_roller and "parent" in mesaj_roller),
-            ("egz_ilk", len(egz_turler) >= 1), ("egz_tamset", len(egz_turler) >= 14),
-        ]
-        for kod, kosul in checks:
-            if kosul and kod not in mevcut_kodlar:
-                doc = {"id": str(uuid.uuid4()), "kullanici_id": user_id, "rozet_kodu": kod, "kazanma_tarihi": datetime.utcnow().isoformat()}
-                try:
-                    await db.kazanilan_rozetler.insert_one(doc)
-                except DuplicateKeyError:
-                    continue  # yarış durumu: rozet zaten eklenmiş, atla
-                doc.pop("_id", None)  # insert_one'ın eklediği ObjectId JSON'a sızmasın
-                rozet_bilgi = next((r for r in (await get_ogretmen_rozetleri()) if r["kod"] == kod), None)
-                await rozet_bildirim_gonder(user_id, rozet_bilgi)
-                yeni_rozetler.append({**doc, "rozet": rozet_bilgi})
-
-    elif role == "student":
-        ogrenci_id = linked_id or user_id
-        logs = await db.reading_logs.find({"ogrenci_id": ogrenci_id}).to_list(length=None)
-        toplam_dk = sum(l.get("sure_dakika", 0) for l in logs)
-        kitaplar = set(l.get("kitap_adi", "") for l in logs if l.get("kitap_adi"))
-        from datetime import timedelta
-        simdi = datetime.utcnow()
-        tarihler = sorted(set(l.get("tarih", "")[:10] for l in logs), reverse=True)
-        streak = 0
-        for i in range(60):
-            gun = (simdi - timedelta(days=i)).strftime("%Y-%m-%d")
-            if gun in tarihler: streak += 1
-            elif i > 0: break
-        gorevler_tam = await db.gorevler.count_documents({"hedef_id": ogrenci_id, "durum": "tamamlandi"})
-        egz_tam = await db.egzersiz_tamamlama.find({"kullanici_id": user_id}).to_list(length=None)
-        egz_turler = set(e.get("egzersiz_id", "") for e in egz_tam)
-        egz_toplam = len(egz_tam)
-        agac_sayisi = toplam_dk  # 1 dk = 1 ağaç
-        student = await db.students.find_one({"id": ogrenci_id})
-        toplam_xp = student.get("toplam_xp", 0) if student else 0
-
-        checks = [
-            ("okuma_ilk", len(logs) >= 1), ("okuma_100", toplam_dk >= 100), ("okuma_500", toplam_dk >= 500), ("okuma_2000", toplam_dk >= 2000),
-            ("streak_3", streak >= 3), ("streak_7", streak >= 7), ("streak_21", streak >= 21), ("streak_60", streak >= 60),
-            ("kitap_1", len(kitaplar) >= 1), ("kitap_5", len(kitaplar) >= 5), ("kitap_15", len(kitaplar) >= 15), ("kitap_30", len(kitaplar) >= 30),
-            ("gorev_ilk", gorevler_tam >= 1), ("gorev_10", gorevler_tam >= 10), ("gorev_30", gorevler_tam >= 30), ("gorev_100", gorevler_tam >= 100),
-            ("egz_ilk", egz_toplam >= 1), ("egz_20", egz_toplam >= 20), ("egz_14", len(egz_turler) >= 14),
-            ("orman_ilk", agac_sayisi >= 1), ("orman_50", agac_sayisi >= 50), ("orman_200", agac_sayisi >= 200),
-            ("lig_gumus", toplam_xp >= 200), ("lig_altin", toplam_xp >= 500), ("lig_elmas", toplam_xp >= 1000),
-        ]
-        for kod, kosul in checks:
-            if kosul and kod not in mevcut_kodlar:
-                doc = {"id": str(uuid.uuid4()), "kullanici_id": user_id, "rozet_kodu": kod, "kazanma_tarihi": datetime.utcnow().isoformat()}
-                try:
-                    await db.kazanilan_rozetler.insert_one(doc)
-                except DuplicateKeyError:
-                    continue  # yarış durumu: rozet zaten eklenmiş, atla
-                doc.pop("_id", None)  # insert_one'ın eklediği ObjectId JSON'a sızmasın
-                rozet_bilgi = next((r for r in (await get_ogrenci_rozetleri()) if r["kod"] == kod), None)
-                await rozet_bildirim_gonder(user_id, rozet_bilgi)
-                yeni_rozetler.append({**doc, "rozet": rozet_bilgi})
-
-    return {"yeni_rozetler": yeni_rozetler, "toplam": len(mevcut_kodlar) + len(yeni_rozetler)}
+    yeni_rozetler = await rozet_degerlendir(user_id, tetikleyen_event="kontrol")
+    toplam = await db.kazanilan_rozetler.count_documents({"kullanici_id": user_id})
+    return {"yeni_rozetler": yeni_rozetler, "toplam": toplam}
 
 
 

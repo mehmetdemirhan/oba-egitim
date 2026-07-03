@@ -3,6 +3,7 @@
 server.py'dan birebir taşındı. Yollar ve davranış değişmedi.
 """
 import uuid
+import asyncio
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -11,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from core.db import db
 from core.auth import get_current_user
+from core.rozet_motor import rozet_tetikle
 
 router = APIRouter()
 
@@ -60,6 +62,8 @@ async def create_reading_log(log: ReadingLogCreate, current_user=Depends(get_cur
     )
     data = model.dict()
     await db.reading_logs.insert_one(data)
+    # Event: okuma kaydı okuma/kitap/streak/orman rozetlerini tetikler (fire-and-forget)
+    asyncio.create_task(rozet_tetikle(current_user["id"], "okuma_kaydi"))
     return data
 
 

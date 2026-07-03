@@ -5,6 +5,7 @@ server.py'dan birebir taşındı. Yollar ve davranış değişmedi.
 Görev atandığında modules.bildirim.bildirim_gorev_atandi ile bildirim üretilir.
 """
 import uuid
+import asyncio
 from datetime import datetime
 from typing import Optional
 
@@ -13,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from core.db import db
 from core.auth import get_current_user
+from core.rozet_motor import rozet_tetikle
 from modules.bildirim import bildirim_gorev_atandi
 
 router = APIRouter()
@@ -184,6 +186,17 @@ async def update_gorev_durum(gorev_id: str, payload: dict, current_user=Depends(
             update["tamamlama_notu"] = payload["not"]
 
     await db.gorevler.update_one({"id": gorev_id}, {"$set": update})
+
+    # Event: görev tamamlanınca hem hedef öğrencinin (gorev_tamamlama) hem atayan
+    # öğretmenin (gorev_20) rozetlerini değerlendir (fire-and-forget)
+    if yeni_durum == "tamamlandi":
+        hedef_user = await db.users.find_one(
+            {"$or": [{"id": gorev.get("hedef_id")}, {"linked_id": gorev.get("hedef_id")}]})
+        if hedef_user:
+            asyncio.create_task(rozet_tetikle(hedef_user["id"], "gorev_tamam"))
+        if gorev.get("atayan_id"):
+            asyncio.create_task(rozet_tetikle(gorev["atayan_id"], "gorev_tamam"))
+
     return {"durum": yeni_durum}
 
 
