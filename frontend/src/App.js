@@ -16,6 +16,8 @@ import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, 
 import { useToast } from "./hooks/use-toast";
 import { Toaster } from "./components/ui/toaster";
 import ModulYonetimi from "./components/ModulYonetimi";
+import RozetYonetimi from "./components/rozet/RozetYonetimi";
+import RozetGrid from "./components/rozet/RozetGrid";
 import MebKelimeYonetimi from "./components/admin/MebKelimeYonetimi";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
 import InstagramAyarlari from "./components/admin/InstagramAyarlari";
@@ -393,6 +395,7 @@ function AppContent() {
             {user.role === "admin" && <TabsTrigger value="yedekleme" className={tabClass}><Database className="h-4 w-4 mr-2" />Yedekleme</TabsTrigger>}
             {user.role === "admin" && <TabsTrigger value="guncelleme" className={tabClass}><GitBranch className="h-4 w-4 mr-2" />Güncelleme</TabsTrigger>}
             {user.role === "admin" && <TabsTrigger value="moduller" className={tabClass}><Package className="h-4 w-4 mr-2" />Modüller</TabsTrigger>}
+            {user.role === "admin" && <TabsTrigger value="rozet-yonetimi" className={tabClass}>🏅 Rozetler</TabsTrigger>}
             {user.role === "admin" && <TabsTrigger value="meb-kelime" className={tabClass}>📖 MEB Kelimeleri</TabsTrigger>}
             <TabsTrigger value="ai-merkezi" className={tabClass}>🧠 AI Merkezi</TabsTrigger>
           </TabsList>
@@ -402,6 +405,13 @@ function AppContent() {
           {user.role === "admin" && (
             <TabsContent value="moduller">
               <ModulYonetimi />
+            </TabsContent>
+          )}
+
+          {/* Rozet Yönetimi (FAZ 3) */}
+          {user.role === "admin" && (
+            <TabsContent value="rozet-yonetimi">
+              <RozetYonetimi />
             </TabsContent>
           )}
 
@@ -5785,13 +5795,7 @@ function OgrenciPaneli({ user, logout }) {
           {/* Rozetlerim */}
           {ogrenciRozetTanim.length > 0 && (
             <div className="bg-white rounded-2xl p-4 shadow-sm border">
-              <div className="flex items-center justify-between mb-3"><h3 className="font-bold text-sm text-gray-900">🏅 Rozetlerim</h3><span className="text-xs text-gray-500">{ogrenciRozetler.length} / {ogrenciRozetTanim.length}</span></div>
-              <div className="grid grid-cols-5 gap-2">
-                {ogrenciRozetTanim.slice(0, 15).map(r => {
-                  const kazandi = ogrenciRozetler.some(k => k.rozet_kodu === r.kod);
-                  return (<div key={r.kod} className={`text-center p-1.5 rounded-xl border ${kazandi ? 'bg-white border-orange-200 shadow-sm' : 'bg-gray-50 border-gray-100 opacity-30'}`} title={r.ad}><div className="text-xl">{kazandi ? r.ikon : "🔒"}</div><div className="text-[8px] text-gray-500 mt-0.5 truncate">{r.ad}</div></div>);
-                })}
-              </div>
+              <RozetGrid tanimlar={ogrenciRozetTanim} kazanilanlar={ogrenciRozetler} baslik="🏅 Rozetlerim" />
             </div>
           )}
 
@@ -6866,6 +6870,7 @@ function VeliPaneli({ user, logout }) {
   const [okumaKayitlari, setOkumaKayitlari] = useState([]);
   const [istatistik, setIstatistik] = useState(null);
   const [gorevler, setGorevler] = useState([]);
+  const [cocukRozet, setCocukRozet] = useState(null); // {tanimlar, kazanilanlar}
   const [aktifSekme, setAktifSekme] = useState("ozet");
   // Mesaj
   const [mesajlar, setMesajlar] = useState([]);
@@ -6909,6 +6914,7 @@ function VeliPaneli({ user, logout }) {
     try { const r = await axios.get(`${API}/reading-logs/${seciliCocuk.id}`); setOkumaKayitlari(Array.isArray(r.data) ? r.data : []); } catch(e) { setOkumaKayitlari([]); }
     try { const r = await axios.get(`${API}/reading-logs/${seciliCocuk.id}/istatistik`); setIstatistik(r.data); } catch(e) {}
     try { const r = await axios.get(`${API}/gorevler?hedef_id=${seciliCocuk.id}&hedef_tip=ogrenci`); setGorevler(Array.isArray(r.data) ? r.data : []); } catch(e) { setGorevler([]); }
+    try { const r = await axios.get(`${API}/rozet/ogrenci/${seciliCocuk.id}`); setCocukRozet(r.data); } catch(e) { setCocukRozet(null); }
   }, [seciliCocuk]);
 
   useEffect(() => { fetchCocukVerileri(); }, [fetchCocukVerileri]);
@@ -7027,6 +7033,26 @@ function VeliPaneli({ user, logout }) {
               </div>
             )}
             {bekleyenGorevler.length > 0 && (<div className="bg-yellow-50 rounded-2xl p-4 border border-yellow-100"><div className="font-medium text-sm text-yellow-800">📌 {bekleyenGorevler.length} bekleyen görev var</div><div className="mt-2 space-y-1">{bekleyenGorevler.slice(0,3).map(g => (<div key={g.id} className="text-xs text-gray-600">• {g.baslik}{g.son_tarih && ` (Son: ${new Date(g.son_tarih).toLocaleDateString('tr-TR')})`}</div>))}</div></div>)}
+
+            {/* 🏅 Çocuğumun Rozetleri (FAZ 3) */}
+            {cocukRozet?.tanimlar?.length > 0 && (
+              <div className="bg-white rounded-2xl p-4 shadow-sm border">
+                {cocukRozet.kazanilanlar?.length > 0 && (
+                  <div className="flex items-center gap-2 mb-3 flex-wrap">
+                    <span className="text-xs font-medium text-gray-500">Son kazanılanlar:</span>
+                    {cocukRozet.tanimlar
+                      .filter(t => cocukRozet.kazanilanlar.some(k => k.rozet_kodu === t.kod))
+                      .slice(-3)
+                      .map(t => <span key={t.kod} className="text-xl" title={t.ad}>{t.ikon}</span>)}
+                  </div>
+                )}
+                <RozetGrid
+                  tanimlar={cocukRozet.tanimlar}
+                  kazanilanlar={cocukRozet.kazanilanlar}
+                  baslik={`🏅 ${seciliCocuk.ad}'in Rozetleri`}
+                />
+              </div>
+            )}
           </>)}
 
           {/* OKUMALAR */}
