@@ -1,0 +1,11 @@
+{
+  "short_name": "OBA",
+  "name": "Okuma Becerileri Akademisi",
+  "icons": [
+    { "src": "/favicon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#f97316",
+  "background_color": "#ffffff"
+}

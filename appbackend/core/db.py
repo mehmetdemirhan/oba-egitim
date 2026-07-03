@@ -92,6 +92,8 @@ async def ensure_indexes():
             pass
         await db.rozetler.create_index(
             [("rol", 1), ("kod", 1)], unique=True, name="uq_rozet_rol_kod")
-        logging.info("[db] rozet index'leri hazır (uq_kullanici_rozet, uq_rozet_rol_kod)")
+        # Tema TANIM koleksiyonu — kod benzersiz
+        await db.theme_configs.create_index("kod", unique=True, name="uq_tema_kod")
+        logging.info("[db] rozet+tema index'leri hazır (uq_kullanici_rozet, uq_rozet_rol_kod, uq_tema_kod)")
     except Exception as ex:
         logging.error(f"[db] ensure_indexes hatası: {type(ex).__name__}: {ex}")

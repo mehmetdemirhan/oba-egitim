@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
+import Logo from "../components/Logo";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -63,17 +64,10 @@ export default function LoginPage() {
         maxWidth: 400,
         padding: "0 20px",
       }}>
-        {/* Logo */}
+        {/* Logo — merkezî Logo bileşeni */}
         <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div style={{
-            width: 64, height: 64, margin: "0 auto 16px",
-            background: "linear-gradient(135deg, #F97316, #EF4444)",
-            borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 8px 24px rgba(249,115,22,0.3)",
-          }}>
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
-            </svg>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+            <Logo size="xl" showText={false} />
           </div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: "#1F2937", margin: 0 }}>Okuma Becerileri Akademisi</h1>
           <p style={{ fontSize: 14, color: "#6B7280", marginTop: 4 }}>Eğitim Yönetim Sistemi</p>
