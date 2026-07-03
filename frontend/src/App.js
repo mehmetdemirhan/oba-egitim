@@ -19,6 +19,7 @@ import ModulYonetimi from "./components/ModulYonetimi";
 import RozetYonetimi from "./components/rozet/RozetYonetimi";
 import RozetGrid from "./components/rozet/RozetGrid";
 import TemaYonetimi from "./components/tema/TemaYonetimi";
+import ThemeToggle from "./components/tema/ThemeToggle";
 import MebKelimeYonetimi from "./components/admin/MebKelimeYonetimi";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
 import InstagramAyarlari from "./components/admin/InstagramAyarlari";
@@ -374,6 +375,7 @@ function AppContent() {
               </div>
               <BildirimZili user={user} />
               <Button onClick={exportToExcel} disabled={loadingAction} className="bg-green-600 hover:bg-green-700 text-white"><Download className="h-4 w-4 mr-2" />Excel</Button>
+              <ThemeToggle />
               <Button variant="outline" size="sm" onClick={logout} className="flex items-center gap-2"><LogOut className="h-4 w-4" />Çıkış</Button>
             </div>
           </div>
@@ -4219,6 +4221,7 @@ function OgretmenPaneli({ user, logout }) {
           </div>
           <div className="flex items-center gap-2">
             <BildirimZili user={user} />
+            <ThemeToggle />
             <Button variant="outline" size="sm" onClick={logout}><LogOut className="h-3 w-3 mr-1" />Çıkış</Button>
           </div>
         </div>
@@ -6988,6 +6991,7 @@ function VeliPaneli({ user, logout }) {
           </div>
           <div className="flex items-center gap-2">
             <BildirimZili user={user} />
+            <ThemeToggle />
             <Button variant="outline" size="sm" onClick={logout} className="text-xs"><LogOut className="h-3 w-3 mr-1" />Çıkış</Button>
           </div>
         </div>
