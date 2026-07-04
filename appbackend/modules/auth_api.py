@@ -163,6 +163,11 @@ async def create_user(
 ):
     from core.hesap import gecici_sifre_uret, ogretmen_kaydi_olustur
 
+    # Koordinatör kullanıcı oluşturabilir AMA admin/yönetici hesabı açamaz
+    # (yetki yükseltme engeli). Sadece admin, admin hesabı oluşturabilir.
+    if current_user.get("role") == "coordinator" and user_data.role == UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Koordinatör yönetici (admin) hesabı oluşturamaz")
+
     # Email kontrolü
     existing = await db.users.find_one({"email": user_data.email.lower().strip()})
     if existing:
@@ -226,7 +231,7 @@ async def list_users(current_user=Depends(require_role(UserRole.ADMIN, UserRole.
     return result
 
 @router.delete("/auth/users/{user_id}")
-async def delete_user(user_id: str, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+async def delete_user(user_id: str, current_user=Depends(require_role(UserRole.ADMIN))):
     if user_id == current_user["id"]:
         raise HTTPException(status_code=400, detail="Kendi hesabınızı silemezsiniz")
     result = await db.users.delete_one({"id": user_id})

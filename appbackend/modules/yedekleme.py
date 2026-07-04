@@ -111,19 +111,19 @@ class RestoreRequest(BaseModel):
 
 
 @router.post("/admin/backup")
-async def admin_create_backup(current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+async def admin_create_backup(current_user=Depends(require_role(UserRole.ADMIN))):
     row = await _snapshot_db(current_user, etiket="manual")
     return _backup_history_public(row)
 
 
 @router.get("/admin/backups")
-async def admin_list_backups(current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+async def admin_list_backups(current_user=Depends(require_role(UserRole.ADMIN))):
     rows = await db.backup_history.find().sort("olusturma_tarihi", -1).to_list(length=None)
     return [_backup_history_public(r) for r in rows]
 
 
 @router.get("/admin/backups/{backup_id}/download")
-async def admin_download_backup(backup_id: str, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+async def admin_download_backup(backup_id: str, current_user=Depends(require_role(UserRole.ADMIN))):
     row = await db.backup_history.find_one({"id": backup_id})
     if not row:
         raise HTTPException(status_code=404, detail="Yedek bulunamadı")
@@ -144,7 +144,7 @@ async def admin_download_backup(backup_id: str, current_user=Depends(require_rol
 
 
 @router.delete("/admin/backups/{backup_id}")
-async def admin_delete_backup(backup_id: str, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+async def admin_delete_backup(backup_id: str, current_user=Depends(require_role(UserRole.ADMIN))):
     row = await db.backup_history.find_one({"id": backup_id})
     if not row:
         raise HTTPException(status_code=404, detail="Yedek bulunamadı")
@@ -162,7 +162,7 @@ async def admin_delete_backup(backup_id: str, current_user=Depends(require_role(
 async def admin_restore_backup(
     backup_id: str,
     body: RestoreRequest,
-    current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR)),
+    current_user=Depends(require_role(UserRole.ADMIN)),
 ):
     if body.onay != "GERI YUKLE":
         raise HTTPException(status_code=403, detail="Onay metni hatalı. Lütfen tam olarak 'GERI YUKLE' yazın.")
@@ -229,7 +229,7 @@ async def admin_restore_backup(
 
 
 @router.get("/admin/version")
-async def admin_version(current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+async def admin_version(current_user=Depends(require_role(UserRole.ADMIN))):
     commit_sha = os.environ.get("RENDER_GIT_COMMIT", "") or os.environ.get("RAILWAY_GIT_COMMIT_SHA", "")
     return {
         "version": APP_VERSION,
@@ -241,7 +241,7 @@ async def admin_version(current_user=Depends(require_role(UserRole.ADMIN, UserRo
 @router.get("/admin/updates/check")
 async def admin_updates_check(
     force: bool = False,
-    current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR)),
+    current_user=Depends(require_role(UserRole.ADMIN)),
 ):
     if not GITHUB_REPO_OWNER or not GITHUB_REPO_NAME:
         return {

@@ -49,6 +49,7 @@ function roleLabel(role) {
 
 function UserManagement({ teachers }) {
   const { toast } = useToast();
+  const { user: aktifUser } = useAuth();  // koordinatör silemez → sadece admin
   const [users, setUsers] = useState([]);
   const [form, setForm] = useState({ ad: "", soyad: "", email: "", telefon: "", password: "", role: "teacher", linked_id: "" });
   const [loading, setLoading] = useState(false);
@@ -132,7 +133,9 @@ function UserManagement({ teachers }) {
                   <TableCell>{u.email}</TableCell>
                   <TableCell className="text-subtle">{u.telefon || '-'}</TableCell>
                   <TableCell><span className={`px-2 py-1 rounded-full text-xs font-medium ${roleBadgeColor[u.role] || 'bg-gray-100'}`}>{roleLabel(u.role)}</span></TableCell>
-                  <TableCell><Button variant="destructive" size="sm" onClick={() => deleteUser(u.id)}><Trash2 className="h-4 w-4" /></Button></TableCell>
+                  <TableCell>{aktifUser?.role === "admin"
+                    ? <Button variant="destructive" size="sm" onClick={() => deleteUser(u.id)}><Trash2 className="h-4 w-4" /></Button>
+                    : <span className="text-[10px] text-gray-400">—</span>}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -434,9 +437,9 @@ function AppContent() {
             <TabsTrigger value="giris-analizi" className={tabClass}><Stethoscope className="h-4 w-4 mr-2" />Giriş Analizi</TabsTrigger>
             <TabsTrigger value="mesajlar" className={tabClass}><Mail className="h-4 w-4 mr-2" />Mesajlar</TabsTrigger>
             {adminVeyaKoord && <TabsTrigger value="ayarlar" className={tabClass}><Star className="h-4 w-4 mr-2" />Ayarlar</TabsTrigger>}
-            {adminVeyaKoord && <TabsTrigger value="yedekleme" className={tabClass}><Database className="h-4 w-4 mr-2" />Yedekleme</TabsTrigger>}
-            {adminVeyaKoord && <TabsTrigger value="guncelleme" className={tabClass}><GitBranch className="h-4 w-4 mr-2" />Güncelleme</TabsTrigger>}
-            {adminVeyaKoord && <TabsTrigger value="moduller" className={tabClass}><Package className="h-4 w-4 mr-2" />Modüller</TabsTrigger>}
+            {user.role === "admin" && <TabsTrigger value="yedekleme" className={tabClass}><Database className="h-4 w-4 mr-2" />Yedekleme</TabsTrigger>}
+            {user.role === "admin" && <TabsTrigger value="guncelleme" className={tabClass}><GitBranch className="h-4 w-4 mr-2" />Güncelleme</TabsTrigger>}
+            {user.role === "admin" && <TabsTrigger value="moduller" className={tabClass}><Package className="h-4 w-4 mr-2" />Modüller</TabsTrigger>}
             {adminVeyaKoord && <TabsTrigger value="tema-yonetimi" className={tabClass}>🎨 Tema</TabsTrigger>}
             {adminVeyaKoord && <TabsTrigger value="rozet-yonetimi" className={tabClass}>🏅 Rozetler</TabsTrigger>}
             {adminVeyaKoord && <TabsTrigger value="meb-kelime" className={tabClass}>📖 MEB Kelimeleri</TabsTrigger>}
@@ -445,7 +448,7 @@ function AppContent() {
           )}
 
           {/* Modül Yönetimi (yama sistemi) */}
-          {adminVeyaKoord && (
+          {user.role === "admin" && (
             <TabsContent value="moduller">
               <ModulYonetimi />
             </TabsContent>
@@ -1306,14 +1309,14 @@ function AppContent() {
           )}
 
           {/* Yedekleme - Sadece Admin */}
-          {adminVeyaKoord && (
+          {user.role === "admin" && (
             <TabsContent value="yedekleme">
               <YedeklemeYonetimi />
             </TabsContent>
           )}
 
           {/* Güncelleme - Sadece Admin */}
-          {adminVeyaKoord && (
+          {user.role === "admin" && (
             <TabsContent value="guncelleme">
               <GuncellemeKontrol />
             </TabsContent>

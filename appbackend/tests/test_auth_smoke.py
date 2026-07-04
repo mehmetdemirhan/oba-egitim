@@ -119,6 +119,28 @@ async def run():
         r = await ac.get("/api/auth/users")
         check(r.status_code in (401, 403), f"token'sız /auth/users reddedildi (status={r.status_code})")
 
+        # 10) Koordinatör yetki sınırları (daraltılmış)
+        r = await ac.post("/api/auth/users", headers=auth, json={
+            "ad": "K", "soyad": "Rd", "email": "krd@test.local", "role": "coordinator"})
+        koord_sifre = r.json()["gecici_sifre"]
+        r = await ac.post("/api/auth/login", json={"email_or_phone": "krd@test.local", "password": koord_sifre})
+        koord_auth = {"Authorization": f"Bearer {r.json()['access_token']}"}
+        # a) koordinatör öğretmen/kullanıcı oluşturabilir
+        r = await ac.post("/api/auth/users", headers=koord_auth, json={
+            "ad": "Yeni", "soyad": "Öğr2", "email": "ogr2@test.local", "role": "teacher"})
+        check(r.status_code == 200, f"koordinatör kullanıcı oluşturabildi (status={r.status_code})")
+        # b) koordinatör ADMIN hesabı oluşturamaz → 403
+        r = await ac.post("/api/auth/users", headers=koord_auth, json={
+            "ad": "Sahte", "soyad": "Admin", "email": "sahteadmin@test.local", "role": "admin"})
+        check(r.status_code == 403, f"koordinatör admin oluşturamaz 403 (status={r.status_code})")
+        # c) koordinatör kullanıcı SİLEMEZ → 403
+        r = await ac.delete("/api/auth/users/auth-admin-1", headers=koord_auth)
+        check(r.status_code == 403, f"koordinatör kullanıcı silemez 403 (status={r.status_code})")
+        # d) admin silebilir (yeni öğretmeni silelim)
+        ogr2 = await db.users.find_one({"email": "ogr2@test.local"})
+        r = await ac.delete(f"/api/auth/users/{ogr2['id']}", headers=auth)
+        check(r.status_code == 200, f"admin kullanıcı silebilir (status={r.status_code})")
+
     await server.client.drop_database(TEST_DB)
 
 
