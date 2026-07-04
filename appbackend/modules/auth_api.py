@@ -30,7 +30,7 @@ class UserCreate(BaseModel):
     ad: str
     soyad: str
     email: str
-    password: str
+    password: Optional[str] = None  # boş bırakılırsa güçlü geçici şifre otomatik üretilir
     role: UserRole
     telefon: Optional[str] = None
     linked_id: Optional[str] = None  # teacher_id, student_id or parent's student_id
@@ -50,11 +50,13 @@ class UserResponse(BaseModel):
     linked_id: Optional[str] = None
     olusturma_tarihi: datetime
     puan: int = 0
+    sifre_degistirme_zorunlu: bool = False
 
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
+    must_change_password: bool = False
 
 class ChangePassword(BaseModel):
     old_password: str
@@ -82,6 +84,7 @@ async def login(credentials: UserLogin):
 
     token = create_access_token({"sub": user["id"], "role": user["role"]})
 
+    zorunlu = bool(user.get("sifre_degistirme_zorunlu", False))
     user_response = UserResponse(
         id=user["id"],
         ad=user["ad"],
@@ -91,10 +94,11 @@ async def login(credentials: UserLogin):
         telefon=user.get("telefon"),
         linked_id=user.get("linked_id"),
         olusturma_tarihi=datetime.fromisoformat(user["olusturma_tarihi"]) if isinstance(user.get("olusturma_tarihi"), str) else user.get("olusturma_tarihi", datetime.now(timezone.utc)),
-        puan=user.get("puan", 0)
+        puan=user.get("puan", 0),
+        sifre_degistirme_zorunlu=zorunlu,
     )
 
-    return TokenResponse(access_token=token, user=user_response)
+    return TokenResponse(access_token=token, user=user_response, must_change_password=zorunlu)
 
 @router.get("/auth/me", response_model=UserResponse)
 async def get_me(current_user=Depends(get_current_user)):
@@ -107,7 +111,8 @@ async def get_me(current_user=Depends(get_current_user)):
         telefon=current_user.get("telefon"),
         linked_id=current_user.get("linked_id"),
         olusturma_tarihi=datetime.fromisoformat(current_user["olusturma_tarihi"]) if isinstance(current_user.get("olusturma_tarihi"), str) else current_user.get("olusturma_tarihi", datetime.now(timezone.utc)),
-        puan=current_user.get("puan", 0)
+        puan=current_user.get("puan", 0),
+        sifre_degistirme_zorunlu=bool(current_user.get("sifre_degistirme_zorunlu", False)),
     )
 
 @router.post("/auth/forgot-password")
@@ -143,22 +148,29 @@ async def change_password(data: ChangePassword, current_user=Depends(get_current
         raise HTTPException(status_code=400, detail="Mevcut şifre hatalı")
 
     new_hash = hash_password(data.new_password)
+    # Şifre değişince zorunlu-değiştirme bayrağı düşer (ilk giriş akışını kapatır)
     await db.users.update_one(
         {"id": current_user["id"]},
-        {"$set": {"password_hash": new_hash}}
+        {"$set": {"password_hash": new_hash, "sifre_degistirme_zorunlu": False}}
     )
     return {"message": "Şifre başarıyla güncellendi"}
 
-# Admin: kullanıcı oluşturma (sadece admin)
-@router.post("/auth/users", response_model=UserResponse)
+# Admin/Koordinatör: kullanıcı oluşturma
+@router.post("/auth/users")
 async def create_user(
     user_data: UserCreate,
-    current_user=Depends(require_role(UserRole.ADMIN))
+    current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))
 ):
+    from core.hesap import gecici_sifre_uret, ogretmen_kaydi_olustur
+
     # Email kontrolü
     existing = await db.users.find_one({"email": user_data.email.lower().strip()})
     if existing:
         raise HTTPException(status_code=400, detail="Bu e-posta zaten kayıtlı")
+
+    # Şifre: admin bir şey girmediyse güçlü geçici şifre üret (tek kullanımlık)
+    uretildi = not (user_data.password and user_data.password.strip())
+    gecici_sifre = (user_data.password or "").strip() or gecici_sifre_uret()
 
     user_doc = {
         "id": str(uuid.uuid4()),
@@ -166,25 +178,37 @@ async def create_user(
         "soyad": user_data.soyad,
         "email": user_data.email.lower().strip(),
         "telefon": user_data.telefon.strip() if user_data.telefon else None,
-        "password_hash": hash_password(user_data.password),
+        "password_hash": hash_password(gecici_sifre),
         "role": user_data.role.value,
-        "linked_id": user_data.linked_id,
+        "linked_id": user_data.linked_id or None,
+        "sifre_degistirme_zorunlu": True,  # ilk girişte zorunlu değiştirme
         "olusturma_tarihi": datetime.now(timezone.utc).isoformat()
     }
     await db.users.insert_one(user_doc)
 
-    return UserResponse(
-        id=user_doc["id"],
-        ad=user_doc["ad"],
-        soyad=user_doc["soyad"],
-        email=user_doc["email"],
-        role=user_doc["role"],
-        linked_id=user_doc.get("linked_id"),
-        olusturma_tarihi=datetime.now(timezone.utc)
-    )
+    # role teacher/coordinator/admin ise otomatik teachers kaydı + köprü
+    teacher_id = await ogretmen_kaydi_olustur(user_doc)
+    if teacher_id:
+        user_doc["linked_id"] = teacher_id
+
+    return {
+        "id": user_doc["id"],
+        "ad": user_doc["ad"],
+        "soyad": user_doc["soyad"],
+        "email": user_doc["email"],
+        "role": user_doc["role"],
+        "telefon": user_doc.get("telefon"),
+        "linked_id": user_doc.get("linked_id"),
+        "olusturma_tarihi": user_doc["olusturma_tarihi"],
+        "sifre_degistirme_zorunlu": True,
+        "teacher_id": teacher_id,
+        # Geçici şifre: SMS/e-posta olmadığı için admin'e bir kereliğine gösterilir
+        "gecici_sifre": gecici_sifre,
+        "gecici_sifre_uretildi": uretildi,
+    }
 
 @router.get("/auth/users", response_model=List[UserResponse])
-async def list_users(current_user=Depends(require_role(UserRole.ADMIN))):
+async def list_users(current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     users = await db.users.find().to_list(length=None)
     result = []
     for u in users:
@@ -202,7 +226,7 @@ async def list_users(current_user=Depends(require_role(UserRole.ADMIN))):
     return result
 
 @router.delete("/auth/users/{user_id}")
-async def delete_user(user_id: str, current_user=Depends(require_role(UserRole.ADMIN))):
+async def delete_user(user_id: str, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     if user_id == current_user["id"]:
         raise HTTPException(status_code=400, detail="Kendi hesabınızı silemezsiniz")
     result = await db.users.delete_one({"id": user_id})

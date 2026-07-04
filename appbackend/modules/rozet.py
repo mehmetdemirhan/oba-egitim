@@ -68,7 +68,7 @@ async def rozet_tanim_listesi(rol: Optional[str] = None):
 
 # ── Admin-only statik yollar (/{rol}/{kod}'dan ÖNCE) ──
 @router.get("/istatistik")
-async def rozet_istatistik(current_user=Depends(require_role(UserRole.ADMIN))):
+async def rozet_istatistik(current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     """Her rozet için kazanan sayısı + en nadir/en yaygın özet."""
     tanimlar = await _tanim_listesi()
     # rol bazlı kullanıcı id kümeleri (kazanımlar rol'e göre ayrıştırılır)
@@ -101,13 +101,13 @@ async def rozet_istatistik(current_user=Depends(require_role(UserRole.ADMIN))):
 
 
 @router.get("/export")
-async def rozet_export(current_user=Depends(require_role(UserRole.ADMIN))):
+async def rozet_export(current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     """Tüm rozet tanımlarını JSON olarak döner (yedek/aktarım)."""
     return {"rozetler": await _tanim_listesi(), "tarih": datetime.utcnow().isoformat()}
 
 
 @router.post("/import")
-async def rozet_import(payload: dict = Body(...), current_user=Depends(require_role(UserRole.ADMIN))):
+async def rozet_import(payload: dict = Body(...), current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     """JSON toplu içe aktarma — (rol, kod) üzerinde upsert."""
     kayitlar = payload.get("rozetler", payload if isinstance(payload, list) else [])
     if not isinstance(kayitlar, list):
@@ -133,7 +133,7 @@ async def rozet_import(payload: dict = Body(...), current_user=Depends(require_r
 
 
 @router.post("/tanim")
-async def rozet_olustur(payload: dict = Body(...), current_user=Depends(require_role(UserRole.ADMIN))):
+async def rozet_olustur(payload: dict = Body(...), current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     """Yeni rozet tanımı ekler."""
     kod = (payload.get("kod") or "").strip()
     rol = payload.get("rol")
@@ -192,7 +192,7 @@ async def rozet_getir(rol: str, kod: str):
 
 @router.put("/{rol}/{kod}")
 async def rozet_guncelle(rol: str, kod: str, payload: dict = Body(...),
-                         current_user=Depends(require_role(UserRole.ADMIN))):
+                         current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     mevcut = await db.rozetler.find_one({"rol": rol, "kod": kod})
     if not mevcut:
         raise HTTPException(status_code=404, detail="Rozet bulunamadı")
@@ -208,7 +208,7 @@ async def rozet_guncelle(rol: str, kod: str, payload: dict = Body(...),
 
 @router.delete("/{rol}/{kod}")
 async def rozet_sil(rol: str, kod: str, payload: dict = Body(default={}),
-                    current_user=Depends(require_role(UserRole.ADMIN))):
+                    current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     """Rozet tanımını siler. kazananlari_koru=False ise bu roldeki kullanıcıların
     kazanımlarını da temizler (diğer roldeki aynı kod ETKİLENMEZ)."""
     res = await db.rozetler.delete_one({"rol": rol, "kod": kod})
@@ -224,7 +224,7 @@ async def rozet_sil(rol: str, kod: str, payload: dict = Body(default={}),
 
 
 @router.get("/{rol}/{kod}/kazananlar")
-async def rozet_kazananlar(rol: str, kod: str, current_user=Depends(require_role(UserRole.ADMIN))):
+async def rozet_kazananlar(rol: str, kod: str, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     uidler = set(await _rol_user_idleri(rol))
     kazanimlar = await db.kazanilan_rozetler.find({"rozet_kodu": kod}).to_list(length=None)
     kazanimlar = [k for k in kazanimlar if k.get("kullanici_id") in uidler]
@@ -243,7 +243,7 @@ async def rozet_kazananlar(rol: str, kod: str, current_user=Depends(require_role
 
 @router.post("/{rol}/{kod}/ver")
 async def rozet_manuel_ver(rol: str, kod: str, payload: dict = Body(...),
-                           current_user=Depends(require_role(UserRole.ADMIN))):
+                           current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     """Bir kullanıcıya rozeti manuel verir + bildirim gönderir."""
     user_id = payload.get("user_id")
     if not user_id:
@@ -263,7 +263,7 @@ async def rozet_manuel_ver(rol: str, kod: str, payload: dict = Body(...),
 
 @router.post("/{rol}/{kod}/geri-al")
 async def rozet_geri_al(rol: str, kod: str, payload: dict = Body(...),
-                        current_user=Depends(require_role(UserRole.ADMIN))):
+                        current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     """Bir kullanıcının kazandığı rozeti geri alır."""
     user_id = payload.get("user_id")
     if not user_id:

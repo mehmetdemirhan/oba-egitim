@@ -626,7 +626,7 @@ async def ai_sorular_listesi(current_user=Depends(get_current_user)):
 
 
 @router.get("/ai/maliyet-ozet")
-async def ai_maliyet_ozet(current_user=Depends(require_role(UserRole.ADMIN))):
+async def ai_maliyet_ozet(current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     """Admin: AI maliyet özeti."""
     bugun = datetime.utcnow().strftime("%Y-%m-%d")
     bu_ay = datetime.utcnow().strftime("%Y-%m")

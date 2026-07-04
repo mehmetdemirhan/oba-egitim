@@ -38,7 +38,7 @@ AI_BEKLEME_SN = 2.0      # batch'ler arası bekleme (büyük prompt → kota gü
 AI_MAX_DENEME = 3
 AI_BATCH_SANIYE = 5      # ilerleme tahmini: batch başına ~saniye (çağrı + bekleme)
 
-_YAZMA = require_role(UserRole.ADMIN)
+_YAZMA = require_role(UserRole.ADMIN, UserRole.COORDINATOR)
 _OKUMA = require_role(UserRole.ADMIN, UserRole.COORDINATOR, UserRole.TEACHER)
 
 # Aynı (sınıf, ders) için eşzamanlı birden çok AI kuyruğu tetiklenmesin

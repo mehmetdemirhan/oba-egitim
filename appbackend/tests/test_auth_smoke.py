@@ -66,12 +66,37 @@ async def run():
         r = await ac.get("/api/auth/me", headers=auth)
         check(r.status_code == 200 and r.json().get("id") == "auth-admin-1", "/auth/me doğru kullanıcı")
 
-        # 5) Admin başka kullanıcı oluşturur
+        # 5) Admin öğretmen oluşturur — şifre VERMEDEN (otomatik güçlü geçici şifre)
         r = await ac.post("/api/auth/users", headers=auth, json={
-            "ad": "Yeni", "soyad": "Öğretmen", "email": "ogr@test.local",
-            "password": "pass123", "role": "teacher",
+            "ad": "Yeni", "soyad": "Öğretmen", "email": "ogr@test.local", "role": "teacher",
         })
-        check(r.status_code == 200 and r.json().get("role") == "teacher", "admin yeni kullanıcı oluşturdu")
+        j = r.json()
+        check(r.status_code == 200 and j.get("role") == "teacher", "admin yeni öğretmen oluşturdu")
+        check(bool(j.get("gecici_sifre")) and j.get("gecici_sifre_uretildi") is True,
+              "otomatik geçici şifre üretildi ve döndü")
+        check(j.get("sifre_degistirme_zorunlu") is True, "yeni kullanıcı şifre değiştirme zorunlu")
+        check(bool(j.get("teacher_id")), "öğretmen için teachers kaydı otomatik oluştu")
+        ogr_gecici = j["gecici_sifre"]
+        trec = await db.teachers.find_one({"id": j["teacher_id"]})
+        check(trec is not None and trec.get("user_id") == j["id"], "teacher.user_id = user.id (köprü)")
+
+        # 5b) İlk giriş: geçici şifre → must_change_password=true; değiştirince düşer
+        r = await ac.post("/api/auth/login", json={"email_or_phone": "ogr@test.local", "password": ogr_gecici})
+        check(r.status_code == 200 and r.json().get("must_change_password") is True,
+              "geçici şifre login must_change=true")
+        ogr_auth = {"Authorization": f"Bearer {r.json()['access_token']}"}
+        r = await ac.post("/api/auth/change-password", headers=ogr_auth,
+                          json={"old_password": ogr_gecici, "new_password": "kalici789"})
+        check(r.status_code == 200, "öğretmen ilk-giriş şifresini değiştirdi")
+        r = await ac.post("/api/auth/login", json={"email_or_phone": "ogr@test.local", "password": "kalici789"})
+        check(r.status_code == 200 and r.json().get("must_change_password") is False,
+              "değiştirdikten sonra must_change=false")
+
+        # 5c) Koordinatör de teachers'a eklenir (req: koord/yönetici de ders anlatır)
+        r = await ac.post("/api/auth/users", headers=auth, json={
+            "ad": "Koord", "soyad": "İnan", "email": "koord@test.local", "role": "coordinator",
+        })
+        check(r.status_code == 200 and r.json().get("teacher_id"), "koordinatör için de teachers kaydı oluştu")
 
         # 6) Aynı email tekrar → 400
         r = await ac.post("/api/auth/users", headers=auth, json={
@@ -79,9 +104,9 @@ async def run():
         })
         check(r.status_code == 400, f"duplike email 400 (status={r.status_code})")
 
-        # 7) Liste
+        # 7) Liste (admin + öğretmen + koordinatör = 3)
         r = await ac.get("/api/auth/users", headers=auth)
-        check(r.status_code == 200 and len(r.json()) == 2, "kullanıcı listesi 2 kayıt")
+        check(r.status_code == 200 and len(r.json()) == 3, f"kullanıcı listesi 3 kayıt ({len(r.json())})")
 
         # 8) change-password sonra yeni şifre ile login
         r = await ac.post("/api/auth/change-password", headers=auth,

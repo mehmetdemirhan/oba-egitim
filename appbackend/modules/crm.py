@@ -11,7 +11,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from core.db import db, prepare_for_mongo, parse_from_mongo
-from core.auth import get_current_user, TeacherLevel
+from core.auth import get_current_user, require_role, UserRole, TeacherLevel, hash_password
+from core.hesap import gecici_sifre_uret, OGRETMEN_ROLLERI
 
 router = APIRouter()
 
@@ -48,6 +49,10 @@ class TeacherCreate(BaseModel):
     telefon: str
     seviye: TeacherLevel
     yapilmasi_gereken_odeme: float = 0.0
+    # ── Opsiyonel hesap oluşturma (tek adımda user + teacher) ──
+    hesap_olustur: bool = False
+    email: Optional[str] = None
+    hesap_rol: str = "teacher"   # teacher | coordinator | admin
 
 class TeacherUpdate(BaseModel):
     ad: Optional[str] = None
@@ -178,11 +183,41 @@ class ExportData(BaseModel):
     odemeler: List[dict]
 
 
-@router.post("/teachers", response_model=Teacher)
-async def create_teacher(teacher_data: TeacherCreate):
-    teacher = Teacher(**teacher_data.dict())
+@router.post("/teachers")
+async def create_teacher(
+    teacher_data: TeacherCreate,
+    current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR)),
+):
+    teacher = Teacher(
+        ad=teacher_data.ad, soyad=teacher_data.soyad, brans=teacher_data.brans,
+        telefon=teacher_data.telefon, seviye=teacher_data.seviye,
+        yapilmasi_gereken_odeme=teacher_data.yapilmasi_gereken_odeme,
+    )
     await db.teachers.insert_one(prepare_for_mongo(teacher.dict()))
-    return teacher
+    sonuc = teacher.dict()
+
+    # Opsiyonel: aynı adımda kullanıcı hesabı oluştur (user ↔ teacher köprüsü)
+    if teacher_data.hesap_olustur and teacher_data.email:
+        email = teacher_data.email.lower().strip()
+        rol = teacher_data.hesap_rol if teacher_data.hesap_rol in OGRETMEN_ROLLERI else "teacher"
+        if await db.users.find_one({"email": email}):
+            raise HTTPException(status_code=400, detail="Bu e-posta zaten kayıtlı")
+        gecici_sifre = gecici_sifre_uret()
+        user_doc = {
+            "id": str(uuid.uuid4()),
+            "ad": teacher_data.ad, "soyad": teacher_data.soyad, "email": email,
+            "telefon": teacher_data.telefon or None,
+            "password_hash": hash_password(gecici_sifre),
+            "role": rol, "linked_id": teacher.id,
+            "sifre_degistirme_zorunlu": True,
+            "olusturma_tarihi": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.users.insert_one(user_doc)
+        await db.teachers.update_one({"id": teacher.id}, {"$set": {"user_id": user_doc["id"]}})
+        sonuc["user_id"] = user_doc["id"]
+        sonuc["hesap"] = {"email": email, "rol": rol,
+                          "gecici_sifre": gecici_sifre, "gecici_sifre_uretildi": True}
+    return sonuc
 
 @router.get("/teachers", response_model=List[Teacher])
 async def get_teachers():

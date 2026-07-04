@@ -134,7 +134,7 @@ async def kullanici_tercih_kaydet(payload: dict = Body(...), current_user=Depend
 # ADMIN YÖNETİMİ (FAZ 3) — /{kod}'dan ÖNCE tanımlı statik yollar
 # ─────────────────────────────────────────────
 @router.get("/tumu")
-async def tum_temalar(current_user=Depends(require_role(UserRole.ADMIN))):
+async def tum_temalar(current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     """Tüm temalar (hazır + özel) — admin."""
     temalar = await _tema_listesi()
     aktif = await _sistem_varsayilan_kod()
@@ -142,12 +142,12 @@ async def tum_temalar(current_user=Depends(require_role(UserRole.ADMIN))):
 
 
 @router.get("/export")
-async def tema_export(current_user=Depends(require_role(UserRole.ADMIN))):
+async def tema_export(current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     return {"temalar": await _tema_listesi(), "tarih": datetime.utcnow().isoformat()}
 
 
 @router.post("/import")
-async def tema_import(payload: dict = Body(...), current_user=Depends(require_role(UserRole.ADMIN))):
+async def tema_import(payload: dict = Body(...), current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     kayitlar = payload.get("temalar", payload if isinstance(payload, list) else [])
     if not isinstance(kayitlar, list):
         raise HTTPException(status_code=400, detail="'temalar' listesi bekleniyor")
@@ -172,7 +172,7 @@ async def tema_import(payload: dict = Body(...), current_user=Depends(require_ro
 
 
 @router.post("")
-async def tema_olustur(payload: dict = Body(...), current_user=Depends(require_role(UserRole.ADMIN))):
+async def tema_olustur(payload: dict = Body(...), current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     """Yeni özel tema ekler."""
     kod = (payload.get("kod") or "").strip()
     if not kod:
@@ -197,7 +197,7 @@ async def tema_olustur(payload: dict = Body(...), current_user=Depends(require_r
 
 
 @router.post("/aktif-yap/{kod}")
-async def tema_aktif_yap(kod: str, current_user=Depends(require_role(UserRole.ADMIN))):
+async def tema_aktif_yap(kod: str, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     """Sistem geneli varsayılan temayı ayarlar (sistem_ayarlari.tema_ayarlari)."""
     if not await _tema_dokuman(kod):
         raise HTTPException(status_code=404, detail="Tema bulunamadı")
@@ -211,7 +211,7 @@ async def tema_aktif_yap(kod: str, current_user=Depends(require_role(UserRole.AD
 
 
 @router.post("/logo")
-async def tema_logo_yukle(dosya: UploadFile = File(...), current_user=Depends(require_role(UserRole.ADMIN))):
+async def tema_logo_yukle(dosya: UploadFile = File(...), current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     """Logo yükler (/uploads/logo/), URL'i tema_ayarlari'na yazar."""
     uzanti = (os.path.splitext(dosya.filename or "")[1] or ".png").lower()
     if uzanti not in (".png", ".jpg", ".jpeg", ".svg", ".webp"):
@@ -231,7 +231,7 @@ async def tema_logo_yukle(dosya: UploadFile = File(...), current_user=Depends(re
 
 
 @router.put("/{kod}")
-async def tema_guncelle(kod: str, payload: dict = Body(...), current_user=Depends(require_role(UserRole.ADMIN))):
+async def tema_guncelle(kod: str, payload: dict = Body(...), current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     mevcut = await db.theme_configs.find_one({"kod": kod})
     if not mevcut:
         raise HTTPException(status_code=404, detail="Tema bulunamadı")
@@ -242,7 +242,7 @@ async def tema_guncelle(kod: str, payload: dict = Body(...), current_user=Depend
 
 
 @router.delete("/{kod}")
-async def tema_sil(kod: str, current_user=Depends(require_role(UserRole.ADMIN))):
+async def tema_sil(kod: str, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     mevcut = await db.theme_configs.find_one({"kod": kod})
     if not mevcut:
         raise HTTPException(status_code=404, detail="Tema bulunamadı")

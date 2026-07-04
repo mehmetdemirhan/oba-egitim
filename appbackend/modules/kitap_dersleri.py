@@ -124,7 +124,7 @@ async def kitap_dersleri_cevapla(payload: dict = Body(...), current_user=Depends
 async def kitap_parca_guncelle(
     parca_id: str,
     payload: dict = Body(...),
-    current_user=Depends(require_role(UserRole.ADMIN))
+    current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))
 ):
     """Okuma parçasını güncelle."""
     guncelle = {}
@@ -138,7 +138,7 @@ async def kitap_parca_guncelle(
 
 
 @router.delete("/kitap-dersleri/parca/{parca_id}")
-async def kitap_parca_sil(parca_id: str, current_user=Depends(require_role(UserRole.ADMIN))):
+async def kitap_parca_sil(parca_id: str, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     """Okuma parçasını sil."""
     await db.ai_okuma_parcalari.delete_one({"id": parca_id})
     return {"ok": True}
@@ -148,7 +148,7 @@ async def kitap_parca_sil(parca_id: str, current_user=Depends(require_role(UserR
 async def kitap_soru_guncelle(
     soru_id: str,
     payload: dict = Body(...),
-    current_user=Depends(require_role(UserRole.ADMIN))
+    current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))
 ):
     """Soruyu güncelle."""
     guncelle = {}
@@ -162,7 +162,7 @@ async def kitap_soru_guncelle(
 
 
 @router.delete("/kitap-dersleri/soru/{soru_id}")
-async def kitap_soru_sil(soru_id: str, current_user=Depends(require_role(UserRole.ADMIN))):
+async def kitap_soru_sil(soru_id: str, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     """Soruyu sil."""
     await db.ai_uretilen_sorular.delete_one({"id": soru_id})
     return {"ok": True}
@@ -171,7 +171,7 @@ async def kitap_soru_sil(soru_id: str, current_user=Depends(require_role(UserRol
 @router.post("/kitap-dersleri/soru-ekle")
 async def kitap_soru_ekle(
     payload: dict = Body(...),
-    current_user=Depends(require_role(UserRole.ADMIN))
+    current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))
 ):
     """Parçaya yeni soru ekle."""
     yeni_soru = {
@@ -194,7 +194,7 @@ async def kitap_soru_ekle(
 @router.post("/kitap-dersleri/parca-ekle")
 async def kitap_parca_ekle(
     payload: dict = Body(...),
-    current_user=Depends(require_role(UserRole.ADMIN))
+    current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))
 ):
     """Kitaba yeni okuma parçası ekle."""
     yeni_parca = {

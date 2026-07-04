@@ -42,8 +42,12 @@ async def run():
     H_admin = {"Authorization": f"Bearer {create_access_token({'sub': admin_id})}"}
     transport = ASGITransport(app=server.app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        # 1) Öğretmen oluştur
-        r = await ac.post("/api/teachers", json={
+        # 0) /teachers artık auth ister (admin/koordinatör) — token'sız 403
+        r = await ac.post("/api/teachers", json={"ad": "X", "soyad": "Y", "brans": "T", "telefon": "5", "seviye": "yeni"})
+        check(r.status_code in (401, 403), f"token'sız /teachers reddedildi (status={r.status_code})")
+
+        # 1) Öğretmen oluştur (admin)
+        r = await ac.post("/api/teachers", headers=H_admin, json={
             "ad": "Ayşe", "soyad": "Yıldız", "brans": "Türkçe",
             "telefon": "5551112233", "seviye": "uzman",
             "yapilmasi_gereken_odeme": 0,
@@ -165,6 +169,27 @@ async def run():
         check(s["kur"] == "5", "öğretmen mali olmayan alanı (kur) güncelleyebildi")
         check(s["yapilmasi_gereken_odeme"] == 1200 and s["ogretmene_yapilacak_odeme"] == 400,
               "öğretmenin gönderdiği mali alanlar yok sayıldı")
+
+        # 14) /teachers ile tek adımda hesap oluşturma (user ↔ teacher köprüsü)
+        r = await ac.post("/api/teachers", headers=H_admin, json={
+            "ad": "Koord", "soyad": "İnan", "brans": "Yönetim", "telefon": "5553334455",
+            "seviye": "uzman", "hesap_olustur": True, "email": "koord@test.local",
+            "hesap_rol": "coordinator",
+        })
+        check(r.status_code == 200, f"hesaplı öğretmen oluştu (status={r.status_code})")
+        tj = r.json()
+        check(tj.get("user_id") and tj.get("hesap", {}).get("gecici_sifre"),
+              "user_id + geçici şifre döndü")
+        # köprü: teacher.user_id = user.id ve user.linked_id = teacher.id
+        yeni_user = await server.db.users.find_one({"email": "koord@test.local"})
+        check(yeni_user and yeni_user["linked_id"] == tj["id"] and yeni_user["role"] == "coordinator",
+              "user.linked_id = teacher.id ve rol=coordinator")
+        check(yeni_user.get("sifre_degistirme_zorunlu") is True, "yeni hesap şifre değiştirme zorunlu")
+        # geçici şifre ile login çalışmalı + must_change_password=true
+        r = await ac.post("/api/auth/login", json={"email_or_phone": "koord@test.local",
+                                                    "password": tj["hesap"]["gecici_sifre"]})
+        check(r.status_code == 200 and r.json().get("must_change_password") is True,
+              "geçici şifre ile login + must_change_password=true")
 
     await server.client.drop_database(TEST_DB)
 

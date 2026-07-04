@@ -20,6 +20,7 @@ import RozetYonetimi from "./components/rozet/RozetYonetimi";
 import RozetGrid from "./components/rozet/RozetGrid";
 import TemaYonetimi from "./components/tema/TemaYonetimi";
 import ThemeToggle from "./components/tema/ThemeToggle";
+import { ZorunluSifreDegistir, SifreDegistirButton } from "./components/SifreDegistir";
 import MebKelimeYonetimi from "./components/admin/MebKelimeYonetimi";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
 import InstagramAyarlari from "./components/admin/InstagramAyarlari";
@@ -51,6 +52,8 @@ function UserManagement({ teachers }) {
   const [users, setUsers] = useState([]);
   const [form, setForm] = useState({ ad: "", soyad: "", email: "", telefon: "", password: "", role: "teacher", linked_id: "" });
   const [loading, setLoading] = useState(false);
+  const [otoSifre, setOtoSifre] = useState(true);      // varsayılan: geçici şifre otomatik üret
+  const [sonSifre, setSonSifre] = useState(null);      // {ad, email, sifre} — bir kereliğine göster
 
   const fetchUsers = useCallback(async () => {
     try { const res = await axios.get(`${API}/auth/users`); setUsers(res.data); } catch (e) { console.error(e); }
@@ -61,10 +64,18 @@ function UserManagement({ teachers }) {
   const createUser = async (e) => {
     e.preventDefault(); setLoading(true);
     try {
-      await axios.post(`${API}/auth/users`, form);
+      // Otomatik şifre modunda password gönderilmez → backend güçlü geçici şifre üretir
+      const payload = { ...form };
+      if (otoSifre) delete payload.password;
+      const r = await axios.post(`${API}/auth/users`, payload);
+      const sifre = r.data?.gecici_sifre;
       setForm({ ad: "", soyad: "", email: "", telefon: "", password: "", role: "teacher", linked_id: "" });
       fetchUsers();
-      toast({ title: "Başarılı", description: "Kullanıcı oluşturuldu" });
+      if (sifre) {
+        setSonSifre({ ad: `${r.data.ad} ${r.data.soyad}`, email: r.data.email, sifre });
+      } else {
+        toast({ title: "Başarılı", description: "Kullanıcı oluşturuldu" });
+      }
     } catch (error) {
       toast({ title: "Hata", description: error.response?.data?.detail || "Hata oluştu", variant: "destructive" });
     }
@@ -88,7 +99,11 @@ function UserManagement({ teachers }) {
             <div><Label>Soyad</Label><Input value={form.soyad} onChange={e => setForm({...form, soyad: e.target.value})} required /></div>
             <div><Label>E-posta</Label><Input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} required /></div>
             <div><Label>Telefon</Label><Input type="tel" value={form.telefon} onChange={e => setForm({...form, telefon: e.target.value})} placeholder="05xx xxx xx xx" /></div>
-            <div><Label>Şifre</Label><Input type="password" value={form.password} onChange={e => setForm({...form, password: e.target.value})} required minLength={6} /></div>
+            <div className="flex items-center gap-2 text-sm">
+              <input type="checkbox" id="otoSifre" checked={otoSifre} onChange={e => setOtoSifre(e.target.checked)} />
+              <label htmlFor="otoSifre" className="text-gray-600">Geçici şifreyi otomatik üret (önerilir)</label>
+            </div>
+            {!otoSifre && <div><Label>Şifre (manuel)</Label><Input type="password" value={form.password} onChange={e => setForm({...form, password: e.target.value})} required minLength={6} /></div>}
             <div><Label>Rol</Label>
               <Select value={form.role} onValueChange={v => setForm({...form, role: v})}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -124,6 +139,23 @@ function UserManagement({ teachers }) {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Geçici şifre — bir kereliğine, kopyalanabilir şekilde göster */}
+      <Dialog open={!!sonSifre} onOpenChange={(o) => { if (!o) setSonSifre(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>🔑 Geçici Şifre Oluşturuldu</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-gray-600">
+              <b>{sonSifre?.ad}</b> ({sonSifre?.email}) için geçici şifre. Bu şifre <b>yalnızca bir kez</b> gösterilir — kullanıcıya iletin. İlk girişte değiştirmesi istenecek.
+            </p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 bg-gray-100 rounded-lg px-3 py-2 font-mono text-sm select-all break-all">{sonSifre?.sifre}</code>
+              <Button size="sm" variant="outline" onClick={() => { navigator.clipboard?.writeText(sonSifre?.sifre || ""); toast({ title: "Kopyalandı" }); }}>Kopyala</Button>
+            </div>
+            <Button className="w-full bg-blue-600 text-white" onClick={() => setSonSifre(null)}>Tamam</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -194,7 +226,8 @@ function AppContent() {
   const [teacherStudents, setTeacherStudents] = useState({});
   const [expandedTeachers, setExpandedTeachers] = useState(new Set());
   const [loadingAction, setLoadingAction] = useState(false);
-  const [teacherForm, setTeacherForm] = useState({ ad: "", soyad: "", brans: "", telefon: "", seviye: "yeni", yapilmasi_gereken_odeme: 0 });
+  const [teacherForm, setTeacherForm] = useState({ ad: "", soyad: "", brans: "", telefon: "", seviye: "yeni", yapilmasi_gereken_odeme: 0, hesap_olustur: false, email: "", hesap_rol: "teacher" });
+  const [ogrGeciciSifre, setOgrGeciciSifre] = useState(null); // öğretmen hesabı geçici şifresi (bir kereliğine)
   const [studentForm, setStudentForm] = useState({ ad: "", soyad: "", sinif: "", veli_ad: "", veli_soyad: "", veli_telefon: "", aldigi_egitim: "", kur: "", yapilmasi_gereken_odeme: 0, ogretmene_yapilacak_odeme: 0, ogretmen_id: "" });
   const [courseForm, setCourseForm] = useState({ ad: "", fiyat: 0, sure: 0 });
   const [paymentForm, setPaymentForm] = useState({ tip: "ogrenci", kisi_id: "", miktar: 0, aciklama: "" });
@@ -272,6 +305,9 @@ function AppContent() {
 
   if (!user) return <LoginPage />;
 
+  // İlk giriş: geçici şifreyle oluşturulan hesap, şifre değiştirmeden hiçbir modüle erişemez
+  if (user.sifre_degistirme_zorunlu) return <ZorunluSifreDegistir />;
+
   // Öğrenci rolü → ayrı panel
   if (user.role === "student") return <OgrenciPaneli user={user} logout={logout} />;
 
@@ -280,6 +316,9 @@ function AppContent() {
 
   // Öğretmen rolü → ayrı panel
   if (user.role === "teacher") return <OgretmenPaneli user={user} logout={logout} />;
+
+  // Admin + Koordinatör aynı yönetim arayüzünü görür (koordinatör muhasebe hariç)
+  const adminVeyaKoord = user.role === "admin" || user.role === "coordinator";
 
   const fetchTeachers = async () => { try { const r = await axios.get(`${API}/teachers`); setTeachers(r.data); } catch(e) {} };
   const fetchStudents = async () => { try { const r = await axios.get(`${API}/students`); setStudents(r.data); } catch(e) {} };
@@ -308,7 +347,7 @@ function AppContent() {
     } catch { toast({ title: "Hata", description: "Güncelleme hatası", variant: "destructive" }); }
   };
 
-  const createTeacher = async (e) => { e.preventDefault(); setLoadingAction(true); try { await axios.post(`${API}/teachers`, teacherForm); setTeacherForm({ ad:"",soyad:"",brans:"",telefon:"",seviye:"yeni",yapilmasi_gereken_odeme:0 }); fetchTeachers(); fetchDashboard(); toast({ title:"Başarılı", description:"Öğretmen eklendi" }); } catch { toast({ title:"Hata", description:"Hata oluştu", variant:"destructive" }); } setLoadingAction(false); };
+  const createTeacher = async (e) => { e.preventDefault(); setLoadingAction(true); try { const r = await axios.post(`${API}/teachers`, teacherForm); setTeacherForm({ ad:"",soyad:"",brans:"",telefon:"",seviye:"yeni",yapilmasi_gereken_odeme:0, hesap_olustur:false, email:"", hesap_rol:"teacher" }); fetchTeachers(); fetchDashboard(); const sifre = r.data?.hesap?.gecici_sifre; if (sifre) { setOgrGeciciSifre({ ad:`${r.data.ad} ${r.data.soyad}`, email:r.data.hesap.email, sifre }); } else { toast({ title:"Başarılı", description:"Öğretmen eklendi" }); } } catch(err) { toast({ title:"Hata", description: err.response?.data?.detail || "Hata oluştu", variant:"destructive" }); } setLoadingAction(false); };
   const createStudent = async (e) => { e.preventDefault(); setLoadingAction(true); try { await axios.post(`${API}/students`, studentForm); setStudentForm({ ad:"",soyad:"",sinif:"",veli_ad:"",veli_soyad:"",veli_telefon:"",aldigi_egitim:"",kur:"",yapilmasi_gereken_odeme:0,ogretmene_yapilacak_odeme:0,ogretmen_id:"" }); fetchStudents(); fetchTeachers(); fetchDashboard(); setTeacherStudents({}); toast({ title:"Başarılı", description:"Öğrenci eklendi" }); } catch { toast({ title:"Hata", description:"Hata oluştu", variant:"destructive" }); } setLoadingAction(false); };
   const createCourse = async (e) => { e.preventDefault(); setLoadingAction(true); try { await axios.post(`${API}/courses`, courseForm); setCourseForm({ ad:"",fiyat:0,sure:0 }); fetchCourses(); fetchDashboard(); toast({ title:"Başarılı", description:"Kurs eklendi" }); } catch { toast({ title:"Hata", description:"Hata oluştu", variant:"destructive" }); } setLoadingAction(false); };
   const createPayment = async (e) => { e.preventDefault(); setLoadingAction(true); try { await axios.post(`${API}/payments`, paymentForm); setPaymentForm({ tip:"ogrenci",kisi_id:"",miktar:0,aciklama:"" }); fetchPayments(); fetchTeachers(); fetchStudents(); fetchDashboard(); toast({ title:"Başarılı", description:"Ödeme kaydedildi" }); } catch { toast({ title:"Hata", description:"Hata oluştu", variant:"destructive" }); } setLoadingAction(false); };
@@ -375,7 +414,7 @@ function AppContent() {
               </div>
               <BildirimZili user={user} />
               <Button onClick={exportToExcel} disabled={loadingAction} className="bg-green-600 hover:bg-green-700 text-white"><Download className="h-4 w-4 mr-2" />Excel</Button>
-              <ThemeToggle />
+              <ThemeToggle /><SifreDegistirButton />
               <Button variant="outline" size="sm" onClick={logout} className="flex items-center gap-2"><LogOut className="h-4 w-4" />Çıkış</Button>
             </div>
           </div>
@@ -389,45 +428,45 @@ function AppContent() {
             <TabsTrigger value="teachers" className={tabClass}><UserCheck className="h-4 w-4 mr-2" />Öğretmenler</TabsTrigger>
             <TabsTrigger value="students" className={tabClass}><Users className="h-4 w-4 mr-2" />Öğrenciler</TabsTrigger>
             {user.role !== "coordinator" && <TabsTrigger value="payments" className={tabClass}><CreditCard className="h-4 w-4 mr-2" />Muhasebe</TabsTrigger>}
-            {user.role === "admin" && <TabsTrigger value="users" className={tabClass}><Shield className="h-4 w-4 mr-2" />Kullanıcılar</TabsTrigger>}
+            {adminVeyaKoord && <TabsTrigger value="users" className={tabClass}><Shield className="h-4 w-4 mr-2" />Kullanıcılar</TabsTrigger>}
             <TabsTrigger value="gelisim" className={tabClass}><Trophy className="h-4 w-4 mr-2" />Gelişim</TabsTrigger>
             <TabsTrigger value="ders-programi" className={tabClass}>📅 Ders Programı</TabsTrigger>
             <TabsTrigger value="giris-analizi" className={tabClass}><Stethoscope className="h-4 w-4 mr-2" />Giriş Analizi</TabsTrigger>
             <TabsTrigger value="mesajlar" className={tabClass}><Mail className="h-4 w-4 mr-2" />Mesajlar</TabsTrigger>
-            {user.role === "admin" && <TabsTrigger value="ayarlar" className={tabClass}><Star className="h-4 w-4 mr-2" />Ayarlar</TabsTrigger>}
-            {user.role === "admin" && <TabsTrigger value="yedekleme" className={tabClass}><Database className="h-4 w-4 mr-2" />Yedekleme</TabsTrigger>}
-            {user.role === "admin" && <TabsTrigger value="guncelleme" className={tabClass}><GitBranch className="h-4 w-4 mr-2" />Güncelleme</TabsTrigger>}
-            {user.role === "admin" && <TabsTrigger value="moduller" className={tabClass}><Package className="h-4 w-4 mr-2" />Modüller</TabsTrigger>}
-            {user.role === "admin" && <TabsTrigger value="tema-yonetimi" className={tabClass}>🎨 Tema</TabsTrigger>}
-            {user.role === "admin" && <TabsTrigger value="rozet-yonetimi" className={tabClass}>🏅 Rozetler</TabsTrigger>}
-            {user.role === "admin" && <TabsTrigger value="meb-kelime" className={tabClass}>📖 MEB Kelimeleri</TabsTrigger>}
+            {adminVeyaKoord && <TabsTrigger value="ayarlar" className={tabClass}><Star className="h-4 w-4 mr-2" />Ayarlar</TabsTrigger>}
+            {adminVeyaKoord && <TabsTrigger value="yedekleme" className={tabClass}><Database className="h-4 w-4 mr-2" />Yedekleme</TabsTrigger>}
+            {adminVeyaKoord && <TabsTrigger value="guncelleme" className={tabClass}><GitBranch className="h-4 w-4 mr-2" />Güncelleme</TabsTrigger>}
+            {adminVeyaKoord && <TabsTrigger value="moduller" className={tabClass}><Package className="h-4 w-4 mr-2" />Modüller</TabsTrigger>}
+            {adminVeyaKoord && <TabsTrigger value="tema-yonetimi" className={tabClass}>🎨 Tema</TabsTrigger>}
+            {adminVeyaKoord && <TabsTrigger value="rozet-yonetimi" className={tabClass}>🏅 Rozetler</TabsTrigger>}
+            {adminVeyaKoord && <TabsTrigger value="meb-kelime" className={tabClass}>📖 MEB Kelimeleri</TabsTrigger>}
             <TabsTrigger value="ai-merkezi" className={tabClass}>🧠 AI Merkezi</TabsTrigger>
           </TabsList>
           )}
 
           {/* Modül Yönetimi (yama sistemi) */}
-          {user.role === "admin" && (
+          {adminVeyaKoord && (
             <TabsContent value="moduller">
               <ModulYonetimi />
             </TabsContent>
           )}
 
           {/* Tema Yönetimi (tema FAZ 3) */}
-          {user.role === "admin" && (
+          {adminVeyaKoord && (
             <TabsContent value="tema-yonetimi">
               <TemaYonetimi />
             </TabsContent>
           )}
 
           {/* Rozet Yönetimi (FAZ 3) */}
-          {user.role === "admin" && (
+          {adminVeyaKoord && (
             <TabsContent value="rozet-yonetimi">
               <RozetYonetimi />
             </TabsContent>
           )}
 
           {/* MEB Kelime Yönetimi */}
-          {user.role === "admin" && (
+          {adminVeyaKoord && (
             <TabsContent value="meb-kelime">
               <MebKelimeYonetimi apiBase={API} />
             </TabsContent>
@@ -565,10 +604,46 @@ function AppContent() {
                       </Select>
                     </div>
                     <div><Label>Ödeme (₺)</Label><Input type="number" step="0.01" value={teacherForm.yapilmasi_gereken_odeme} onChange={e => setTeacherForm({...teacherForm, yapilmasi_gereken_odeme:parseFloat(e.target.value)||0})} /></div>
+                    {/* Tek adımda giriş hesabı oluştur (user ↔ teacher köprüsü) */}
+                    <div className="border-t pt-3 space-y-2">
+                      <label className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input type="checkbox" checked={teacherForm.hesap_olustur} onChange={e => setTeacherForm({...teacherForm, hesap_olustur:e.target.checked})} />
+                        Giriş hesabı da oluştur
+                      </label>
+                      {teacherForm.hesap_olustur && (<>
+                        <div><Label className="text-xs">E-posta</Label><Input type="email" value={teacherForm.email} onChange={e => setTeacherForm({...teacherForm, email:e.target.value})} required placeholder="ogretmen@okul.com" /></div>
+                        <div><Label className="text-xs">Hesap Rolü</Label>
+                          <Select value={teacherForm.hesap_rol} onValueChange={v => setTeacherForm({...teacherForm, hesap_rol:v})}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="teacher">Öğretmen</SelectItem>
+                              <SelectItem value="coordinator">Koordinatör</SelectItem>
+                              <SelectItem value="admin">Yönetici</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <p className="text-[10px] text-gray-400">Şifre otomatik üretilecek ve size gösterilecek.</p>
+                      </>)}
+                    </div>
                     <Button type="submit" disabled={loadingAction} className="w-full">Ekle</Button>
                   </form>
                 </CardContent>
               </Card>
+
+              {/* Öğretmen hesabı geçici şifre — bir kereliğine göster */}
+              <Dialog open={!!ogrGeciciSifre} onOpenChange={(o) => { if (!o) setOgrGeciciSifre(null); }}>
+                <DialogContent className="max-w-sm">
+                  <DialogHeader><DialogTitle>🔑 Geçici Şifre Oluşturuldu</DialogTitle></DialogHeader>
+                  <div className="space-y-3">
+                    <p className="text-sm text-gray-600"><b>{ogrGeciciSifre?.ad}</b> ({ogrGeciciSifre?.email}) için geçici şifre. <b>Yalnızca bir kez</b> gösterilir; kullanıcıya iletin. İlk girişte değiştirmesi istenecek.</p>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 bg-gray-100 rounded-lg px-3 py-2 font-mono text-sm select-all break-all">{ogrGeciciSifre?.sifre}</code>
+                      <Button size="sm" variant="outline" onClick={() => { navigator.clipboard?.writeText(ogrGeciciSifre?.sifre || ""); toast({ title: "Kopyalandı" }); }}>Kopyala</Button>
+                    </div>
+                    <Button className="w-full bg-blue-600 text-white" onClick={() => setOgrGeciciSifre(null)}>Tamam</Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
               <Card className="lg:col-span-2 border-0 shadow-sm">
                 <CardHeader><CardTitle className="flex items-center justify-between">Öğretmenler <label className="flex items-center gap-2 text-sm font-normal cursor-pointer"><input type="checkbox" checked={showArchived.teachers} onChange={e => setShowArchived(p => ({...p, teachers: e.target.checked}))} className="rounded" /> Arşivi göster</label></CardTitle></CardHeader>
                 <CardContent>
@@ -1192,7 +1267,7 @@ function AppContent() {
           </TabsContent>
 
           {/* Users - admin only */}
-          {user.role === "admin" && (
+          {adminVeyaKoord && (
             <TabsContent value="users">
               <UserManagement teachers={teachers} />
             </TabsContent>
@@ -1224,21 +1299,21 @@ function AppContent() {
           </TabsContent>
 
           {/* Ayarlar - Sadece Admin */}
-          {user.role === "admin" && (
+          {adminVeyaKoord && (
             <TabsContent value="ayarlar">
               <SistemAyarlari user={user} />
             </TabsContent>
           )}
 
           {/* Yedekleme - Sadece Admin */}
-          {user.role === "admin" && (
+          {adminVeyaKoord && (
             <TabsContent value="yedekleme">
               <YedeklemeYonetimi />
             </TabsContent>
           )}
 
           {/* Güncelleme - Sadece Admin */}
-          {user.role === "admin" && (
+          {adminVeyaKoord && (
             <TabsContent value="guncelleme">
               <GuncellemeKontrol />
             </TabsContent>
@@ -4221,7 +4296,7 @@ function OgretmenPaneli({ user, logout }) {
           </div>
           <div className="flex items-center gap-2">
             <BildirimZili user={user} />
-            <ThemeToggle />
+            <ThemeToggle /><SifreDegistirButton />
             <Button variant="outline" size="sm" onClick={logout}><LogOut className="h-3 w-3 mr-1" />Çıkış</Button>
           </div>
         </div>
@@ -6991,7 +7066,7 @@ function VeliPaneli({ user, logout }) {
           </div>
           <div className="flex items-center gap-2">
             <BildirimZili user={user} />
-            <ThemeToggle />
+            <ThemeToggle /><SifreDegistirButton />
             <Button variant="outline" size="sm" onClick={logout} className="text-xs"><LogOut className="h-3 w-3 mr-1" />Çıkış</Button>
           </div>
         </div>

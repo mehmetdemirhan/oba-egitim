@@ -79,8 +79,17 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  // Kullanıcıyı backend'den yeniden çek (ör. şifre değişince sifre_degistirme_zorunlu güncellensin)
+  const refreshUser = async () => {
+    try {
+      const r = await axios.get(`${API}/auth/me`);
+      setUser(r.data);
+      return r.data;
+    } catch (e) { return null; }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, token, login, logout, loading, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

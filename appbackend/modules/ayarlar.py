@@ -45,7 +45,7 @@ async def get_puanlar(current_user=Depends(get_current_user)):
 
 
 @router.put("/ayarlar/puanlar")
-async def update_puanlar(data: dict = Body(...), current_user=Depends(require_role(UserRole.ADMIN))):
+async def update_puanlar(data: dict = Body(...), current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     await db.sistem_ayarlari.update_one(
         {"tip": "puan_ayarlari"},
         {"$set": {"tip": "puan_ayarlari", "puanlar": data}},
@@ -116,7 +116,7 @@ async def get_ozellik_ayarlari_endpoint():
 @router.put("/ayarlar/ozellikler")
 async def update_ozellik_ayarlari(
     payload: dict = Body(...),
-    current_user=Depends(require_role(UserRole.ADMIN))
+    current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))
 ):
     ayarlar = payload.get("ayarlar", {})
     gecerli_idler = {f["id"] for f in OZELLIK_TANIMLARI}

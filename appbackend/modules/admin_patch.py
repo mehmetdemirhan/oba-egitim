@@ -1,6 +1,6 @@
 """Modül Yöneticisi (yama sistemi) — ADMIN API endpoint'leri (/admin/moduller/*).
 
-Tüm endpoint'ler require_role(UserRole.ADMIN) ile korunur; diğer roller 403 alır.
+Tüm endpoint'ler require_role(UserRole.ADMIN, UserRole.COORDINATOR) ile korunur; diğer roller 403 alır.
 İş mantığı core.patch_manager içindedir; bu dosya yalnızca HTTP katmanıdır.
 """
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
@@ -19,7 +19,7 @@ class DurumGuncelle(BaseModel):
 
 
 @router.get("/admin/moduller")
-async def moduller_listele(current_user=Depends(require_role(UserRole.ADMIN))):
+async def moduller_listele(current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     """Kurulu tüm modüllerin manifest listesi (UI kartları için)."""
     return pm.list_modules()
 
@@ -27,7 +27,7 @@ async def moduller_listele(current_user=Depends(require_role(UserRole.ADMIN))):
 @router.post("/admin/moduller/yukle")
 async def modul_yukle(
     dosya: UploadFile = File(...),
-    current_user=Depends(require_role(UserRole.ADMIN)),
+    current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR)),
 ):
     """ZIP yama yükle ve kur. Sonuç raporu döner."""
     if not dosya.filename.lower().endswith(".zip"):
@@ -44,7 +44,7 @@ async def modul_yukle(
 
 
 @router.get("/admin/moduller/{ad}/versiyonlar")
-async def modul_versiyonlar(ad: str, current_user=Depends(require_role(UserRole.ADMIN))):
+async def modul_versiyonlar(ad: str, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     """Bir modülün arşivlenmiş geçmiş sürümleri (yeniden eskiye)."""
     if pm.manifest_oku(ad) is None and not (pm.VERSIONS_DIR / ad).exists():
         raise HTTPException(status_code=404, detail="Modül bulunamadı.")
@@ -52,7 +52,7 @@ async def modul_versiyonlar(ad: str, current_user=Depends(require_role(UserRole.
 
 
 @router.post("/admin/moduller/{ad}/geri-yukle/{etiket}")
-async def modul_geri_yukle(ad: str, etiket: str, current_user=Depends(require_role(UserRole.ADMIN))):
+async def modul_geri_yukle(ad: str, etiket: str, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     """Modülü arşivdeki bir sürüme geri döndürür."""
     sonuc = pm.restore_version(ad, etiket)
     if not sonuc["ok"]:
@@ -66,7 +66,7 @@ async def modul_geri_yukle(ad: str, etiket: str, current_user=Depends(require_ro
 
 @router.put("/admin/moduller/{ad}/durum")
 async def modul_durum(ad: str, body: DurumGuncelle,
-                      current_user=Depends(require_role(UserRole.ADMIN))):
+                      current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     """Modülü aktif/pasif yap. Çekirdek (core) modüller kapatılamaz."""
     try:
         registry.set_active(ad, body.active)
@@ -80,7 +80,7 @@ async def modul_durum(ad: str, body: DurumGuncelle,
 
 
 @router.delete("/admin/moduller/{ad}")
-async def modul_sil(ad: str, current_user=Depends(require_role(UserRole.ADMIN))):
+async def modul_sil(ad: str, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     """Modülü tamamen kaldır (dosyalar + manifest + registry + arşiv)."""
     sonuc = pm.delete_module(ad)
     if not sonuc["ok"]:

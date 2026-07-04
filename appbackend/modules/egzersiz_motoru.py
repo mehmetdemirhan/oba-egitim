@@ -702,7 +702,7 @@ async def egzersiz_varyant_uret(icerik_id: str, current_user=Depends(_KUTUPHANE_
 
 
 @router.patch("/egzersiz/icerik/{icerik_id}/arsivle")
-async def egzersiz_arsivle(icerik_id: str, current_user=Depends(require_role(UserRole.ADMIN))):
+async def egzersiz_arsivle(icerik_id: str, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     """İçeriği arşivler (durum="arsivli"). Yalnızca admin. Kayıt DB'de kalır;
     oturum çekiminde artık gelmez."""
     res = await db.egzersiz_icerikler.update_one(
@@ -714,7 +714,7 @@ async def egzersiz_arsivle(icerik_id: str, current_user=Depends(require_role(Use
 
 
 @router.delete("/egzersiz/icerik/{icerik_id}")
-async def egzersiz_icerik_sil(icerik_id: str, current_user=Depends(require_role(UserRole.ADMIN))):
+async def egzersiz_icerik_sil(icerik_id: str, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     """İçeriği kalıcı siler (hard delete). Yalnızca admin; nadir kullanılır.
     Genelde arşivleme tercih edilmelidir."""
     res = await db.egzersiz_icerikler.delete_one({"id": icerik_id})
