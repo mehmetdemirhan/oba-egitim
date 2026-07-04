@@ -82,6 +82,30 @@ async def run():
         r = await ac.post("/api/bildirimler/kontrol", headers=auth)
         check(r.status_code == 403, f"öğrenci için /kontrol 403 (status={r.status_code})")
 
+        # 7) Kategori + önem alanları set ediliyor
+        await bildirim_olustur("bil-user-1", "risk_yuksek", "Kategori testi", ilgili_id="test7risk")
+        r = await ac.get("/api/bildirimler", headers=auth)
+        risk = next((b for b in r.json() if b.get("ilgili_id") == "test7risk"), None)
+        check(risk and risk.get("kategori") == "ogrenci" and risk.get("onem_seviyesi") == "kritik",
+              "risk_yuksek → kategori=ogrenci, onem=kritik")
+
+        # 8) Cooldown: aynı risk (aynı ilgili_id) 24 saatte tekrar üretilmez
+        await bildirim_olustur("bil-user-1", "risk_yuksek", "Tekrar risk", ilgili_id="ogr-x")
+        await bildirim_olustur("bil-user-1", "risk_yuksek", "Tekrar risk 2", ilgili_id="ogr-x")
+        n = await db.bildirimler.count_documents({"alici_id": "bil-user-1", "tur": "risk_yuksek", "ilgili_id": "ogr-x"})
+        check(n == 1, f"cooldown: aynı risk 24s'te 1 kez ({n})")
+
+        # 9) Tercih endpoint'i + kapatınca o kategori üretilmiyor
+        r = await ac.get("/api/bildirimler/tercihler", headers=auth)
+        check(r.status_code == 200 and r.json() == {"ogrenci": True, "ogretmen": True, "veli": True}, "varsayılan tercih hepsi açık")
+        r = await ac.put("/api/bildirimler/tercihler", headers=auth, json={"ogrenci": False, "ogretmen": True, "veli": True})
+        check(r.status_code == 200 and r.json()["bildirim_tercihleri"]["ogrenci"] is False, "ogrenci kategorisi kapatıldı")
+        sonuc = await bildirim_olustur("bil-user-1", "rozet_kazandi", "Kapalı kategori", ilgili_id="rk1")
+        check(sonuc is None, "kapalı kategoride (ogrenci) bildirim üretilmedi")
+        # veli kategorisi hâlâ açık → mesaj üretilir
+        sonuc2 = await bildirim_olustur("bil-user-1", "mesaj_geldi", "Açık kategori", ilgili_id="m1")
+        check(sonuc2 is not None, "açık kategoride (veli) bildirim üretildi")
+
     await server.client.drop_database(TEST_DB)
 
 

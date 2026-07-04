@@ -22,6 +22,7 @@ import TemaYonetimi from "./components/tema/TemaYonetimi";
 import ThemeToggle from "./components/tema/ThemeToggle";
 import { ZorunluSifreDegistir, SifreDegistirButton } from "./components/SifreDegistir";
 import BildirimIzni from "./components/BildirimIzni";
+import { BildirimTercihleriButton } from "./components/BildirimTercihleri";
 import MebKelimeYonetimi from "./components/admin/MebKelimeYonetimi";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
 import InstagramAyarlari from "./components/admin/InstagramAyarlari";
@@ -474,7 +475,7 @@ function AppContent() {
               </div>
               <BildirimZili user={user} />
               <Button onClick={exportToExcel} disabled={loadingAction} className="bg-green-600 hover:bg-green-700 text-white"><Download className="h-4 w-4 mr-2" />Excel</Button>
-              <ThemeToggle /><SifreDegistirButton />
+              <ThemeToggle /><BildirimTercihleriButton /><SifreDegistirButton />
               <Button variant="outline" size="sm" onClick={logout} className="flex items-center gap-2"><LogOut className="h-4 w-4" />Çıkış</Button>
             </div>
           </div>
@@ -1496,19 +1497,25 @@ function BildirimZili({ user }) {
   const tumunuOku = async () => { try { await axios.put(`${API}/bildirimler/tumunu-oku`); fetchBildirimler(); } catch(e) {} };
 
   const turIkon = { rapor_tamamlandi: "📋", gorev_atandi: "📌", gorev_tamamlandi: "✅", gorev_hatirlatma: "⏰", streak_kirildi: "🔥", streak_tebrik: "🎉", kur_atladi: "🎓", mesaj_geldi: "✉️", rozet_kazandi: "🏅", risk_yuksek: "🚨", anket_hatirlatma: "⭐", lig_yukseldi: "🏆", haftalik_ozet: "📊" };
+  // Önem seviyesine göre renk: kırmızı/turuncu/mavi/gri
+  const ONEM_RENK = { kritik: "border-l-red-500", orta: "border-l-orange-400", bilgi: "border-l-blue-400", dusuk: "border-l-gray-300" };
+  const ONEM_ETIKET = { kritik: "Kritik", orta: "Orta", bilgi: "Bilgi", dusuk: "Genel" };
+  const KATEGORI_ETIKET = { ogrenci: "Öğrenci", ogretmen: "Öğretmen", veli: "Veli" };
+  // Zil ve panel AYNI sayıyı gösterir (tutarlılık); rozet gibi 99'da kapanır
+  const okunmamisEtiket = okunmamis > 99 ? "99+" : okunmamis;
 
   return (
     <div className="relative">
       <button onClick={() => setAcik(!acik)} className="relative p-2 rounded-xl hover:bg-gray-100 transition-all">
         <Bell className="h-5 w-5 text-subtle" />
-        {okunmamis > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">{okunmamis > 9 ? "9+" : okunmamis}</span>}
+        {okunmamis > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-5 h-5 px-1 flex items-center justify-center">{okunmamisEtiket}</span>}
       </button>
       {acik && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setAcik(false)} />
           <div className="absolute right-0 top-12 w-80 sm:w-96 bg-surface rounded-2xl shadow-2xl border z-50 max-h-[70vh] flex flex-col">
             <div className="flex items-center justify-between p-3 border-b">
-              <span className="font-bold text-sm">Bildirimler {okunmamis > 0 && `(${okunmamis})`}</span>
+              <span className="font-bold text-sm">Bildirimler {okunmamis > 0 && `(${okunmamisEtiket})`}</span>
               {okunmamis > 0 && <button onClick={tumunuOku} className="text-xs text-primary hover:underline">Tümünü oku</button>}
             </div>
             <div className="overflow-y-auto flex-1">
@@ -1516,13 +1523,16 @@ function BildirimZili({ user }) {
                 <div className="p-6 text-center text-subtle text-sm">Bildirim yok</div>
               ) : bildirimler.map(b => (
                 <div key={b.id} onClick={() => !b.okundu && oku(b.id)}
-                  className={`p-3 border-b border-gray-50 cursor-pointer hover:bg-app transition-all ${!b.okundu ? 'bg-blue-50/50' : ''}`}>
+                  className={`p-3 border-b border-gray-50 border-l-4 ${ONEM_RENK[b.onem_seviyesi] || "border-l-gray-300"} cursor-pointer hover:bg-app transition-all ${!b.okundu ? 'bg-blue-50/50' : ''}`}>
                   <div className="flex items-start gap-2">
                     <span className="text-lg">{turIkon[b.tur] || "🔔"}</span>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-1">
                         <span className={`text-xs font-medium ${!b.okundu ? 'text-primary' : 'text-subtle'}`}>{b.baslik}</span>
-                        {!b.okundu && <span className="w-2 h-2 bg-primary rounded-full shrink-0" />}
+                        <div className="flex items-center gap-1 shrink-0">
+                          {b.kategori && <span className="text-[9px] px-1 py-0.5 rounded-full bg-gray-100 text-gray-500">{KATEGORI_ETIKET[b.kategori] || b.kategori}</span>}
+                          {!b.okundu && <span className="w-2 h-2 bg-primary rounded-full" />}
+                        </div>
                       </div>
                       <p className="text-xs text-subtle mt-0.5 line-clamp-2">{b.icerik}</p>
                       <span className="text-[10px] text-subtle">{new Date(b.tarih).toLocaleDateString('tr-TR')} {new Date(b.tarih).toLocaleTimeString('tr-TR', {hour:'2-digit',minute:'2-digit'})}</span>
@@ -4360,7 +4370,7 @@ function OgretmenPaneli({ user, logout }) {
           </div>
           <div className="flex items-center gap-2">
             <BildirimZili user={user} />
-            <ThemeToggle /><SifreDegistirButton />
+            <ThemeToggle /><BildirimTercihleriButton /><SifreDegistirButton />
             <Button variant="outline" size="sm" onClick={logout}><LogOut className="h-3 w-3 mr-1" />Çıkış</Button>
           </div>
         </div>
@@ -6967,7 +6977,7 @@ function MesajlarPanel({ user }) {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${rolRenk(m.gonderen_rol)}`}>{({admin:"Yönetici",coordinator:"Koord.",teacher:"Öğretmen",student:"Öğrenci",parent:"Veli"})[m.gonderen_rol]}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${rolRenk(m.gonderen_rol)}`}>{({admin:"Yönetici",coordinator:"Koord.",teacher:"Öğretmen",student:"Öğrenci",parent:"Veli"})[m.gonderen_rol] || "—"}</span>
                         <span className="font-medium text-sm text-gray-900">{m.gonderen_ad}</span>
                         {!m.okundu && <span className="w-2 h-2 bg-blue-500 rounded-full" />}
                       </div>
@@ -6995,7 +7005,7 @@ function MesajlarPanel({ user }) {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs text-gray-500">→</span>
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${rolRenk(m.alici_rol)}`}>{({admin:"Yönetici",coordinator:"Koord.",teacher:"Öğretmen",student:"Öğrenci",parent:"Veli"})[m.alici_rol]}</span>
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${rolRenk(m.alici_rol)}`}>{({admin:"Yönetici",coordinator:"Koord.",teacher:"Öğretmen",student:"Öğrenci",parent:"Veli"})[m.alici_rol] || "—"}</span>
                       <span className="font-medium text-sm text-gray-900">{m.alici_ad}</span>
                       {m.okundu ? <span className="text-xs text-green-600">✓ okundu</span> : <span className="text-xs text-gray-400">gönderildi</span>}
                     </div>
@@ -7130,7 +7140,7 @@ function VeliPaneli({ user, logout }) {
           </div>
           <div className="flex items-center gap-2">
             <BildirimZili user={user} />
-            <ThemeToggle /><SifreDegistirButton />
+            <ThemeToggle /><BildirimTercihleriButton /><SifreDegistirButton />
             <Button variant="outline" size="sm" onClick={logout} className="text-xs"><LogOut className="h-3 w-3 mr-1" />Çıkış</Button>
           </div>
         </div>

@@ -164,6 +164,10 @@ async def push_kontrol(anahtar: str = Query(default=""), gonder: bool = Query(de
         }
         if gonder:
             for uid in veliler:
+                # Veli "veli" kategorisini kapattıysa push gönderme
+                u = await db.users.find_one({"id": uid}, {"bildirim_tercihleri": 1})
+                if ((u or {}).get("bildirim_tercihleri") or {}).get("veli", True) is False:
+                    continue
                 gonderilen += await _kullaniciya_gonder(uid, payload)
         veli_sayisi += len(veliler)
         await db.push_gonderimler.insert_one({

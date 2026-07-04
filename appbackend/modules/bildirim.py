@@ -10,7 +10,7 @@ import uuid
 import logging
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body
 
 from core.db import db
 from core.auth import get_current_user
@@ -18,34 +18,64 @@ from core.auth import get_current_user
 router = APIRouter()
 
 
+# Her tür için: baslik, oncelik(eski uyum), kategori(ogrenci|ogretmen|veli),
+# onem(kritik|orta|bilgi|dusuk), cooldown_saat(spam engeli; 0 = kısıtsız)
 BILDIRIM_TURLERI = {
-    "rapor_tamamlandi": {"baslik": "📋 Rapor Hazır", "oncelik": "yuksek"},
-    "gorev_atandi": {"baslik": "📌 Yeni Görev", "oncelik": "normal"},
-    "gorev_tamamlandi": {"baslik": "✅ Görev Tamamlandı", "oncelik": "normal"},
-    "gorev_hatirlatma": {"baslik": "⏰ Görev Hatırlatma", "oncelik": "normal"},
-    "streak_kirildi": {"baslik": "🔥 Streak Uyarısı", "oncelik": "yuksek"},
-    "streak_tebrik": {"baslik": "🎉 Streak Tebrik", "oncelik": "normal"},
-    "kur_atladi": {"baslik": "🎓 Kur Atlama", "oncelik": "yuksek"},
-    "mesaj_geldi": {"baslik": "✉️ Yeni Mesaj", "oncelik": "normal"},
-    "rozet_kazandi": {"baslik": "🏅 Yeni Rozet", "oncelik": "normal"},
-    "risk_yuksek": {"baslik": "🚨 Yüksek Risk", "oncelik": "yuksek"},
-    "anket_hatirlatma": {"baslik": "⭐ Değerlendirme", "oncelik": "normal"},
-    "lig_yukseldi": {"baslik": "🏆 Lig Yükselme", "oncelik": "normal"},
-    "haftalik_ozet": {"baslik": "📊 Haftalık Özet", "oncelik": "normal"},
-    "ders_degisiklik": {"baslik": "📅 Ders Değişikliği", "oncelik": "yuksek"},
+    "rapor_tamamlandi": {"baslik": "📋 Rapor Hazır", "oncelik": "yuksek", "kategori": "veli", "onem": "bilgi", "cooldown_saat": 0},
+    "gorev_atandi":     {"baslik": "📌 Yeni Görev", "oncelik": "normal", "kategori": "ogrenci", "onem": "orta", "cooldown_saat": 0},
+    "gorev_tamamlandi": {"baslik": "✅ Görev Tamamlandı", "oncelik": "normal", "kategori": "ogretmen", "onem": "bilgi", "cooldown_saat": 0},
+    "gorev_hatirlatma": {"baslik": "⏰ Görev Hatırlatma", "oncelik": "normal", "kategori": "ogrenci", "onem": "orta", "cooldown_saat": 24},
+    "streak_kirildi":   {"baslik": "🔥 Streak Uyarısı", "oncelik": "yuksek", "kategori": "ogrenci", "onem": "orta", "cooldown_saat": 24},
+    "streak_tebrik":    {"baslik": "🎉 Streak Tebrik", "oncelik": "normal", "kategori": "ogrenci", "onem": "bilgi", "cooldown_saat": 24},
+    "kur_atladi":       {"baslik": "🎓 Kur Atlama", "oncelik": "yuksek", "kategori": "ogrenci", "onem": "bilgi", "cooldown_saat": 0},
+    "mesaj_geldi":      {"baslik": "✉️ Yeni Mesaj", "oncelik": "normal", "kategori": "veli", "onem": "bilgi", "cooldown_saat": 0},
+    "rozet_kazandi":    {"baslik": "🏅 Yeni Rozet", "oncelik": "normal", "kategori": "ogrenci", "onem": "bilgi", "cooldown_saat": 0},
+    "risk_yuksek":      {"baslik": "🚨 Yüksek Risk", "oncelik": "yuksek", "kategori": "ogrenci", "onem": "kritik", "cooldown_saat": 24},
+    "anket_hatirlatma": {"baslik": "⭐ Değerlendirme", "oncelik": "normal", "kategori": "veli", "onem": "bilgi", "cooldown_saat": 24},
+    "lig_yukseldi":     {"baslik": "🏆 Lig Yükselme", "oncelik": "normal", "kategori": "ogrenci", "onem": "bilgi", "cooldown_saat": 0},
+    "haftalik_ozet":    {"baslik": "📊 Haftalık Özet", "oncelik": "normal", "kategori": "ogretmen", "onem": "dusuk", "cooldown_saat": 24},
+    "ders_degisiklik":  {"baslik": "📅 Ders Değişikliği", "oncelik": "yuksek", "kategori": "veli", "onem": "orta", "cooldown_saat": 0},
 }
+
+VARSAYILAN_TERCIH = {"ogrenci": True, "ogretmen": True, "veli": True}
 
 
 async def bildirim_olustur(alici_id, tur, icerik, ilgili_id=None):
-    """Bildirim oluştur ve kaydet"""
-    tur_bilgi = BILDIRIM_TURLERI.get(tur, {"baslik": "Bildirim", "oncelik": "normal"})
+    """Bildirim oluştur ve kaydet.
+
+    - Kullanıcı tercihi: kapalı kategorinin bildirimi HİÇ oluşturulmaz.
+    - Cooldown: tür için cooldown_saat>0 ve aynı (alıcı, tür, ilgili_id) o süre
+      içinde varsa yeni bildirim üretilmez (spam engeli).
+    """
+    tur_bilgi = BILDIRIM_TURLERI.get(tur, {"baslik": "Bildirim", "oncelik": "normal",
+                                           "kategori": "ogrenci", "onem": "bilgi", "cooldown_saat": 0})
+    kategori = tur_bilgi.get("kategori", "ogrenci")
+    onem = tur_bilgi.get("onem", "bilgi")
+
+    # Kategori tercihi (varsayılan açık) — kapalıysa üretme
+    alici = await db.users.find_one({"id": alici_id}, {"bildirim_tercihleri": 1})
+    tercih = (alici or {}).get("bildirim_tercihleri") or {}
+    if tercih.get(kategori, True) is False:
+        return None
+
+    # Cooldown / tekilleştirme
+    cd = tur_bilgi.get("cooldown_saat", 0)
+    if cd and cd > 0:
+        esik = (datetime.utcnow() - timedelta(hours=cd)).isoformat()
+        mevcut = await db.bildirimler.find_one(
+            {"alici_id": alici_id, "tur": tur, "ilgili_id": ilgili_id, "tarih": {"$gte": esik}})
+        if mevcut:
+            return None
+
     doc = {
         "id": str(uuid.uuid4()),
         "alici_id": alici_id,
         "tur": tur,
         "baslik": tur_bilgi["baslik"],
         "icerik": icerik,
-        "oncelik": tur_bilgi["oncelik"],
+        "oncelik": tur_bilgi.get("oncelik", "normal"),
+        "kategori": kategori,
+        "onem_seviyesi": onem,
         "ilgili_id": ilgili_id,
         "okundu": False,
         "tarih": datetime.utcnow().isoformat(),
@@ -69,6 +99,20 @@ async def get_bildirimler(current_user=Depends(get_current_user)):
 async def get_okunmamis_bildirim(current_user=Depends(get_current_user)):
     sayi = await db.bildirimler.count_documents({"alici_id": current_user["id"], "okundu": False})
     return {"sayi": sayi}
+
+
+# Bildirim tercihleri (kategori bazlı aç/kapa)
+@router.get("/bildirimler/tercihler")
+async def get_bildirim_tercihleri(current_user=Depends(get_current_user)):
+    t = current_user.get("bildirim_tercihleri") or {}
+    return {**VARSAYILAN_TERCIH, **t}
+
+
+@router.put("/bildirimler/tercihler")
+async def put_bildirim_tercihleri(payload: dict = Body(...), current_user=Depends(get_current_user)):
+    yeni = {k: bool(payload.get(k, True)) for k in ("ogrenci", "ogretmen", "veli")}
+    await db.users.update_one({"id": current_user["id"]}, {"$set": {"bildirim_tercihleri": yeni}})
+    return {"ok": True, "bildirim_tercihleri": yeni}
 
 
 # Bildirim okundu işaretle
