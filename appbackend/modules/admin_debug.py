@@ -39,7 +39,7 @@ router = APIRouter()
 
 # ── Migration / Debug Endpoint ──
 @router.post("/admin/fix-ids")
-async def fix_missing_ids(current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+async def fix_missing_ids(current_user=Depends(require_role(UserRole.ADMIN))):
     """Eksik id alanlarını düzelt"""
     fixed = 0
     # analiz_metinler
@@ -56,7 +56,7 @@ async def fix_missing_ids(current_user=Depends(require_role(UserRole.ADMIN, User
 
 
 @router.get("/admin/gemini-test")
-async def gemini_test(current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+async def gemini_test(current_user=Depends(require_role(UserRole.ADMIN))):
     """Gemini API bağlantısını test et — sadece admin."""
     key = GEMINI_API_KEY
     if not key:
@@ -88,7 +88,7 @@ async def gemini_modeller():
 
 
 @router.get("/admin/debug-metinler")
-async def debug_metinler(current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+async def debug_metinler(current_user=Depends(require_role(UserRole.ADMIN))):
     """Tüm metinleri ham haliyle göster"""
     items = await db.analiz_metinler.find().to_list(length=None)
     result = []
@@ -99,7 +99,7 @@ async def debug_metinler(current_user=Depends(require_role(UserRole.ADMIN, UserR
 
 
 @router.get("/admin/debug-ogrenciler")
-async def debug_ogrenciler(current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+async def debug_ogrenciler(current_user=Depends(require_role(UserRole.ADMIN))):
     items = await db.students.find().to_list(length=None)
     result = []
     for item in items:
