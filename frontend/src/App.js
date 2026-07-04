@@ -809,18 +809,18 @@ function AppContent() {
                       </Select>
                     </div>
                     <div><Label>Kur</Label><Input value={studentForm.kur} onChange={e => setStudentForm({...studentForm, kur:e.target.value})} required /></div>
-                    {/* Muhasebe + öğretmen ataması yalnız Yönetici'ye görünür; Koordinatör'de gizli
-                        (koordinatörün öğrencisi otomatik kendi kaydına bağlanır, mali alanlar backend'de sıfırlanır) */}
+                    {/* Mali alanlar YALNIZ Yönetici'ye görünür (muhasebe admin'e ait) */}
                     {user.role === "admin" && (<>
                     <div><Label>Ödeme (₺)</Label><Input type="number" step="0.01" value={studentForm.yapilmasi_gereken_odeme} onChange={e => setStudentForm({...studentForm, yapilmasi_gereken_odeme:parseFloat(e.target.value)||0})} /></div>
                     <div><Label>Öğretmen Payı (₺)</Label><Input type="number" step="0.01" value={studentForm.ogretmene_yapilacak_odeme} onChange={e => setStudentForm({...studentForm, ogretmene_yapilacak_odeme:parseFloat(e.target.value)||0})} /></div>
+                    </>)}
+                    {/* Öğretmen ataması Yönetici + Koordinatör'e açık (koordinatör istediği öğretmene atar) */}
                     <div><Label>Öğretmen</Label>
                       <Select value={studentForm.ogretmen_id} onValueChange={v => setStudentForm({...studentForm, ogretmen_id:v})}>
                         <SelectTrigger><SelectValue placeholder="Seçin" /></SelectTrigger>
                         <SelectContent>{teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.ad} {t.soyad}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
-                    </>)}
                     <Button type="submit" disabled={loadingAction} className="w-full">Ekle</Button>
                   </form>
                 </CardContent>

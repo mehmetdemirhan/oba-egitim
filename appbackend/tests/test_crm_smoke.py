@@ -198,13 +198,14 @@ async def run():
             "yapilmasi_gereken_odeme": 0, "yapilan_odeme": 0, "arsivli": False})
         await server.db.users.insert_one({"id": koord_user, "role": "coordinator", "linked_id": koord_teacher, "ad": "Koo"})
         H_koord = {"Authorization": f"Bearer {create_access_token({'sub': koord_user})}"}
+        # Koordinatör öğretmen atamasını SEÇEBİLİR (admin formuyla aynı); mali alanlar yok sayılır
         r = await ac.post("/api/students", headers=H_koord, json={
             "ad": "Kd", "soyad": "Ogr", "sinif": "3", "veli_ad": "V", "veli_soyad": "D", "veli_telefon": "5",
             "aldigi_egitim": "x", "kur": "1", "yapilmasi_gereken_odeme": 9999,
-            "ogretmene_yapilacak_odeme": 888, "ogretmen_id": "BASKASI"})
+            "ogretmene_yapilacak_odeme": 888, "ogretmen_id": teacher_id})
         check(r.status_code == 200, f"koordinatör öğrenci ekledi (status={r.status_code})")
         ky = r.json()
-        check(ky["ogretmen_id"] == koord_teacher, "koordinatör öğrencisi kendi teacher kaydına bağlandı")
+        check(ky["ogretmen_id"] == teacher_id, "koordinatör seçtiği öğretmene atadı (öğretmen ataması açık)")
         check(ky["yapilmasi_gereken_odeme"] == 0 and ky["ogretmene_yapilacak_odeme"] == 0,
               "koordinatör mali alanları sıfırlandı (body yok sayıldı)")
         r = await ac.get("/api/students", headers=H_koord)

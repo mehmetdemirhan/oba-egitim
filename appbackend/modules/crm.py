@@ -270,11 +270,15 @@ async def create_student(student_data: StudentCreate, current_user=Depends(get_c
     if rol not in ("admin", "coordinator", "teacher"):
         raise HTTPException(status_code=403, detail="Bu işlem için yetkiniz yok")
     data = student_data.dict()
-    if rol in ("teacher", "coordinator"):
-        # Öğretmen/Koordinatör kendi öğrencisini ekler: mali alanlar ve öğretmen
-        # ataması body'den gelse bile yok sayılır (muhasebe yalnız admin'e ait).
-        # ogretmen_id, kişinin kendi teacher kaydına (linked_id) bağlanır.
+    if rol == "teacher":
+        # Öğretmen kendi öğrencisini ekler: öğretmen ataması kendine sabitlenir,
+        # mali alanlar body'den gelse bile yok sayılır.
         data["ogretmen_id"] = current_user.get("linked_id") or current_user.get("id")
+        data["yapilmasi_gereken_odeme"] = 0.0
+        data["ogretmene_yapilacak_odeme"] = 0.0
+    elif rol == "coordinator":
+        # Koordinatör admin ile AYNI formu kullanır (öğretmen atamasını seçebilir);
+        # TEK fark: mali alanlar body'den gelse bile yok sayılır (muhasebe admin'e ait).
         data["yapilmasi_gereken_odeme"] = 0.0
         data["ogretmene_yapilacak_odeme"] = 0.0
     student = Student(**data)
