@@ -55,6 +55,21 @@ function UserManagement({ teachers }) {
   const [loading, setLoading] = useState(false);
   const [otoSifre, setOtoSifre] = useState(true);      // varsayılan: geçici şifre otomatik üret
   const [sonSifre, setSonSifre] = useState(null);      // {ad, email, sifre} — bir kereliğine göster
+  const [duzenle, setDuzenle] = useState(null);        // düzenlenen kullanıcı {id, ad, soyad, email, telefon, role, password}
+
+  const saveEdit = async (e) => {
+    e.preventDefault();
+    try {
+      const body = { ad: duzenle.ad, soyad: duzenle.soyad, email: duzenle.email, telefon: duzenle.telefon, role: duzenle.role };
+      if (duzenle.password && duzenle.password.trim()) body.password = duzenle.password.trim();
+      await axios.put(`${API}/auth/users/${duzenle.id}`, body);
+      setDuzenle(null);
+      fetchUsers();
+      toast({ title: "Başarılı", description: "Kullanıcı güncellendi" + (body.password ? " (şifre değişti — ilk girişte yenilemesi istenecek)" : "") });
+    } catch (error) {
+      toast({ title: "Hata", description: error.response?.data?.detail || "Güncellenemedi", variant: "destructive" });
+    }
+  };
 
   const fetchUsers = useCallback(async () => {
     try { const res = await axios.get(`${API}/auth/users`); setUsers(res.data); } catch (e) { console.error(e); }
@@ -134,7 +149,10 @@ function UserManagement({ teachers }) {
                   <TableCell className="text-subtle">{u.telefon || '-'}</TableCell>
                   <TableCell><span className={`px-2 py-1 rounded-full text-xs font-medium ${roleBadgeColor[u.role] || 'bg-gray-100'}`}>{roleLabel(u.role)}</span></TableCell>
                   <TableCell>{aktifUser?.role === "admin"
-                    ? <Button variant="destructive" size="sm" onClick={() => deleteUser(u.id)}><Trash2 className="h-4 w-4" /></Button>
+                    ? <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setDuzenle({ id: u.id, ad: u.ad, soyad: u.soyad, email: u.email, telefon: u.telefon || "", role: u.role, password: "" })}><Edit2 className="h-4 w-4" /></Button>
+                        <Button variant="destructive" size="sm" onClick={() => deleteUser(u.id)}><Trash2 className="h-4 w-4" /></Button>
+                      </div>
                     : <span className="text-[10px] text-gray-400">—</span>}</TableCell>
                 </TableRow>
               ))}
@@ -157,6 +175,44 @@ function UserManagement({ teachers }) {
             </div>
             <Button className="w-full bg-blue-600 text-white" onClick={() => setSonSifre(null)}>Tamam</Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Kullanıcı düzenleme (admin) */}
+      <Dialog open={!!duzenle} onOpenChange={(o) => { if (!o) setDuzenle(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Kullanıcıyı Düzenle</DialogTitle></DialogHeader>
+          {duzenle && (
+            <form onSubmit={saveEdit} className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div><Label>Ad</Label><Input value={duzenle.ad} onChange={e => setDuzenle({...duzenle, ad:e.target.value})} required /></div>
+                <div><Label>Soyad</Label><Input value={duzenle.soyad} onChange={e => setDuzenle({...duzenle, soyad:e.target.value})} required /></div>
+              </div>
+              <div><Label>E-posta</Label><Input type="email" value={duzenle.email} onChange={e => setDuzenle({...duzenle, email:e.target.value})} required /></div>
+              <div><Label>Telefon</Label><Input value={duzenle.telefon} onChange={e => setDuzenle({...duzenle, telefon:e.target.value})} /></div>
+              <div><Label>Rol</Label>
+                <Select value={duzenle.role} onValueChange={v => setDuzenle({...duzenle, role:v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Yönetici</SelectItem>
+                    <SelectItem value="coordinator">Koordinatör</SelectItem>
+                    <SelectItem value="teacher">Öğretmen</SelectItem>
+                    <SelectItem value="student">Öğrenci</SelectItem>
+                    <SelectItem value="parent">Veli</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Yeni şifre (opsiyonel)</Label>
+                <Input type="password" value={duzenle.password} onChange={e => setDuzenle({...duzenle, password:e.target.value})} placeholder="Boş bırak = değişmez" minLength={6} />
+                <p className="text-[10px] text-gray-400 mt-1">Şifre girilirse kullanıcı ilk girişte yenilemek zorunda kalır.</p>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Button type="submit" className="flex-1 bg-blue-600 text-white">Kaydet</Button>
+                <Button type="button" variant="outline" className="flex-1" onClick={() => setDuzenle(null)}>İptal</Button>
+              </div>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </div>
@@ -752,6 +808,9 @@ function AppContent() {
                       </Select>
                     </div>
                     <div><Label>Kur</Label><Input value={studentForm.kur} onChange={e => setStudentForm({...studentForm, kur:e.target.value})} required /></div>
+                    {/* Muhasebe + öğretmen ataması yalnız Yönetici'ye görünür; Koordinatör'de gizli
+                        (koordinatörün öğrencisi otomatik kendi kaydına bağlanır, mali alanlar backend'de sıfırlanır) */}
+                    {user.role === "admin" && (<>
                     <div><Label>Ödeme (₺)</Label><Input type="number" step="0.01" value={studentForm.yapilmasi_gereken_odeme} onChange={e => setStudentForm({...studentForm, yapilmasi_gereken_odeme:parseFloat(e.target.value)||0})} /></div>
                     <div><Label>Öğretmen Payı (₺)</Label><Input type="number" step="0.01" value={studentForm.ogretmene_yapilacak_odeme} onChange={e => setStudentForm({...studentForm, ogretmene_yapilacak_odeme:parseFloat(e.target.value)||0})} /></div>
                     <div><Label>Öğretmen</Label>
@@ -760,6 +819,7 @@ function AppContent() {
                         <SelectContent>{teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.ad} {t.soyad}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
+                    </>)}
                     <Button type="submit" disabled={loadingAction} className="w-full">Ekle</Button>
                   </form>
                 </CardContent>

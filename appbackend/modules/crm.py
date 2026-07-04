@@ -270,10 +270,10 @@ async def create_student(student_data: StudentCreate, current_user=Depends(get_c
     if rol not in ("admin", "coordinator", "teacher"):
         raise HTTPException(status_code=403, detail="Bu işlem için yetkiniz yok")
     data = student_data.dict()
-    if rol == "teacher":
-        # Öğretmen kendi öğrencisini ekler: mali alanlar ve öğretmen ataması
-        # body'den gelse bile yok sayılır; ogretmen_id öğretmenin students
-        # filtresiyle (linked_id || id) uyumlu olacak şekilde backend'de set edilir.
+    if rol in ("teacher", "coordinator"):
+        # Öğretmen/Koordinatör kendi öğrencisini ekler: mali alanlar ve öğretmen
+        # ataması body'den gelse bile yok sayılır (muhasebe yalnız admin'e ait).
+        # ogretmen_id, kişinin kendi teacher kaydına (linked_id) bağlanır.
         data["ogretmen_id"] = current_user.get("linked_id") or current_user.get("id")
         data["yapilmasi_gereken_odeme"] = 0.0
         data["ogretmene_yapilacak_odeme"] = 0.0
@@ -315,8 +315,8 @@ async def create_student(student_data: StudentCreate, current_user=Depends(get_c
 async def get_students(current_user=Depends(get_current_user)):
     students = await db.students.find().to_list(length=None)
     sonuc = [Student(**parse_from_mongo(s)).dict() for s in students]
-    # Öğretmen rolü mali alanları görmemeli (öğretmen payı/ödeme yalnızca admin/koordinatör).
-    if current_user.get("role") == "teacher":
+    # Öğretmen + Koordinatör mali alanları görmemeli (muhasebe yalnızca admin'e ait).
+    if current_user.get("role") in ("teacher", "coordinator"):
         for s in sonuc:
             for alan in ("yapilmasi_gereken_odeme", "yapilan_odeme", "ogretmene_yapilacak_odeme"):
                 s.pop(alan, None)
@@ -332,9 +332,9 @@ async def get_student(student_id: str):
 @router.put("/students/{student_id}", response_model=Student)
 async def update_student(student_id: str, student_update: StudentUpdate, current_user=Depends(get_current_user)):
     update_data = student_update.dict(exclude_unset=True)
-    # Mali alanları yalnızca admin/koordinatör güncelleyebilir; öğretmen gönderse
-    # bile yok sayılır (ödeme/öğretmen payı yetkisi admin/koordinatöre ait).
-    if current_user.get("role") == "teacher":
+    # Mali alanları yalnızca admin güncelleyebilir; öğretmen/koordinatör gönderse
+    # bile yok sayılır (muhasebe yetkisi yalnız admin'e ait).
+    if current_user.get("role") in ("teacher", "coordinator"):
         for alan in ("yapilmasi_gereken_odeme", "yapilan_odeme", "ogretmene_yapilacak_odeme"):
             update_data.pop(alan, None)
     if not update_data:

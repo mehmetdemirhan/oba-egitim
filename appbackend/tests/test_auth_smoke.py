@@ -141,6 +141,23 @@ async def run():
         r = await ac.delete(f"/api/auth/users/{ogr2['id']}", headers=auth)
         check(r.status_code == 200, f"admin kullanıcı silebilir (status={r.status_code})")
 
+        # 11) Admin kullanıcı DÜZENLEME (PUT /auth/users/{id})
+        r = await ac.post("/api/auth/users", headers=auth, json={
+            "ad": "Duz", "soyad": "En", "email": "duzen@test.local", "role": "parent"})
+        uid = r.json()["id"]
+        r = await ac.put(f"/api/auth/users/{uid}", headers=auth, json={
+            "ad": "Yeni Ad", "role": "teacher", "password": "resetsifre1"})
+        check(r.status_code == 200, f"admin kullanıcı düzenledi (status={r.status_code})")
+        u = await db.users.find_one({"id": uid})
+        check(u["ad"] == "Yeni Ad" and u["role"] == "teacher", "ad + rol güncellendi")
+        check(u.get("sifre_degistirme_zorunlu") is True, "admin şifre değişince zorunlu bayrağı set")
+        check(bool(u.get("linked_id")), "rol teacher'a dönünce teachers köprüsü kuruldu")
+        r = await ac.post("/api/auth/login", json={"email_or_phone": "duzen@test.local", "password": "resetsifre1"})
+        check(r.status_code == 200, "admin'in belirlediği yeni şifre ile login")
+        # koordinatör düzenleyemez → 403
+        r = await ac.put(f"/api/auth/users/{uid}", headers=koord_auth, json={"ad": "X"})
+        check(r.status_code == 403, f"koordinatör kullanıcı düzenleyemez 403 (status={r.status_code})")
+
     await server.client.drop_database(TEST_DB)
 
 

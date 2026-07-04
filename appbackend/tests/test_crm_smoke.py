@@ -191,6 +191,25 @@ async def run():
         check(r.status_code == 200 and r.json().get("must_change_password") is True,
               "geçici şifre ile login + must_change_password=true")
 
+        # 15) Koordinatör öğrenci ekler → kendi teacher kaydına bağlanır, mali alanlar sıfır
+        koord_user, koord_teacher = str(uuid.uuid4()), str(uuid.uuid4())
+        await server.db.teachers.insert_one({"id": koord_teacher, "ad": "Koo", "soyad": "Rd", "brans": "-",
+            "telefon": "", "seviye": "yeni", "ogrenci_sayisi": 0, "atanan_ogrenciler": [],
+            "yapilmasi_gereken_odeme": 0, "yapilan_odeme": 0, "arsivli": False})
+        await server.db.users.insert_one({"id": koord_user, "role": "coordinator", "linked_id": koord_teacher, "ad": "Koo"})
+        H_koord = {"Authorization": f"Bearer {create_access_token({'sub': koord_user})}"}
+        r = await ac.post("/api/students", headers=H_koord, json={
+            "ad": "Kd", "soyad": "Ogr", "sinif": "3", "veli_ad": "V", "veli_soyad": "D", "veli_telefon": "5",
+            "aldigi_egitim": "x", "kur": "1", "yapilmasi_gereken_odeme": 9999,
+            "ogretmene_yapilacak_odeme": 888, "ogretmen_id": "BASKASI"})
+        check(r.status_code == 200, f"koordinatör öğrenci ekledi (status={r.status_code})")
+        ky = r.json()
+        check(ky["ogretmen_id"] == koord_teacher, "koordinatör öğrencisi kendi teacher kaydına bağlandı")
+        check(ky["yapilmasi_gereken_odeme"] == 0 and ky["ogretmene_yapilacak_odeme"] == 0,
+              "koordinatör mali alanları sıfırlandı (body yok sayıldı)")
+        r = await ac.get("/api/students", headers=H_koord)
+        check(all("yapilmasi_gereken_odeme" not in s for s in r.json()), "koordinatör listesinde mali alan gizli")
+
     await server.client.drop_database(TEST_DB)
 
 

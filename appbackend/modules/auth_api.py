@@ -35,6 +35,14 @@ class UserCreate(BaseModel):
     telefon: Optional[str] = None
     linked_id: Optional[str] = None  # teacher_id, student_id or parent's student_id
 
+class UserUpdate(BaseModel):
+    ad: Optional[str] = None
+    soyad: Optional[str] = None
+    email: Optional[str] = None
+    telefon: Optional[str] = None
+    role: Optional[UserRole] = None
+    password: Optional[str] = None  # verilirse şifre değiştirilir (yeni şifre belirleme)
+
 class UserLogin(BaseModel):
     email_or_phone: Optional[str] = None
     email: Optional[str] = None  # eski frontend uyumluluğu
@@ -211,6 +219,42 @@ async def create_user(
         "gecici_sifre": gecici_sifre,
         "gecici_sifre_uretildi": uretildi,
     }
+
+@router.put("/auth/users/{user_id}")
+async def update_user(user_id: str, data: UserUpdate,
+                      current_user=Depends(require_role(UserRole.ADMIN))):
+    """Admin kullanıcı düzenleme: ad/soyad/email/telefon/rol + opsiyonel yeni şifre."""
+    from core.hesap import ogretmen_kaydi_olustur
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı")
+    upd = {}
+    if data.ad is not None:
+        upd["ad"] = data.ad
+    if data.soyad is not None:
+        upd["soyad"] = data.soyad
+    if data.telefon is not None:
+        upd["telefon"] = data.telefon.strip() or None
+    if data.email is not None:
+        yeni_email = data.email.lower().strip()
+        if yeni_email and yeni_email != user.get("email"):
+            if await db.users.find_one({"email": yeni_email, "id": {"$ne": user_id}}):
+                raise HTTPException(status_code=400, detail="Bu e-posta zaten kayıtlı")
+            upd["email"] = yeni_email
+    if data.role is not None:
+        upd["role"] = data.role.value
+    if data.password and data.password.strip():
+        upd["password_hash"] = hash_password(data.password.strip())
+        # Admin yeni şifre belirledi → kullanıcı ilk girişte değiştirsin (tek kullanımlık mantığı)
+        upd["sifre_degistirme_zorunlu"] = True
+    if not upd:
+        raise HTTPException(status_code=400, detail="Güncellenecek veri yok")
+    await db.users.update_one({"id": user_id}, {"$set": upd})
+    # Rol teacher/coordinator/admin'e döndüyse teachers köprüsünü garanti et
+    guncel = await db.users.find_one({"id": user_id})
+    await ogretmen_kaydi_olustur(guncel)
+    return {"ok": True, "id": user_id}
+
 
 @router.get("/auth/users", response_model=List[UserResponse])
 async def list_users(current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
