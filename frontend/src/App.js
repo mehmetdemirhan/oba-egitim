@@ -21,6 +21,7 @@ import RozetGrid from "./components/rozet/RozetGrid";
 import TemaYonetimi from "./components/tema/TemaYonetimi";
 import ThemeToggle from "./components/tema/ThemeToggle";
 import { ZorunluSifreDegistir, SifreDegistirButton } from "./components/SifreDegistir";
+import BildirimIzni from "./components/BildirimIzni";
 import MebKelimeYonetimi from "./components/admin/MebKelimeYonetimi";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
 import InstagramAyarlari from "./components/admin/InstagramAyarlari";
@@ -7175,6 +7176,8 @@ function VeliPaneli({ user, logout }) {
               <h3 className="font-bold text-lg">{seciliCocuk.ad} {seciliCocuk.soyad}</h3>
               <p className="text-sm text-subtle">{seciliCocuk.sinif && `${seciliCocuk.sinif}. sınıf`} {seciliCocuk.kur && `• Kur: ${seciliCocuk.kur}`}</p>
             </div>
+            {/* Ders hatırlatma bildirim izni (web push) */}
+            <BildirimIzni />
             {istatistik && (<div className="grid grid-cols-3 gap-3">
               <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-orange-600">{istatistik.streak}</div><div className="text-xs text-subtle">🔥 Streak</div></div>
               <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-green-600">{istatistik.bugun_dakika}</div><div className="text-xs text-subtle">⏱ Bugün</div></div>

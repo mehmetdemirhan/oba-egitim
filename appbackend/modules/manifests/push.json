@@ -1,0 +1,15 @@
+{
+  "name": "push",
+  "version": "1.0.0",
+  "description": "Web Push modülü (/push/*) — VAPID ile ders hatırlatma bildirimleri; abonelik + 15 dk önce cron tetikli gönderim.",
+  "author": "OBA Çekirdek",
+  "type": "backend",
+  "core": false,
+  "active": true,
+  "backend_files": [
+    "push.py"
+  ],
+  "frontend_files": [],
+  "installed_at": "2026-07-04T00:00:00+00:00",
+  "builtin": true
+}

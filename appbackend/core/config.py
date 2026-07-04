@@ -20,6 +20,18 @@ DB_NAME = os.environ['DB_NAME']
 # Prod'da e-posta/SMS gönderimi olmadığından varsayılan KAPALI: şifre yanıtta dönmez.
 SIFRE_SIFIRLAMA_DEBUG = os.environ.get("SIFRE_SIFIRLAMA_DEBUG", "").lower() in ("1", "true", "yes", "on")
 
+# ── Web Push (VAPID) — ders hatırlatma bildirimleri ──
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
+# PEM tek satırda saklanır (\n kaçışlı) → gerçek satır başlarına çevrilir
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "").replace("\\n", "\n")
+VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "mailto:admin@oba.com")
+# Ders saatleri yerel (TR) saklanır; "15 dk önce" hesabı için UTC ofseti
+PUSH_TZ_OFFSET_SAAT = int(os.environ.get("PUSH_TZ_OFFSET_SAAT", "3"))
+# Ders öncesi kaç dakika bildirilsin
+PUSH_HATIRLATMA_DK = int(os.environ.get("PUSH_HATIRLATMA_DK", "15"))
+# /push/kontrol için gizli anahtar (cron çağrısında ?anahtar=). Boşsa açık (dev).
+PUSH_CRON_TOKEN = os.environ.get("PUSH_CRON_TOKEN", "")
+
 # ── Backup (GridFS) & update-check config ──
 APP_VERSION = os.environ.get("APP_VERSION", "1.0.0")
 GITHUB_REPO_OWNER = os.environ.get("GITHUB_REPO_OWNER", "")

@@ -72,6 +72,10 @@
     "active": true
   },
   {
+    "name": "push",
+    "active": true
+  },
+  {
     "name": "anketler",
     "active": true
   },
