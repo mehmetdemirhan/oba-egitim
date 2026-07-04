@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Sun, Moon, Monitor, Palette } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
+import { useToast } from "../../hooks/use-toast";
 
 /**
  * ThemeToggle — header'da tema/mod seçici.
@@ -14,8 +15,12 @@ const MODLAR = [
 
 export default function ThemeToggle() {
   const { tema, mod, temalar, etkinMod, setTema, setMod } = useTheme() || {};
+  const { toast } = useToast();
   const [acik, setAcik] = useState(false);
   const AktifIkon = etkinMod === "dark" ? Moon : Sun;
+
+  const temaSec = (t) => { setTema?.(t.kod); toast({ title: `🎨 Tema: ${t.ad}` }); };
+  const modSec = (k, ad) => { setMod?.(k); toast({ title: `Görünüm: ${ad}` }); };
 
   return (
     <div className="relative">
@@ -35,7 +40,7 @@ export default function ThemeToggle() {
             <div className="text-[10px] font-semibold text-gray-400 px-2 pb-1">GÖRÜNÜM</div>
             <div className="grid grid-cols-3 gap-1 mb-2">
               {MODLAR.map(({ k, ad, ikon: Ikon }) => (
-                <button key={k} onClick={() => setMod?.(k)}
+                <button key={k} onClick={() => modSec(k, ad)}
                   className={`flex flex-col items-center gap-0.5 py-1.5 rounded-lg text-[10px] ${mod === k ? "bg-blue-50 text-blue-600 ring-1 ring-blue-200" : "text-gray-600 hover:bg-gray-50"}`}>
                   <Ikon className="h-4 w-4" /> {ad}
                 </button>
@@ -49,7 +54,7 @@ export default function ThemeToggle() {
                   {temalar.map((t) => {
                     const c = t?.modlar?.light || {};
                     return (
-                      <button key={t.kod} onClick={() => setTema?.(t.kod)}
+                      <button key={t.kod} onClick={() => temaSec(t)}
                         className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs ${tema?.kod === t.kod ? "bg-gray-100 font-medium" : "hover:bg-gray-50"}`}>
                         <span className="flex -space-x-1">
                           {["primary", "accent", "success"].map((tok) => (

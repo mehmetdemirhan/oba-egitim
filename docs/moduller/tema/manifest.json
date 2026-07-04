@@ -1,0 +1,37 @@
+{
+  "ad": "tema",
+  "versiyon": "1.0.0",
+  "core": true,
+  "aciklama": "Veri-odaklı tema/görünüm sistemi. 12 semantik token (light+dark), 5 hazır tema, rol-varsayılan + kullanıcı tercihi + sistem varsayılanı çözümlemesi. Dark mode + auto (prefers-color-scheme). Admin CRUD + logo yükleme.",
+  "yazar": "OBA Çekirdek",
+  "backend": [
+    "modules/tema.py",
+    "core/tema_varsayilan.py"
+  ],
+  "frontend_components": [
+    "Logo",
+    "ThemeToggle",
+    "TemaKarti",
+    "TemaFormu",
+    "LogoYukleyici",
+    "TemaYonetimi"
+  ],
+  "frontend_context": [
+    "context/ThemeContext.jsx"
+  ],
+  "koleksiyonlar": [
+    "theme_configs",
+    "users.tema_tercihi",
+    "sistem_ayarlari (tip: tema_ayarlari)"
+  ],
+  "indexler": [
+    "theme_configs: {kod:1} unique"
+  ],
+  "migrationlar": [
+    "scripts/seed_temalar.py"
+  ],
+  "tokenlar": [
+    "primary", "primary_hover", "secondary", "background", "surface",
+    "text", "text_secondary", "border", "accent", "danger", "success", "warning"
+  ]
+}

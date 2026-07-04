@@ -39,3 +39,15 @@ rozetleri) görünümleri paylaşılan `RozetGrid` bileşenini kullanır.
 
 Mimari, event akışı, yeni metrik ekleme, API referansı ve üretim migrasyonu:
 **[docs/ROZET_SISTEMI.md](docs/ROZET_SISTEMI.md)**
+
+## Tema / Görünüm Sistemi
+
+Renkler **CSS değişkeni token'ları** (12 semantik token: primary/surface/text/…)
+üzerinden yönetilir; temalar `theme_configs` koleksiyonunda durur. 5 hazır tema
+(deniz/orman/gün_batımı/gece_yarısı + öğrenci_cream), **dark mode + otomatik**
+(sistem tercihi), rol-varsayılan + kullanıcı tercihi + sistem varsayılanı çözümlemesi.
+Admin panelde **🎨 Tema** sekmesinden tam CRUD + logo yükleme; her kullanıcı header'daki
+toggle'dan tema/mod seçer. Öğrenci paneli cream paleti korunmuştur.
+
+Kurulum: `cd appbackend && .venv/Scripts/python.exe scripts/seed_temalar.py`
+Ayrıntı: **[docs/TEMA_SISTEMI.md](docs/TEMA_SISTEMI.md)** · migration: **[docs/TEMA_MIGRATION.md](docs/TEMA_MIGRATION.md)**
