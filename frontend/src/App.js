@@ -4195,7 +4195,7 @@ function OgretmenPaneli({ user, logout }) {
     const d = ogrenciDetay;
     return (
       <div className="min-h-screen bg-app">
-        <div className="bg-surface border-b sticky top-0 z-10"><div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
+        <div className="bg-surface border-b sticky top-0 z-30"><div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="outline" size="sm" onClick={() => setAktifSekme("ogrencilerim")}>← Geri</Button>
           <div><div className="font-bold">{seciliOgrenci.ad} {seciliOgrenci.soyad}</div><div className="text-xs text-subtle">{seciliOgrenci.sinif}. sınıf • {seciliOgrenci.kur || "Kur yok"}</div></div>
         </div></div>
@@ -4373,7 +4373,7 @@ function OgretmenPaneli({ user, logout }) {
     <div className="min-h-screen bg-app">
       {/* Header — tam ekran egzersiz modunda gizlenir */}
       {!isFullscreen && (
-      <div className="bg-surface border-b sticky top-0 z-10">
+      <div className="bg-surface border-b sticky top-0 z-30">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center"><BookOpen className="h-5 w-5 text-white" /></div>
@@ -4390,7 +4390,7 @@ function OgretmenPaneli({ user, logout }) {
 
       {/* Tabs — tam ekran egzersiz modunda gizlenir */}
       {!isFullscreen && (
-      <div className="bg-surface border-b sticky top-[60px] z-10">
+      <div className="bg-surface border-b sticky top-[60px] z-20">
         <div className="max-w-4xl mx-auto px-2 flex gap-1 overflow-x-auto py-2">
           {sekmeler.map(s => (
             <button key={s.id} onClick={() => setAktifSekme(s.id)}
@@ -5740,7 +5740,7 @@ function OgrenciPaneli({ user, logout }) {
     <div className="min-h-screen bg-gray-50">
       {/* Header — tam ekran egzersiz modunda gizlenir */}
       {!isFullscreen && (
-      <div className="bg-white border-b sticky top-0 z-10">
+      <div className="bg-white border-b sticky top-0 z-30">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-red-500 rounded-xl flex items-center justify-center"><BookOpen className="h-5 w-5 text-white" /></div>
@@ -5757,7 +5757,7 @@ function OgrenciPaneli({ user, logout }) {
 
       {/* 5 Tab — temiz, taşmaz — tam ekran egzersiz modunda gizlenir */}
       {!isFullscreen && (
-      <div className="bg-white border-b sticky top-[60px] z-10">
+      <div className="bg-white border-b sticky top-[60px] z-20">
         <div className="max-w-2xl mx-auto px-2 flex justify-between py-2">
           {sekmeler.map(s => (
             <button key={s.id} onClick={() => setAktifSekme(s.id)}
@@ -7143,7 +7143,7 @@ function VeliPaneli({ user, logout }) {
   return (
     <div className="min-h-screen bg-app">
       {!isFullscreen && (
-      <div className="bg-surface border-b sticky top-0 z-10">
+      <div className="bg-surface border-b sticky top-0 z-30">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-pink-500 rounded-xl flex items-center justify-center"><BookOpen className="h-5 w-5 text-white" /></div>
@@ -7173,7 +7173,7 @@ function VeliPaneli({ user, logout }) {
       )}
 
       {!isFullscreen && (
-      <div className="bg-surface border-b sticky top-[60px] z-10">
+      <div className="bg-surface border-b sticky top-[60px] z-20">
         <div className="max-w-2xl mx-auto px-2 flex gap-1 overflow-x-auto py-2">
           {sekmeler.map(s => (
             <button key={s.id} onClick={() => setAktifSekme(s.id)}
