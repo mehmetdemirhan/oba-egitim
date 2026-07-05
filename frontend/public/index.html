@@ -18,7 +18,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- NOT: Tailwind artık craco/PostCSS ile derleniyor (tailwind.config.js + @tailwind
+         direktifleri). Eski cdn.tailwindcss.com <script>'u KALDIRILDI: runtime CDN,
+         özel semantik token'ları (primary/surface/content…) tanımadığı için bg-primary
+         gibi sınıfları eziyor/boş bırakıyordu → butonlar/etiketler görünmez oluyordu. -->
     <style>
       [data-radix-dialog-overlay] {
         position: fixed;

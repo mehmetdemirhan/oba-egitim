@@ -38,4 +38,6 @@ konvansiyonlar; ayrıntı için ilgili dokümanlara bakın.
 ## Konvansiyonlar
 - Kod/yorum dili: mevcut dosyalardaki gibi **Türkçe** açıklamalar.
 - Büyük her adımdan sonra commit; commit mesajları Türkçe ve açıklayıcı.
-- Frontend build doğrulaması: `cd frontend && CI=false npx craco build`.
+- Frontend build doğrulaması: `cd frontend && CI=false npm run build` (react-scripts;
+  Tailwind CRA'nın yerleşik desteğiyle `tailwind.config.js` üzerinden derlenir —
+  craco KULLANILMIYOR, `cdn.tailwindcss.com` script'i YOK).
