@@ -282,7 +282,9 @@ async def update_user(user_id: str, data: UserUpdate,
 
 
 @router.get("/auth/users", response_model=List[UserResponse])
-async def list_users(current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+async def list_users(current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR, UserRole.TEACHER))):
+    # Öğretmen de listeye erişebilir: mesajlaşmada alıcı (yönetici/koordinatör/öğretmen)
+    # seçimi için gerekli. Salt-okunur; oluşturma/silme hâlâ admin/koordinatöre özel.
     users = await db.users.find().to_list(length=None)
     result = []
     for u in users:
