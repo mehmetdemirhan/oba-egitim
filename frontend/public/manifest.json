@@ -1,11 +1,17 @@
 {
   "short_name": "OBA",
   "name": "Okuma Becerileri Akademisi",
+  "description": "Okuma Becerileri Akademisi — Eğitim Yönetim Sistemi",
   "icons": [
-    { "src": "/favicon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" }
+    { "src": "/favicon.svg", "type": "image/svg+xml", "sizes": "any" },
+    { "src": "/icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any maskable" }
   ],
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "theme_color": "#f97316",
-  "background_color": "#ffffff"
+  "background_color": "#ffffff",
+  "lang": "tr"
 }

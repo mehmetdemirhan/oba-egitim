@@ -5,8 +5,9 @@ import App from "./App";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { swKaydet } from "./lib/push";
+import PWAKur from "./components/PWAKur";
 
-// Web Push service worker'ı kaydet (ders hatırlatma bildirimleri)
+// Web Push + PWA service worker'ı kaydet
 swKaydet();
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
@@ -15,6 +16,7 @@ root.render(
     <AuthProvider>
       <ThemeProvider>
         <App />
+        <PWAKur />
       </ThemeProvider>
     </AuthProvider>
   </React.StrictMode>,

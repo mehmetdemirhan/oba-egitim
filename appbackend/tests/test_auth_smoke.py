@@ -158,6 +158,22 @@ async def run():
         r = await ac.put(f"/api/auth/users/{uid}", headers=koord_auth, json={"ad": "X"})
         check(r.status_code == 403, f"koordinatör kullanıcı düzenleyemez 403 (status={r.status_code})")
 
+        # 12) Kalıcı oturum: login refresh döner, /auth/refresh yeni access verir, logout iptal eder
+        r = await ac.post("/api/auth/login", json={"email_or_phone": "admin@test.local", "password": "yeni456"})
+        refresh = r.json().get("refresh_token")
+        check(bool(refresh), "login refresh_token döndürdü")
+        r = await ac.post("/api/auth/refresh", json={"refresh_token": refresh})
+        check(r.status_code == 200 and bool(r.json().get("access_token")), "refresh yeni access verdi")
+        # yeni access ile /auth/me çalışır
+        r2 = await ac.get("/api/auth/me", headers={"Authorization": f"Bearer {r.json()['access_token']}"})
+        check(r2.status_code == 200, "yenilenmiş access geçerli")
+        # logout → refresh iptal → tekrar refresh 401
+        await ac.post("/api/auth/logout", json={"refresh_token": refresh})
+        r = await ac.post("/api/auth/refresh", json={"refresh_token": refresh})
+        check(r.status_code == 401, f"logout sonrası refresh 401 (status={r.status_code})")
+        r = await ac.post("/api/auth/refresh", json={"refresh_token": "gecersiz"})
+        check(r.status_code == 401, "geçersiz refresh 401")
+
     await server.client.drop_database(TEST_DB)
 
 

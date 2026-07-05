@@ -97,6 +97,9 @@ async def ensure_indexes():
         # Web Push: abonelik endpoint benzersiz + hatırlatma idempotency anahtarı
         await db.push_abonelikleri.create_index("endpoint", unique=True, name="uq_push_endpoint")
         await db.push_gonderimler.create_index("anahtar", unique=True, name="uq_push_anahtar")
+        # Kalıcı oturum refresh token'ları
+        await db.refresh_tokens.create_index("token_hash", unique=True, name="uq_refresh_hash")
+        await db.refresh_tokens.create_index("user_id", name="ix_refresh_user")
         logging.info("[db] rozet+tema index'leri hazır (uq_kullanici_rozet, uq_rozet_rol_kod, uq_tema_kod)")
     except Exception as ex:
         logging.error(f"[db] ensure_indexes hatası: {type(ex).__name__}: {ex}")

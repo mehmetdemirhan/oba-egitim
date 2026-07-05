@@ -8,6 +8,39 @@ const AuthContext = createContext(null);
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
+// ── Otomatik token yenileme (kalıcı 45 günlük oturum) ──
+// Access token 401 verince refresh ile sessizce yenilenir ve istek tekrarlanır.
+let _yenilemePromise = null;
+axios.interceptors.response.use(
+  (r) => r,
+  async (error) => {
+    const orig = error.config || {};
+    const rt = localStorage.getItem("oba_refresh");
+    const url = String(orig.url || "");
+    const atlansin = url.includes("/auth/refresh") || url.includes("/auth/login");
+    if (error.response?.status === 401 && rt && !orig._retry && !atlansin) {
+      orig._retry = true;
+      try {
+        if (!_yenilemePromise) _yenilemePromise = axios.post(`${API}/auth/refresh`, { refresh_token: rt });
+        const { data } = await _yenilemePromise;
+        _yenilemePromise = null;
+        localStorage.setItem("oba_token", data.access_token);
+        axios.defaults.headers.common["Authorization"] = `Bearer ${data.access_token}`;
+        orig.headers = orig.headers || {};
+        orig.headers["Authorization"] = `Bearer ${data.access_token}`;
+        return axios(orig);
+      } catch (e) {
+        _yenilemePromise = null;
+        localStorage.removeItem("oba_token");
+        localStorage.removeItem("oba_refresh");
+        delete axios.defaults.headers.common["Authorization"];
+        window.location.reload(); // oturum gerçekten bitti → giriş ekranı
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem("oba_token"));
@@ -63,17 +96,22 @@ export function AuthProvider({ children }) {
         throw err;
       }
     }
-    const { access_token, user: userData } = response.data;
+    const { access_token, user: userData, refresh_token } = response.data;
 
     localStorage.setItem("oba_token", access_token);
+    if (refresh_token) localStorage.setItem("oba_refresh", refresh_token);
     axios.defaults.headers.common["Authorization"] = `Bearer ${access_token}`;
     setToken(access_token);
     setUser(userData);
     return userData;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    // Sunucuda refresh token'ı iptal et (bu cihazın oturumunu kapat)
+    const rt = localStorage.getItem("oba_refresh");
+    if (rt) { try { await axios.post(`${API}/auth/logout`, { refresh_token: rt }); } catch (e) {} }
     localStorage.removeItem("oba_token");
+    localStorage.removeItem("oba_refresh");
     delete axios.defaults.headers.common["Authorization"];
     setToken(null);
     setUser(null);

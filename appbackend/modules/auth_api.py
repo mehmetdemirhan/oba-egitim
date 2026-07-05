@@ -17,6 +17,7 @@ from core.config import SIFRE_SIFIRLAMA_DEBUG
 from core.auth import (
     UserRole, get_current_user, require_role,
     hash_password, verify_password, create_access_token,
+    refresh_token_olustur, refresh_token_dogrula, refresh_token_sil,
 )
 
 router = APIRouter()
@@ -65,6 +66,7 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     user: UserResponse
     must_change_password: bool = False
+    refresh_token: Optional[str] = None
 
 class ChangePassword(BaseModel):
     old_password: str
@@ -106,7 +108,30 @@ async def login(credentials: UserLogin):
         sifre_degistirme_zorunlu=zorunlu,
     )
 
-    return TokenResponse(access_token=token, user=user_response, must_change_password=zorunlu)
+    refresh = await refresh_token_olustur(user["id"])
+    return TokenResponse(access_token=token, user=user_response,
+                         must_change_password=zorunlu, refresh_token=refresh)
+
+
+@router.post("/auth/refresh")
+async def refresh_access(payload: dict = Body(...)):
+    """Refresh token ile yeni kısa ömürlü access token üretir (kalıcı oturum)."""
+    user_id = await refresh_token_dogrula(payload.get("refresh_token", ""))
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Geçersiz veya süresi dolmuş oturum")
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=401, detail="Kullanıcı bulunamadı")
+    token = create_access_token({"sub": user["id"], "role": user["role"]})
+    return {"access_token": token, "token_type": "bearer"}
+
+
+@router.post("/auth/logout")
+async def logout(payload: dict = Body(default={})):
+    """Refresh token'ı iptal eder (bu cihaz için oturumu kapatır)."""
+    await refresh_token_sil(payload.get("refresh_token", ""))
+    return {"ok": True}
+
 
 @router.get("/auth/me", response_model=UserResponse)
 async def get_me(current_user=Depends(get_current_user)):

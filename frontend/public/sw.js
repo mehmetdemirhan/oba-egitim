@@ -1,4 +1,8 @@
-/* OBA Service Worker — Web Push (ders hatırlatma) */
+/* OBA Service Worker — Web Push (ders hatırlatma) + PWA */
+
+// PWA yüklenebilirliği için fetch handler gerekir (no-op passthrough).
+self.addEventListener("fetch", () => { /* tarayıcı normal işler */ });
+
 self.addEventListener("push", (event) => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch (e) {}

@@ -3,6 +3,8 @@
 server.py'daki orijinal tanımların birebir aynısıdır. `create_default_admin`
 başlangıç görevi olduğu için server.py'da kalmaya devam eder.
 """
+import secrets
+import hashlib
 from datetime import datetime, timezone, timedelta
 from enum import Enum
 from typing import Optional
@@ -12,7 +14,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 
-from core.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
+from core.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS
 from core.db import db
 
 
@@ -48,6 +50,43 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+# ── Refresh token (45 günlük kalıcı oturum, DB'de saklı & iptal edilebilir) ──
+def _refresh_hash(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+async def refresh_token_olustur(user_id: str) -> str:
+    """Opak refresh token üretir, hash'ini DB'ye yazar, düz metni döner (yalnız istemciye)."""
+    token = secrets.token_urlsafe(48)
+    await db.refresh_tokens.insert_one({
+        "token_hash": _refresh_hash(token),
+        "user_id": user_id,
+        "expires_at": (datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)).isoformat(),
+        "olusturma_tarihi": datetime.now(timezone.utc).isoformat(),
+    })
+    return token
+
+
+async def refresh_token_dogrula(token: str) -> Optional[str]:
+    """Geçerli & süresi dolmamışsa user_id döner; süresi geçmişse siler ve None döner."""
+    if not token:
+        return None
+    doc = await db.refresh_tokens.find_one({"token_hash": _refresh_hash(token)})
+    if not doc:
+        return None
+    if doc.get("expires_at", "") < datetime.now(timezone.utc).isoformat():
+        await db.refresh_tokens.delete_one({"_id": doc["_id"]})
+        return None
+    return doc.get("user_id")
+
+
+async def refresh_token_sil(token: str) -> bool:
+    if not token:
+        return False
+    res = await db.refresh_tokens.delete_one({"token_hash": _refresh_hash(token)})
+    return res.deleted_count > 0
 
 
 def decode_token(token: str) -> dict:
