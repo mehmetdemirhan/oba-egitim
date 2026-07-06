@@ -35,6 +35,10 @@ module.exports = {
         muted: { DEFAULT: "var(--background)", foreground: "var(--text-secondary)" },
         input: "var(--border)",
         ring: "var(--primary)",
+        // Select/Dropdown/Popover içerik yüzeyi. Tanımsızken bg-popover ölü sınıftı
+        // → açılan liste ŞEFFAF kalıp altındaki form alanlarıyla iç içe görünüyordu.
+        // Yüzey = kart yüzeyi (--surface), metin = ana metin (--text); light/dark oto.
+        popover: { DEFAULT: "var(--surface)", foreground: "var(--text)" },
       },
     },
   },
