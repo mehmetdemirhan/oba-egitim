@@ -21,6 +21,11 @@ class DashboardStats(BaseModel):
     toplam_ogrenci_alacak: float
     toplam_ogretmen_borc: float
     bu_ay_odenen_toplam: float
+    # Koordinatör dashboard'u için öğrenci-bazlı metrikler (additive; admin
+    # görünümü bunları kullanmaz). "kur atlayan" hem öğretmen akışını hem elle
+    # düzenlemeyi kapsar (tüm kur_atlamalari).
+    bu_ay_yeni_kayit: int = 0
+    bu_ay_kur_atlayan: int = 0
 
 class WeeklyStats(BaseModel):
     hafta: str
@@ -34,6 +39,7 @@ class MonthlyStats(BaseModel):
     odemeler: float
     gelir: float
     toplam_borc: float
+    kur_atlayan: int = 0  # o ay kur atlayan öğrenci sayısı (koordinatör grafiği)
 
 
 @router.get("/dashboard", response_model=DashboardStats)
@@ -52,13 +58,18 @@ async def get_dashboard_stats():
     current_month_start = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     monthly_payments = await db.payments.find({"tarih": {"$gte": current_month_start.isoformat()}}).to_list(length=None)
     monthly_total = sum(p.get('miktar', 0) for p in monthly_payments)
+    # Öğrenci-bazlı aylık metrikler (koordinatör dashboard'u)
+    bu_ay_yeni_kayit = await db.students.count_documents({"olusturma_tarihi": {"$gte": current_month_start.isoformat()}})
+    bu_ay_kur_atlayan = await db.kur_atlamalari.count_documents({"tarih": {"$gte": current_month_start.isoformat()}})
     return DashboardStats(
         toplam_ogretmen=teacher_count,
         toplam_ogrenci=student_count,
         toplam_kurs=course_count,
         toplam_ogrenci_alacak=total_student_receivable,
         toplam_ogretmen_borc=total_teacher_debt,
-        bu_ay_odenen_toplam=monthly_total
+        bu_ay_odenen_toplam=monthly_total,
+        bu_ay_yeni_kayit=bu_ay_yeni_kayit,
+        bu_ay_kur_atlayan=bu_ay_kur_atlayan,
     )
 
 
@@ -125,11 +136,13 @@ async def get_monthly_stats():
         students_this_month = await db.students.find({"olusturma_tarihi": {"$gte": month_start.isoformat(), "$lt": month_end.isoformat()}}).to_list(length=None)
         payments_this_month = await db.payments.find({"tarih": {"$gte": month_start.isoformat(), "$lt": month_end.isoformat()}}).to_list(length=None)
         students_total = await db.students.find({"olusturma_tarihi": {"$lt": month_end.isoformat()}}).to_list(length=None)
+        kur_atlayan = await db.kur_atlamalari.count_documents({"tarih": {"$gte": month_start.isoformat(), "$lt": month_end.isoformat()}})
         stats.append(MonthlyStats(
             ay=month_start.strftime('%B %Y'),
             yeni_ogrenciler=len(students_this_month),
             odemeler=sum(p.get('miktar', 0) for p in payments_this_month),
             gelir=sum(s.get('yapilmasi_gereken_odeme', 0) for s in students_this_month),
-            toplam_borc=sum(max(0, s.get('yapilmasi_gereken_odeme', 0) - s.get('yapilan_odeme', 0)) for s in students_total)
+            toplam_borc=sum(max(0, s.get('yapilmasi_gereken_odeme', 0) - s.get('yapilan_odeme', 0)) for s in students_total),
+            kur_atlayan=kur_atlayan,
         ))
     return list(reversed(stats))

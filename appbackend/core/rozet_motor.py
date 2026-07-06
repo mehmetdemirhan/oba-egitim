@@ -100,7 +100,8 @@ async def _ogretmen_metrikleri(user_id: str, user: dict) -> dict:
         streakler.append(_streak_hesapla(tarihler, simdi))
     ort_streak = sum(streakler) / max(len(streakler), 1)
 
-    kur_sayisi = await db.kur_atlamalari.count_documents({"ogretmen_id": ogretmen_id})
+    # Elle (kaynak="manuel") kur düzenlemeleri öğretmen başarısına sayılmaz.
+    kur_sayisi = await db.kur_atlamalari.count_documents({"ogretmen_id": ogretmen_id, "kaynak": {"$ne": "manuel"}})
     gelisim_tam = await db.gelisim_tamamlama.count_documents({"kullanici_id": user_id})
 
     mesajlar = await db.mesajlar.find({"gonderen_id": user_id}).to_list(length=None)

@@ -227,6 +227,38 @@ async def run():
         check(bozuk_id not in idler, "bozuk kayıt (seviye eksik) listeden atlandı")
         check(teacher_id in idler, "geçerli kayıtlar normal şekilde döndü")
 
+        # 17) KUR ATLAMA: PUT /students ile kur değişince kur_atlamalari'na
+        #     kaynak="manuel" log yazılmalı; dashboard metrikleri bunu saymalı.
+        r = await ac.post("/api/students", headers=H_admin, json={
+            "ad": "Kur", "soyad": "Test", "sinif": "4", "veli_ad": "V", "veli_soyad": "T",
+            "veli_telefon": "5", "aldigi_egitim": "Hızlı Okuma", "kur": "Kur 1",
+            "ogretmen_id": teacher_id})
+        kt_id = r.json()["id"]
+        log0 = await server.db.kur_atlamalari.count_documents({"kaynak": "manuel"})
+        # kur değiştir → log oluşmalı
+        r = await ac.put(f"/api/students/{kt_id}", headers=H_admin, json={"kur": "Kur 2"})
+        check(r.status_code == 200 and r.json()["kur"] == "Kur 2", "öğrenci kuru Kur 2'ye güncellendi")
+        log1 = await server.db.kur_atlamalari.count_documents({"kaynak": "manuel"})
+        check(log1 == log0 + 1, "kur değişince kaynak=manuel kur_atlamalari kaydı oluştu")
+        kayit = await server.db.kur_atlamalari.find_one({"ogrenci_id": kt_id, "kaynak": "manuel"})
+        check(bool(kayit) and kayit["eski_kur"] == "Kur 1" and kayit["yeni_kur"] == "Kur 2",
+              "log eski_kur=Kur 1, yeni_kur=Kur 2 doğru")
+        # kur DEĞİŞMEYEN PUT → yeni log oluşmamalı
+        r = await ac.put(f"/api/students/{kt_id}", headers=H_admin, json={"veli_ad": "Yeni Veli"})
+        log2 = await server.db.kur_atlamalari.count_documents({"kaynak": "manuel"})
+        check(log2 == log1, "kur değişmeyen PUT yeni kur_atlamalari kaydı üretmedi")
+
+        # 18) DASHBOARD METRİKLERİ: yeni alanlar mevcut ve kur atlamayı yansıtıyor
+        r = await ac.get("/api/dashboard")
+        d = r.json()
+        check("bu_ay_yeni_kayit" in d and "bu_ay_kur_atlayan" in d, "dashboard yeni öğrenci-metrik alanları var")
+        check(d["bu_ay_yeni_kayit"] >= 1, f"bu_ay_yeni_kayit >= 1 ({d.get('bu_ay_yeni_kayit')})")
+        check(d["bu_ay_kur_atlayan"] >= 1, f"bu_ay_kur_atlayan >= 1 ({d.get('bu_ay_kur_atlayan')})")
+        r = await ac.get("/api/stats/monthly")
+        aylik = r.json()
+        check(all("kur_atlayan" in a for a in aylik), "aylık istatistiklerde kur_atlayan alanı var")
+        check(sum(a["kur_atlayan"] for a in aylik) >= 1, "aylık toplam kur_atlayan >= 1")
+
     await server.client.drop_database(TEST_DB)
 
 

@@ -362,6 +362,20 @@ async def update_student(student_id: str, student_update: StudentUpdate, current
     old_payment = old_student.get('ogretmene_yapilacak_odeme', 0)
     new_payment = update_data.get('ogretmene_yapilacak_odeme', old_payment)
     await db.students.update_one({"id": student_id}, {"$set": update_data})
+    # Elle kur değişimi de kur atlama olarak loglanır (dashboard "kur atlayan"
+    # metriği için). kaynak="manuel" ile ayrışır; öğretmen rozet/hedef/başarı
+    # sayaçları bu manuel kayıtları saymaz (kaynak != "manuel" filtresi).
+    eski_kur = old_student.get('kur', '')
+    if 'kur' in update_data and update_data['kur'] != eski_kur:
+        await db.kur_atlamalari.insert_one({
+            "id": str(uuid.uuid4()),
+            "ogrenci_id": student_id,
+            "ogretmen_id": new_teacher_id,
+            "eski_kur": eski_kur,
+            "yeni_kur": update_data['kur'],
+            "tarih": datetime.now(timezone.utc).isoformat(),
+            "kaynak": "manuel",
+        })
     if old_teacher_id != new_teacher_id:
         if old_teacher_id:
             await db.teachers.update_one({"id": old_teacher_id}, {"$inc": {"ogrenci_sayisi": -1, "yapilmasi_gereken_odeme": -old_payment}, "$pull": {"atanan_ogrenciler": student_id}})

@@ -318,9 +318,9 @@ async def _ogretmen_puan_tablosu(current_user) -> dict:
         if tid:
             ogr_say[tid] = ogr_say.get(tid, 0) + 1
 
-    # Kur atlatma sayısı (ogretmen_id bazlı)
+    # Kur atlatma sayısı (ogretmen_id bazlı) — elle düzenlemeler (manuel) hariç.
     kur_say = {}
-    for k in await db.kur_atlamalari.find({}, {"ogretmen_id": 1}).to_list(length=None):
+    for k in await db.kur_atlamalari.find({"kaynak": {"$ne": "manuel"}}, {"ogretmen_id": 1}).to_list(length=None):
         tid = k.get("ogretmen_id")
         if tid:
             kur_say[tid] = kur_say.get(tid, 0) + 1
@@ -525,7 +525,7 @@ async def ogretmen_basarilarim(current_user=Depends(get_current_user)):
             except Exception:
                 return degerler[0]
     try:
-        kurlar = await db.kur_atlamalari.find({"ogretmen_id": ogretmen_id}).to_list(length=None)
+        kurlar = await db.kur_atlamalari.find({"ogretmen_id": ogretmen_id, "kaynak": {"$ne": "manuel"}}).to_list(length=None)
         gruplar = {}
         for k in kurlar:
             gruplar.setdefault(k.get("ogrenci_id"), []).append(k)
@@ -740,7 +740,7 @@ async def ogretmen_basarilarim(current_user=Depends(get_current_user)):
 
         # Kur hızı (ardışık atlamalar arası ortalama gün) — bağımsız sorgu
         kur_gaplar = []
-        kur_kayit = await db.kur_atlamalari.find({"ogretmen_id": ogretmen_id}).to_list(length=None)
+        kur_kayit = await db.kur_atlamalari.find({"ogretmen_id": ogretmen_id, "kaynak": {"$ne": "manuel"}}).to_list(length=None)
         kur_grup = {}
         for k in kur_kayit:
             kur_grup.setdefault(k.get("ogrenci_id"), []).append(k)

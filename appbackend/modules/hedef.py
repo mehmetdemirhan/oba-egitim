@@ -62,7 +62,8 @@ async def get_hedefler(current_user=Depends(get_current_user)):
         if kod == "ogrenci_sayisi":
             mevcut = await db.students.count_documents({"ogretmen_id": ogretmen_id, "arsivli": {"$ne": True}})
         elif kod == "kur_atlama":
-            mevcut = await db.kur_atlamalari.count_documents({"ogretmen_id": ogretmen_id})
+            # Elle (kaynak="manuel") kur düzenlemeleri hedefe sayılmaz.
+            mevcut = await db.kur_atlamalari.count_documents({"ogretmen_id": ogretmen_id, "kaynak": {"$ne": "manuel"}})
         elif kod == "icerik_uretme":
             mevcut = await db.gelisim_icerik.count_documents({"ekleyen_id": current_user["id"], "durum": "yayinda"})
         elif kod == "gorev_atama":

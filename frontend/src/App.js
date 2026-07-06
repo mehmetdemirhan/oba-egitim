@@ -222,7 +222,8 @@ function UserManagement({ teachers }) {
 }
 
 function SimpleEditForm({ item, teachers, courses, classes, onSave, onCancel, userRole }) {
-  const maliYetki = userRole === 'admin' || userRole === 'coordinator';
+  // Muhasebe/mali alanlar YALNIZ Yönetici'ye görünür (koordinatör + öğretmen hariç).
+  const maliYetki = userRole === 'admin';
   const [data, setData] = useState(item.data);
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -450,6 +451,12 @@ function AppContent() {
     { name:'Öğretmen Borçları', value:dashboardStats.toplam_ogretmen_borc, color:'#dc2626' }
   ] : [];
 
+  // Koordinatör dashboard'u — finansal yerine öğrenci-bazlı (bu ay yeni kayıt vs kur atlayan)
+  const pieDataKoord = dashboardStats ? [
+    { name:'Yeni Kayıt', value:dashboardStats.bu_ay_yeni_kayit || 0, color:'#3b82f6' },
+    { name:'Kur Atlayan', value:dashboardStats.bu_ay_kur_atlayan || 0, color:'#059669' }
+  ] : [];
+
   const tabClass = "inline-flex items-center justify-center whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-red-500 data-[state=active]:text-white data-[state=active]:shadow-sm";
 
   return (
@@ -592,11 +599,27 @@ function AppContent() {
                   <Card className="border-0 shadow-sm bg-gradient-to-br from-orange-50 to-orange-100 cursor-pointer" onClick={() => setActiveTab("courses")}>
                     <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-orange-600">Kurs</p><p className="text-3xl font-bold text-orange-900">{dashboardStats.toplam_kurs}</p></div><div className="w-12 h-12 bg-orange-500 rounded-2xl flex items-center justify-center"><BookOpen className="h-6 w-6 text-white" /></div></div></CardContent>
                   </Card>
+                  {user.role === "coordinator" ? (
+                  <Card className="border-0 shadow-sm bg-gradient-to-br from-purple-50 to-purple-100 cursor-pointer" onClick={() => setActiveTab("students")}>
+                    <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-purple-600">Bu Ay Yeni Kayıt</p><p className="text-3xl font-bold text-purple-900">{dashboardStats.bu_ay_yeni_kayit || 0}</p></div><div className="w-12 h-12 bg-purple-500 rounded-2xl flex items-center justify-center"><Calendar className="h-6 w-6 text-white" /></div></div></CardContent>
+                  </Card>
+                  ) : (
                   <Card className="border-0 shadow-sm bg-gradient-to-br from-purple-50 to-purple-100 cursor-pointer" onClick={() => setActiveTab("payments")}>
                     <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-purple-600">Bu Ay</p><p className="text-xl font-bold text-purple-900">{formatCurrency(dashboardStats.bu_ay_odenen_toplam)}</p></div><div className="w-12 h-12 bg-purple-500 rounded-2xl flex items-center justify-center"><Calendar className="h-6 w-6 text-white" /></div></div></CardContent>
                   </Card>
+                  )}
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {user.role === "coordinator" ? (<>
+                  <Card className="border-0 shadow-sm">
+                    <CardHeader><CardTitle>Yeni Kayıt vs Kur Atlayan (Bu Ay)</CardTitle></CardHeader>
+                    <CardContent><div className="h-64"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={pieDataKoord} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value">{pieDataKoord.map((e,i) => <Cell key={i} fill={e.color} />)}</Pie><Tooltip formatter={(v,n) => [`${v} öğrenci`, n]} /></PieChart></ResponsiveContainer></div></CardContent>
+                  </Card>
+                  <Card className="border-0 shadow-sm">
+                    <CardHeader><CardTitle>Aylık Kur Atlayan Öğrenci</CardTitle></CardHeader>
+                    <CardContent><div className="h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={monthlyStats}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="ay" /><YAxis allowDecimals={false} /><Tooltip /><Bar dataKey="yeni_ogrenciler" fill="#3b82f6" name="Yeni Kayıt" /><Bar dataKey="kur_atlayan" fill="#059669" name="Kur Atlayan" /></BarChart></ResponsiveContainer></div></CardContent>
+                  </Card>
+                  </>) : (<>
                   <Card className="border-0 shadow-sm">
                     <CardHeader><CardTitle>Finansal Durum</CardTitle></CardHeader>
                     <CardContent><div className="h-64"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value">{pieData.map((e,i) => <Cell key={i} fill={e.color} />)}</Pie><Tooltip formatter={v => formatCurrency(v)} /></PieChart></ResponsiveContainer></div></CardContent>
@@ -605,6 +628,7 @@ function AppContent() {
                     <CardHeader><CardTitle>Aylık İstatistikler</CardTitle></CardHeader>
                     <CardContent><div className="h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={monthlyStats}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="ay" /><YAxis /><Tooltip /><Bar dataKey="yeni_ogrenciler" fill="#3b82f6" /><Bar dataKey="gelir" fill="#f97316" /></BarChart></ResponsiveContainer></div></CardContent>
                   </Card>
+                  </>)}
                 </div>
 
                 {/* Öğretmen Rozet + Veli Anket Özeti */}
@@ -664,7 +688,10 @@ function AppContent() {
                         <SelectContent><SelectItem value="yeni">Yeni</SelectItem><SelectItem value="uzman">Uzman</SelectItem></SelectContent>
                       </Select>
                     </div>
+                    {/* Mali alan YALNIZ Yönetici'ye görünür (muhasebe admin'e ait) */}
+                    {user.role === "admin" && (
                     <div><Label>Ödeme (₺)</Label><Input type="number" step="0.01" value={teacherForm.yapilmasi_gereken_odeme} onChange={e => setTeacherForm({...teacherForm, yapilmasi_gereken_odeme:parseFloat(e.target.value)||0})} /></div>
+                    )}
                     {/* Tek adımda giriş hesabı oluştur (user ↔ teacher köprüsü) */}
                     <div className="border-t pt-3 space-y-2">
                       <label className="flex items-center gap-2 text-sm cursor-pointer">
