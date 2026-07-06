@@ -3,6 +3,7 @@
 server.py'dan birebir taşındı. Modeller, yollar, yanıt modelleri ve davranış
 değişmedi. TeacherLevel core/auth'tan gelir.
 """
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -228,7 +229,15 @@ async def get_teachers():
         teacher['ogrenci_sayisi'] = real_count
         if teacher.get('ogrenci_sayisi', 0) != real_count:
             await db.teachers.update_one({"id": teacher['id']}, {"$set": {"ogrenci_sayisi": real_count}})
-        result.append(Teacher(**parse_from_mongo(teacher)))
+        # Tek bozuk kayıt (ör. eksik 'seviye') TÜM listeyi 500'e düşürmesin:
+        # geçersiz kaydı atla + logla, geçerli kayıtları döndürmeye devam et.
+        try:
+            result.append(Teacher(**parse_from_mongo(teacher)))
+        except Exception as ex:
+            logging.warning(
+                f"[crm] Teacher kaydı parse edilemedi, atlandı: id={teacher.get('id')} "
+                f"ad={teacher.get('ad','')} {teacher.get('soyad','')} hata={type(ex).__name__}: {ex}"
+            )
     return result
 
 @router.get("/teachers/{teacher_id}", response_model=Teacher)

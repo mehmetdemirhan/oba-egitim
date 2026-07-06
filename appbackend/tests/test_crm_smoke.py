@@ -211,6 +211,22 @@ async def run():
         r = await ac.get("/api/students", headers=H_koord)
         check(all("yapilmasi_gereken_odeme" not in s for s in r.json()), "koordinatör listesinde mali alan gizli")
 
+        # 16) DAYANIKLILIK: 'seviye' alanı eksik bozuk bir teacher kaydı TÜM listeyi
+        #     500'e düşürmemeli — bozuk kayıt atlanır, geçerliler döner. (reconcile
+        #     sonrası /api/teachers 500 regresyonu)
+        bozuk_id = str(uuid.uuid4())
+        await server.db.teachers.insert_one({
+            "id": bozuk_id, "ad": "Bozuk", "soyad": "Kayıt", "brans": "-",
+            "telefon": "", "ogrenci_sayisi": 0, "atanan_ogrenciler": [],
+            "yapilmasi_gereken_odeme": 0, "yapilan_odeme": 0, "arsivli": False,
+            # DİKKAT: 'seviye' bilerek YOK → Teacher şeması bunu reddeder
+        })
+        r = await ac.get("/api/teachers")
+        check(r.status_code == 200, f"bozuk kayıt varken /teachers 500 DEĞİL (status={r.status_code})")
+        idler = [t["id"] for t in r.json()]
+        check(bozuk_id not in idler, "bozuk kayıt (seviye eksik) listeden atlandı")
+        check(teacher_id in idler, "geçerli kayıtlar normal şekilde döndü")
+
     await server.client.drop_database(TEST_DB)
 
 
