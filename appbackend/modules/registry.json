@@ -32,6 +32,10 @@
     "active": true
   },
   {
+    "name": "kutulu_okuma",
+    "active": true
+  },
+  {
     "name": "kitap",
     "active": true
   },

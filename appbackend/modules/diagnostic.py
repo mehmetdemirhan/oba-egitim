@@ -11,16 +11,62 @@ import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi.responses import StreamingResponse, Response
 from pydantic import BaseModel, Field
 
 from core.db import db
 from core.auth import get_current_user, require_role, UserRole
 from core.sistem import get_puan_ayarlari
+from core.metin_zorluk import zorluk_hesapla
 from modules.bildirim import bildirim_rapor_tamamlandi
 
 router = APIRouter()
+
+# Metin havuzu katkısı yapabilen roller (üçü de EŞİT yetkili)
+KATKI_ROLLERI = ("admin", "coordinator", "teacher")
+
+
+def _serialize_metin(item: dict, role: str) -> dict:
+    """Metin dokümanını API yanıtı için hazırlar.
+
+    - `gorsel_prompt` HİÇBİR role dönmez (yalnız backend'de saklı; ileride AI
+      görsel üretimi için). `gorsel` ham base64'ü de liste yanıtında taşınmaz —
+      yerine `gorsel_var` bayrağı konur (görsel /gorsel endpoint'inden çekilir).
+    - Öğrenci/veli: MCQ'ların doğru cevabı ve iç bayrakları (güven, kontrol) gizlenir.
+    """
+    item = dict(item)
+    item.pop("_id", None)
+    item.pop("gorsel_prompt", None)
+    gorsel = item.pop("gorsel", None)
+    item["gorsel_var"] = bool(gorsel)
+
+    egitici = role in KATKI_ROLLERI
+    sorular = item.get("sorular") or []
+    temiz = []
+    for s in sorular:
+        s = dict(s)
+        if not egitici:
+            # Öğrenciye doğru cevap ve iç işaretler sızmasın
+            for gizli in ("dogru_cevap", "dogru_cevap_kaynak", "guven",
+                          "kontrol_gerekli", "ilk_duzelten_id",
+                          "son_duzelten_id", "son_duzelten_tarih"):
+                s.pop(gizli, None)
+        temiz.append(s)
+    if sorular:
+        item["sorular"] = temiz
+
+    # Açık uçlu sorular: öğrenciye model cevap / örnek gösterilmez
+    acik = item.get("acik_sorular") or []
+    if acik and not egitici:
+        temiz_acik = []
+        for s in acik:
+            if isinstance(s, dict):
+                s = dict(s)
+                s.pop("model_cevap", None)
+            temiz_acik.append(s)
+        item["acik_sorular"] = temiz_acik
+    return item
 
 
 # Varsayılan norm tablosu (admin değiştirebilir)
@@ -124,6 +170,8 @@ async def create_metin(data: MetinCreate, current_user=Depends(get_current_user)
         "kelime_sayisi": kelime_sayisi,
         "sinif_seviyesi": data.sinif_seviyesi,
         "tur": data.tur,
+        # Kutulu Okuma metin seçimi için otomatik zorluk etiketi (sezgisel).
+        "zorluk": zorluk_hesapla(data.icerik or ""),
         "durum": durum,
         "ekleyen_id": current_user["id"],
         "ekleyen_ad": f"{current_user.get('ad', '')} {current_user.get('soyad', '')}",
@@ -143,7 +191,12 @@ async def create_metin(data: MetinCreate, current_user=Depends(get_current_user)
 
 # ★ Metin listeleme endpoint'i (frontend: axios.get(`${API}/diagnostic/texts`))
 @router.get("/diagnostic/texts")
-async def get_metinler(sinif_seviyesi: Optional[str] = None, current_user=Depends(get_current_user)):
+async def get_metinler(
+    sinif_seviyesi: Optional[str] = None,
+    min_kelime: Optional[int] = None,   # SEVİYE (kelime sayısı) alt sınırı
+    max_kelime: Optional[int] = None,   # SEVİYE (kelime sayısı) üst sınırı
+    current_user=Depends(get_current_user),
+):
     role = current_user.get("role", "")
     user_id = current_user.get("id", "")
 
@@ -151,27 +204,42 @@ async def get_metinler(sinif_seviyesi: Optional[str] = None, current_user=Depend
     if sinif_seviyesi:
         m = re.search(r"\d+", sinif_seviyesi)
         if m:
-            query["sinif_seviyesi"] = m.group()
+            # Sınıf filtresi eski (sınıf etiketli) metinler için geçerli; ama seviye
+            # (kelime sayısı) bazlı havuz metinleri sinif_seviyesi=null olduğundan
+            # HER ZAMAN dahil edilir — aksi halde 159 havuz metni bir öğrenci
+            # seçilince dropdown'dan gizlenirdi. Seviye daraltması kelime filtresiyle.
+            query["$or"] = [
+                {"sinif_seviyesi": m.group()},
+                {"sinif_seviyesi": None},
+                {"sinif_seviyesi": {"$exists": False}},
+            ]
+    # Kelime sayısı (seviye) aralık filtresi — akıcı okuma metinleri sınıfa değil
+    # kelime sayısına göre seçilir.
+    if min_kelime is not None or max_kelime is not None:
+        aralik = {}
+        if min_kelime is not None:
+            aralik["$gte"] = min_kelime
+        if max_kelime is not None:
+            aralik["$lte"] = max_kelime
+        query["kelime_sayisi"] = aralik
 
     items = await db.analiz_metinler.find(query).sort("olusturma_tarihi", -1).to_list(length=None)
     result = []
     for item in items:
-        item.pop("_id", None)
         durum = item.get("durum", "")
 
         # Admin her şeyi görür
         if role == "admin":
-            result.append(item)
+            gorunur = True
         # Öğretmen: kendi eklediği + oylama bekleyenler + havuzdakiler
         elif role == "teacher":
-            if item.get("ekleyen_id") == user_id:
-                result.append(item)
-            elif durum in ("oylama", "havuzda"):
-                result.append(item)
+            gorunur = item.get("ekleyen_id") == user_id or durum in ("oylama", "havuzda")
         # Öğrenci/diğer: sadece havuzdakiler
         else:
-            if durum == "havuzda":
-                result.append(item)
+            gorunur = durum == "havuzda"
+
+        if gorunur:
+            result.append(_serialize_metin(item, role))
 
     return result
 
@@ -257,6 +325,130 @@ async def metin_oy_ver(oy: MetinOyCreate, current_user=Depends(get_current_user)
 async def delete_metin(metin_id: str, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
     await db.analiz_metinler.delete_one({"id": metin_id})
     return {"message": "Silindi"}
+
+
+# ─────────────────────────────────────────────
+# ★ MCQ DOĞRU CEVAP DÜZELTME (öğretmen/koordinatör/yönetici — eşit yetki)
+# ─────────────────────────────────────────────
+class SoruCevapGuncelle(BaseModel):
+    dogru_cevap: str  # "A" | "B" | "C" | "D"
+
+
+@router.patch("/diagnostic/texts/{metin_id}/soru/{soru_id}")
+async def mcq_cevap_duzelt(metin_id: str, soru_id: str, data: SoruCevapGuncelle,
+                           current_user=Depends(get_current_user)):
+    """Bir MCQ'nun doğru cevabını manuel olarak işaretler/düzeltir.
+
+    Öğretmen, koordinatör ve yönetici EŞİT yetkiye sahiptir. Bir soru İLK kez
+    düzeltildiğinde düzeltene küçük bir XP verilir; sonraki düzeltmeler ödül vermez
+    (aynı soruyu tekrar tekrar işaretleyerek puan biriktirme engellenir).
+    """
+    role = current_user.get("role", "")
+    if role not in KATKI_ROLLERI:
+        raise HTTPException(status_code=403, detail="Yetkisiz")
+
+    yeni = (data.dogru_cevap or "").strip().upper()
+    metin = await db.analiz_metinler.find_one({"id": metin_id})
+    if not metin:
+        raise HTTPException(status_code=404, detail="Metin bulunamadı")
+    sorular = metin.get("sorular") or []
+    idx = next((i for i, s in enumerate(sorular) if s.get("id") == soru_id), None)
+    if idx is None:
+        raise HTTPException(status_code=404, detail="Soru bulunamadı")
+
+    soru = sorular[idx]
+    if yeni not in (soru.get("secenekler") or {"A": 1, "B": 1, "C": 1, "D": 1}):
+        raise HTTPException(status_code=400, detail="Geçersiz cevap şıkkı")
+
+    ilk_defa = not soru.get("ilk_duzelten_id")
+    now = datetime.now(timezone.utc).isoformat()
+    soru["dogru_cevap"] = yeni
+    soru["dogru_cevap_kaynak"] = "manuel"
+    soru["kontrol_gerekli"] = False   # manuel onaylandı → düşük güven bayrağı kalkar
+    soru["son_duzelten_id"] = current_user["id"]
+    soru["son_duzelten_tarih"] = now
+    odul = 0
+    if ilk_defa:
+        soru["ilk_duzelten_id"] = current_user["id"]
+
+    await db.analiz_metinler.update_one({"id": metin_id}, {"$set": {f"sorular.{idx}": soru}})
+
+    if ilk_defa:
+        puanlar = await get_puan_ayarlari()
+        odul = puanlar.get("cevap_duzeltme", 2)
+        if odul:
+            await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": odul}})
+
+    return {"soru": soru, "odul": odul, "ilk_defa": ilk_defa}
+
+
+# ─────────────────────────────────────────────
+# ★ METİN GÖRSELİ EKLEME / GETİRME (öğretmen/koordinatör/yönetici — eşit yetki)
+# ─────────────────────────────────────────────
+_IZINLI_GORSEL_MIME = {"image/jpeg", "image/jpg", "image/png"}
+_MAKS_GORSEL_BYTE = 3 * 1024 * 1024  # 3 MB
+
+
+@router.post("/diagnostic/texts/{metin_id}/gorsel")
+async def metin_gorsel_ekle(metin_id: str, dosya: UploadFile = File(...),
+                            current_user=Depends(get_current_user)):
+    """Metne jpg/png görsel yükler. Yüklenen görsel, saklı `gorsel_prompt`'un
+    YERİNE öğrenciye gösterilecek görsel olur. Bir metne İLK görsel eklendiğinde
+    ekleyene küçük bir XP verilir; sonraki değişiklikler ödül vermez."""
+    import base64
+    role = current_user.get("role", "")
+    if role not in KATKI_ROLLERI:
+        raise HTTPException(status_code=403, detail="Yetkisiz")
+
+    mime = (dosya.content_type or "").lower()
+    if mime not in _IZINLI_GORSEL_MIME:
+        raise HTTPException(status_code=400, detail="Sadece JPG/PNG yüklenebilir")
+
+    icerik = await dosya.read()
+    if len(icerik) > _MAKS_GORSEL_BYTE:
+        raise HTTPException(status_code=400, detail="Görsel 3 MB'tan büyük olamaz")
+
+    metin = await db.analiz_metinler.find_one({"id": metin_id})
+    if not metin:
+        raise HTTPException(status_code=404, detail="Metin bulunamadı")
+
+    ilk_defa = not metin.get("gorsel_ilk_ekleyen_id")
+    now = datetime.now(timezone.utc).isoformat()
+    gorsel = {
+        "dosya_b64": base64.b64encode(icerik).decode("ascii"),
+        "mime": mime if mime != "image/jpg" else "image/jpeg",
+        "ekleyen_id": current_user["id"],
+        "tarih": now,
+    }
+    set_alan = {"gorsel": gorsel}
+    if ilk_defa:
+        set_alan["gorsel_ilk_ekleyen_id"] = current_user["id"]
+    await db.analiz_metinler.update_one({"id": metin_id}, {"$set": set_alan})
+
+    odul = 0
+    if ilk_defa:
+        puanlar = await get_puan_ayarlari()
+        odul = puanlar.get("gorsel_ekleme", 2)
+        if odul:
+            await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": odul}})
+
+    return {"ok": True, "odul": odul, "ilk_defa": ilk_defa}
+
+
+@router.get("/diagnostic/texts/{metin_id}/gorsel")
+async def metin_gorsel_getir(metin_id: str, current_user=Depends(get_current_user)):
+    """Metnin yüklenmiş görselini binary olarak döner (<img src> için).
+    Not: `gorsel_prompt` ASLA dönmez — yalnızca yüklenmiş görsel."""
+    import base64
+    metin = await db.analiz_metinler.find_one({"id": metin_id}, {"gorsel": 1})
+    gorsel = (metin or {}).get("gorsel")
+    if not gorsel or not gorsel.get("dosya_b64"):
+        raise HTTPException(status_code=404, detail="Görsel yok")
+    try:
+        ham = base64.b64decode(gorsel["dosya_b64"])
+    except Exception:
+        raise HTTPException(status_code=500, detail="Görsel çözülemedi")
+    return Response(content=ham, media_type=gorsel.get("mime", "image/jpeg"))
 
 # ── Analiz Oturumları ──
 class HataKaydi(BaseModel):

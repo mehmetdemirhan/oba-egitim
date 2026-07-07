@@ -18,6 +18,7 @@ import BenzerKelimeler from "./BenzerKelimeler";
 import KelimeArama from "./KelimeArama";
 import MetinArama from "./MetinArama";
 import TekMiCiftMi from "./TekMiCiftMi";
+import KutuluOkuma from "./KutuluOkuma";
 
 export const GOZ_YENI_EGZERSIZLER = [
   // ── Büyüyen Şekiller serisi (görme alanı) ──
@@ -41,6 +42,7 @@ export const GOZ_YENI_EGZERSIZLER = [
   { id: "karel-kare",     baslik: "KAREL: Kare Görme",      icon: "🔤", aciklama: "Harf gridinde işaretli harf merkezle aynı mı? Yanıtla.",      renk: "from-lime-500 to-green-600",     kat: "gorme", render: (t) => <KarelKareGorme onTamamla={t} /> },
 
   // ── Kelime / metin arama ──
+  { id: "kutulu-okuma",     baslik: "Kutulu Okuma",         icon: "📦", aciklama: "Akan metinde sağ/sol ok ile ilerledikçe kutular birikir; okunan kelimeler kutulu kalır. Metin sınıf+seviyene göre otomatik gelir.", renk: "from-indigo-500 to-violet-600", kat: "okuma", render: (t) => <KutuluOkuma onTamamla={t} /> },
   { id: "benzer-kelimeler", baslik: "Benzer Kelimeler",     icon: "🔎", aciklama: "4 kutudan iki kelimesi farklı olanı bul.",                    renk: "from-rose-500 to-pink-600",      kat: "okuma", render: (t) => <BenzerKelimeler onTamamla={t} /> },
   { id: "kelime-arama",     baslik: "Kelime Arama",         icon: "🧩", aciklama: "Harf gridinde gizli kelimeleri bul.",                         renk: "from-fuchsia-500 to-purple-600", kat: "okuma", render: (t) => <KelimeArama onTamamla={t} /> },
   { id: "metin-arama",      baslik: "Metin Arama",          icon: "📄", aciklama: "Uzun metinde hedef kelimeyi hızlıca tara ve bul.",            renk: "from-sky-500 to-blue-600",       kat: "okuma", render: (t) => <MetinArama onTamamla={t} /> },

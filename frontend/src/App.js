@@ -1831,6 +1831,156 @@ function NormTablosu({ onClose }) {
 }
 
 // ── METİN YÖNETİMİ (Moderasyon Akışlı) ──
+// Metin havuzu katkı paneli — bir metnin MCQ'larının doğru cevabını düzeltme +
+// görsel ekleme. Öğretmen/Koordinatör/Yönetici EŞİT yetkili. İlk katkıda küçük XP.
+// NOT: image_prompt (gorsel_prompt) hiçbir zaman gösterilmez — yüklenen görsel onun
+// yerine öğrenciye gösterilecek görseldir.
+function MetinKatkiPaneli({ metin, user, onDegisti }) {
+  const { toast } = useToast();
+  const [acik, setAcik] = useState(false);
+  const [sorular, setSorular] = useState(metin.sorular || []);
+  const [gorselVar, setGorselVar] = useState(!!metin.gorsel_var);
+  const [gorselV, setGorselV] = useState(0);      // cache-bust anahtarı
+  const [yukleniyor, setYukleniyor] = useState(false);
+  const fileRef = useRef(null);
+
+  useEffect(() => { setSorular(metin.sorular || []); setGorselVar(!!metin.gorsel_var); }, [metin]);
+
+  const egitici = ["admin", "coordinator", "teacher"].includes(user?.role);
+  const soruSayisi = (metin.sorular || []).length;
+  const acikSoruSayisi = (metin.acik_sorular || []).length;
+  const kontrolSayisi = (metin.sorular || []).filter(s => s.kontrol_gerekli).length;
+  if (!egitici || (soruSayisi === 0 && acikSoruSayisi === 0 && !gorselVar)) return null;
+
+  const sikHarfleri = ["A", "B", "C", "D"];
+
+  const cevapDuzelt = async (soru, yeniCevap) => {
+    if (soru.dogru_cevap === yeniCevap && soru.dogru_cevap_kaynak === "manuel") return;
+    try {
+      const r = await axios.patch(`${API}/diagnostic/texts/${metin.id}/soru/${soru.id}`, { dogru_cevap: yeniCevap });
+      setSorular(prev => prev.map(s => s.id === soru.id ? r.data.soru : s));
+      toast({ title: r.data.ilk_defa && r.data.odul ? `✅ Doğru cevap işaretlendi (+${r.data.odul} XP)` : "✅ Doğru cevap güncellendi" });
+      onDegisti && onDegisti();
+    } catch (e) { toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
+  };
+
+  const gorselYukle = async (e) => {
+    const dosya = e.target.files?.[0];
+    if (!dosya) return;
+    if (!["image/jpeg", "image/jpg", "image/png"].includes(dosya.type)) {
+      toast({ title: "Sadece JPG/PNG", variant: "destructive" }); return;
+    }
+    setYukleniyor(true);
+    try {
+      const fd = new FormData();
+      fd.append("dosya", dosya);
+      const r = await axios.post(`${API}/diagnostic/texts/${metin.id}/gorsel`, fd, { headers: { "Content-Type": "multipart/form-data" } });
+      setGorselVar(true); setGorselV(v => v + 1);
+      toast({ title: r.data.ilk_defa && r.data.odul ? `🖼️ Görsel eklendi (+${r.data.odul} XP)` : "🖼️ Görsel güncellendi" });
+      onDegisti && onDegisti();
+    } catch (e2) { toast({ title: "Hata", description: e2.response?.data?.detail, variant: "destructive" }); }
+    finally { setYukleniyor(false); if (fileRef.current) fileRef.current.value = ""; }
+  };
+
+  return (
+    <div className="mt-2 border-t border-line pt-2" onClick={(e) => e.stopPropagation()}>
+      <button type="button" onClick={() => setAcik(a => !a)}
+        className="text-xs font-medium text-primary flex items-center gap-1.5 hover:underline">
+        {acik ? "▼" : "▶"} 📝 Sorular & Görsel
+        {soruSayisi > 0 && <span className="text-subtle">({soruSayisi} soru)</span>}
+        {kontrolSayisi > 0 && <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full">⚠ {kontrolSayisi} kontrol edilmeli</span>}
+        {gorselVar && <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded-full">🖼️ görsel</span>}
+      </button>
+
+      {acik && (
+        <div className="mt-2 space-y-3">
+          {/* Görsel bölümü */}
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xs font-semibold text-purple-800">Metin Görseli</div>
+              <div className="flex items-center gap-2">
+                <input ref={fileRef} type="file" accept="image/jpeg,image/png" className="hidden" onChange={gorselYukle} />
+                <Button type="button" size="sm" disabled={yukleniyor} onClick={() => fileRef.current?.click()}
+                  className="bg-purple-600 hover:bg-purple-700 text-white h-7 text-xs">
+                  {yukleniyor ? "Yükleniyor…" : gorselVar ? "🖼️ Görseli Değiştir" : "🖼️ Görsel Ekle"}
+                </Button>
+              </div>
+            </div>
+            {gorselVar ? (
+              <img src={`${API}/diagnostic/texts/${metin.id}/gorsel?v=${gorselV}`} alt={metin.baslik}
+                className="mt-2 max-h-40 rounded-lg border border-purple-200 object-contain" />
+            ) : (
+              <p className="text-[11px] text-purple-600 mt-1">Henüz görsel yok. İlk ekleyene küçük XP verilir.</p>
+            )}
+          </div>
+
+          {/* MCQ listesi */}
+          {sorular.map((s, i) => {
+            const secenekler = s.secenekler || {};
+            return (
+              <div key={s.id || i} className="bg-app rounded-lg p-3 text-sm">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="font-medium text-content">{i + 1}. {s.soru}</div>
+                  {s.kontrol_gerekli && <span className="shrink-0 px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[11px] rounded-full">⚠ kontrol edilmeli</span>}
+                </div>
+                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  {sikHarfleri.filter(h => secenekler[h] !== undefined).map(h => {
+                    const dogru = s.dogru_cevap === h;
+                    return (
+                      <button key={h} type="button" onClick={() => cevapDuzelt(s, h)}
+                        className={`text-left px-2 py-1.5 rounded-lg border text-xs transition flex items-start gap-1.5
+                          ${dogru ? "border-green-500 bg-green-50 text-green-800 font-semibold" : "border-line bg-surface text-subtle hover:border-primary"}`}>
+                        <span className="font-bold">{h}</span><span>{secenekler[h]}</span>
+                        {dogru && <span className="ml-auto">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="text-[11px] text-subtle mt-1.5">
+                  Doğru: <strong>{s.dogru_cevap || "—"}</strong>
+                  {s.dogru_cevap_kaynak === "manuel" ? " (öğretmen onaylı)" : " (otomatik)"}
+                  {" · Şıklardan birine tıklayarak doğru cevabı düzeltin."}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Açık uçlu sorular — Bloom kategorisi + model/örnek cevap. Subjektif
+              olanlarda otomatik doğru/yanlış YOK; örnek cevap yönlendirme olarak. */}
+          {acikSoruSayisi > 0 && (
+            <div className="bg-app rounded-lg p-3 text-sm space-y-2">
+              <div className="font-medium text-content">Açık Uçlu Sorular</div>
+              {metin.acik_sorular.map((q, i) => {
+                const nesne = q && typeof q === "object";
+                const soruMetni = nesne ? q.soru : q;
+                const kategori = nesne ? q.kategori : null;
+                const subjektif = nesne ? q.subjektif : false;
+                const modelCevap = nesne ? q.model_cevap : null;
+                return (
+                  <div key={(nesne && q.id) || i} className="border-b border-line last:border-0 pb-2 last:pb-0">
+                    <div className="flex items-start gap-2">
+                      {kategori && <span className="shrink-0 mt-0.5 px-1.5 py-0.5 bg-blue-100 text-primary text-[10px] rounded-full">{kategori}</span>}
+                      <span className="text-content text-xs">{nesne && q.no ? `${q.no}. ` : ""}{soruMetni}</span>
+                    </div>
+                    {subjektif ? (
+                      <div className="text-[11px] text-amber-700 mt-1 ml-1">
+                        ✎ Açık uçlu — otomatik değerlendirilmez.
+                        {modelCevap && <span className="text-subtle"> Örnek/yönlendirme: {modelCevap}</span>}
+                      </div>
+                    ) : (
+                      modelCevap && <div className="text-[11px] text-green-700 mt-1 ml-1">Model cevap: {modelCevap}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif }) {
   const { toast } = useToast();
   const [metinler, setMetinler] = useState([]);
@@ -1840,6 +1990,20 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif }) {
   const [redSebep, setRedSebep] = useState("");
   const [puanAyarlari, setPuanAyarlari] = useState({ metin_ekleme: 5, oylama_katilim: 2, metin_havuza_girme: 10 });
   const [puanDuzenle, setPuanDuzenle] = useState(false);
+  // Seviye (kelime sayısı) aralık filtresi — akıcı okuma metinleri sınıfa değil
+  // kelime sayısına göre seçilir.
+  const [kelimeAralik, setKelimeAralik] = useState(null); // {min,max,l} | null
+  const KELIME_ARALIKLARI = [
+    { l: "0–70 kelime", min: 0, max: 70 },
+    { l: "71–150 kelime", min: 71, max: 150 },
+    { l: "151–250 kelime", min: 151, max: 250 },
+    { l: "251+ kelime", min: 251, max: Infinity },
+  ];
+  const kelimeAraligindaMi = (m) => {
+    if (!kelimeAralik) return true;
+    const k = m.kelime_sayisi || 0;
+    return k >= kelimeAralik.min && k <= kelimeAralik.max;
+  };
 
   const fetchMetinler = async () => {
     try {
@@ -2030,10 +2194,26 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif }) {
       )}
 
       {/* Havuzdaki / Seçilebilir Metinler */}
-      <div className="space-y-2 max-h-80 overflow-y-auto">
-        <h4 className="text-sm font-semibold text-green-700 mb-2">✅ Havuzdaki Metinler ({metinler.filter(m => m.durum === "havuzda").length})</h4>
-        {metinler.filter(m => m.durum === "havuzda").length === 0 && <p className="text-subtle text-sm text-center py-6">Henüz havuzda metin yok. Metin ekleyip onaylayın.</p>}
-        {metinler.filter(m => m.durum === "havuzda").map(m => (
+      {(() => {
+        const havuzTumu = metinler.filter(m => m.durum === "havuzda");
+        const havuzdakiler = havuzTumu.filter(kelimeAraligindaMi);
+        return (
+      <div className="space-y-2 max-h-96 overflow-y-auto">
+        <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
+          <h4 className="text-sm font-semibold text-green-700">✅ Havuzdaki Metinler ({havuzdakiler.length}{kelimeAralik ? ` / ${havuzTumu.length}` : ""})</h4>
+        </div>
+        {/* Seviye (kelime sayısı) aralık filtresi */}
+        <div className="flex items-center gap-1.5 flex-wrap mb-1">
+          <span className="text-xs text-subtle">Seviye:</span>
+          <button type="button" onClick={() => setKelimeAralik(null)}
+            className={`px-2 py-1 rounded-full text-xs border transition ${!kelimeAralik ? 'bg-primary text-white border-blue-600' : 'bg-surface text-subtle border-line hover:bg-app'}`}>Tümü</button>
+          {KELIME_ARALIKLARI.map(a => (
+            <button key={a.l} type="button" onClick={() => setKelimeAralik(kelimeAralik?.l === a.l ? null : a)}
+              className={`px-2 py-1 rounded-full text-xs border transition ${kelimeAralik?.l === a.l ? 'bg-primary text-white border-blue-600' : 'bg-surface text-subtle border-line hover:bg-app'}`}>{a.l}</button>
+          ))}
+        </div>
+        {havuzdakiler.length === 0 && <p className="text-subtle text-sm text-center py-6">{havuzTumu.length === 0 ? "Henüz havuzda metin yok. Metin ekleyip onaylayın." : "Bu seviye aralığında metin yok."}</p>}
+        {havuzdakiler.map(m => (
           <div key={m.id}
             onClick={() => secimModu && m.durum === "havuzda" && onMetinSec && onMetinSec(m)}
             className={`border rounded-xl p-4 transition-all
@@ -2045,16 +2225,19 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif }) {
                   <span className="font-semibold">{m.baslik}</span>
                   {durumBadge(m.durum)}
                 </div>
-                <div className="text-xs text-subtle mt-1">{m.sinif_seviyesi}. Sınıf • {turLabel[m.tur]} • {m.kelime_sayisi} kelime</div>
+                <div className="text-xs text-subtle mt-1">{m.sinif_seviyesi ? `${m.sinif_seviyesi}. Sınıf • ` : ""}{turLabel[m.tur] || m.tur} • {m.kelime_sayisi} kelime</div>
                 <p className="text-sm text-subtle mt-1 line-clamp-2">{m.icerik}</p>
               </div>
               {(user?.role === "admin" || user?.role === "coordinator") && (
                 <Button variant="destructive" size="sm" className="ml-2" onClick={(e) => { e.stopPropagation(); sil(m.id); }}><Trash2 className="h-4 w-4"/></Button>
               )}
             </div>
+            <MetinKatkiPaneli metin={m} user={user} onDegisti={fetchMetinler} />
           </div>
         ))}
       </div>
+        );
+      })()}
 
       {/* Puan Rehberi */}
       <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-sm">
@@ -7869,12 +8052,14 @@ function SistemAyarlari({ user }) {
     {no:8,soru:"Bu öğretmeni başka velilere tavsiye eder misiniz?",tip:"evet_hayir",kategori:"tavsiye"},
     {no:9,soru:"Eklemek istediğiniz not (opsiyonel)",tip:"metin",kategori:"not"},
   ]);
+  const [kutuluOkuma, setKutuluOkuma] = useState({ kutu_basi_kelime: 1 });
   const [kayitEdiliyor, setKayitEdiliyor] = useState(false);
 
   // DB'de özelleştirilmiş ayar varsa overwrite et
   useEffect(() => {
     const tryLoadFromDB = async () => {
       try { const r = await axios.get(`${API}/ayarlar/xp_tablosu`); if (r.data?.degerler && Object.keys(r.data.degerler).length > 0) setXpTablosu(r.data.degerler); } catch(e) {}
+      try { const r = await axios.get(`${API}/ayarlar/kutulu_okuma`); if (r.data?.degerler?.kutu_basi_kelime) setKutuluOkuma(r.data.degerler); } catch(e) {}
       try { const r = await axios.get(`${API}/ayarlar/lig_esikleri`); if (r.data?.degerler && Object.keys(r.data.degerler).length > 0) setLigEsikleri(r.data.degerler); } catch(e) {}
       try { const r = await axios.get(`${API}/ayarlar/ogretmen_puan_agirliklari`); if (r.data?.degerler && Object.keys(r.data.degerler).length > 0) setOgretmenAgirliklari(prev => ({ ...prev, ...r.data.degerler })); } catch(e) {}
       try { const r = await axios.get(`${API}/ayarlar/ogretmen_rozetleri`); if (Array.isArray(r.data?.degerler) && r.data.degerler.length > 0) setOgretmenRozetler(r.data.degerler); } catch(e) {}
@@ -7900,7 +8085,7 @@ function SistemAyarlari({ user }) {
       <p className="text-subtle text-sm">Rozet, XP, lig ve anket ayarlarını buradan yönetin. Değişiklikler anında uygulanır.</p>
 
       <div className="flex gap-2 flex-wrap">
-        {[{id:"ozellikler",l:"🎛️ Özellik Yönetimi"},{id:"xp",l:"💰 XP Değerleri"},{id:"ogretmen_xp",l:"👨‍🏫 Öğretmen XP"},{id:"lig",l:"🏆 Lig Eşikleri"},{id:"ogretmen_rozet",l:"🏅 Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"🎓 Öğrenci Rozetleri"},{id:"anket",l:"⭐ Anket Soruları"},{id:"profil_gorunurluk",l:"👁️ Profil Görünürlüğü"},{id:"instagram",l:"📱 Instagram"},{id:"kvkk",l:"🔒 Veri & KVKK"},{id:"sezon",l:"🔄 Sezonluk Reset"}].map(s => (
+        {[{id:"ozellikler",l:"🎛️ Özellik Yönetimi"},{id:"xp",l:"💰 XP Değerleri"},{id:"ogretmen_xp",l:"👨‍🏫 Öğretmen XP"},{id:"lig",l:"🏆 Lig Eşikleri"},{id:"ogretmen_rozet",l:"🏅 Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"🎓 Öğrenci Rozetleri"},{id:"anket",l:"⭐ Anket Soruları"},{id:"kutulu_okuma",l:"📦 Kutulu Okuma"},{id:"profil_gorunurluk",l:"👁️ Profil Görünürlüğü"},{id:"instagram",l:"📱 Instagram"},{id:"kvkk",l:"🔒 Veri & KVKK"},{id:"sezon",l:"🔄 Sezonluk Reset"}].map(s => (
           <button key={s.id} onClick={() => setAyarSekme(s.id)}
             className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${ayarSekme === s.id ? 'bg-primary text-white border-blue-600' : 'bg-surface text-subtle border-line'}`}>{s.l}</button>
         ))}
@@ -7916,6 +8101,21 @@ function SistemAyarlari({ user }) {
           </div>
         ))}
         <Button onClick={() => kaydet("xp_tablosu", xpTablosu)} disabled={kayitEdiliyor} className="w-full bg-primary text-white mt-4">💾 XP Değerlerini Kaydet</Button>
+      </div></CardContent></Card>)}
+
+      {/* Kutulu Okuma — kutu başına kelime genel varsayılanı */}
+      {ayarSekme === "kutulu_okuma" && (<Card className="border-0 shadow-sm"><CardHeader><CardTitle>📦 Kutulu Okuma</CardTitle><p className="text-sm text-subtle">Kutulu Okuma egzersizinde her kutuda kaç kelime gösterilsin (genel varsayılan). Öğrenci/eğitici egzersizi açtığında ayar çekmecesinden yine 1/2/3 olarak değiştirebilir.</p></CardHeader><CardContent><div className="space-y-4">
+        <div>
+          <Label className="text-sm block mb-2">Kutu Başına Kelime Sayısı</Label>
+          <div className="flex gap-2 max-w-xs">
+            {[1,2,3].map(n => (
+              <button key={n} onClick={() => setKutuluOkuma({...kutuluOkuma, kutu_basi_kelime: n})}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition ${kutuluOkuma.kutu_basi_kelime === n ? 'bg-primary text-white border-blue-600' : 'bg-surface text-subtle border-line hover:bg-gray-50'}`}>{n}</button>
+            ))}
+          </div>
+          <p className="text-xs text-subtle mt-2">Varsayılan: 1 (her kutuda tek kelime).</p>
+        </div>
+        <Button onClick={() => kaydet("kutulu_okuma", kutuluOkuma)} disabled={kayitEdiliyor} className="w-full bg-primary text-white mt-2">💾 Kutulu Okuma Ayarını Kaydet</Button>
       </div></CardContent></Card>)}
 
       {/* Öğretmen XP Ağırlıkları */}

@@ -143,6 +143,9 @@ VARSAYILAN_PUANLAR = {
     "test_soru_basi": 1,       # eklenen test sorusu başına
     "test_soru_max": 3,        # test sorusu bonus tavanı
     "icerik_tamamla_max": 5,   # içerik tamamlama ödülü tavanı (test başarısına göre)
+    # Metin havuzu katkıları (öğretmen/koordinatör/yönetici) — yalnız İLK katkı ödüllendirilir
+    "cevap_duzeltme": 2,       # bir MCQ'nun doğru cevabını ilk kez düzelten
+    "gorsel_ekleme": 2,        # bir metne ilk kez görsel ekleyen
 }
 
 
@@ -151,6 +154,17 @@ async def get_puan_ayarlari():
     if doc:
         return doc.get("puanlar", VARSAYILAN_PUANLAR)
     return VARSAYILAN_PUANLAR
+
+
+# ── Kutulu Okuma egzersizi ayarları ──
+# kutu_basi_kelime: bir kutuda kaç kelime gösterilsin (genel varsayılan; egzersiz
+# ayar çekmecesinden her açılışta 1/2/3 olarak değiştirilebilir).
+KUTULU_OKUMA_DEFAULT = {"kutu_basi_kelime": 1}
+
+
+async def get_kutulu_okuma_ayarlari():
+    doc = await db.sistem_ayarlari.find_one({"tip": "kutulu_okuma"})
+    return doc.get("degerler", KUTULU_OKUMA_DEFAULT) if doc else KUTULU_OKUMA_DEFAULT
 
 
 # ── Öğretmen XP bileşen ağırlıkları (öğrenci / kur / veli çıktıları) ──
