@@ -610,16 +610,8 @@ function AppContent() {
                   )}
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {user.role === "coordinator" ? (<>
-                  <Card className="border-0 shadow-sm">
-                    <CardHeader><CardTitle>Yeni Kayıt vs Kur Atlayan (Bu Ay)</CardTitle></CardHeader>
-                    <CardContent><div className="h-64"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={pieDataKoord} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value">{pieDataKoord.map((e,i) => <Cell key={i} fill={e.color} />)}</Pie><Tooltip formatter={(v,n) => [`${v} öğrenci`, n]} /></PieChart></ResponsiveContainer></div></CardContent>
-                  </Card>
-                  <Card className="border-0 shadow-sm">
-                    <CardHeader><CardTitle>Aylık Kur Atlayan Öğrenci</CardTitle></CardHeader>
-                    <CardContent><div className="h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={monthlyStats}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="ay" /><YAxis allowDecimals={false} /><Tooltip /><Bar dataKey="yeni_ogrenciler" fill="#3b82f6" name="Yeni Kayıt" /><Bar dataKey="kur_atlayan" fill="#059669" name="Kur Atlayan" /></BarChart></ResponsiveContainer></div></CardContent>
-                  </Card>
-                  </>) : (<>
+                  {/* Finansal grafikler — YALNIZ Yönetici (koordinatör/öğretmende gizli) */}
+                  {user.role !== "coordinator" && (<>
                   <Card className="border-0 shadow-sm">
                     <CardHeader><CardTitle>Finansal Durum</CardTitle></CardHeader>
                     <CardContent><div className="h-64"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value">{pieData.map((e,i) => <Cell key={i} fill={e.color} />)}</Pie><Tooltip formatter={v => formatCurrency(v)} /></PieChart></ResponsiveContainer></div></CardContent>
@@ -629,6 +621,15 @@ function AppContent() {
                     <CardContent><div className="h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={monthlyStats}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="ay" /><YAxis /><Tooltip /><Bar dataKey="yeni_ogrenciler" fill="#3b82f6" /><Bar dataKey="gelir" fill="#f97316" /></BarChart></ResponsiveContainer></div></CardContent>
                   </Card>
                   </>)}
+                  {/* Öğrenci hareket grafikleri — HEM Yönetici HEM Koordinatör görür */}
+                  <Card className="border-0 shadow-sm">
+                    <CardHeader><CardTitle>Yeni Kayıt vs Kur Atlayan (Bu Ay)</CardTitle></CardHeader>
+                    <CardContent><div className="h-64"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={pieDataKoord} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value">{pieDataKoord.map((e,i) => <Cell key={i} fill={e.color} />)}</Pie><Tooltip formatter={(v,n) => [`${v} öğrenci`, n]} /></PieChart></ResponsiveContainer></div></CardContent>
+                  </Card>
+                  <Card className="border-0 shadow-sm">
+                    <CardHeader><CardTitle>Aylık Kur Atlayan Öğrenci</CardTitle></CardHeader>
+                    <CardContent><div className="h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={monthlyStats}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="ay" /><YAxis allowDecimals={false} /><Tooltip /><Bar dataKey="yeni_ogrenciler" fill="#3b82f6" name="Yeni Kayıt" /><Bar dataKey="kur_atlayan" fill="#059669" name="Kur Atlayan" /></BarChart></ResponsiveContainer></div></CardContent>
+                  </Card>
                 </div>
 
                 {/* Öğretmen Rozet + Veli Anket Özeti */}
