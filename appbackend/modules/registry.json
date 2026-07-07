@@ -158,5 +158,9 @@
   {
     "name": "instagram_beslemesi",
     "active": true
+  },
+  {
+    "name": "timi",
+    "active": true
   }
 ]

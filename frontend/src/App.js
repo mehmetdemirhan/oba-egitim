@@ -36,7 +36,7 @@ import ProfilGorunurlukAyarlari from "./components/admin/ProfilGorunurlukAyarlar
 import ExerciseLibrary from "./components/exercises/ExerciseLibrary";
 import HaftalikTakvim from "./components/program/HaftalikTakvim";
 import { FullscreenExerciseProvider, useFullscreenExercise } from "./context/FullscreenExerciseContext";
-import { ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Tooltip, XAxis, YAxis, CartesianGrid, AreaChart, Area } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Tooltip, XAxis, YAxis, CartesianGrid, AreaChart, Area, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from 'recharts';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 
@@ -500,6 +500,7 @@ function AppContent() {
             <TabsTrigger value="gelisim" className={tabClass}><Trophy className="h-4 w-4 mr-2" />Gelişim</TabsTrigger>
             <TabsTrigger value="ders-programi" className={tabClass}>📅 Ders Programı</TabsTrigger>
             <TabsTrigger value="giris-analizi" className={tabClass}><Stethoscope className="h-4 w-4 mr-2" />Giriş Analizi</TabsTrigger>
+            <TabsTrigger value="timi" className={tabClass}>🧠 TIMI</TabsTrigger>
             <TabsTrigger value="mesajlar" className={tabClass}><Mail className="h-4 w-4 mr-2" />Mesajlar</TabsTrigger>
             {adminVeyaKoord && <TabsTrigger value="ayarlar" className={tabClass}><Star className="h-4 w-4 mr-2" />Ayarlar</TabsTrigger>}
             {user.role === "admin" && <TabsTrigger value="yedekleme" className={tabClass}><Database className="h-4 w-4 mr-2" />Yedekleme</TabsTrigger>}
@@ -1369,6 +1370,11 @@ function AppContent() {
           {/* Giris Analizi */}
           <TabsContent value="giris-analizi">
             <GirisAnaliziModul user={user} students={students} teachers={teachers} />
+          </TabsContent>
+
+          {/* TIMI - Çoklu Zeka Envanteri */}
+          <TabsContent value="timi">
+            <TimiModul user={user} students={students} />
           </TabsContent>
 
           {/* Gelisim Alani */}
@@ -3972,8 +3978,10 @@ function EgzersizlerModul({ user, egzersizPuanlari = {}, onTamamla }) {
   );
 }
 
-function GirisAnaliziModul({ user, students, teachers }) {
+function GirisAnaliziModul({ user, students, teachers, asama = "olcum" }) {
   const { toast } = useToast();
+  const gelisimMi = asama === "gelisim";
+  const modulBaslik = gelisimMi ? "Gelişim Analizi" : "Ölçüm Analizi";
   const [adim, setAdim] = useState("liste"); // liste, metin-sec, canli, sonuc, rapor-form, rapor-goruntule
   const [seciliOgrenci, setSeciliOgrenci] = useState(null);
   const [seciliMetin, setSeciliMetin] = useState(null);
@@ -3986,8 +3994,8 @@ function GirisAnaliziModul({ user, students, teachers }) {
   const [metinDialogAcik, setMetinDialogAcik] = useState(false);
 
   const fetchGecmis = useCallback(async () => {
-    try { const r = await axios.get(`${API}/diagnostic/sessions`); setGecmisOturumlar(r.data); } catch(e) {}
-  }, []);
+    try { const r = await axios.get(`${API}/diagnostic/sessions?asama=${asama}`); setGecmisOturumlar(r.data); } catch(e) {}
+  }, [asama]);
 
   useEffect(() => { fetchGecmis(); }, [fetchGecmis]);
 
@@ -3996,7 +4004,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
     if (!seciliOgrenci?.id) { toast({ title: "Geçersiz öğrenci", description: "Lütfen listeden tekrar seçin", variant: "destructive" }); return; }
     if (!seciliMetin?.id) { toast({ title: "Geçersiz metin", description: "Lütfen metni tekrar seçin", variant: "destructive" }); return; }
     try {
-      const payload = { ogrenci_id: seciliOgrenci.id, metin_id: seciliMetin.id };
+      const payload = { ogrenci_id: seciliOgrenci.id, metin_id: seciliMetin.id, asama };
       console.log("Session başlatılıyor:", payload);
       const r = await axios.post(`${API}/diagnostic/sessions`, payload);
       console.log("Session response:", r.data);
@@ -4225,6 +4233,432 @@ function GirisAnaliziModul({ user, students, teachers }) {
 }
 
 
+// ═══════════════════════════════════════════════
+// TIMI — Teele Çoklu Zeka Envanteri (Giriş Analizi ile kardeş modül)
+// 28 kart / 56 görselden oluşan zorlamalı-seçim envanteri.
+// ═══════════════════════════════════════════════
+
+const TIMI_KART_SAYISI = 28;
+// Sıralı 7 zeka alanı (backend timi.py KATEGORI_SIRASI ile birebir)
+const TIMI_SIRA = ["dilsel", "mantiksal_matematiksel", "mekansal", "muziksel", "bedensel", "kisisel", "kisilerarasi"];
+const TIMI_TR = {
+  dilsel: "Dilsel Zeka",
+  mantiksal_matematiksel: "Mantıksal-Matematiksel Zeka",
+  mekansal: "Mekansal (Görsel-Uzamsal) Zeka",
+  muziksel: "Müziksel Zeka",
+  bedensel: "Bedensel-Kinestetik Zeka",
+  kisisel: "Kişisel (İçsel) Zeka",
+  kisilerarasi: "Kişilerarası (Sosyal) Zeka",
+};
+// Radar ekseni için kısa etiketler
+const TIMI_KISA = {
+  dilsel: "Dilsel",
+  mantiksal_matematiksel: "Mantık-Mat.",
+  mekansal: "Mekansal",
+  muziksel: "Müziksel",
+  bedensel: "Bedensel",
+  kisisel: "Kişisel",
+  kisilerarasi: "Kişilerarası",
+};
+const TIMI_IKON = {
+  dilsel: "📖", mantiksal_matematiksel: "🔢", mekansal: "🎨", muziksel: "🎵",
+  bedensel: "🤸", kisisel: "🧘", kisilerarasi: "🤝",
+};
+const TIMI_YORUM = {
+  dilsel: "Kelimelerle, okuma-yazma ve konuşma yoluyla öğrenmeye yatkındır; hikâye, kelime oyunları ve sözlü anlatımdan keyif alır.",
+  mantiksal_matematiksel: "Sayılar, örüntüler, mantık ve neden-sonuç ilişkileriyle düşünmeye yatkındır; problem çözmeyi ve keşfetmeyi sever.",
+  mekansal: "Görsellerle, renklerle, şekil ve haritalarla düşünmeye yatkındır; çizim, yapbozlar ve görsel tasarımdan keyif alır.",
+  muziksel: "Ritim, melodi ve seslere duyarlıdır; müzik dinleyerek, mırıldanarak veya ritim tutarak öğrenmeye eğilimlidir.",
+  bedensel: "Hareket ederek, dokunarak ve yaparak öğrenmeye yatkındır; el becerileri, spor ve uygulamalı etkinliklerden keyif alır.",
+  kisisel: "Kendi iç dünyasına, duygularına ve hedeflerine dönüktür; bağımsız çalışmayı ve üzerine düşünmeyi sever.",
+  kisilerarasi: "Başkalarını anlama ve onlarla iş birliği yapmaya yatkındır; grup çalışması, paylaşım ve sosyal etkileşimden keyif alır.",
+};
+const TIMI_UYARI = "Bu envanter öğrencinin kendi algıladığı ilgi ve tercihlerini ölçen keşfedici bir araçtır; kesin/klinik bir zeka testi değildir. Sonuçlar tek başına değil, öğretmen gözlemleriyle birlikte değerlendirilmelidir.";
+// Kart → [A görsel kategori no, B görsel kategori no] (yalnız detay tablosu için)
+const TIMI_KART_KATEGORI = {
+  1: [1, 3], 2: [4, 5], 3: [1, 7], 4: [7, 2], 5: [3, 5], 6: [1, 6], 7: [4, 3],
+  8: [1, 5], 9: [2, 3], 10: [4, 7], 11: [1, 4], 12: [1, 2], 13: [6, 5], 14: [6, 7],
+  15: [7, 5], 16: [2, 5], 17: [4, 2], 18: [4, 6], 19: [3, 7], 20: [2, 3], 21: [1, 7],
+  22: [5, 4], 23: [2, 6], 24: [6, 3], 25: [1, 6], 26: [3, 5], 27: [2, 4], 28: [7, 6],
+};
+const TIMI_NO_KEY = { 1: "dilsel", 2: "mantiksal_matematiksel", 3: "mekansal", 4: "muziksel", 5: "bedensel", 6: "kisisel", 7: "kisilerarasi" };
+
+const timiKartGorsel = (no, ab) => `${process.env.PUBLIC_URL || ""}/timi/card_${String(no).padStart(2, "0")}_${ab}.png`;
+
+// Sonuç raporu (hem canlı sonuç hem geçmiş görüntüleme için ortak)
+function TimiRapor({ sonuc, ogrenci }) {
+  const [detayAcik, setDetayAcik] = useState(false);
+  const puanlar = sonuc?.kategori_puanlari || {};
+  const baskin = sonuc?.baskin_zeka_alanlari || [];
+  const radarData = TIMI_SIRA.map(k => ({ alan: TIMI_KISA[k], puan: puanlar[k] || 0, key: k }));
+  const ogrAd = ogrenci ? `${ogrenci.ad || ""} ${ogrenci.soyad || ""}`.trim() : "";
+  const tarih = sonuc?.uygulama_tarihi ? new Date(sonuc.uygulama_tarihi).toLocaleDateString("tr-TR") : "";
+
+  return (
+    <div className="space-y-5">
+      {/* Öğrenci + baskın alan başlığı */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div>
+          <div className="text-lg font-bold text-content">{ogrAd || "Öğrenci"}</div>
+          <div className="text-sm text-subtle">{sonuc?.sinif_seviyesi ? `${sonuc.sinif_seviyesi}. sınıf` : ""}{tarih ? ` • ${tarih}` : ""}</div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {baskin.map(k => (
+            <span key={k} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-sm font-semibold shadow-sm">
+              {TIMI_IKON[k]} {TIMI_TR[k]} ({puanlar[k] || 0}/8)
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Baskın alan vurgusu */}
+      {baskin.length > 0 && (
+        <Card className="border-2 border-purple-200 bg-purple-50/40">
+          <CardContent className="py-4">
+            <div className="text-sm font-semibold text-purple-800 mb-1">🧠 Baskın Zeka Alanı{baskin.length > 1 ? "ları" : ""}</div>
+            <div className="text-sm text-content">{baskin.map(k => TIMI_TR[k]).join(", ")}</div>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Radar grafik */}
+        <Card className="border-0 shadow-sm">
+          <CardHeader><CardTitle className="text-base">Çoklu Zeka Profili</CardTitle></CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <RadarChart data={radarData} outerRadius="72%">
+                <PolarGrid />
+                <PolarAngleAxis dataKey="alan" tick={{ fontSize: 11 }} />
+                <PolarRadiusAxis angle={90} domain={[0, 8]} tickCount={5} tick={{ fontSize: 10 }} />
+                <Radar name="Puan" dataKey="puan" stroke="#7c3aed" fill="#7c3aed" fillOpacity={0.35} />
+                <Tooltip formatter={(v) => [`${v}/8`, "Puan"]} />
+              </RadarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Kategori tablosu */}
+        <Card className="border-0 shadow-sm">
+          <CardHeader><CardTitle className="text-base">Zeka Alanı Puanları</CardTitle></CardHeader>
+          <CardContent className="space-y-2.5">
+            {TIMI_SIRA.map(k => {
+              const p = puanlar[k] || 0;
+              const bask = baskin.includes(k);
+              return (
+                <div key={k}>
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className={`flex items-center gap-1.5 ${bask ? "font-bold text-purple-700" : "text-content"}`}>{TIMI_IKON[k]} {TIMI_TR[k]}</span>
+                    <span className={`font-semibold tabular-nums ${bask ? "text-purple-700" : "text-subtle"}`}>{p}/8</span>
+                  </div>
+                  <div className="h-2.5 rounded-full bg-gray-100 overflow-hidden">
+                    <div className={`h-full rounded-full ${bask ? "bg-gradient-to-r from-purple-500 to-indigo-500" : "bg-indigo-300"}`} style={{ width: `${(p / 8) * 100}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Yorumlayıcı metin */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader><CardTitle className="text-base">Zeka Alanları — Kısa Açıklama</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          {[...baskin, ...TIMI_SIRA.filter(k => !baskin.includes(k))].map(k => (
+            <div key={k} className={`text-sm ${baskin.includes(k) ? "" : "opacity-70"}`}>
+              <span className="font-semibold text-content">{TIMI_IKON[k]} {TIMI_TR[k]}:</span>{" "}
+              <span className="text-subtle">{TIMI_YORUM[k]}</span>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* Öğretmen notu */}
+      {sonuc?.notlar && (
+        <Card className="border-0 shadow-sm">
+          <CardHeader><CardTitle className="text-base">Öğretmen Gözlem Notu</CardTitle></CardHeader>
+          <CardContent><p className="text-sm text-content whitespace-pre-wrap">{sonuc.notlar}</p></CardContent>
+        </Card>
+      )}
+
+      {/* Cevap detay tablosu (opsiyonel) */}
+      <div>
+        <Button variant="outline" size="sm" onClick={() => setDetayAcik(a => !a)}>
+          {detayAcik ? "▼" : "▶"} Cevap Detayları ({(sonuc?.yanitlar || []).length} kart)
+        </Button>
+        {detayAcik && (
+          <div className="mt-3 overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow><TableHead>Kart</TableHead><TableHead>Seçim</TableHead><TableHead>Zeka Alanı</TableHead></TableRow>
+              </TableHeader>
+              <TableBody>
+                {(sonuc?.yanitlar || []).slice().sort((a, b) => a.kart_no - b.kart_no).map(y => {
+                  const pair = TIMI_KART_KATEGORI[y.kart_no] || [0, 0];
+                  const catNo = y.secim === "A" ? pair[0] : pair[1];
+                  const catKey = TIMI_NO_KEY[catNo];
+                  return (
+                    <TableRow key={y.kart_no}>
+                      <TableCell className="font-medium">Kart {y.kart_no}</TableCell>
+                      <TableCell><span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">{y.secim}</span></TableCell>
+                      <TableCell className="text-sm">{catKey ? `${TIMI_IKON[catKey]} ${TIMI_TR[catKey]}` : "-"}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
+
+      {/* Psikometrik uyarı */}
+      <div className="text-xs text-subtle bg-amber-50 border border-amber-200 rounded-lg p-3">
+        ⚠️ {TIMI_UYARI}
+      </div>
+    </div>
+  );
+}
+
+// Öğrenci profili için TIMI özet kartı (en son uygulama)
+function TimiOzetKart({ ogrenciId }) {
+  const [son, setSon] = useState(null);
+  const [yuklendi, setYuklendi] = useState(false);
+  useEffect(() => {
+    let iptal = false;
+    axios.get(`${API}/timi/ogrenci/${ogrenciId}`)
+      .then(r => { if (!iptal) { setSon((r.data || [])[0] || null); setYuklendi(true); } })
+      .catch(() => { if (!iptal) setYuklendi(true); });
+    return () => { iptal = true; };
+  }, [ogrenciId]);
+
+  if (!yuklendi) return null;
+  const baskin = son?.baskin_zeka_alanlari || [];
+  return (
+    <Card className="border-0 shadow-sm">
+      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5">🧠 TIMI — Çoklu Zeka</CardTitle></CardHeader>
+      <CardContent>
+        {son ? (
+          <div className="space-y-1.5">
+            <div className="text-xs text-subtle">Son uygulama: {son.uygulama_tarihi ? new Date(son.uygulama_tarihi).toLocaleDateString("tr-TR") : "-"}</div>
+            <div className="flex flex-wrap gap-1.5">
+              {baskin.length ? baskin.map(k => (
+                <span key={k} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-semibold">{TIMI_IKON[k]} {TIMI_KISA[k]}</span>
+              )) : <span className="text-xs text-subtle">Baskın alan yok</span>}
+            </div>
+          </div>
+        ) : (
+          <div className="text-xs text-subtle">Henüz TIMI uygulanmadı</div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function TimiModul({ user, students }) {
+  const { toast } = useToast();
+  const [adim, setAdim] = useState("liste"); // liste | uygulama | sonuc
+  const [seciliOgrenci, setSeciliOgrenci] = useState(null);
+  const [sonucId, setSonucId] = useState(null);
+  const [kartIndex, setKartIndex] = useState(0);
+  const [yanitlar, setYanitlar] = useState({}); // { [kartNo]: "A" | "B" }
+  const [notlar, setNotlar] = useState("");
+  const [sonuc, setSonuc] = useState(null);
+  const [gecmis, setGecmis] = useState([]);
+  const [kaydediliyor, setKaydediliyor] = useState(false);
+
+  const fetchGecmis = useCallback(async () => {
+    try { const r = await axios.get(`${API}/timi/sessions`); setGecmis(r.data); } catch (e) {}
+  }, []);
+  useEffect(() => { fetchGecmis(); }, [fetchGecmis]);
+
+  const ogrenciAd = (id) => { const o = students.find(s => s.id === id); return o ? `${o.ad} ${o.soyad}` : "-"; };
+
+  const baslat = async () => {
+    if (!seciliOgrenci?.id) { toast({ title: "Öğrenci seçin", variant: "destructive" }); return; }
+    try {
+      const r = await axios.post(`${API}/timi/baslat`, { ogrenci_id: seciliOgrenci.id });
+      setSonucId(r.data.id); setYanitlar({}); setKartIndex(0); setNotlar(""); setSonuc(null); setAdim("uygulama");
+    } catch (e) { toast({ title: "Hata", description: e.response?.data?.detail || "Başlatılamadı", variant: "destructive" }); }
+  };
+
+  const secYap = (secim) => {
+    const kartNo = kartIndex + 1;
+    setYanitlar(prev => ({ ...prev, [kartNo]: secim }));
+    if (sonucId) axios.patch(`${API}/timi/${sonucId}/yanit`, { kart_no: kartNo, secim }).catch(() => {});
+    if (kartIndex < TIMI_KART_SAYISI - 1) setTimeout(() => setKartIndex(i => (i < TIMI_KART_SAYISI - 1 ? i + 1 : i)), 180);
+  };
+
+  const tamamla = async () => {
+    const arr = [];
+    for (let n = 1; n <= TIMI_KART_SAYISI; n++) { if (yanitlar[n]) arr.push({ kart_no: n, secim: yanitlar[n] }); }
+    if (arr.length !== TIMI_KART_SAYISI) { toast({ title: `Eksik yanıt: ${arr.length}/28`, description: "Tüm kartları işaretleyin", variant: "destructive" }); return; }
+    setKaydediliyor(true);
+    try {
+      const r = await axios.post(`${API}/timi/${sonucId}/tamamla`, { yanitlar: arr, notlar });
+      setSonuc(r.data); setAdim("sonuc"); fetchGecmis();
+    } catch (e) { toast({ title: "Hata", description: e.response?.data?.detail || "Tamamlanamadı", variant: "destructive" }); }
+    finally { setKaydediliyor(false); }
+  };
+
+  const listeyeDon = () => { setAdim("liste"); setSonuc(null); setSonucId(null); setSeciliOgrenci(null); setYanitlar({}); setKartIndex(0); setNotlar(""); };
+
+  // ── UYGULAMA EKRANI (28 adımlı kart akışı) ──
+  if (adim === "uygulama") {
+    const kartNo = kartIndex + 1;
+    const secili = yanitlar[kartNo];
+    const cevaplanan = Object.keys(yanitlar).length;
+    const sonKart = kartIndex === TIMI_KART_SAYISI - 1;
+    const KartPanel = ({ ab }) => (
+      <button
+        onClick={() => secYap(ab)}
+        className={`group relative flex-1 rounded-2xl border-2 overflow-hidden transition-all bg-surface ${secili === ab ? "border-purple-600 ring-4 ring-purple-200" : "border-line hover:border-purple-400"}`}
+      >
+        <img src={timiKartGorsel(kartNo, ab)} alt={`Kart ${kartNo} — ${ab}`} className="w-full h-auto object-contain select-none pointer-events-none" draggable="false" />
+        <div className={`absolute top-2 left-2 w-9 h-9 flex items-center justify-center rounded-full text-lg font-black shadow ${secili === ab ? "bg-purple-600 text-white" : "bg-white/90 text-purple-700"}`}>{ab}</div>
+        {secili === ab && <div className="absolute top-2 right-2 w-9 h-9 flex items-center justify-center rounded-full bg-purple-600 text-white text-lg shadow">✓</div>}
+      </button>
+    );
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <Button variant="outline" size="sm" onClick={() => { if (window.confirm("Envanterden çıkılsın mı? İşaretlenen cevaplar kaydedildi.")) listeyeDon(); }}>← Çık</Button>
+          <div className="text-sm font-semibold text-content">{seciliOgrenci ? `${seciliOgrenci.ad} ${seciliOgrenci.soyad}` : ""}</div>
+          <div className="text-sm font-bold text-purple-700">Kart {kartNo} / {TIMI_KART_SAYISI}</div>
+        </div>
+
+        {/* İlerleme çubuğu */}
+        <div className="h-2.5 rounded-full bg-gray-100 overflow-hidden">
+          <div className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full transition-all" style={{ width: `${(cevaplanan / TIMI_KART_SAYISI) * 100}%` }} />
+        </div>
+
+        <p className="text-center text-sm text-subtle">Öğrencinin kendini daha çok özdeşleştirdiği pandayı seçin</p>
+
+        {/* İki görsel + ortada ayraç */}
+        <div className="flex items-stretch gap-2 md:gap-4">
+          <KartPanel ab="A" />
+          <div className="w-px bg-line self-stretch my-4" />
+          <KartPanel ab="B" />
+        </div>
+
+        {/* Öğretmen gözlem notu (son kartta) */}
+        {sonKart && (
+          <div>
+            <Label className="text-sm">Öğretmen Gözlem Notu (opsiyonel)</Label>
+            <textarea
+              value={notlar}
+              onChange={e => setNotlar(e.target.value)}
+              rows={2}
+              placeholder="Uygulama sırasındaki gözlemlerinizi not edebilirsiniz..."
+              className="w-full border border-line rounded-lg p-2 text-sm bg-surface focus:outline-none focus:border-purple-400"
+            />
+          </div>
+        )}
+
+        {/* Navigasyon */}
+        <div className="flex items-center justify-between gap-3">
+          <Button variant="outline" onClick={() => setKartIndex(i => Math.max(0, i - 1))} disabled={kartIndex === 0}>← Önceki Kart</Button>
+          {!sonKart ? (
+            <Button variant="outline" onClick={() => setKartIndex(i => Math.min(TIMI_KART_SAYISI - 1, i + 1))} disabled={!secili}>Sonraki Kart →</Button>
+          ) : (
+            <Button onClick={tamamla} disabled={cevaplanan !== TIMI_KART_SAYISI || kaydediliyor} className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold">
+              {kaydediliyor ? "Kaydediliyor..." : "✅ Envanteri Tamamla"}
+            </Button>
+          )}
+        </div>
+        {sonKart && cevaplanan !== TIMI_KART_SAYISI && (
+          <p className="text-center text-xs text-amber-600">Eksik kart var ({cevaplanan}/28). Tamamlamak için tüm kartları işaretleyin.</p>
+        )}
+      </div>
+    );
+  }
+
+  // ── SONUÇ RAPORU ──
+  if (adim === "sonuc" && sonuc) {
+    const ogr = students.find(s => s.id === sonuc.ogrenci_id) || seciliOgrenci;
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={listeyeDon}>← Listeye Dön</Button>
+          <h2 className="text-lg font-bold">TIMI Sonuç Raporu</h2>
+        </div>
+        <TimiRapor sonuc={sonuc} ogrenci={ogr} />
+      </div>
+    );
+  }
+
+  // ── ANA LİSTE ──
+  const tamamlananlar = gecmis.filter(g => g.durum === "tamamlandi");
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold">🧠 TIMI — Çoklu Zeka Envanteri</h2>
+          <p className="text-xs text-subtle">Teele Çoklu Zeka Envanteri (28 kart, zorlamalı seçim)</p>
+        </div>
+      </div>
+
+      {/* Yeni Uygulama */}
+      <Card className="border-2 border-purple-200 shadow-sm">
+        <CardHeader><CardTitle className="text-base flex items-center gap-2">🎯 Yeni Uygulama Başlat</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label>Öğrenci Seç</Label>
+            <Select value={seciliOgrenci?.id || ""} onValueChange={v => setSeciliOgrenci(students.find(s => s.id === v))}>
+              <SelectTrigger><SelectValue placeholder="Öğrenci seçin..." /></SelectTrigger>
+              <SelectContent position="popper" sideOffset={4} className="max-h-60 overflow-y-auto z-[60] bg-surface">
+                {(students || []).map(s => <SelectItem key={s.id} value={s.id}>{s.ad} {s.soyad} — {s.sinif}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={baslat} disabled={!seciliOgrenci} className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 font-bold">
+            ▶ Envanteri Başlat
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Geçmiş Uygulamalar */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader><CardTitle className="text-base">Geçmiş Uygulamalar</CardTitle></CardHeader>
+        <CardContent>
+          {tamamlananlar.length === 0 && <p className="text-subtle text-sm text-center py-8">Henüz envanter uygulanmadı</p>}
+          {tamamlananlar.length > 0 && (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Öğrenci</TableHead>
+                  <TableHead>Tarih</TableHead>
+                  <TableHead>Baskın Zeka Alanı</TableHead>
+                  <TableHead>Rapor</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {tamamlananlar.map(g => (
+                  <TableRow key={g.id}>
+                    <TableCell className="font-medium">{ogrenciAd(g.ogrenci_id)}</TableCell>
+                    <TableCell className="text-sm text-subtle">{g.uygulama_tarihi ? new Date(g.uygulama_tarihi).toLocaleDateString("tr-TR") : "-"}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {(g.baskin_zeka_alanlari || []).map(k => (
+                          <span key={k} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 text-xs font-semibold">{TIMI_IKON[k]} {TIMI_KISA[k]}</span>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Button size="sm" variant="outline" onClick={() => { setSonuc(g); setSeciliOgrenci(students.find(s => s.id === g.ogrenci_id) || null); setAdim("sonuc"); }}>📄 Rapor</Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+
 
 
 // ═══════════════════════════════════════════════
@@ -4395,6 +4829,7 @@ function OgretmenPaneli({ user, logout }) {
     ozellikAktif("ogretmen_gorevler")      && { id: "ogrencilerim", label: "Öğrencilerim", icon: "👥" },
     ozellikAktif("ogretmen_gorevler")      && { id: "gorevler",     label: "Görevler",     icon: "📌", badge: benimGorevlerim.filter(g => g.durum !== "tamamlandi").length || null },
     ozellikAktif("ogretmen_giris_analizi") && { id: "giris-analizi",label: "Analiz",       icon: "🔬" },
+    ozellikAktif("ogretmen_timi")          && { id: "timi",         label: "TIMI",         icon: "🧠" },
     ozellikAktif("ogretmen_gelisim")       && { id: "gelisim",      label: "Gelişim",      icon: "🎓" },
     { id: "program", label: "Program", icon: "📅" },
     ozellikAktif("ogretmen_mesajlar")      && { id: "mesajlar",     label: "Mesajlar",     icon: "✉️", badge: okunmamisSayisi || null },
@@ -4422,6 +4857,9 @@ function OgretmenPaneli({ user, logout }) {
             </div>
             {/* Risk faktörleri */}
             {d.risk?.faktorler?.length > 0 && (<div className="bg-red-50 rounded-xl p-3 border border-red-100"><div className="text-xs font-medium text-red-700 mb-1">⚠️ Risk Faktörleri:</div>{d.risk.faktorler.map((f,i) => <div key={i} className="text-xs text-red-600">• {f}</div>)}</div>)}
+
+            {/* 🧠 TIMI — Çoklu Zeka özeti */}
+            <TimiOzetKart ogrenciId={seciliOgrenci.id} />
 
             {/* 🤖 AI Koçluk Butonu + Sonuçlar */}
             {(() => {
@@ -5210,6 +5648,10 @@ function OgretmenPaneli({ user, logout }) {
         {/* ═══ GİRİŞ ANALİZİ ═══ */}
         {aktifSekme === "giris-analizi" && ozellikAktif("ogretmen_giris_analizi") && (<GirisAnaliziModul user={user} students={ogrenciler} teachers={[]} />)}
         {aktifSekme === "giris-analizi" && !ozellikAktif("ogretmen_giris_analizi") && (<div className="text-center py-16 text-subtle"><div className="text-4xl mb-3">🔒</div><p className="font-medium">Bu özellik şu an devre dışı</p><p className="text-sm mt-1">Sistem yöneticisi bu modülü kapatmıştır.</p></div>)}
+
+        {/* ═══ TIMI — ÇOKLU ZEKA ═══ */}
+        {aktifSekme === "timi" && ozellikAktif("ogretmen_timi") && (<TimiModul user={user} students={ogrenciler} />)}
+        {aktifSekme === "timi" && !ozellikAktif("ogretmen_timi") && (<div className="text-center py-16 text-subtle"><div className="text-4xl mb-3">🔒</div><p className="font-medium">Bu özellik şu an devre dışı</p><p className="text-sm mt-1">Sistem yöneticisi bu modülü kapatmıştır.</p></div>)}
 
         {/* ═══ GELİŞİM ═══ */}
         {aktifSekme === "gelisim" && ozellikAktif("ogretmen_gelisim") && (<GelisimAlani user={user} />)}

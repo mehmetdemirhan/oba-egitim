@@ -187,6 +187,7 @@ OZELLIK_TANIMLARI = [
     # ── ÖĞRETMEN PANELİ ──
     {"id":"ogretmen_dashboard",     "label":"Öğretmen Dashboard",        "kategori":"ogretmen","ikon":"📊","aciklama":"Risk skorları, öğrenci özeti, genel istatistikler"},
     {"id":"ogretmen_giris_analizi", "label":"Giriş Analizi (Okuma)",      "kategori":"ogretmen","ikon":"🔬","aciklama":"Sesli okuma analizi, WPM, prozodik okuma ve rapor üretimi"},
+    {"id":"ogretmen_timi",          "label":"TIMI - Çoklu Zeka Envanteri", "kategori":"ogretmen","ikon":"🧠","aciklama":"Teele Çoklu Zeka Envanteri: 28 kartlık zorlamalı-seçim, 7 zeka alanı profili ve rapor"},
     {"id":"ogretmen_gelisim",       "label":"Gelişim Alanı",              "kategori":"ogretmen","ikon":"🎓","aciklama":"İçerik ekleme, oylama, materyal yönetimi"},
     {"id":"ogretmen_gorevler",      "label":"Görev Atama",                "kategori":"ogretmen","ikon":"📌","aciklama":"Öğrencilere görev ve ödev atama sistemi"},
     {"id":"ogretmen_mesajlar",      "label":"Mesajlaşma",                 "kategori":"ogretmen","ikon":"✉️","aciklama":"Öğrenci ve velilerle mesajlaşma"},
