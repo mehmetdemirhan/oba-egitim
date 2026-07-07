@@ -7,6 +7,9 @@ node_modules/
 turkce_1_1.pdf
 *_deneme.pdf
 
+# TIMI ham kaynak görseller (public/timi tek doğru kaynak; repoda tekrar tutulmaz)
+timi_kart_gorselleri/
+
 # tek seferlik debug scriptleri
 metin_kontrol.py
 metin_kontrol_v2.py
