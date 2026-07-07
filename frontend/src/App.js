@@ -36,7 +36,7 @@ import ProfilGorunurlukAyarlari from "./components/admin/ProfilGorunurlukAyarlar
 import ExerciseLibrary from "./components/exercises/ExerciseLibrary";
 import HaftalikTakvim from "./components/program/HaftalikTakvim";
 import { FullscreenExerciseProvider, useFullscreenExercise } from "./context/FullscreenExerciseContext";
-import { ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Tooltip, XAxis, YAxis, CartesianGrid, AreaChart, Area } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Tooltip, XAxis, YAxis, CartesianGrid, AreaChart, Area, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Legend } from 'recharts';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 
@@ -499,7 +499,7 @@ function AppContent() {
             {adminVeyaKoord && <TabsTrigger value="users" className={tabClass}><Shield className="h-4 w-4 mr-2" />Kullanıcılar</TabsTrigger>}
             <TabsTrigger value="gelisim" className={tabClass}><Trophy className="h-4 w-4 mr-2" />Gelişim</TabsTrigger>
             <TabsTrigger value="ders-programi" className={tabClass}>📅 Ders Programı</TabsTrigger>
-            <TabsTrigger value="giris-analizi" className={tabClass}><Stethoscope className="h-4 w-4 mr-2" />Giriş Analizi</TabsTrigger>
+            <TabsTrigger value="giris-analizi" className={tabClass}><Stethoscope className="h-4 w-4 mr-2" />Analiz</TabsTrigger>
             <TabsTrigger value="mesajlar" className={tabClass}><Mail className="h-4 w-4 mr-2" />Mesajlar</TabsTrigger>
             {adminVeyaKoord && <TabsTrigger value="ayarlar" className={tabClass}><Star className="h-4 w-4 mr-2" />Ayarlar</TabsTrigger>}
             {user.role === "admin" && <TabsTrigger value="yedekleme" className={tabClass}><Database className="h-4 w-4 mr-2" />Yedekleme</TabsTrigger>}
@@ -1366,9 +1366,9 @@ function AppContent() {
             </TabsContent>
           )}
 
-          {/* Giris Analizi */}
+          {/* Analiz — Giriş Analizi + TIMI kardeş modülleri */}
           <TabsContent value="giris-analizi">
-            <GirisAnaliziModul user={user} students={students} teachers={teachers} />
+            <AnalizSekmesi user={user} students={students} teachers={teachers} />
           </TabsContent>
 
           {/* Gelisim Alani */}
@@ -1835,9 +1835,11 @@ function NormTablosu({ onClose }) {
 // görsel ekleme. Öğretmen/Koordinatör/Yönetici EŞİT yetkili. İlk katkıda küçük XP.
 // NOT: image_prompt (gorsel_prompt) hiçbir zaman gösterilmez — yüklenen görsel onun
 // yerine öğrenciye gösterilecek görseldir.
-function MetinKatkiPaneli({ metin, user, onDegisti }) {
+function MetinKatkiPaneli({ metin, user, onDegisti, acik: acikProp, onToggle }) {
   const { toast } = useToast();
-  const [acik, setAcik] = useState(false);
+  const [icAcik, setIcAcik] = useState(false);
+  const acik = acikProp !== undefined ? acikProp : icAcik;   // kontrollü ya da içsel
+  const toggle = () => (onToggle ? onToggle() : setIcAcik(a => !a));
   const [sorular, setSorular] = useState(metin.sorular || []);
   const [gorselVar, setGorselVar] = useState(!!metin.gorsel_var);
   const [gorselV, setGorselV] = useState(0);      // cache-bust anahtarı
@@ -1884,9 +1886,9 @@ function MetinKatkiPaneli({ metin, user, onDegisti }) {
 
   return (
     <div className="mt-2 border-t border-line pt-2" onClick={(e) => e.stopPropagation()}>
-      <button type="button" onClick={() => setAcik(a => !a)}
+      <button type="button" onClick={toggle}
         className="text-xs font-medium text-primary flex items-center gap-1.5 hover:underline">
-        {acik ? "▼" : "▶"} 📝 Sorular & Görsel
+        {acik ? "▼" : "▶"} 📝 Cevap Anahtarı & Görsel
         {soruSayisi > 0 && <span className="text-subtle">({soruSayisi} soru)</span>}
         {kontrolSayisi > 0 && <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full">⚠ {kontrolSayisi} kontrol edilmeli</span>}
         {gorselVar && <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded-full">🖼️ görsel</span>}
@@ -1910,7 +1912,7 @@ function MetinKatkiPaneli({ metin, user, onDegisti }) {
               <img src={`${API}/diagnostic/texts/${metin.id}/gorsel?v=${gorselV}`} alt={metin.baslik}
                 className="mt-2 max-h-40 rounded-lg border border-purple-200 object-contain" />
             ) : (
-              <p className="text-[11px] text-purple-600 mt-1">Henüz görsel yok. İlk ekleyene küçük XP verilir.</p>
+              <p className="text-[11px] text-purple-600 mt-1">Henüz görsel yok. İlk ekleyene XP verilir.</p>
             )}
           </div>
 
@@ -1981,7 +1983,7 @@ function MetinKatkiPaneli({ metin, user, onDegisti }) {
   );
 }
 
-function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif }) {
+function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEkran = false, onDuzenle }) {
   const { toast } = useToast();
   const [metinler, setMetinler] = useState([]);
   const [formAcik, setFormAcik] = useState(false);
@@ -1993,6 +1995,7 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif }) {
   // Seviye (kelime sayısı) aralık filtresi — akıcı okuma metinleri sınıfa değil
   // kelime sayısına göre seçilir.
   const [kelimeAralik, setKelimeAralik] = useState(null); // {min,max,l} | null
+  const [acikId, setAcikId] = useState(null); // tıklayınca cevap anahtarı/görsel editörü açılan metin
   const KELIME_ARALIKLARI = [
     { l: "0–70 kelime", min: 0, max: 70 },
     { l: "71–150 kelime", min: 71, max: 150 },
@@ -2198,7 +2201,7 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif }) {
         const havuzTumu = metinler.filter(m => m.durum === "havuzda");
         const havuzdakiler = havuzTumu.filter(kelimeAraligindaMi);
         return (
-      <div className="space-y-2 max-h-96 overflow-y-auto">
+      <div className={`space-y-2 ${tamEkran ? "" : "max-h-96 overflow-y-auto"}`}>
         <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
           <h4 className="text-sm font-semibold text-green-700">✅ Havuzdaki Metinler ({havuzdakiler.length}{kelimeAralik ? ` / ${havuzTumu.length}` : ""})</h4>
         </div>
@@ -2213,28 +2216,41 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif }) {
           ))}
         </div>
         {havuzdakiler.length === 0 && <p className="text-subtle text-sm text-center py-6">{havuzTumu.length === 0 ? "Henüz havuzda metin yok. Metin ekleyip onaylayın." : "Bu seviye aralığında metin yok."}</p>}
-        {havuzdakiler.map(m => (
+        {havuzdakiler.map(m => {
+          const secili = acikId === m.id;
+          return (
           <div key={m.id}
-            onClick={() => secimModu && m.durum === "havuzda" && onMetinSec && onMetinSec(m)}
             className={`border rounded-xl p-4 transition-all
-              ${secimModu && m.durum === "havuzda" ? 'cursor-pointer hover:border-orange-400 hover:bg-orange-50' : ''}
-              ${m.durum === "havuzda" ? 'border-green-200' : 'border-line'}`}>
-            <div className="flex items-start justify-between">
+              ${secili ? 'border-primary ring-1 ring-blue-200 bg-blue-50/40' : (m.durum === "havuzda" ? 'border-green-200' : 'border-line')}`}>
+            {/* Başlık alanı — tıklayınca cevap anahtarı & görsel editörü açılır */}
+            <div className="flex items-start justify-between cursor-pointer"
+              onClick={() => setAcikId(secili ? null : m.id)}
+              title="Cevap anahtarı & görsel için tıklayın">
               <div className="flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-subtle text-xs">{secili ? "▼" : "▶"}</span>
                   <span className="font-semibold">{m.baslik}</span>
                   {durumBadge(m.durum)}
                 </div>
                 <div className="text-xs text-subtle mt-1">{m.sinif_seviyesi ? `${m.sinif_seviyesi}. Sınıf • ` : ""}{turLabel[m.tur] || m.tur} • {m.kelime_sayisi} kelime</div>
                 <p className="text-sm text-subtle mt-1 line-clamp-2">{m.icerik}</p>
               </div>
-              {(user?.role === "admin" || user?.role === "coordinator") && (
-                <Button variant="destructive" size="sm" className="ml-2" onClick={(e) => { e.stopPropagation(); sil(m.id); }}><Trash2 className="h-4 w-4"/></Button>
-              )}
+              <div className="flex items-center gap-2 ml-2 shrink-0">
+                {secimModu && m.durum === "havuzda" && onMetinSec && (
+                  <Button size="sm" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={(e) => { e.stopPropagation(); onMetinSec(m); }}>Seç</Button>
+                )}
+                {onDuzenle && ["admin", "coordinator", "teacher"].includes(user?.role) && (
+                  <Button size="sm" variant="outline" className="border-primary text-primary" onClick={(e) => { e.stopPropagation(); onDuzenle(m); }}>✏️ Düzenle</Button>
+                )}
+                {(user?.role === "admin" || user?.role === "coordinator") && (
+                  <Button variant="destructive" size="sm" onClick={(e) => { e.stopPropagation(); sil(m.id); }}><Trash2 className="h-4 w-4"/></Button>
+                )}
+              </div>
             </div>
-            <MetinKatkiPaneli metin={m} user={user} onDegisti={fetchMetinler} />
+            <MetinKatkiPaneli metin={m} user={user} onDegisti={fetchMetinler} acik={secili} onToggle={() => setAcikId(secili ? null : m.id)} />
           </div>
-        ))}
+          );
+        })}
       </div>
         );
       })()}
@@ -2306,6 +2322,207 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif }) {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// ── METİN DÜZENLE EKRANI (tam ekran) ──
+// Başlık/gövde/tür/zorluk/sınıf + MCQ soruları + açık uçlu sorular + cevap
+// anahtarı + görsel düzenlenir; tek "Kaydet" ile PUT /diagnostic/texts/{id}.
+// Öğretmen/Koordinatör/Yönetici EŞİT yetkili. Görsel ayrı uçla (anında) yüklenir.
+function MetinDuzenleEkrani({ metin, user, onGeri }) {
+  const { toast } = useToast();
+  const [baslik, setBaslik] = useState(metin.baslik || "");
+  const [icerik, setIcerik] = useState(metin.icerik || "");
+  const [tur, setTur] = useState(metin.tur || "hikaye");
+  const [zorluk, setZorluk] = useState(metin.zorluk || "orta");
+  const [sinif, setSinif] = useState(metin.sinif_seviyesi || "");
+  const [sorular, setSorular] = useState((metin.sorular || []).map(s => ({ ...s })));
+  const [acikSorular, setAcikSorular] = useState(
+    (metin.acik_sorular || []).map(s => (typeof s === "object" ? { ...s } : { id: null, soru: s, subjektif: true, kategori: null, model_cevap: null }))
+  );
+  const [gorselVar, setGorselVar] = useState(!!metin.gorsel_var);
+  const [gorselV, setGorselV] = useState(0);
+  const [kaydediyor, setKaydediyor] = useState(false);
+  const [gorselYukleniyor, setGorselYukleniyor] = useState(false);
+  const fileRef = useRef(null);
+
+  const kelimeSay = (icerik || "").trim().split(/\s+/).filter(Boolean).length;
+  const sikHarfleri = ["A", "B", "C", "D"];
+  const BLOOMLAR = ["Hatırlama", "Anlama", "Uygulama", "Analiz", "Yaratma", "Değerlendirme"];
+
+  // MCQ yardımcıları
+  const soruGuncelle = (i, alan, deger) => setSorular(prev => prev.map((s, idx) => idx === i ? { ...s, [alan]: deger } : s));
+  const sikGuncelle = (i, harf, deger) => setSorular(prev => prev.map((s, idx) => idx === i ? { ...s, secenekler: { ...(s.secenekler || {}), [harf]: deger } } : s));
+  const soruSil = (i) => setSorular(prev => prev.filter((_, idx) => idx !== i));
+  const soruEkle = () => setSorular(prev => [...prev, { id: null, soru: "", secenekler: { A: "", B: "", C: "", D: "" }, dogru_cevap: "A", guven: "high", kontrol_gerekli: false }]);
+
+  // Açık uçlu yardımcıları
+  const acikGuncelle = (i, alan, deger) => setAcikSorular(prev => prev.map((s, idx) => idx === i ? { ...s, [alan]: deger } : s));
+  const acikSil = (i) => setAcikSorular(prev => prev.filter((_, idx) => idx !== i));
+  const acikEkle = () => setAcikSorular(prev => [...prev, { id: null, no: prev.length + 1, kategori: "Anlama", soru: "", model_cevap: "", subjektif: false }]);
+
+  const gorselYukle = async (e) => {
+    const dosya = e.target.files?.[0];
+    if (!dosya) return;
+    if (!["image/jpeg", "image/jpg", "image/png"].includes(dosya.type)) { toast({ title: "Sadece JPG/PNG", variant: "destructive" }); return; }
+    setGorselYukleniyor(true);
+    try {
+      const fd = new FormData(); fd.append("dosya", dosya);
+      const r = await axios.post(`${API}/diagnostic/texts/${metin.id}/gorsel`, fd, { headers: { "Content-Type": "multipart/form-data" } });
+      setGorselVar(true); setGorselV(v => v + 1);
+      toast({ title: r.data.ilk_defa && r.data.odul ? `🖼️ Görsel eklendi (+${r.data.odul} XP)` : "🖼️ Görsel güncellendi" });
+    } catch (e2) { toast({ title: "Hata", description: e2.response?.data?.detail, variant: "destructive" }); }
+    finally { setGorselYukleniyor(false); if (fileRef.current) fileRef.current.value = ""; }
+  };
+
+  const kaydet = async () => {
+    if (!baslik.trim() || !icerik.trim()) { toast({ title: "Başlık ve içerik zorunlu", variant: "destructive" }); return; }
+    setKaydediyor(true);
+    try {
+      await axios.put(`${API}/diagnostic/texts/${metin.id}`, {
+        baslik, icerik, tur, zorluk, sinif_seviyesi: sinif || null, sorular, acik_sorular: acikSorular,
+      });
+      toast({ title: "✅ Metin kaydedildi" });
+      onGeri && onGeri();
+    } catch (e) { toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
+    finally { setKaydediyor(false); }
+  };
+
+  return (
+    <div className="space-y-4 pb-16">
+      {/* Üst bar */}
+      <div className="flex items-center justify-between gap-3 sticky top-0 bg-app z-10 py-2">
+        <div className="flex items-center gap-3 min-w-0">
+          <Button variant="outline" size="sm" onClick={onGeri}>← Geri</Button>
+          <h2 className="text-xl font-bold truncate">✏️ Metni Düzenle</h2>
+        </div>
+        <Button onClick={kaydet} disabled={kaydediyor} className="bg-green-600 hover:bg-green-700 text-white shrink-0">
+          {kaydediyor ? "Kaydediliyor…" : "💾 Kaydet"}
+        </Button>
+      </div>
+
+      {/* Temel bilgiler */}
+      <Card className="border-0 shadow-sm"><CardContent className="p-5 space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="md:col-span-2"><Label>Başlık</Label><Input value={baslik} onChange={e => setBaslik(e.target.value)} /></div>
+          <div><Label>Tür</Label>
+            <Select value={tur} onValueChange={setTur}><SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="akici_okuma">Akıcı Okuma</SelectItem>
+                <SelectItem value="hikaye">Hikaye</SelectItem>
+                <SelectItem value="bilgilendirici">Bilgilendirici</SelectItem>
+                <SelectItem value="siir">Şiir</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div><Label>Zorluk</Label>
+            <Select value={zorluk} onValueChange={setZorluk}><SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="kolay">Kolay</SelectItem>
+                <SelectItem value="orta">Orta</SelectItem>
+                <SelectItem value="zor">Zor</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div><Label>Sınıf Seviyesi (opsiyonel)</Label>
+            <Input value={sinif} onChange={e => setSinif(e.target.value)} placeholder="Havuz metinlerinde boş bırakılabilir" />
+            <p className="text-[11px] text-subtle mt-1">Seviye = kelime sayısı ({kelimeSay}). Sınıf boşsa seviye filtresi geçerli.</p>
+          </div>
+        </div>
+        <div>
+          <Label>Metin İçeriği</Label>
+          <textarea value={icerik} onChange={e => setIcerik(e.target.value)} rows={10}
+            className="w-full border border-line rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-y font-serif leading-relaxed" />
+          <p className="text-xs text-subtle mt-1">Kelime sayısı: {kelimeSay} (kaydedince otomatik güncellenir)</p>
+        </div>
+      </CardContent></Card>
+
+      {/* Görsel */}
+      <Card className="border-0 shadow-sm"><CardContent className="p-5">
+        <div className="flex items-center justify-between gap-2">
+          <div className="font-semibold text-content">🖼️ Metin Görseli</div>
+          <div>
+            <input ref={fileRef} type="file" accept="image/jpeg,image/png" className="hidden" onChange={gorselYukle} />
+            <Button type="button" size="sm" disabled={gorselYukleniyor} onClick={() => fileRef.current?.click()} className="bg-purple-600 hover:bg-purple-700 text-white">
+              {gorselYukleniyor ? "Yükleniyor…" : gorselVar ? "Görseli Değiştir" : "Görsel Ekle"}
+            </Button>
+          </div>
+        </div>
+        {gorselVar
+          ? <img src={`${API}/diagnostic/texts/${metin.id}/gorsel?v=${gorselV}`} alt={baslik} className="mt-3 max-h-52 rounded-lg border border-line object-contain" />
+          : <p className="text-xs text-subtle mt-2">Henüz görsel yok. İlk ekleyene XP verilir. (Görsel anında kaydedilir.)</p>}
+      </CardContent></Card>
+
+      {/* MCQ soruları */}
+      <Card className="border-0 shadow-sm"><CardContent className="p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="font-semibold text-content">Çoktan Seçmeli Sorular ({sorular.length})</div>
+          <Button size="sm" variant="outline" onClick={soruEkle}><Plus className="h-4 w-4 mr-1" />Soru Ekle</Button>
+        </div>
+        {sorular.length === 0 && <p className="text-subtle text-sm">Bu metinde çoktan seçmeli soru yok.</p>}
+        {sorular.map((s, i) => (
+          <div key={s.id || `yeni-${i}`} className="border border-line rounded-lg p-3 space-y-2">
+            <div className="flex items-start gap-2">
+              <span className="text-xs font-bold text-subtle mt-2">{i + 1}.</span>
+              <Input value={s.soru || ""} onChange={e => soruGuncelle(i, "soru", e.target.value)} placeholder="Soru metni" className="flex-1" />
+              <Button size="sm" variant="destructive" onClick={() => soruSil(i)}><Trash2 className="h-4 w-4" /></Button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-6">
+              {sikHarfleri.map(h => (
+                <div key={h} className="flex items-center gap-2">
+                  <button type="button" onClick={() => soruGuncelle(i, "dogru_cevap", h)}
+                    title="Doğru cevap olarak işaretle"
+                    className={`w-7 h-7 shrink-0 rounded-full text-xs font-bold border transition ${s.dogru_cevap === h ? "bg-green-500 border-green-600 text-white" : "bg-surface border-line text-subtle hover:border-primary"}`}>{h}</button>
+                  <Input value={(s.secenekler || {})[h] ?? ""} onChange={e => sikGuncelle(i, h, e.target.value)} placeholder={`${h} şıkkı`} className="flex-1 h-8 text-sm" />
+                </div>
+              ))}
+            </div>
+            <div className="text-[11px] text-subtle pl-6">Doğru cevap: <strong>{s.dogru_cevap || "—"}</strong> · Yeşil daireye tıklayarak değiştirin.</div>
+          </div>
+        ))}
+      </CardContent></Card>
+
+      {/* Açık uçlu sorular */}
+      <Card className="border-0 shadow-sm"><CardContent className="p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="font-semibold text-content">Açık Uçlu Sorular ({acikSorular.length})</div>
+          <Button size="sm" variant="outline" onClick={acikEkle}><Plus className="h-4 w-4 mr-1" />Soru Ekle</Button>
+        </div>
+        {acikSorular.length === 0 && <p className="text-subtle text-sm">Bu metinde açık uçlu soru yok.</p>}
+        {acikSorular.map((s, i) => (
+          <div key={s.id || `yeni-a-${i}`} className="border border-line rounded-lg p-3 space-y-2">
+            <div className="flex items-start gap-2">
+              <span className="text-xs font-bold text-subtle mt-2">{i + 1}.</span>
+              <Input value={s.soru || ""} onChange={e => acikGuncelle(i, "soru", e.target.value)} placeholder="Soru metni" className="flex-1" />
+              <Button size="sm" variant="destructive" onClick={() => acikSil(i)}><Trash2 className="h-4 w-4" /></Button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pl-6">
+              <div>
+                <Label className="text-[11px]">Bloom Kategorisi</Label>
+                <Select value={s.kategori || ""} onValueChange={v => acikGuncelle(i, "kategori", v)}>
+                  <SelectTrigger className="h-8"><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent>{BLOOMLAR.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="sm:col-span-2">
+                <Label className="text-[11px]">Model / Örnek Cevap</Label>
+                <Input value={s.model_cevap || ""} onChange={e => acikGuncelle(i, "model_cevap", e.target.value)} placeholder="Model cevap veya örnek yönlendirme" className="h-8 text-sm" />
+              </div>
+            </div>
+            <label className="flex items-center gap-2 text-[11px] text-subtle pl-6 cursor-pointer">
+              <input type="checkbox" checked={!!s.subjektif} onChange={e => acikGuncelle(i, "subjektif", e.target.checked)} />
+              Subjektif (açık uçlu — otomatik doğru/yanlış değerlendirilmez)
+            </label>
+          </div>
+        ))}
+      </CardContent></Card>
+
+      <div className="flex justify-end">
+        <Button onClick={kaydet} disabled={kaydediyor} className="bg-green-600 hover:bg-green-700 text-white">
+          {kaydediyor ? "Kaydediliyor…" : "💾 Kaydet"}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -3972,9 +4189,439 @@ function EgzersizlerModul({ user, egzersizPuanlari = {}, onTamamla }) {
   );
 }
 
+// Gelişim Raporu Oluştur — öğrenci + iki tamamlanmış oturum seçilip ön/son
+// karşılaştırmalı gelişim raporu üretir. Kendi dialog'unu taşır (self-contained).
+function GelisimRaporuButonu({ students }) {
+  const { toast } = useToast();
+  const [acik, setAcik] = useState(false);
+  const [ogrenciId, setOgrenciId] = useState("");
+  const [oturumlar, setOturumlar] = useState([]);
+  const [ilkId, setIlkId] = useState("");
+  const [sonId, setSonId] = useState("");
+  const [dersSayisi, setDersSayisi] = useState(12);
+  const [uretiliyor, setUretiliyor] = useState(false);
+  const [sonucRapor, setSonucRapor] = useState(null);
+
+  const ogrenciSec = async (oid) => {
+    setOgrenciId(oid); setSonucRapor(null); setIlkId(""); setSonId("");
+    try {
+      const r = await axios.get(`${API}/diagnostic/sessions/student/${oid}`);
+      const tamam = (r.data || []).filter(o => o.durum === "tamamlandi")
+        .sort((a, b) => (a.olusturma_tarihi || "").localeCompare(b.olusturma_tarihi || ""));
+      setOturumlar(tamam);
+      if (tamam.length >= 2) { setIlkId(tamam[0].id); setSonId(tamam[tamam.length - 1].id); }
+    } catch (e) { setOturumlar([]); }
+  };
+
+  const olustur = async () => {
+    setUretiliyor(true);
+    try {
+      const r = await axios.post(`${API}/diagnostic/gelisim-raporu`, {
+        ogrenci_id: ogrenciId, ilk_oturum_id: ilkId, son_oturum_id: sonId, ders_sayisi: dersSayisi });
+      setSonucRapor(r.data);
+      toast({ title: "✅ Gelişim raporu oluşturuldu" });
+    } catch (e) {
+      toast({ title: "Hata", description: e?.response?.data?.detail || "Oluşturulamadı", variant: "destructive" });
+    }
+    setUretiliyor(false);
+  };
+
+  const pdfIndir = async () => {
+    try {
+      const r = await axios.get(`${API}/diagnostic/rapor/${sonucRapor.id}/pdf`, { responseType: "blob" });
+      const url = URL.createObjectURL(r.data);
+      const a = document.createElement("a"); a.href = url; a.download = `Gelisim_Raporu.pdf`; a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) { toast({ title: "PDF indirilemedi", variant: "destructive" }); }
+  };
+
+  const ot = (o) => `${new Date(o.olusturma_tarihi).toLocaleDateString("tr-TR")} • ${o.wpm} wpm • %${o.dogruluk_yuzde} • ${o.oturum_tipi || "analiz"}`;
+
+  return (
+    <>
+      <Button variant="outline" onClick={() => setAcik(true)}>🚀 Gelişim Raporu Oluştur</Button>
+      <Dialog open={acik} onOpenChange={setAcik}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>🚀 Gelişim Raporu (Ön Test / Son Test)</DialogTitle>
+            <DialogDescription>Bir öğrencinin iki tamamlanmış analizi karşılaştırılır. Her iki analizin de ölçüm raporu olmalıdır.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Öğrenci</Label>
+              <Select value={ogrenciId} onValueChange={ogrenciSec}>
+                <SelectTrigger><SelectValue placeholder="Öğrenci seçin" /></SelectTrigger>
+                <SelectContent>{students.map(s => <SelectItem key={s.id} value={s.id}>{s.ad} {s.soyad}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            {ogrenciId && oturumlar.length < 2 && (
+              <p className="text-sm text-amber-600">Bu öğrencinin en az 2 tamamlanmış analizi yok ({oturumlar.length}).</p>
+            )}
+            {oturumlar.length >= 2 && (<>
+              <div><Label>Ön Test (İlk Analiz)</Label>
+                <Select value={ilkId} onValueChange={setIlkId}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{oturumlar.map(o => <SelectItem key={o.id} value={o.id}>{ot(o)}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div><Label>Son Test (Kur Sonu)</Label>
+                <Select value={sonId} onValueChange={setSonId}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{oturumlar.map(o => <SelectItem key={o.id} value={o.id}>{ot(o)}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div><Label>Ders Sayısı</Label><Input type="number" value={dersSayisi} onChange={e => setDersSayisi(parseInt(e.target.value) || 12)} className="w-28" /></div>
+              {!sonucRapor ? (
+                <Button onClick={olustur} disabled={uretiliyor || !ilkId || !sonId || ilkId === sonId} className="w-full bg-primary text-white">
+                  {uretiliyor ? "Oluşturuluyor…" : "Gelişim Raporunu Oluştur"}
+                </Button>
+              ) : (
+                <div className="border rounded-xl p-3 bg-green-50 space-y-2">
+                  <div className="font-semibold text-green-700">✓ Rapor hazır</div>
+                  <div className="text-xs space-y-1">
+                    {sonucRapor.ozet_tablo?.map(m => (
+                      <div key={m.metrik} className="flex justify-between">
+                        <span>{m.etiket}</span>
+                        <span className="font-medium">{m.on_test} → {m.son_test} <span className={m.yon === "artis" ? "text-green-600" : m.yon === "dusus" ? "text-red-600" : "text-gray-500"}>({m.degisim > 0 ? "+" : ""}{m.degisim} · {m.gelisim_duzeyi})</span></span>
+                      </div>
+                    ))}
+                  </div>
+                  <Button onClick={pdfIndir} className="w-full bg-primary text-white">📄 PDF İndir</Button>
+                </div>
+              )}
+            </>)}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+// ── TIMI — Teele Çoklu Zeka Envanteri ──
+const TIMI_SIRA = ["dilsel", "mantiksal_matematiksel", "mekansal", "muziksel", "bedensel", "kisisel", "kisilerarasi"];
+const TIMI_KATEGORILER = {
+  dilsel: { tr: "Dilsel", kisa: "Dilsel", renk: "#3b82f6", yorum: "Kelimelerle düşünür; okuyarak, yazarak ve konuşarak öğrenmeye yatkındır. Hikâye, kelime oyunu ve tartışmadan keyif alır." },
+  mantiksal_matematiksel: { tr: "Mantıksal-Matematiksel", kisa: "Mantıksal", renk: "#8b5cf6", yorum: "Sayılar, örüntüler ve mantıkla ilgilenir; problem çözmekten, sınıflamaktan ve neden-sonuç kurmaktan hoşlanır." },
+  mekansal: { tr: "Mekansal (Görsel)", kisa: "Mekansal", renk: "#06b6d4", yorum: "Görseller, renkler ve şekillerle düşünür; harita, resim, yapı-bloğu ve çizimle öğrenmeye yatkındır." },
+  muziksel: { tr: "Müziksel", kisa: "Müziksel", renk: "#f59e0b", yorum: "Ritim, ses ve melodilere duyarlıdır; şarkı, tempo ve müzikle daha kolay öğrenir." },
+  bedensel: { tr: "Bedensel-Kinestetik", kisa: "Bedensel", renk: "#ef4444", yorum: "Hareket ederek, dokunarak ve yaparak öğrenir. El becerisi, spor ve uygulamalı etkinliklerde güçlüdür." },
+  kisisel: { tr: "Kişisel (İçsel)", kisa: "Kişisel", renk: "#10b981", yorum: "Kendi duygu, ilgi ve hedeflerinin farkındadır; bağımsız çalışmayı ve kendi hızında ilerlemeyi sever." },
+  kisilerarasi: { tr: "Kişilerarası (Sosyal)", kisa: "Sosyal", renk: "#ec4899", yorum: "Başkalarıyla iletişim ve işbirliğinde güçlüdür; grupla, paylaşarak ve birlikte çalışarak öğrenir." },
+};
+const TIMI_IMG = (kartNo, harf) => `${process.env.PUBLIC_URL || ""}/timi/card_${String(kartNo).padStart(2, "0")}_${harf}.png`;
+
+function TimiSonucGorunumu({ sonuc, ogrenci }) {
+  const [detayAcik, setDetayAcik] = useState(false);
+  const puanlar = sonuc.kategori_puanlari || {};
+  const baskin = sonuc.baskin_zeka_alanlari || [];
+  const grafikVerisi = TIMI_SIRA.map(k => ({ alan: TIMI_KATEGORILER[k].kisa, puan: puanlar[k] || 0 }));
+  return (
+    <div className="space-y-5">
+      {/* Baskın zeka rozet(ler)i */}
+      <div className="flex flex-wrap gap-3">
+        {baskin.map(k => (
+          <div key={k} className="flex items-center gap-2 px-4 py-2 rounded-xl text-white shadow-sm" style={{ background: TIMI_KATEGORILER[k].renk }}>
+            <span className="text-lg">🧠</span>
+            <div>
+              <div className="text-[11px] opacity-90">Baskın Zeka Alanı</div>
+              <div className="font-bold leading-tight">{TIMI_KATEGORILER[k].tr} ({puanlar[k]}/8)</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Kategori tablosu */}
+        <Card className="border-0 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-base">Zeka Alanı Puanları</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {TIMI_SIRA.map(k => {
+              const p = puanlar[k] || 0;
+              const enYuksek = baskin.includes(k);
+              return (
+                <div key={k} className="flex items-center gap-2">
+                  <div className={`w-40 text-sm ${enYuksek ? "font-bold text-content" : "text-subtle"}`}>{TIMI_KATEGORILER[k].tr}</div>
+                  <div className="flex-1 bg-gray-200 rounded-full h-2.5"><div className="h-2.5 rounded-full" style={{ width: `${(p / 8) * 100}%`, background: TIMI_KATEGORILER[k].renk }} /></div>
+                  <div className="w-10 text-right text-sm font-semibold">{p}/8</div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+
+        {/* Radar grafik */}
+        <Card className="border-0 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-base">Zeka Profili</CardTitle></CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={280}>
+              <RadarChart data={grafikVerisi} outerRadius="72%">
+                <PolarGrid />
+                <PolarAngleAxis dataKey="alan" tick={{ fontSize: 11 }} />
+                <PolarRadiusAxis angle={90} domain={[0, 8]} tickCount={5} tick={{ fontSize: 10 }} />
+                <Radar name="Puan" dataKey="puan" stroke="#f97316" fill="#f97316" fillOpacity={0.4} />
+                <Tooltip />
+              </RadarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Yorumlayıcı metinler */}
+      <Card className="border-0 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-base">Zeka Alanları — Açıklamalar</CardTitle></CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {TIMI_SIRA.map(k => (
+            <div key={k} className={`rounded-lg p-3 border ${baskin.includes(k) ? "border-orange-300 bg-orange-50" : "border-line"}`}>
+              <div className="flex items-center justify-between">
+                <div className="font-semibold text-sm" style={{ color: TIMI_KATEGORILER[k].renk }}>{TIMI_KATEGORILER[k].tr}</div>
+                <div className="text-xs font-bold text-subtle">{puanlar[k] || 0}/8</div>
+              </div>
+              <p className="text-xs text-subtle mt-1 leading-relaxed">{TIMI_KATEGORILER[k].yorum}</p>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* Detay cevap tablosu */}
+      <div>
+        <button type="button" onClick={() => setDetayAcik(a => !a)} className="text-sm font-medium text-primary hover:underline">
+          {detayAcik ? "▼" : "▶"} Cevap Detayı (28 kart)
+        </button>
+        {detayAcik && (
+          <div className="mt-2 overflow-x-auto">
+            <table className="w-full text-xs border border-line rounded-lg">
+              <thead><tr className="bg-app text-subtle"><th className="p-2 text-left">Kart</th><th className="p-2 text-left">Seçim</th><th className="p-2 text-left">Zeka Alanı</th></tr></thead>
+              <tbody>
+                {(sonuc.yanitlar || []).map(y => (
+                  <tr key={y.kart_no} className="border-t border-line">
+                    <td className="p-2">{y.kart_no}</td>
+                    <td className="p-2 font-semibold">{y.secim}</td>
+                    <td className="p-2">{y.kategori ? TIMI_KATEGORILER[y.kategori]?.tr : "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Psikometrik uyarı */}
+      <div className="text-xs text-subtle bg-app border border-line rounded-lg p-3">
+        ⚠️ Bu envanter, öğrencinin kendi algıladığı ilgi ve tercihlerini ölçen <strong>keşfedici</strong> bir araçtır; kesin/klinik
+        bir zeka testi değildir. Sonuçlar tek başına değil, öğretmen gözlemleriyle birlikte değerlendirilmelidir.
+      </div>
+    </div>
+  );
+}
+
+// Öğrenci profili için kompakt TIMI özet kartı (son uygulama + baskın zeka)
+function TimiOzetKarti({ ogrenciId }) {
+  const [gecmis, setGecmis] = useState(null); // null=yükleniyor, []=yok
+  useEffect(() => {
+    let iptal = false;
+    axios.get(`${API}/timi/ogrenci/${ogrenciId}`)
+      .then(r => { if (!iptal) setGecmis((r.data || []).filter(g => g.durum === "tamamlandi")); })
+      .catch(() => { if (!iptal) setGecmis([]); });
+    return () => { iptal = true; };
+  }, [ogrenciId]);
+  if (gecmis === null) return null;
+  const son = gecmis[0];
+  return (
+    <div className="bg-surface rounded-2xl p-4 shadow-sm border">
+      <div className="flex items-center gap-2 mb-2"><span className="text-lg">🧠</span><span className="font-bold text-sm">TIMI — Çoklu Zeka</span>
+        {gecmis.length > 0 && <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">{gecmis.length} uygulama</span>}
+      </div>
+      {!son ? (
+        <p className="text-xs text-subtle">Bu öğrenciye henüz TIMI uygulanmadı. "Analiz → TIMI" sekmesinden uygulayabilirsiniz.</p>
+      ) : (
+        <div>
+          <div className="text-xs text-subtle mb-1">Son uygulama: {son.uygulama_tarihi ? new Date(son.uygulama_tarihi).toLocaleDateString("tr-TR") : "-"}</div>
+          <div className="flex flex-wrap gap-1.5">
+            {(son.baskin_zeka_alanlari || []).map(k => (
+              <span key={k} className="text-xs font-semibold text-white px-2 py-1 rounded-full" style={{ background: TIMI_KATEGORILER[k]?.renk || "#6366f1" }}>
+                {TIMI_KATEGORILER[k]?.tr || k} ({son.kategori_puanlari?.[k]}/8)
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TimiModul({ user, students }) {
+  const { toast } = useToast();
+  const [adim, setAdim] = useState("liste"); // liste | uygulama | sonuc
+  const [seciliOgrenci, setSeciliOgrenci] = useState(null);
+  const [sonucId, setSonucId] = useState(null);
+  const [kartIndex, setKartIndex] = useState(0); // 0..27
+  const [yanitlar, setYanitlar] = useState({}); // { kartNo: "A"|"B" }
+  const [sonuc, setSonuc] = useState(null);
+  const [gecmis, setGecmis] = useState([]);
+  const [notlar, setNotlar] = useState("");
+  const [basliyor, setBasliyor] = useState(false);
+  const [tamamlaniyor, setTamamlaniyor] = useState(false);
+
+  const gecmisGetir = useCallback(async (oid) => {
+    if (!oid) { setGecmis([]); return; }
+    try { const r = await axios.get(`${API}/timi/ogrenci/${oid}`); setGecmis(r.data || []); } catch (e) { setGecmis([]); }
+  }, []);
+  useEffect(() => { gecmisGetir(seciliOgrenci?.id); }, [seciliOgrenci, gecmisGetir]);
+
+  const kartNo = kartIndex + 1;
+  const yanitSayisi = Object.keys(yanitlar).length;
+
+  const baslat = async () => {
+    if (!seciliOgrenci) return;
+    setBasliyor(true);
+    try {
+      const r = await axios.post(`${API}/timi/baslat`, { ogrenci_id: seciliOgrenci.id });
+      setSonucId(r.data.id); setYanitlar({}); setKartIndex(0); setNotlar(""); setSonuc(null); setAdim("uygulama");
+    } catch (e) { toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
+    finally { setBasliyor(false); }
+  };
+
+  const secim = async (harf) => {
+    setYanitlar(prev => ({ ...prev, [kartNo]: harf }));
+    try { await axios.patch(`${API}/timi/${sonucId}/yanit`, { kart_no: kartNo, secim: harf }); } catch (e) {}
+    if (kartIndex < 27) setKartIndex(i => i + 1); // otomatik ilerle
+  };
+
+  const tamamla = async () => {
+    setTamamlaniyor(true);
+    try {
+      const yanitDizi = Object.entries(yanitlar).map(([k, v]) => ({ kart_no: Number(k), secim: v }));
+      const r = await axios.post(`${API}/timi/${sonucId}/tamamla`, { notlar, yanitlar: yanitDizi });
+      setSonuc(r.data); setAdim("sonuc"); gecmisGetir(seciliOgrenci?.id);
+    } catch (e) { toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
+    finally { setTamamlaniyor(false); }
+  };
+
+  const gecmisAc = async (id) => {
+    try { const r = await axios.get(`${API}/timi/${id}`); setSonuc(r.data); setAdim("sonuc"); } catch (e) { toast({ title: "Hata", variant: "destructive" }); }
+  };
+
+  // ── UYGULAMA EKRANI (28 kart) ──
+  if (adim === "uygulama") {
+    const secili = yanitlar[kartNo];
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={() => { if (window.confirm("Uygulamadan çıkılsın mı? İşaretlenenler kaydedildi.")) setAdim("liste"); }}>← Çık</Button>
+          <h2 className="text-xl font-bold">🧠 TIMI Uygulaması — {seciliOgrenci?.ad} {seciliOgrenci?.soyad}</h2>
+        </div>
+        {/* İlerleme */}
+        <div>
+          <div className="flex justify-between text-sm text-subtle mb-1"><span>Kart {kartNo} / 28</span><span>{yanitSayisi} / 28 işaretlendi</span></div>
+          <div className="w-full bg-gray-200 rounded-full h-2"><div className="h-2 rounded-full bg-gradient-to-r from-indigo-500 to-violet-600 transition-all" style={{ width: `${(yanitSayisi / 28) * 100}%` }} /></div>
+        </div>
+        {/* Kart: A | B */}
+        <div className="flex items-stretch gap-0 bg-surface rounded-2xl border border-line overflow-hidden">
+          {["A", "B"].map((harf, idx) => (
+            <React.Fragment key={harf}>
+              {idx === 1 && <div className="w-px bg-line self-stretch" />}
+              <button type="button" onClick={() => secim(harf)}
+                className={`flex-1 p-3 sm:p-5 flex flex-col items-center gap-2 transition-all ${secili === harf ? "bg-indigo-50 ring-2 ring-inset ring-indigo-500" : "hover:bg-app"}`}>
+                <div className={`text-sm font-bold ${secili === harf ? "text-indigo-600" : "text-subtle"}`}>{harf}{secili === harf ? " ✓" : ""}</div>
+                <img src={TIMI_IMG(kartNo, harf)} alt={`Kart ${kartNo} ${harf}`} className="w-full max-w-md object-contain rounded-lg" style={{ maxHeight: "52vh" }} />
+              </button>
+            </React.Fragment>
+          ))}
+        </div>
+        {/* Navigasyon */}
+        <div className="flex items-center justify-between gap-2">
+          <Button variant="outline" onClick={() => setKartIndex(i => Math.max(0, i - 1))} disabled={kartIndex === 0}>◀ Önceki</Button>
+          <div className="text-xs text-subtle text-center">Öğrencinin işaret ettiği görsele (A/B) tıklayın. Yanlış işaretlemede "Önceki" ile dönebilirsiniz.</div>
+          {kartIndex < 27
+            ? <Button onClick={() => setKartIndex(i => Math.min(27, i + 1))} disabled={!secili}>Sonraki ▶</Button>
+            : <Button onClick={tamamla} disabled={yanitSayisi < 28 || tamamlaniyor} className="bg-green-600 hover:bg-green-700 text-white">{tamamlaniyor ? "Hesaplanıyor…" : "✓ Envanteri Tamamla"}</Button>}
+        </div>
+        {yanitSayisi < 28 && kartIndex === 27 && <p className="text-xs text-center text-amber-600">Tamamlamak için tüm 28 kartı işaretleyin ({yanitSayisi}/28).</p>}
+      </div>
+    );
+  }
+
+  // ── SONUÇ EKRANI ──
+  if (adim === "sonuc" && sonuc) {
+    const ogr = students.find(s => s.id === sonuc.ogrenci_id) || seciliOgrenci || {};
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={() => setAdim("liste")}>← Listeye Dön</Button>
+          <h2 className="text-xl font-bold">🧠 TIMI Sonucu — {ogr.ad} {ogr.soyad}</h2>
+        </div>
+        <TimiSonucGorunumu sonuc={sonuc} ogrenci={ogr} />
+      </div>
+    );
+  }
+
+  // ── ANA LİSTE (öğrenci seçimi + geçmiş) ──
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg font-bold">🧠 TIMI — Teele Çoklu Zeka Envanteri</h2>
+        <p className="text-sm text-subtle">28 kart / 56 görsel — öğrenciyle karşılıklı oturarak uygulanan zorlamalı-seçim envanteri.</p>
+      </div>
+
+      <Card className="border-2 border-indigo-200 shadow-sm">
+        <CardHeader><CardTitle className="text-base flex items-center gap-2">🎯 Yeni Uygulama Başlat</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label>Öğrenci Seç</Label>
+            <Select value={seciliOgrenci?.id || ""} onValueChange={v => setSeciliOgrenci((students || []).find(s => s.id === v))}>
+              <SelectTrigger><SelectValue placeholder="Öğrenci seçin..." /></SelectTrigger>
+              <SelectContent position="popper" sideOffset={4} className="max-h-60 overflow-y-auto z-[60] bg-surface">
+                {(students || []).map(s => <SelectItem key={s.id} value={s.id}>{s.ad} {s.soyad} — {s.sinif}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={baslat} disabled={!seciliOgrenci || basliyor} className="w-full bg-gradient-to-r from-indigo-500 to-violet-600 text-white py-3 font-bold">
+            {basliyor ? "Başlatılıyor…" : "▶ Envanteri Başlat"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Öğrencinin geçmiş uygulamaları */}
+      {seciliOgrenci && (
+        <Card className="border-0 shadow-sm">
+          <CardHeader><CardTitle className="text-base">Geçmiş TIMI Uygulamaları — {seciliOgrenci.ad} {seciliOgrenci.soyad}</CardTitle></CardHeader>
+          <CardContent>
+            {gecmis.length === 0 && <p className="text-subtle text-sm text-center py-6">Bu öğrenciye henüz TIMI uygulanmadı.</p>}
+            <div className="space-y-2">
+              {gecmis.filter(g => g.durum === "tamamlandi").map(g => (
+                <div key={g.id} className="flex items-center justify-between border border-line rounded-lg p-3">
+                  <div>
+                    <div className="text-sm font-medium">{g.uygulama_tarihi ? new Date(g.uygulama_tarihi).toLocaleDateString("tr-TR") : "-"}</div>
+                    <div className="text-xs text-subtle">Baskın: {(g.baskin_zeka_alanlari || []).map(k => TIMI_KATEGORILER[k]?.tr).join(", ") || "-"}</div>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => gecmisAc(g.id)}>📄 Sonucu Gör</Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ── ANALİZ SEKMESİ — Giriş Analizi + TIMI kardeş modülleri ──
+function AnalizSekmesi({ user, students, teachers }) {
+  const [altModul, setAltModul] = useState("giris"); // giris | timi
+  const sekmeClass = (aktif) => `px-4 py-2 rounded-xl text-sm font-medium border transition-all ${aktif ? "bg-primary text-white border-blue-600" : "bg-surface text-subtle border-line hover:bg-app"}`;
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2 flex-wrap">
+        <button onClick={() => setAltModul("giris")} className={sekmeClass(altModul === "giris")}>🩺 Giriş Analizi</button>
+        <button onClick={() => setAltModul("timi")} className={sekmeClass(altModul === "timi")}>🧠 TIMI - Çoklu Zeka Envanteri</button>
+      </div>
+      {altModul === "giris" && <GirisAnaliziModul user={user} students={students} teachers={teachers} />}
+      {altModul === "timi" && <TimiModul user={user} students={students} />}
+    </div>
+  );
+}
+
 function GirisAnaliziModul({ user, students, teachers }) {
   const { toast } = useToast();
   const [adim, setAdim] = useState("liste"); // liste, metin-sec, canli, sonuc, rapor-form, rapor-goruntule
+  const [analizModu, setAnalizModu] = useState("olcum"); // olcum | gelisim
+  const [oturumTipi, setOturumTipi] = useState("ilk_analiz"); // ilk_analiz | ara_analiz | kur_sonu_analiz
   const [seciliOgrenci, setSeciliOgrenci] = useState(null);
   const [seciliMetin, setSeciliMetin] = useState(null);
   const [aktifOturumId, setAktifOturumId] = useState(null);
@@ -3984,6 +4631,9 @@ function GirisAnaliziModul({ user, students, teachers }) {
   const [aktifOturum, setAktifOturum] = useState(null);
   const [normDialogAcik, setNormDialogAcik] = useState(false);
   const [metinDialogAcik, setMetinDialogAcik] = useState(false);
+  const [duzenlenecekMetin, setDuzenlenecekMetin] = useState(null);
+  // "Düzenle": secimModu ne olursa olsun tam ekran editöre geç (modalı kapat)
+  const acMetinDuzenle = (m) => { setMetinDialogAcik(false); setDuzenlenecekMetin(m); setAdim("metin-duzenle"); };
 
   const fetchGecmis = useCallback(async () => {
     try { const r = await axios.get(`${API}/diagnostic/sessions`); setGecmisOturumlar(r.data); } catch(e) {}
@@ -3996,7 +4646,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
     if (!seciliOgrenci?.id) { toast({ title: "Geçersiz öğrenci", description: "Lütfen listeden tekrar seçin", variant: "destructive" }); return; }
     if (!seciliMetin?.id) { toast({ title: "Geçersiz metin", description: "Lütfen metni tekrar seçin", variant: "destructive" }); return; }
     try {
-      const payload = { ogrenci_id: seciliOgrenci.id, metin_id: seciliMetin.id };
+      const payload = { ogrenci_id: seciliOgrenci.id, metin_id: seciliMetin.id, oturum_tipi: oturumTipi };
       console.log("Session başlatılıyor:", payload);
       const r = await axios.post(`${API}/diagnostic/sessions`, payload);
       console.log("Session response:", r.data);
@@ -4107,6 +4757,30 @@ function GirisAnaliziModul({ user, students, teachers }) {
     );
   }
 
+  // ── METİN YÖNETİMİ (tam ekran, gözatma/katkı) ──
+  if (adim === "metin-yonetimi") {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={() => setAdim("liste")}>← Geri</Button>
+          <h2 className="text-xl font-bold">📄 Metin Havuzu Yönetimi</h2>
+        </div>
+        <MetinYonetimi tamEkran user={user} onDuzenle={acMetinDuzenle} />
+      </div>
+    );
+  }
+
+  // ── METİN DÜZENLE (tam ekran editör) ──
+  if (adim === "metin-duzenle" && duzenlenecekMetin) {
+    return (
+      <MetinDuzenleEkrani
+        metin={duzenlenecekMetin}
+        user={user}
+        onGeri={() => { setDuzenlenecekMetin(null); setAdim("metin-yonetimi"); }}
+      />
+    );
+  }
+
   // ── ANA LİSTE ──
   return (
     <div className="space-y-6">
@@ -4118,15 +4792,30 @@ function GirisAnaliziModul({ user, students, teachers }) {
               ⚙️ Norm Tablosu
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={() => setMetinDialogAcik(true)}>
+          <Button variant="outline" size="sm" onClick={() => setAdim("metin-yonetimi")}>
             📄 Metinler
           </Button>
         </div>
       </div>
 
-      {/* Yeni Analiz Başlat */}
+      {/* Analiz Modu Seçimi: Ölçüm mü, Gelişim mi? */}
+      <div className="grid grid-cols-2 gap-3">
+        <button onClick={() => setAnalizModu("olcum")}
+          className={`p-4 rounded-2xl border-2 text-left transition-all ${analizModu === "olcum" ? "border-orange-400 bg-orange-50" : "border-line bg-surface hover:bg-app"}`}>
+          <div className="font-bold flex items-center gap-2">📊 Ölçüm Analizi{analizModu === "olcum" && " ✓"}</div>
+          <div className="text-xs text-subtle mt-1">Öğrenciyle canlı okuma; hız/doğruluk/anlama/prozodi ölçülür, ölçüm raporu üretilir.</div>
+        </button>
+        <button onClick={() => setAnalizModu("gelisim")}
+          className={`p-4 rounded-2xl border-2 text-left transition-all ${analizModu === "gelisim" ? "border-indigo-400 bg-indigo-50" : "border-line bg-surface hover:bg-app"}`}>
+          <div className="font-bold flex items-center gap-2">📈 Gelişim Analizi{analizModu === "gelisim" && " ✓"}</div>
+          <div className="text-xs text-subtle mt-1">İki ölçümü (ön test / son test) karşılaştırır, kur sonu gelişim raporu üretir.</div>
+        </button>
+      </div>
+
+      {/* ÖLÇÜM: Yeni Analiz Başlat */}
+      {analizModu === "olcum" && (
       <Card className="border-2 border-orange-200 shadow-sm">
-        <CardHeader><CardTitle className="text-base flex items-center gap-2">🎯 Yeni Analiz Başlat</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base flex items-center gap-2">🎯 Yeni Ölçüm Analizi Başlat</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -4147,12 +4836,36 @@ function GirisAnaliziModul({ user, students, teachers }) {
               </button>
             </div>
           </div>
+          <div>
+            <Label>Analiz Türü</Label>
+            <Select value={oturumTipi} onValueChange={setOturumTipi}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent position="popper" className="z-[60] bg-surface">
+                <SelectItem value="ilk_analiz">İlk Analiz (ön test)</SelectItem>
+                <SelectItem value="ara_analiz">Ara Analiz</SelectItem>
+                <SelectItem value="kur_sonu_analiz">Kur Sonu Analizi (son test)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-subtle mt-1">Gelişim raporu için "İlk Analiz" ve "Kur Sonu Analizi" karşılaştırılır.</p>
+          </div>
           <Button onClick={analiziBaslat} disabled={!seciliOgrenci || !seciliMetin}
             className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 font-bold">
             ▶ Analizi Başlat
           </Button>
         </CardContent>
       </Card>
+      )}
+
+      {/* GELİŞİM: iki ölçümü karşılaştır */}
+      {analizModu === "gelisim" && (
+      <Card className="border-2 border-indigo-200 shadow-sm">
+        <CardHeader><CardTitle className="text-base flex items-center gap-2">📈 Gelişim Analizi (Ön Test / Son Test)</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-subtle">Bir öğrencinin <b>İlk Analiz</b> ve <b>Kur Sonu Analizi</b> ölçümlerini karşılaştırarak gelişim raporu üretin. Her iki ölçümün de tamamlanmış ve ölçüm raporu oluşturulmuş olması gerekir.</p>
+          <GelisimRaporuButonu students={students} />
+        </CardContent>
+      </Card>
+      )}
 
       {/* Geçmiş Analizler */}
       <Card className="border-0 shadow-sm">
@@ -4217,7 +4930,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
             <DialogTitle>📄 Analiz Metinleri</DialogTitle>
             <DialogDescription>{seciliMetin ? "Farklı bir metin seçin veya yeni metin ekleyin" : "Analiz için metin seçin"}</DialogDescription>
           </DialogHeader>
-          <MetinYonetimi secimModu={true} user={user} filtreSinif={seciliOgrenci?.sinif} onMetinSec={m => { setSeciliMetin(m); setMetinDialogAcik(false); }} />
+          <MetinYonetimi secimModu={true} user={user} filtreSinif={seciliOgrenci?.sinif} onDuzenle={acMetinDuzenle} onMetinSec={m => { setSeciliMetin(m); setMetinDialogAcik(false); }} />
         </DialogContent>
       </Dialog>
     </div>
@@ -4422,6 +5135,9 @@ function OgretmenPaneli({ user, logout }) {
             </div>
             {/* Risk faktörleri */}
             {d.risk?.faktorler?.length > 0 && (<div className="bg-red-50 rounded-xl p-3 border border-red-100"><div className="text-xs font-medium text-red-700 mb-1">⚠️ Risk Faktörleri:</div>{d.risk.faktorler.map((f,i) => <div key={i} className="text-xs text-red-600">• {f}</div>)}</div>)}
+
+            {/* TIMI Çoklu Zeka özeti */}
+            <TimiOzetKarti ogrenciId={seciliOgrenci.id} />
 
             {/* 🤖 AI Koçluk Butonu + Sonuçlar */}
             {(() => {
@@ -5208,7 +5924,7 @@ function OgretmenPaneli({ user, logout }) {
         </div>)}
 
         {/* ═══ GİRİŞ ANALİZİ ═══ */}
-        {aktifSekme === "giris-analizi" && ozellikAktif("ogretmen_giris_analizi") && (<GirisAnaliziModul user={user} students={ogrenciler} teachers={[]} />)}
+        {aktifSekme === "giris-analizi" && ozellikAktif("ogretmen_giris_analizi") && (<AnalizSekmesi user={user} students={ogrenciler} teachers={[]} />)}
         {aktifSekme === "giris-analizi" && !ozellikAktif("ogretmen_giris_analizi") && (<div className="text-center py-16 text-subtle"><div className="text-4xl mb-3">🔒</div><p className="font-medium">Bu özellik şu an devre dışı</p><p className="text-sm mt-1">Sistem yöneticisi bu modülü kapatmıştır.</p></div>)}
 
         {/* ═══ GELİŞİM ═══ */}
@@ -7976,6 +8692,158 @@ function GuncellemeKontrol() {
 
 
 // ═══════════════════════════════════════════════
+// RAPOR ÖLÇÜTLERİ YÖNETİM PANELİ — Giriş Analizi raporları (admin/coordinator)
+// Norm/eşik/rubrik ölçütleri /admin/rapor-ayarlari/{tip} üzerinden CRUD edilir.
+// ═══════════════════════════════════════════════
+function RaporOlcutleriPaneli() {
+  const { toast } = useToast();
+  const [a, setA] = useState(null);
+  const [kayit, setKayit] = useState("");
+  const [bolum, setBolum] = useState("normlar");
+
+  useEffect(() => { axios.get(`${API}/admin/rapor-ayarlari`).then(r => setA(r.data)).catch(() => {}); }, []);
+
+  const setTip = (tip, deg) => setA(prev => ({ ...prev, [tip]: deg }));
+  const kaydet = async (tip) => {
+    setKayit(tip);
+    try { await axios.put(`${API}/admin/rapor-ayarlari/${tip}`, { degerler: a[tip] }); toast({ title: "✅ Kaydedildi" }); }
+    catch (e) { toast({ title: "Hata", variant: "destructive" }); }
+    setKayit("");
+  };
+  const varsayilana = async (tip) => {
+    try { const r = await axios.post(`${API}/admin/rapor-ayarlari/${tip}/varsayilana-don`); setTip(tip, r.data.degerler); toast({ title: "↩️ Varsayılana dönüldü" }); } catch (e) {}
+  };
+  const yeniId = (on) => `${on}_${Date.now()}`;
+
+  if (!a) return <div className="p-6 text-subtle text-sm">Yükleniyor…</div>;
+
+  const bolumler = [
+    { id: "normlar", l: "📏 Okuma Hızı Normları" },
+    { id: "dogruluk", l: "🎯 Doğruluk & Kur Eşikleri" },
+    { id: "anlama", l: "🧠 Anlama Rubriği" },
+    { id: "prozodik", l: "🎵 Prozodik Ölçütler" },
+    { id: "gelisim", l: "📈 Gelişim Eşikleri" },
+  ];
+  const KaydetBtn = ({ tip }) => (
+    <div className="flex gap-2 pt-2">
+      <Button onClick={() => kaydet(tip)} disabled={kayit === tip} className="bg-primary text-white">💾 Kaydet</Button>
+      <Button variant="outline" onClick={() => varsayilana(tip)}>↩️ Varsayılana Dön</Button>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-2xl font-bold">📋 Rapor Ölçütleri</h2>
+        <p className="text-subtle text-sm">Giriş Analizi (Ölçüm & Gelişim) raporlarının norm, eşik ve rubrik ölçütleri. Değişiklikler yeni oluşturulan raporlara uygulanır.</p>
+      </div>
+      <div className="flex gap-2 flex-wrap">
+        {bolumler.map(b => (
+          <button key={b.id} onClick={() => setBolum(b.id)}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${bolum === b.id ? 'bg-primary text-white border-blue-600' : 'bg-surface text-subtle border-line'}`}>{b.l}</button>
+        ))}
+      </div>
+
+      {/* 📏 Okuma Hızı Normları */}
+      {bolum === "normlar" && (
+        <Card className="border-0 shadow-sm"><CardHeader><CardTitle>Okuma Hızı Normları (kelime/dk)</CardTitle><p className="text-sm text-subtle">Sınıf bazlı Düşük/Orta/Yeterli eşikleri. WPM bu eşiklere göre düzeye çevrilir.</p></CardHeader><CardContent>
+          <div className="overflow-x-auto"><table className="text-sm">
+            <thead><tr className="text-subtle"><th className="p-1 text-left">Sınıf</th><th className="p-1">Düşük</th><th className="p-1">Orta</th><th className="p-1">Yeterli</th></tr></thead>
+            <tbody>{Object.keys(a.okuma_hizi_normlari).sort().map(sn => (
+              <tr key={sn}><td className="p-1 font-medium">{sn}. sınıf</td>
+                {["dusuk", "orta", "yeterli"].map(k => (
+                  <td key={k} className="p-1"><Input type="number" className="w-24 text-center" value={a.okuma_hizi_normlari[sn][k]}
+                    onChange={e => setTip("okuma_hizi_normlari", { ...a.okuma_hizi_normlari, [sn]: { ...a.okuma_hizi_normlari[sn], [k]: parseInt(e.target.value) || 0 } })} /></td>
+                ))}</tr>
+            ))}</tbody>
+          </table></div>
+          <KaydetBtn tip="okuma_hizi_normlari" />
+        </CardContent></Card>
+      )}
+
+      {/* 🎯 Doğruluk & Kur Eşikleri */}
+      {bolum === "dogruluk" && (
+        <Card className="border-0 shadow-sm"><CardHeader><CardTitle>Doğru Okuma Oranı Eşikleri (%)</CardTitle></CardHeader><CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-3 max-w-md">
+            <div><Label className="text-sm">İyi (≥)</Label><Input type="number" value={a.dogruluk_esikleri.iyi} onChange={e => setTip("dogruluk_esikleri", { ...a.dogruluk_esikleri, iyi: parseInt(e.target.value) || 0 })} /></div>
+            <div><Label className="text-sm">Geliştirilmeli (≥)</Label><Input type="number" value={a.dogruluk_esikleri.gelistirilmeli} onChange={e => setTip("dogruluk_esikleri", { ...a.dogruluk_esikleri, gelistirilmeli: parseInt(e.target.value) || 0 })} /></div>
+          </div>
+          <p className="text-xs text-subtle">≥İyi → "İyi", ≥Geliştirilmeli → "Geliştirilmeli", altı → "Yetersiz".</p>
+          <KaydetBtn tip="dogruluk_esikleri" />
+          <div className="border-t pt-3">
+            <Label className="text-sm font-bold">Kur Önerisi Eşikleri (doğruluk %)</Label>
+            <div className="grid grid-cols-2 gap-3 max-w-md mt-1">
+              <div><Label className="text-xs">Kur 3 için (≥)</Label><Input type="number" value={a.kur_onerisi_esikleri.kur3_dogruluk} onChange={e => setTip("kur_onerisi_esikleri", { ...a.kur_onerisi_esikleri, kur3_dogruluk: parseInt(e.target.value) || 0 })} /></div>
+              <div><Label className="text-xs">Kur 2 için (≥)</Label><Input type="number" value={a.kur_onerisi_esikleri.kur2_dogruluk} onChange={e => setTip("kur_onerisi_esikleri", { ...a.kur_onerisi_esikleri, kur2_dogruluk: parseInt(e.target.value) || 0 })} /></div>
+            </div>
+            <KaydetBtn tip="kur_onerisi_esikleri" />
+          </div>
+        </CardContent></Card>
+      )}
+
+      {/* 🧠 Anlama Rubriği (4 boyut, madde ekle/düzenle/sil) */}
+      {bolum === "anlama" && (
+        <Card className="border-0 shadow-sm"><CardHeader><CardTitle>Okuduğunu Anlama Rubriği</CardTitle><p className="text-sm text-subtle">4 alt boyut ve maddeleri. Eklediğiniz madde, yeni Ölçüm Raporu formunda otomatik satır olarak çıkar.</p></CardHeader><CardContent className="space-y-4">
+          {(a.anlama_rubrik_maddeleri || []).map((boyut, bi) => (
+            <div key={boyut.id || bi} className="border rounded-xl p-3">
+              <Input className="font-bold mb-2" value={boyut.baslik} onChange={e => { const c = [...a.anlama_rubrik_maddeleri]; c[bi] = { ...c[bi], baslik: e.target.value }; setTip("anlama_rubrik_maddeleri", c); }} />
+              <div className="space-y-1.5">
+                {(boyut.maddeler || []).map((m, mi) => (
+                  <div key={m.id || mi} className="flex items-center gap-2">
+                    <Input className="text-sm" value={m.etiket} onChange={e => { const c = [...a.anlama_rubrik_maddeleri]; c[bi].maddeler[mi] = { ...m, etiket: e.target.value }; setTip("anlama_rubrik_maddeleri", c); }} />
+                    <button onClick={() => { const c = [...a.anlama_rubrik_maddeleri]; c[bi].maddeler = c[bi].maddeler.filter((_, i) => i !== mi); setTip("anlama_rubrik_maddeleri", c); }} className="text-red-500 hover:bg-red-50 rounded px-2">🗑️</button>
+                  </div>
+                ))}
+                <button onClick={() => { const c = [...a.anlama_rubrik_maddeleri]; c[bi].maddeler = [...(c[bi].maddeler || []), { id: yeniId("madde"), etiket: "Yeni madde" }]; setTip("anlama_rubrik_maddeleri", c); }} className="text-sm text-primary hover:underline">+ Madde ekle</button>
+              </div>
+            </div>
+          ))}
+          <KaydetBtn tip="anlama_rubrik_maddeleri" />
+        </CardContent></Card>
+      )}
+
+      {/* 🎵 Prozodik Ölçütler (ekle/düzenle/sil + 1-4 çapa) */}
+      {bolum === "prozodik" && (
+        <Card className="border-0 shadow-sm"><CardHeader><CardTitle>Prozodik Okuma Ölçütleri</CardTitle><p className="text-sm text-subtle">Her ölçüt 1-4 puan; toplam puan ölçüt sayısına göre dinamik hesaplanır.</p></CardHeader><CardContent className="space-y-3">
+          {(a.prozodik_olcutler || []).map((olcut, oi) => (
+            <div key={olcut.id || oi} className="border rounded-xl p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <Input className="font-bold" value={olcut.etiket} onChange={e => { const c = [...a.prozodik_olcutler]; c[oi] = { ...c[oi], etiket: e.target.value }; setTip("prozodik_olcutler", c); }} />
+                <button onClick={() => setTip("prozodik_olcutler", a.prozodik_olcutler.filter((_, i) => i !== oi))} className="text-red-500 hover:bg-red-50 rounded px-2">🗑️</button>
+              </div>
+              <div className="grid grid-cols-4 gap-1.5">
+                {["1", "2", "3", "4"].map(p => (
+                  <div key={p}><Label className="text-[10px] text-subtle">{p} puan</Label>
+                    <Input className="text-xs" value={(olcut.capalar || {})[p] || ""} onChange={e => { const c = [...a.prozodik_olcutler]; c[oi] = { ...c[oi], capalar: { ...(c[oi].capalar || {}), [p]: e.target.value } }; setTip("prozodik_olcutler", c); }} /></div>
+                ))}
+              </div>
+            </div>
+          ))}
+          <button onClick={() => setTip("prozodik_olcutler", [...(a.prozodik_olcutler || []), { id: yeniId("olcut"), etiket: "Yeni ölçüt", capalar: { "1": "", "2": "", "3": "", "4": "" } }])} className="text-sm text-primary hover:underline">+ Ölçüt ekle</button>
+          <KaydetBtn tip="prozodik_olcutler" />
+        </CardContent></Card>
+      )}
+
+      {/* 📈 Gelişim Değişim Eşikleri */}
+      {bolum === "gelisim" && (
+        <Card className="border-0 shadow-sm"><CardHeader><CardTitle>Gelişim Raporu Değişim Eşikleri</CardTitle><p className="text-sm text-subtle">Ön→son değişim bu eşiklere göre "Anlamlı Gelişim / Sabit-Sınırlı / Gerileme" olarak etiketlenir.</p></CardHeader><CardContent className="space-y-3">
+          <div className="overflow-x-auto"><table className="text-sm">
+            <thead><tr className="text-subtle"><th className="p-1 text-left">Metrik</th><th className="p-1">Anlamlı Gelişim (≥)</th><th className="p-1">Gerileme (≤)</th></tr></thead>
+            <tbody>{[["wpm", "Okuma Hızı"], ["dogruluk", "Doğruluk %"], ["prozodik", "Prozodik Puan"], ["anlama", "Anlama %"]].map(([k, l]) => (
+              <tr key={k}><td className="p-1 font-medium">{l}</td>
+                <td className="p-1"><Input type="number" className="w-24 text-center" value={a.gelisim_degisim_esikleri[k]?.anlamli ?? 0} onChange={e => setTip("gelisim_degisim_esikleri", { ...a.gelisim_degisim_esikleri, [k]: { ...a.gelisim_degisim_esikleri[k], anlamli: parseInt(e.target.value) || 0 } })} /></td>
+                <td className="p-1"><Input type="number" className="w-24 text-center" value={a.gelisim_degisim_esikleri[k]?.gerileme ?? 0} onChange={e => setTip("gelisim_degisim_esikleri", { ...a.gelisim_degisim_esikleri, [k]: { ...a.gelisim_degisim_esikleri[k], gerileme: parseInt(e.target.value) || 0 } })} /></td>
+              </tr>
+            ))}</tbody>
+          </table></div>
+          <KaydetBtn tip="gelisim_degisim_esikleri" />
+        </CardContent></Card>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════
 // SİSTEM AYARLARI — Admin panel (Rozet, XP, Lig, Anket yönetimi)
 // ═══════════════════════════════════════════════
 
@@ -8085,7 +8953,7 @@ function SistemAyarlari({ user }) {
       <p className="text-subtle text-sm">Rozet, XP, lig ve anket ayarlarını buradan yönetin. Değişiklikler anında uygulanır.</p>
 
       <div className="flex gap-2 flex-wrap">
-        {[{id:"ozellikler",l:"🎛️ Özellik Yönetimi"},{id:"xp",l:"💰 XP Değerleri"},{id:"ogretmen_xp",l:"👨‍🏫 Öğretmen XP"},{id:"lig",l:"🏆 Lig Eşikleri"},{id:"ogretmen_rozet",l:"🏅 Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"🎓 Öğrenci Rozetleri"},{id:"anket",l:"⭐ Anket Soruları"},{id:"kutulu_okuma",l:"📦 Kutulu Okuma"},{id:"profil_gorunurluk",l:"👁️ Profil Görünürlüğü"},{id:"instagram",l:"📱 Instagram"},{id:"kvkk",l:"🔒 Veri & KVKK"},{id:"sezon",l:"🔄 Sezonluk Reset"}].map(s => (
+        {[{id:"ozellikler",l:"🎛️ Özellik Yönetimi"},{id:"xp",l:"💰 XP Değerleri"},{id:"ogretmen_xp",l:"👨‍🏫 Öğretmen XP"},{id:"lig",l:"🏆 Lig Eşikleri"},{id:"ogretmen_rozet",l:"🏅 Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"🎓 Öğrenci Rozetleri"},{id:"anket",l:"⭐ Anket Soruları"},{id:"kutulu_okuma",l:"📦 Kutulu Okuma"},{id:"rapor_olcutleri",l:"📋 Rapor Ölçütleri"},{id:"profil_gorunurluk",l:"👁️ Profil Görünürlüğü"},{id:"instagram",l:"📱 Instagram"},{id:"kvkk",l:"🔒 Veri & KVKK"},{id:"sezon",l:"🔄 Sezonluk Reset"}].map(s => (
           <button key={s.id} onClick={() => setAyarSekme(s.id)}
             className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${ayarSekme === s.id ? 'bg-primary text-white border-blue-600' : 'bg-surface text-subtle border-line'}`}>{s.l}</button>
         ))}
@@ -8200,6 +9068,8 @@ function SistemAyarlari({ user }) {
 
       {/* KVKK / Veri Paneli */}
       {/* Özellik Yönetimi */}
+      {ayarSekme === "rapor_olcutleri" && <RaporOlcutleriPaneli />}
+
       {ayarSekme === "ozellikler" && (
         <Card className="border-0 shadow-sm">
           <CardContent className="pt-6">
