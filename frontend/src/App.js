@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./components/ui/dialog";
 import { Badge } from "./components/ui/badge";
-import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send, Bell, Database, RefreshCw, GitBranch, AlertTriangle, Package, ClipboardList, Flame, Target, Award, Heart, FlaskConical, Medal, Lock, Sparkles } from "lucide-react";
+import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send, Bell, Database, RefreshCw, GitBranch, AlertTriangle, Package, ClipboardList, Flame, Target, Award, Heart, FlaskConical, Medal, Lock, Sparkles, Lightbulb, MessageCircle, TrendingUp } from "lucide-react";
 import { useToast } from "./hooks/use-toast";
 import { Toaster } from "./components/ui/toaster";
 import ModulYonetimi from "./components/ModulYonetimi";
@@ -5722,7 +5722,7 @@ function OgretmenPaneli({ user, logout }) {
                               </div>
                               <p className="text-xs text-subtle mt-1">{seciliRozet.kriter}</p>
                               <div className="mt-2">{seciliRozet.kazandi
-                                ? <span className="text-xs text-green-600 font-medium bg-green-50 px-2 py-1 rounded-full">✅ Kazanıldı!</span>
+                                ? <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium bg-green-50 px-2 py-1 rounded-full"><CheckCircle className="w-3 h-3" /> Kazanıldı!</span>
                                 : <span className="inline-flex items-center gap-1 text-xs text-subtle bg-gray-100 px-2 py-1 rounded-full"><Lock className="w-3 h-3" /> Henüz kazanılmadı — yukarıdaki kriteri tamamlayın</span>
                               }</div>
                             </div>
@@ -5753,7 +5753,7 @@ function OgretmenPaneli({ user, logout }) {
               {anketDetayAcik && (() => {
                 const ipuclari = {
                   iletisim: {
-                    baslik: "💬 İletişim",
+                    baslik: "İletişim",
                     puan: anketOzet.kategoriler?.iletisim,
                     ipuclari: [
                       "Öğrenciyle bire bir kısa görüşmeler yapın — 2 dakika bile fark yaratır",
@@ -5763,7 +5763,7 @@ function OgretmenPaneli({ user, logout }) {
                     ]
                   },
                   duzen: {
-                    baslik: "📋 Düzen",
+                    baslik: "Düzen",
                     puan: anketOzet.kategoriler?.duzen,
                     ipuclari: [
                       "Her hafta aynı gün görev atayın — düzenlilik güven oluşturur",
@@ -5773,7 +5773,7 @@ function OgretmenPaneli({ user, logout }) {
                     ]
                   },
                   etki: {
-                    baslik: "📈 Etki",
+                    baslik: "Etki",
                     puan: anketOzet.kategoriler?.etki,
                     ipuclari: [
                       "Kur atlama raporlarını velilerle paylaşın — somut ilerleme göstersin",
@@ -5783,7 +5783,7 @@ function OgretmenPaneli({ user, logout }) {
                     ]
                   },
                   geri_bildirim: {
-                    baslik: "📝 Geri Bildirim",
+                    baslik: "Geri Bildirim",
                     puan: anketOzet.kategoriler?.geri_bildirim,
                     ipuclari: [
                       "Test sonuçlarından sonra kısa bir yorum yazın: 'Anlama becerisi gelişiyor'",
@@ -5793,7 +5793,7 @@ function OgretmenPaneli({ user, logout }) {
                     ]
                   },
                   motivasyon: {
-                    baslik: "🔥 Motivasyon",
+                    baslik: "Motivasyon",
                     puan: anketOzet.kategoriler?.motivasyon,
                     ipuclari: [
                       "Streak tebrik mesajları gönderin: '7 gün! Harika gidiyorsun!'",
@@ -5803,7 +5803,7 @@ function OgretmenPaneli({ user, logout }) {
                     ]
                   },
                   icerik: {
-                    baslik: "📚 İçerik Çeşitliliği",
+                    baslik: "İçerik Çeşitliliği",
                     puan: anketOzet.kategoriler?.icerik,
                     ipuclari: [
                       "Farklı türlerde görevler atayın: kitap, film, makale karışık",
@@ -5813,7 +5813,7 @@ function OgretmenPaneli({ user, logout }) {
                     ]
                   },
                   genel: {
-                    baslik: "⭐ Genel Memnuniyet",
+                    baslik: "Genel Memnuniyet",
                     puan: anketOzet.kategoriler?.genel,
                     ipuclari: [
                       "Tüm kategorilerde tutarlı olun — zayıf alan genel puanı düşürür",
@@ -5824,6 +5824,7 @@ function OgretmenPaneli({ user, logout }) {
                   }
                 };
                 const katRenk = (v) => v >= 4.5 ? "bg-green-500" : v >= 4.0 ? "bg-purple-500" : v >= 3.5 ? "bg-yellow-500" : "bg-red-500";
+                const kategoriIkon = { iletisim: MessageCircle, duzen: ClipboardList, etki: TrendingUp, geri_bildirim: FileText, motivasyon: Flame, icerik: BookOpen, genel: Star };
 
                 return (
                   <div className="mt-3 pt-3 border-t border-line space-y-3">
@@ -5845,17 +5846,17 @@ function OgretmenPaneli({ user, logout }) {
                             </div>
                             {seciliKategori === k && ipuclari[k] && (
                               <div className="ml-1 mt-1 mb-2 bg-gradient-to-r from-purple-50 to-white rounded-xl p-3 border border-purple-100">
-                                <div className="text-xs font-bold text-purple-700 mb-1.5">{ipuclari[k].baslik} — Puanınızı artırmak için:</div>
+                                <div className="flex items-center gap-1.5 text-xs font-bold text-purple-700 mb-1.5">{React.createElement(kategoriIkon[k] || Star, { className: "w-3.5 h-3.5" })} {ipuclari[k].baslik} — Puanınızı artırmak için:</div>
                                 <div className="space-y-1.5">
                                   {ipuclari[k].ipuclari.map((tip, i) => (
                                     <div key={i} className="flex items-start gap-2">
-                                      <span className="text-purple-400 text-xs mt-0.5">💡</span>
+                                      <Lightbulb className="w-3 h-3 text-amber-500 mt-0.5 shrink-0" />
                                       <span className="text-xs text-subtle">{tip}</span>
                                     </div>
                                   ))}
                                 </div>
                                 {v < 4.5 && <div className="mt-2 text-[10px] text-purple-500 italic">Şu anki puan: {v} → Hedefiniz: 4.5+ ile bu alanda mükemmel seviyeye ulaşın</div>}
-                                {v >= 4.5 && <div className="mt-2 text-[10px] text-green-600 italic">🎉 Bu kategoride harika gidiyorsunuz! Tutarlılığı koruyun.</div>}
+                                {v >= 4.5 && <div className="mt-2 flex items-center gap-1 text-[10px] text-green-600 italic"><CheckCircle className="w-3 h-3" /> Bu kategoride harika gidiyorsunuz! Tutarlılığı koruyun.</div>}
                               </div>
                             )}
                           </div>
@@ -5917,7 +5918,7 @@ function OgretmenPaneli({ user, logout }) {
                         setHedefEkleAcik(false); setHedefForm({ kod: "", hedef_deger: 0, son_tarih: "" });
                         const r = await axios.get(`${API}/hedefler`); setHedefler(Array.isArray(r.data) ? r.data : []);
                       } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
-                    }}>🎯 Hedef Belirle</Button>
+                    }}><Target className="w-4 h-4 inline mr-1" /> Hedef Belirle</Button>
                   </>)}
                 </div>
               );
