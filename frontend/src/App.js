@@ -12913,6 +12913,118 @@ function GeminiDurumSatiri({ apiBase }) {
   );
 }
 
+
+// Kitap okuyucu modalı — GelisimAlani'ndan ayrı bileşen. useState'ler bileşen
+// tepesinde (koşullu IIFE içinde değil) → Rules of Hooks ihlali giderildi.
+function KitapOkuyucuModal({ kitap, onClose }) {
+        const bolumler = kitap.bolumler || [];
+        const [aktifBolum, setAktifBolum] = React.useState(0);
+        const [aramaMetni, setAramaMetni] = React.useState("");
+
+        const filtreliBolumler = aramaMetni.trim()
+          ? bolumler.filter(b => b.baslik?.toLowerCase().includes(aramaMetni.toLowerCase()) || b.metin?.toLowerCase().includes(aramaMetni.toLowerCase()))
+          : bolumler;
+
+        return (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-stretch justify-center">
+            <div className="bg-surface w-full max-w-5xl flex flex-col shadow-2xl">
+
+              {/* Header */}
+              <div className="bg-gray-900 text-white px-5 py-3 flex items-center gap-3 shrink-0">
+                <span className="text-xl">{kitap.ext === ".pdf" ? "📕" : "📘"}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-sm truncate">{kitap.yukleme?.kitap_adi || kitap.dosya_adi}</div>
+                  <div className="text-xs text-subtle flex gap-3">
+                    {kitap.yukleme?.sinif && <span>{kitap.yukleme.sinif}. Sınıf</span>}
+                    {kitap.yukleme?.ders_adi && <span>• {kitap.yukleme.ders_adi}</span>}
+                    {kitap.yukleme?.yazar && <span>• {kitap.yukleme.yazar}</span>}
+                    <span>• {kitap.toplam_bolum} bölüm</span>
+                    <span>• {kitap.toplam_kelime?.toLocaleString()} kelime</span>
+                  </div>
+                </div>
+                <button onClick={() => onClose()} className="w-8 h-8 bg-white/10 hover:bg-red-500 rounded-lg flex items-center justify-center transition-all text-sm">✕</button>
+              </div>
+
+              {/* Ana layout — sidebar + içerik */}
+              <div className="flex flex-1 overflow-hidden">
+
+                {/* Sol sidebar — bölüm listesi */}
+                <div className="w-56 bg-app border-r flex flex-col shrink-0">
+                  <div className="p-2 border-b">
+                    <input
+                      value={aramaMetni}
+                      onChange={e => setAramaMetni(e.target.value)}
+                      placeholder="🔍 Bölüm ara..."
+                      className="w-full text-xs border rounded-lg px-2 py-1.5 bg-surface focus:outline-none focus:border-teal-400"
+                    />
+                  </div>
+                  <div className="overflow-y-auto flex-1 py-1">
+                    {filtreliBolumler.map((b, i) => {
+                      const gercekIdx = bolumler.indexOf(b);
+                      return (
+                        <button key={i} onClick={() => { setAktifBolum(gercekIdx); setAramaMetni(""); }}
+                          className={`w-full text-left px-3 py-2 text-xs transition-all border-l-2 ${aktifBolum === gercekIdx ? "bg-teal-50 border-teal-500 text-teal-800 font-medium" : "border-transparent text-subtle hover:bg-gray-100"}`}>
+                          <div className="truncate">{b.baslik || `Bölüm ${gercekIdx+1}`}</div>
+                          {b.sayfa && <div className="text-[10px] text-subtle">Sayfa {b.sayfa}</div>}
+                        </button>
+                      );
+                    })}
+                    {filtreliBolumler.length === 0 && <div className="text-center py-6 text-xs text-subtle">Sonuç yok</div>}
+                  </div>
+                  <div className="p-2 border-t text-[10px] text-subtle text-center">
+                    {bolumler.length} bölüm
+                  </div>
+                </div>
+
+                {/* Sağ — metin içeriği */}
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  {bolumler.length > 0 ? (
+                    <>
+                      {/* Bölüm başlığı + navigasyon */}
+                      <div className="px-6 py-3 border-b bg-surface flex items-center justify-between shrink-0">
+                        <div>
+                          <div className="font-bold text-content">{bolumler[aktifBolum]?.baslik || `Bölüm ${aktifBolum+1}`}</div>
+                          <div className="text-xs text-subtle">{bolumler[aktifBolum]?.metin?.split(" ").length || 0} kelime • {bolumler[aktifBolum]?.sayfa ? `Sayfa ${bolumler[aktifBolum].sayfa}` : `${aktifBolum+1}/${bolumler.length}`}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => setAktifBolum(Math.max(0, aktifBolum-1))} disabled={aktifBolum === 0}
+                            className="w-8 h-8 rounded-lg border flex items-center justify-center text-sm disabled:opacity-30 hover:bg-gray-100">←</button>
+                          <span className="text-xs text-subtle">{aktifBolum+1} / {bolumler.length}</span>
+                          <button onClick={() => setAktifBolum(Math.min(bolumler.length-1, aktifBolum+1))} disabled={aktifBolum === bolumler.length-1}
+                            className="w-8 h-8 rounded-lg border flex items-center justify-center text-sm disabled:opacity-30 hover:bg-gray-100">→</button>
+                        </div>
+                      </div>
+
+                      {/* Metin */}
+                      <div className="flex-1 overflow-y-auto p-6 md:p-10">
+                        <div className="max-w-2xl mx-auto">
+                          <p className="text-content leading-loose text-base font-serif whitespace-pre-wrap">
+                            {bolumler[aktifBolum]?.metin || "Bu bölümde içerik bulunamadı."}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Alt navigasyon */}
+                      <div className="border-t px-6 py-2 flex justify-between items-center shrink-0 bg-surface">
+                        <button onClick={() => setAktifBolum(Math.max(0, aktifBolum-1))} disabled={aktifBolum === 0}
+                          className="text-xs text-teal-600 disabled:opacity-30 hover:underline">← Önceki</button>
+                        <div className="text-xs text-subtle">{aktifBolum+1} / {bolumler.length}</div>
+                        <button onClick={() => setAktifBolum(Math.min(bolumler.length-1, aktifBolum+1))} disabled={aktifBolum === bolumler.length-1}
+                          className="text-xs text-teal-600 disabled:opacity-30 hover:underline">Sonraki →</button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center text-subtle">
+                      <div className="text-center"><div className="text-4xl mb-3">📭</div><p>İçerik bulunamadı</p></div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+}
+
 function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabChange }) {
   const { toast } = useToast();
   const { isFullscreen } = useFullscreenExercise();
@@ -12970,7 +13082,6 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
     try { const r = await axios.get(`${API}/gelisim/tamamlama/${user.id}`); setTamamlananlar(r.data); } catch(e) {}
     try { const r = await axios.get(`${API}/puan-tablosu/birlesik`); setPuanTablosu(Array.isArray(r.data) ? r.data : []); } catch(e) {}
     try { const r = await axios.get(`${API}/egzersiz/puanlar`); setEgzersizPuanlari(r.data); } catch(e) {}
-    try { const r = await axios.get(`${API}/gelisim/peer-rozet`); setHaftalikOySayisi(r.data.haftalik_oy || 0); setPeerRozetler(r.data); } catch(e) {}
   }, [user.id]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
@@ -13795,115 +13906,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
       {/* Görevler alt sekmesi */}
 
       {/* KİTAP OKUYUCU MODALI */}
-      {kitapOkuyucu && (() => {
-        const mod = kitapOkuyucu.mod || "parca";
-        const bolumler = kitapOkuyucu.bolumler || [];
-        const [aktifBolum, setAktifBolum] = React.useState(0);
-        const [aramaMetni, setAramaMetni] = React.useState("");
-
-        const filtreliBolumler = aramaMetni.trim()
-          ? bolumler.filter(b => b.baslik?.toLowerCase().includes(aramaMetni.toLowerCase()) || b.metin?.toLowerCase().includes(aramaMetni.toLowerCase()))
-          : bolumler;
-
-        return (
-          <div className="fixed inset-0 bg-black/60 z-50 flex items-stretch justify-center">
-            <div className="bg-surface w-full max-w-5xl flex flex-col shadow-2xl">
-
-              {/* Header */}
-              <div className="bg-gray-900 text-white px-5 py-3 flex items-center gap-3 shrink-0">
-                <span className="text-xl">{kitapOkuyucu.ext === ".pdf" ? "📕" : "📘"}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="font-bold text-sm truncate">{kitapOkuyucu.yukleme?.kitap_adi || kitapOkuyucu.dosya_adi}</div>
-                  <div className="text-xs text-subtle flex gap-3">
-                    {kitapOkuyucu.yukleme?.sinif && <span>{kitapOkuyucu.yukleme.sinif}. Sınıf</span>}
-                    {kitapOkuyucu.yukleme?.ders_adi && <span>• {kitapOkuyucu.yukleme.ders_adi}</span>}
-                    {kitapOkuyucu.yukleme?.yazar && <span>• {kitapOkuyucu.yukleme.yazar}</span>}
-                    <span>• {kitapOkuyucu.toplam_bolum} bölüm</span>
-                    <span>• {kitapOkuyucu.toplam_kelime?.toLocaleString()} kelime</span>
-                  </div>
-                </div>
-                <button onClick={() => setKitapOkuyucu(null)} className="w-8 h-8 bg-white/10 hover:bg-red-500 rounded-lg flex items-center justify-center transition-all text-sm">✕</button>
-              </div>
-
-              {/* Ana layout — sidebar + içerik */}
-              <div className="flex flex-1 overflow-hidden">
-
-                {/* Sol sidebar — bölüm listesi */}
-                <div className="w-56 bg-app border-r flex flex-col shrink-0">
-                  <div className="p-2 border-b">
-                    <input
-                      value={aramaMetni}
-                      onChange={e => setAramaMetni(e.target.value)}
-                      placeholder="🔍 Bölüm ara..."
-                      className="w-full text-xs border rounded-lg px-2 py-1.5 bg-surface focus:outline-none focus:border-teal-400"
-                    />
-                  </div>
-                  <div className="overflow-y-auto flex-1 py-1">
-                    {filtreliBolumler.map((b, i) => {
-                      const gercekIdx = bolumler.indexOf(b);
-                      return (
-                        <button key={i} onClick={() => { setAktifBolum(gercekIdx); setAramaMetni(""); }}
-                          className={`w-full text-left px-3 py-2 text-xs transition-all border-l-2 ${aktifBolum === gercekIdx ? "bg-teal-50 border-teal-500 text-teal-800 font-medium" : "border-transparent text-subtle hover:bg-gray-100"}`}>
-                          <div className="truncate">{b.baslik || `Bölüm ${gercekIdx+1}`}</div>
-                          {b.sayfa && <div className="text-[10px] text-subtle">Sayfa {b.sayfa}</div>}
-                        </button>
-                      );
-                    })}
-                    {filtreliBolumler.length === 0 && <div className="text-center py-6 text-xs text-subtle">Sonuç yok</div>}
-                  </div>
-                  <div className="p-2 border-t text-[10px] text-subtle text-center">
-                    {bolumler.length} bölüm
-                  </div>
-                </div>
-
-                {/* Sağ — metin içeriği */}
-                <div className="flex-1 flex flex-col overflow-hidden">
-                  {bolumler.length > 0 ? (
-                    <>
-                      {/* Bölüm başlığı + navigasyon */}
-                      <div className="px-6 py-3 border-b bg-surface flex items-center justify-between shrink-0">
-                        <div>
-                          <div className="font-bold text-content">{bolumler[aktifBolum]?.baslik || `Bölüm ${aktifBolum+1}`}</div>
-                          <div className="text-xs text-subtle">{bolumler[aktifBolum]?.metin?.split(" ").length || 0} kelime • {bolumler[aktifBolum]?.sayfa ? `Sayfa ${bolumler[aktifBolum].sayfa}` : `${aktifBolum+1}/${bolumler.length}`}</div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button onClick={() => setAktifBolum(Math.max(0, aktifBolum-1))} disabled={aktifBolum === 0}
-                            className="w-8 h-8 rounded-lg border flex items-center justify-center text-sm disabled:opacity-30 hover:bg-gray-100">←</button>
-                          <span className="text-xs text-subtle">{aktifBolum+1} / {bolumler.length}</span>
-                          <button onClick={() => setAktifBolum(Math.min(bolumler.length-1, aktifBolum+1))} disabled={aktifBolum === bolumler.length-1}
-                            className="w-8 h-8 rounded-lg border flex items-center justify-center text-sm disabled:opacity-30 hover:bg-gray-100">→</button>
-                        </div>
-                      </div>
-
-                      {/* Metin */}
-                      <div className="flex-1 overflow-y-auto p-6 md:p-10">
-                        <div className="max-w-2xl mx-auto">
-                          <p className="text-content leading-loose text-base font-serif whitespace-pre-wrap">
-                            {bolumler[aktifBolum]?.metin || "Bu bölümde içerik bulunamadı."}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Alt navigasyon */}
-                      <div className="border-t px-6 py-2 flex justify-between items-center shrink-0 bg-surface">
-                        <button onClick={() => setAktifBolum(Math.max(0, aktifBolum-1))} disabled={aktifBolum === 0}
-                          className="text-xs text-teal-600 disabled:opacity-30 hover:underline">← Önceki</button>
-                        <div className="text-xs text-subtle">{aktifBolum+1} / {bolumler.length}</div>
-                        <button onClick={() => setAktifBolum(Math.min(bolumler.length-1, aktifBolum+1))} disabled={aktifBolum === bolumler.length-1}
-                          className="text-xs text-teal-600 disabled:opacity-30 hover:underline">Sonraki →</button>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex-1 flex items-center justify-center text-subtle">
-                      <div className="text-center"><div className="text-4xl mb-3">📭</div><p>İçerik bulunamadı</p></div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {kitapOkuyucu && <KitapOkuyucuModal kitap={kitapOkuyucu} onClose={() => setKitapOkuyucu(null)} />}
 
 
       {/* AI Bilgi Tabanı — PDF/Word yükleme */}
