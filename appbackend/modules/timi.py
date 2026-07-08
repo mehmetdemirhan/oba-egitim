@@ -22,7 +22,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from core.db import db
-from core.auth import get_current_user, UserRole
+from core.auth import get_current_user, require_role, UserRole
 
 router = APIRouter()
 
@@ -42,8 +42,11 @@ TIMI_KATEGORILER = {
 # Sıralı kategori anahtarları (rapor/tablo düzeni için)
 KATEGORI_SIRASI = [TIMI_KATEGORILER[i]["key"] for i in range(1, 8)]
 
-# ── Puanlama anahtarı (timi_scoring_key.json > cards) ──
-# kart_no → (A görselinin kategorisi, B görselinin kategorisi)
+# ── Puanlama anahtarı VARSAYILANI (timi_scoring_key.json > cards) ──
+# kart_no → (A görselinin kategorisi, B görselinin kategorisi).
+# Bu doğrulanmış sabit yalnızca VARSAYILANDIR; canlı anahtar DB'de tutulur ve
+# Koordinatör/Yönetici panelinden düzenlenebilir (bkz. get_timi_kartlar /
+# /timi/anahtar). DB boşsa/eksikse daima buraya düşülür — varsayılan kaybolmaz.
 TIMI_KARTLAR = {
     1:  (1, 3), 2:  (4, 5), 3:  (1, 7), 4:  (7, 2), 5:  (3, 5), 6:  (1, 6), 7:  (4, 3),
     8:  (1, 5), 9:  (2, 3), 10: (4, 7), 11: (1, 4), 12: (1, 2), 13: (6, 5), 14: (6, 7),
@@ -78,19 +81,23 @@ TIMI_UYARI_NOTU = (
 )
 
 
-def timi_puanla(yanitlar: List[dict]) -> dict:
+def timi_puanla(yanitlar: List[dict], kartlar: dict = None) -> dict:
     """Yanıt listesinden ({kart_no, secim}) kategori puanlarını hesaplar.
 
     Her seçim, seçilen görselin bağlı olduğu zeka kategorisine +1 puan işler.
     Sonuç, KATEGORI_SIRASI'ndaki tüm anahtarları içerir (seçilmeyenler 0).
+    `kartlar` verilmezse doğrulanmış varsayılan (TIMI_KARTLAR) kullanılır; canlı
+    puanlamada çağıran, DB'deki güncel anahtarı (get_timi_kartlar) geçirir.
     """
+    if kartlar is None:
+        kartlar = TIMI_KARTLAR
     puanlar = {k: 0 for k in KATEGORI_SIRASI}
     for y in yanitlar:
         kart_no = y.get("kart_no") if isinstance(y, dict) else getattr(y, "kart_no", None)
         secim = (y.get("secim") if isinstance(y, dict) else getattr(y, "secim", "")) or ""
-        if kart_no not in TIMI_KARTLAR:
+        if kart_no not in kartlar:
             continue
-        a_cat, b_cat = TIMI_KARTLAR[kart_no]
+        a_cat, b_cat = kartlar[kart_no]
         cat = a_cat if secim.upper() == "A" else b_cat if secim.upper() == "B" else None
         if cat is None:
             continue
@@ -106,6 +113,54 @@ def baskin_zeka_alanlari(kategori_puanlari: dict) -> List[str]:
     if en_yuksek <= 0:
         return []
     return [k for k in KATEGORI_SIRASI if kategori_puanlari.get(k, 0) == en_yuksek]
+
+
+# ─────────────────────────────────────────────
+# Puanlama anahtarı — DB katmanı (Koordinatör/Yönetici düzenlenebilir)
+# ─────────────────────────────────────────────
+# Anahtar db.sistem_ayarlari'nda {tip, degerler, guncelleyen, guncelleme_tarihi}
+# olarak tutulur (rapor_ayarlari deseniyle tutarlı). DB boşsa doğrulanmış
+# TIMI_KARTLAR varsayılanına düşülür → varsayılan asla kaybolmaz (ayrı seed'e
+# gerek yok; getter'ın fallback'i seed görevini görür).
+TIMI_ANAHTAR_TIP = "timi_puanlama_anahtari"
+
+
+async def get_timi_kartlar():
+    """(kartlar_map {int:(a,b)}, guncelleme_tarihi|None) döndürür; DB yoksa varsayılan."""
+    doc = await db.sistem_ayarlari.find_one({"tip": TIMI_ANAHTAR_TIP})
+    if doc and doc.get("degerler"):
+        kartlar = {}
+        for k, v in doc["degerler"].items():
+            try:
+                kartlar[int(k)] = (int(v["a"]), int(v["b"]))
+            except (KeyError, ValueError, TypeError):
+                continue
+        if len(kartlar) == TIMI_KART_SAYISI:
+            return kartlar, doc.get("guncelleme_tarihi")
+    return dict(TIMI_KARTLAR), None
+
+
+async def set_timi_kartlar(kartlar_map, guncelleyen: str = "") -> str:
+    """Anahtarı DB'ye yazar (upsert); guncelleme_tarihi ISO string döndürür."""
+    now = datetime.now(timezone.utc).isoformat()
+    degerler = {str(no): {"a": a, "b": b} for no, (a, b) in kartlar_map.items()}
+    await db.sistem_ayarlari.update_one(
+        {"tip": TIMI_ANAHTAR_TIP},
+        {"$set": {"tip": TIMI_ANAHTAR_TIP, "degerler": degerler,
+                  "guncelleme_tarihi": now, "guncelleyen": guncelleyen}},
+        upsert=True,
+    )
+    return now
+
+
+def anahtar_denge(kartlar_map) -> dict:
+    """Her kategori anahtarının kaç kez göründüğü (dengeli envanterde hepsi 8)."""
+    sayac = {k: 0 for k in KATEGORI_SIRASI}
+    for (a, b) in kartlar_map.values():
+        for cat in (a, b):
+            if cat in TIMI_KATEGORILER:
+                sayac[TIMI_KATEGORILER[cat]["key"]] += 1
+    return sayac
 
 
 # ─────────────────────────────────────────────
@@ -126,6 +181,16 @@ class TimiTamamla(BaseModel):
     # kademeli kaydedilmiş yanıtlar kullanılır.
     yanitlar: Optional[List[TimiYanit]] = None
     notlar: str = ""
+
+
+class TimiAnahtarKart(BaseModel):
+    kart_no: int = Field(ge=1, le=TIMI_KART_SAYISI)
+    a_kategori: int = Field(ge=1, le=7)
+    b_kategori: int = Field(ge=1, le=7)
+
+
+class TimiAnahtarGuncelle(BaseModel):
+    kartlar: List[TimiAnahtarKart]
 
 
 def _yetkili(current_user) -> bool:
@@ -151,6 +216,57 @@ async def get_timi_meta(current_user=Depends(get_current_user)):
         "yorumlar": TIMI_YORUMLAR,
         "uyari_notu": TIMI_UYARI_NOTU,
     }
+
+
+# ── Puanlama anahtarı yönetimi (yalnız Koordinatör/Yönetici) ──
+# NOT: Bu route'lar /timi/{sonuc_id} catch-all'ından ÖNCE tanımlanmalı.
+def _anahtar_yaniti(kartlar_map, guncelleme_tarihi, guncelleyen=""):
+    denge = anahtar_denge(kartlar_map)
+    return {
+        "kartlar": [
+            {"kart_no": no, "a_kategori": a, "b_kategori": b}
+            for no, (a, b) in sorted(kartlar_map.items())
+        ],
+        "kategoriler": {
+            i: {"key": TIMI_KATEGORILER[i]["key"], "tr": TIMI_KATEGORILER[i]["tr"]}
+            for i in range(1, 8)
+        },
+        "denge": denge,
+        "dengeli": all(v == 8 for v in denge.values()),
+        "guncelleme_tarihi": guncelleme_tarihi,
+        "guncelleyen": guncelleyen,
+    }
+
+
+@router.get("/timi/anahtar")
+async def get_timi_anahtar(current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+    """Canlı puanlama anahtarı (DB → varsayılan) + kategori adları + denge bilgisi."""
+    kartlar, tarih = await get_timi_kartlar()
+    doc = await db.sistem_ayarlari.find_one({"tip": TIMI_ANAHTAR_TIP})
+    guncelleyen = (doc or {}).get("guncelleyen", "")
+    return _anahtar_yaniti(kartlar, tarih, guncelleyen)
+
+
+@router.put("/timi/anahtar")
+async def put_timi_anahtar(data: TimiAnahtarGuncelle,
+                           current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+    """Anahtarı toplu kaydeder. Denge (her kategori 8×) ENGELLENMEZ; yanıtta bilgi
+    olarak döner — uyarıyı frontend gösterir."""
+    if len(data.kartlar) != TIMI_KART_SAYISI:
+        raise HTTPException(status_code=400, detail=f"28 kart gerekli ({len(data.kartlar)} geldi)")
+    kartlar_map = {k.kart_no: (k.a_kategori, k.b_kategori) for k in data.kartlar}
+    if len(kartlar_map) != TIMI_KART_SAYISI:
+        raise HTTPException(status_code=400, detail="Kart numaraları 1–28 arası benzersiz olmalı")
+    ad = f"{current_user.get('ad','')} {current_user.get('soyad','')}".strip()
+    tarih = await set_timi_kartlar(kartlar_map, guncelleyen=ad)
+    return {"ok": True, **_anahtar_yaniti(kartlar_map, tarih, ad)}
+
+
+@router.post("/timi/anahtar/varsayilana-don")
+async def timi_anahtar_varsayilana_don(current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+    """DB kaydını siler → doğrulanmış varsayılan anahtara döner."""
+    await db.sistem_ayarlari.delete_one({"tip": TIMI_ANAHTAR_TIP})
+    return {"ok": True, **_anahtar_yaniti(dict(TIMI_KARTLAR), None, "")}
 
 
 # ─────────────────────────────────────────────
@@ -226,7 +342,11 @@ async def timi_tamamla(sonuc_id: str, data: TimiTamamla, current_user=Depends(ge
             detail=f"28 kartın tamamı yanıtlanmalı ({len(yanitlar)}/{TIMI_KART_SAYISI})",
         )
 
-    kategori_puanlari = timi_puanla(yanitlar)
+    # Puanlama, o ANDAKİ canlı anahtarla yapılır; kullanılan anahtar sürümü
+    # (guncelleme_tarihi) sonuca damgalanır. Geçmiş sonuçlar sonradan anahtar
+    # değişse bile YENİDEN hesaplanmaz — kayıtlı kategori_puanlari kalıcıdır.
+    kartlar, anahtar_tarihi = await get_timi_kartlar()
+    kategori_puanlari = timi_puanla(yanitlar, kartlar)
     baskin = baskin_zeka_alanlari(kategori_puanlari)
     now = datetime.now(timezone.utc).isoformat()
     guncelle = {
@@ -234,6 +354,7 @@ async def timi_tamamla(sonuc_id: str, data: TimiTamamla, current_user=Depends(ge
         "yanitlar": sorted(yanitlar, key=lambda y: y.get("kart_no", 0)),
         "kategori_puanlari": kategori_puanlari,
         "baskin_zeka_alanlari": baskin,
+        "kullanilan_anahtar_tarihi": anahtar_tarihi or "varsayilan",
         "notlar": data.notlar or sonuc.get("notlar", ""),
         "uygulama_tarihi": now,
         "updated_at": now,

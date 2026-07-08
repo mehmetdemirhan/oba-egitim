@@ -8813,6 +8813,122 @@ function GuncellemeKontrol() {
 
 // ═══════════════════════════════════════════════
 // RAPOR ÖLÇÜTLERİ YÖNETİM PANELİ — Giriş Analizi raporları (admin/coordinator)
+// ═══════════════════════════════════════════════
+// TIMI Puanlama Anahtarı Yönetimi — /timi/anahtar (yalnız Koordinatör/Yönetici)
+// 28 kartın A/B görselinin hangi zekâ alanına puan yazdığı düzenlenir.
+// ═══════════════════════════════════════════════
+function TimiAnahtarPaneli() {
+  const { toast } = useToast();
+  const [veri, setVeri] = useState(null); // {kartlar, kategoriler, guncelleme_tarihi, guncelleyen}
+  const [kaydediliyor, setKaydediliyor] = useState(false);
+
+  const yukle = useCallback(() => {
+    axios.get(`${API}/timi/anahtar`).then(r => setVeri(r.data)).catch(() => toast({ title: "Anahtar yüklenemedi", variant: "destructive" }));
+  }, [toast]);
+  useEffect(() => { yukle(); }, [yukle]);
+
+  if (!veri) return <div className="p-6 text-subtle text-sm">Yükleniyor…</div>;
+
+  const kategoriler = veri.kategoriler || {}; // {1:{key,tr},...}
+  const katOpts = Object.keys(kategoriler).map(Number).sort((x, y) => x - y);
+  const imgUrl = (no, ab) => `${process.env.PUBLIC_URL || ""}/timi/card_${String(no).padStart(2, "0")}_${ab}.png`;
+
+  // Canlı denge (kaydetmeden önce uyarı için client-side)
+  const denge = {}; katOpts.forEach(i => { denge[i] = 0; });
+  (veri.kartlar || []).forEach(k => { denge[k.a_kategori] = (denge[k.a_kategori] || 0) + 1; denge[k.b_kategori] = (denge[k.b_kategori] || 0) + 1; });
+  const dengeli = katOpts.every(i => denge[i] === 8);
+
+  const setKat = (kartNo, alan, deger) => setVeri(prev => ({
+    ...prev, kartlar: prev.kartlar.map(k => k.kart_no === kartNo ? { ...k, [alan]: Number(deger) } : k),
+  }));
+
+  const kaydet = async () => {
+    if (!dengeli && !window.confirm("Bu değişiklik zekâ kategorileri arasındaki dengeyi bozuyor, envanterin geçerliliğini etkileyebilir. Yine de kaydetmek istiyor musunuz?")) return;
+    setKaydediliyor(true);
+    try {
+      const r = await axios.put(`${API}/timi/anahtar`, { kartlar: veri.kartlar.map(k => ({ kart_no: k.kart_no, a_kategori: k.a_kategori, b_kategori: k.b_kategori })) });
+      setVeri(v => ({ ...v, ...r.data }));
+      toast({ title: "✅ Puanlama anahtarı kaydedildi" });
+    } catch (e) { toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
+    finally { setKaydediliyor(false); }
+  };
+  const varsayilana = async () => {
+    if (!window.confirm("Doğrulanmış varsayılan anahtara dönülecek. Emin misiniz?")) return;
+    try { const r = await axios.post(`${API}/timi/anahtar/varsayilana-don`); setVeri(v => ({ ...v, ...r.data })); toast({ title: "↩️ Varsayılana dönüldü" }); } catch (e) {}
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-2xl font-bold">🧠 TIMI Puanlama Anahtarı</h2>
+        <p className="text-subtle text-sm">28 kartın A/B görsellerinin hangi zekâ alanına puan yazdığını düzenleyin. Değişiklik yalnızca <b>yeni</b> uygulamalara etki eder; geçmiş sonuçlar korunur.</p>
+      </div>
+
+      {/* Denge göstergesi + uyarı */}
+      <div className={`rounded-xl p-3 border text-sm ${dengeli ? "bg-green-50 border-green-200 text-green-800" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
+        <div className="font-semibold mb-1.5">{dengeli ? "✅ Denge korunuyor (her kategori 8×)" : "⚠️ Denge bozuk — envanterin geçerliliği etkilenebilir"}</div>
+        <div className="flex flex-wrap gap-1.5">
+          {katOpts.map(i => (
+            <span key={i} className={`px-2 py-0.5 rounded-full text-xs font-medium ${denge[i] === 8 ? "bg-white/70" : "bg-red-100 text-red-700"}`}>{kategoriler[i].tr}: {denge[i]}/8</span>
+          ))}
+        </div>
+      </div>
+
+      <div className="text-xs text-subtle">
+        {veri.guncelleme_tarihi
+          ? `Son güncelleme: ${new Date(veri.guncelleme_tarihi).toLocaleString("tr-TR")}${veri.guncelleyen ? ` • ${veri.guncelleyen}` : ""}`
+          : "Şu an doğrulanmış varsayılan anahtar kullanılıyor."}
+      </div>
+
+      {/* 28 kart tablosu */}
+      <div className="overflow-x-auto border border-line rounded-xl">
+        <table className="w-full text-sm">
+          <thead className="bg-app">
+            <tr>
+              <th className="p-2 text-center">Kart</th>
+              <th className="p-2 text-center">A görseli</th>
+              <th className="p-2 text-left">A kategorisi</th>
+              <th className="p-2 text-center">B görseli</th>
+              <th className="p-2 text-left">B kategorisi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {veri.kartlar.map(k => (
+              <tr key={k.kart_no} className="border-t border-line">
+                <td className="p-2 font-bold text-center">{k.kart_no}</td>
+                <td className="p-2 text-center"><img src={imgUrl(k.kart_no, "A")} alt={`Kart ${k.kart_no} A`} className="h-14 w-auto mx-auto rounded border border-line object-contain" /></td>
+                <td className="p-2 min-w-[190px]">
+                  <Select value={String(k.a_kategori)} onValueChange={v => setKat(k.kart_no, "a_kategori", v)}>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent position="popper" className="z-[70] bg-surface max-h-60 overflow-y-auto">
+                      {katOpts.map(i => <SelectItem key={i} value={String(i)}>{kategoriler[i].tr}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </td>
+                <td className="p-2 text-center"><img src={imgUrl(k.kart_no, "B")} alt={`Kart ${k.kart_no} B`} className="h-14 w-auto mx-auto rounded border border-line object-contain" /></td>
+                <td className="p-2 min-w-[190px]">
+                  <Select value={String(k.b_kategori)} onValueChange={v => setKat(k.kart_no, "b_kategori", v)}>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent position="popper" className="z-[70] bg-surface max-h-60 overflow-y-auto">
+                      {katOpts.map(i => <SelectItem key={i} value={String(i)}>{kategoriler[i].tr}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="flex gap-2 sticky bottom-0 bg-surface/95 py-2 border-t border-line">
+        <Button onClick={kaydet} disabled={kaydediliyor} className="bg-primary text-white">💾 {kaydediliyor ? "Kaydediliyor…" : "Kaydet"}</Button>
+        <Button variant="outline" onClick={varsayilana}>↩️ Varsayılana Sıfırla</Button>
+      </div>
+    </div>
+  );
+}
+
+
 // Norm/eşik/rubrik ölçütleri /admin/rapor-ayarlari/{tip} üzerinden CRUD edilir.
 // ═══════════════════════════════════════════════
 function RaporOlcutleriPaneli() {
@@ -9073,7 +9189,7 @@ function SistemAyarlari({ user }) {
       <p className="text-subtle text-sm">Rozet, XP, lig ve anket ayarlarını buradan yönetin. Değişiklikler anında uygulanır.</p>
 
       <div className="flex gap-2 flex-wrap">
-        {[{id:"ozellikler",l:"🎛️ Özellik Yönetimi"},{id:"xp",l:"💰 XP Değerleri"},{id:"ogretmen_xp",l:"👨‍🏫 Öğretmen XP"},{id:"lig",l:"🏆 Lig Eşikleri"},{id:"ogretmen_rozet",l:"🏅 Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"🎓 Öğrenci Rozetleri"},{id:"anket",l:"⭐ Anket Soruları"},{id:"kutulu_okuma",l:"📦 Kutulu Okuma"},{id:"rapor_olcutleri",l:"📋 Rapor Ölçütleri"},{id:"profil_gorunurluk",l:"👁️ Profil Görünürlüğü"},{id:"instagram",l:"📱 Instagram"},{id:"kvkk",l:"🔒 Veri & KVKK"},{id:"sezon",l:"🔄 Sezonluk Reset"}].map(s => (
+        {[{id:"ozellikler",l:"🎛️ Özellik Yönetimi"},{id:"xp",l:"💰 XP Değerleri"},{id:"ogretmen_xp",l:"👨‍🏫 Öğretmen XP"},{id:"lig",l:"🏆 Lig Eşikleri"},{id:"ogretmen_rozet",l:"🏅 Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"🎓 Öğrenci Rozetleri"},{id:"anket",l:"⭐ Anket Soruları"},{id:"kutulu_okuma",l:"📦 Kutulu Okuma"},{id:"rapor_olcutleri",l:"📋 Rapor Ölçütleri"},{id:"timi_anahtar",l:"🧠 TIMI Puanlama Anahtarı"},{id:"profil_gorunurluk",l:"👁️ Profil Görünürlüğü"},{id:"instagram",l:"📱 Instagram"},{id:"kvkk",l:"🔒 Veri & KVKK"},{id:"sezon",l:"🔄 Sezonluk Reset"}].map(s => (
           <button key={s.id} onClick={() => setAyarSekme(s.id)}
             className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${ayarSekme === s.id ? 'bg-primary text-white border-blue-600' : 'bg-surface text-subtle border-line'}`}>{s.l}</button>
         ))}
@@ -9189,6 +9305,7 @@ function SistemAyarlari({ user }) {
       {/* KVKK / Veri Paneli */}
       {/* Özellik Yönetimi */}
       {ayarSekme === "rapor_olcutleri" && <RaporOlcutleriPaneli />}
+      {ayarSekme === "timi_anahtar" && <TimiAnahtarPaneli />}
 
       {ayarSekme === "ozellikler" && (
         <Card className="border-0 shadow-sm">

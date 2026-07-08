@@ -159,6 +159,39 @@ async def api_kontroller():
         r = await ac.post("/api/timi/baslat", json={"ogrenci_id": ogr_id}, headers=SH)
         check(r.status_code == 403, "öğrenci rolü envanter başlatamaz (403)")
 
+        # ── Puanlama anahtarı yönetimi (Koordinatör/Yönetici) + geçmiş korunması ──
+        admin_id = str(uuid.uuid4())
+        await server.db.users.insert_one({"id": admin_id, "ad": "Adm", "soyad": "N", "role": "admin", "puan": 0})
+        AH = {"Authorization": f"Bearer {create_access_token({'sub': admin_id})}"}
+
+        r = await ac.get("/api/timi/anahtar", headers=AH)
+        check(r.status_code == 200 and r.json().get("dengeli") is True, "anahtar okundu, varsayılan dengeli (her kategori 8×)")
+        kartlar = r.json()["kartlar"]
+
+        r = await ac.put("/api/timi/anahtar", json={"kartlar": kartlar}, headers=TH)
+        check(r.status_code == 403, "öğretmen anahtarı düzenleyemez (403)")
+
+        # Kart 1 B: mekansal(3) → mantıksal(2) — dengeyi bozar ama engellenmez
+        for k in kartlar:
+            if k["kart_no"] == 1:
+                k["b_kategori"] = 2
+        r = await ac.put("/api/timi/anahtar", json={"kartlar": kartlar}, headers=AH)
+        check(r.status_code == 200 and r.json().get("dengeli") is False, "admin anahtarı değiştirdi (denge bozuk, engellenmedi)")
+
+        # Yeni uygulama güncel anahtarla puanlanır (aynı yanıtlar, farklı sonuç)
+        r = await ac.post("/api/timi/baslat", json={"ogrenci_id": ogr_id}, headers=TH)
+        yeni_id = r.json()["id"]
+        r = await ac.post(f"/api/timi/{yeni_id}/tamamla", json={"yanitlar": [y for y in ORNEK_YANITLAR]}, headers=TH)
+        yp = r.json()["kategori_puanlari"]
+        check(yp["mekansal"] == 3 and yp["mantiksal_matematiksel"] == 5, "yeni sonuç güncel anahtarla puanlandı (mekansal 4→3, mantıksal 4→5)")
+
+        # Değişiklikten ÖNCE tamamlanan eski sonuç YENİDEN HESAPLANMAZ
+        r = await ac.get(f"/api/timi/{sonuc_id}", headers=AH)
+        check(r.json()["kategori_puanlari"]["mekansal"] == 4, "eski sonuç korundu (mekansal hâlâ 4, yeniden hesaplanmadı)")
+
+        r = await ac.post("/api/timi/anahtar/varsayilana-don", headers=AH)
+        check(r.status_code == 200 and r.json().get("dengeli") is True, "varsayılan anahtara sıfırlandı")
+
     await server.client.drop_database(TEST_DB)
 
 
