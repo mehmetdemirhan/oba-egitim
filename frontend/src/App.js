@@ -12,8 +12,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./components/ui/dialog";
 import { Badge } from "./components/ui/badge";
-import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send, Bell, Database, RefreshCw, GitBranch, AlertTriangle, Package, ClipboardList, Flame, Target, Award, Heart, FlaskConical, Medal, Lock, Sparkles, Lightbulb, MessageCircle, TrendingUp, PenLine, Link, Sprout, TreePine, Leaf, Mountain, Landmark, Home, Castle, Crosshair, Bug, ThumbsUp, Crown, Gem, Dumbbell, Pin, Book, Library, Search, Vote, Map as MapIcon, Rocket, Zap, Brain } from "lucide-react";
+import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send, Bell, Database, RefreshCw, GitBranch, AlertTriangle, Package, ClipboardList, Flame, Target, Award, Heart, FlaskConical, Medal, Lock, Sparkles, Lightbulb, MessageCircle, TrendingUp } from "lucide-react";
 import { useToast } from "./hooks/use-toast";
+import { IkonCoz } from "./lib/ikonlar";
 import { Toaster } from "./components/ui/toaster";
 import ModulYonetimi from "./components/ModulYonetimi";
 import RozetYonetimi from "./components/rozet/RozetYonetimi";
@@ -47,30 +48,6 @@ const API = `${BACKEND_URL}/api`;
 const hataBildir = (toast, mesaj = "İşlem başarısız oldu. Lütfen tekrar deneyin.") =>
   toast?.({ title: mesaj, variant: "destructive" });
 const LIG_ESIKLERI_FE = { bronz: 0, gumus: 200, altin: 500, elmas: 1000 };
-
-// ── İkon çözücü (Faz A) ─────────────────────────────────────────────────────
-// DB'de rozet/hedef ikonları hâlâ emoji olarak saklanıyor. Veriyi değiştirmeden,
-// render anında emoji'yi Lucide bileşenine çeviriyoruz. Bilinmeyen değerlerde
-// (gelecekte eklenecek yeni emoji vb.) fallback ikon gösterilir.
-const IKON_EMOJI_HARITA = {
-  "✅": CheckCircle, "✍️": PenLine, "⭐": Star, "🌉": Link, "🌟": Sparkles,
-  "🌱": Sprout, "🌳": TreePine, "🌿": Leaf, "🎓": GraduationCap, "🎖️": Medal,
-  "🎯": Target, "🏅": Award, "🏔️": Mountain, "🏛️": Landmark, "🏠": Home,
-  "🏰": Castle, "🏹": Crosshair, "🐛": Bug, "👁️": Eye, "👍": ThumbsUp,
-  "👑": Crown, "💎": Gem, "💜": Heart, "💡": Lightbulb, "💪": Dumbbell,
-  "💫": Sparkles, "💬": MessageCircle, "📋": ClipboardList, "📌": Pin, "📕": Book,
-  "📖": BookOpen, "📚": Library, "🔍": Search, "🔥": Flame, "🗳️": Vote,
-  "🗺️": MapIcon, "🚀": Rocket, "🛡️": Shield, "🥇": Medal, "🥈": Medal,
-  "🦸": Zap, "🧠": Brain, "👥": Users,
-};
-
-// deger: DB'deki ikon (emoji VEYA ileride Lucide bileşen adı). Eşleşme yoksa
-// fallback ikon döner (varsayılan Award). Kesinlikle ham emoji basmaz — tutarlı
-// ikon dili korunur.
-function IkonCoz({ deger, className = "w-5 h-5", fallback: Fallback = Award }) {
-  const Comp = (deger && IKON_EMOJI_HARITA[deger]) || Fallback;
-  return <Comp className={className} aria-hidden="true" />;
-}
 
 function roleLabel(role) {
   const labels = { admin: "Yönetici", coordinator: "Koordinatör", teacher: "Öğretmen", student: "Öğrenci", parent: "Veli" };
@@ -5172,7 +5149,7 @@ function OgretmenPaneli({ user, logout }) {
       const yr = rk.data?.yeni_rozetler || [];
       if (yr.length > 0) {
         const ilk = yr[0]?.rozet || {};
-        toast({ title: `🏅 Yeni rozet${yr.length > 1 ? ` +${yr.length}` : ""}!`, description: `${ilk.ikon || "🎖️"} ${ilk.ad || "Rozet"} kazandın!` });
+        toast({ title: `🏅 Yeni rozet${yr.length > 1 ? ` +${yr.length}` : ""}!`, description: `${ilk.ad || "Rozet"} kazandın!` });
       }
     } catch(e) {}
     try { const r = await axios.get(`${API}/rozetler/${user.id}`); setRozetlerim(Array.isArray(r.data) ? r.data : []); } catch(e) {}
@@ -6246,7 +6223,7 @@ function OgrenciPaneli({ user, logout }) {
       const yr = rk.data?.yeni_rozetler || [];
       if (yr.length > 0) {
         const ilk = yr[0]?.rozet || {};
-        toast({ title: `🏅 Yeni rozet${yr.length > 1 ? ` +${yr.length}` : ""}!`, description: `${ilk.ikon || "🎖️"} ${ilk.ad || "Rozet"} kazandın!` });
+        toast({ title: `🏅 Yeni rozet${yr.length > 1 ? ` +${yr.length}` : ""}!`, description: `${ilk.ad || "Rozet"} kazandın!` });
       }
     } catch(e) {}
     try { const r = await axios.get(`${API}/rozetler/${user.id}`); setOgrenciRozetler(Array.isArray(r.data) ? r.data : []); } catch(e) {}
@@ -8320,7 +8297,7 @@ function VeliPaneli({ user, logout }) {
                     {cocukRozet.tanimlar
                       .filter(t => cocukRozet.kazanilanlar.some(k => k.rozet_kodu === t.kod))
                       .slice(-3)
-                      .map(t => <span key={t.kod} className="text-xl" title={t.ad}>{t.ikon}</span>)}
+                      .map(t => <span key={t.kod} className="text-amber-500" title={t.ad}><IkonCoz deger={t.ikon} className="w-5 h-5" /></span>)}
                   </div>
                 )}
                 <RozetGrid

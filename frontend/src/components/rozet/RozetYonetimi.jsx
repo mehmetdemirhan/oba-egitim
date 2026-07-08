@@ -11,6 +11,7 @@ import { useToast } from "../../hooks/use-toast";
 import RozetGrid from "./RozetGrid";
 import RozetFormu from "./RozetFormu";
 import KazananlarDialog from "./KazananlarDialog";
+import { IkonCoz } from "../../lib/ikonlar";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -134,7 +135,9 @@ export default function RozetYonetimi() {
                 ["Tanım", istatistik.toplam_tanim],
                 ["Aktif", istatistik.aktif_tanim],
                 ["Toplam Kazanım", istatistik.toplam_kazanim],
-                ["En Yaygın", istatistik.en_yaygin ? `${istatistik.en_yaygin.ikon} ${istatistik.en_yaygin.kazanan_sayisi}` : "—"],
+                ["En Yaygın", istatistik.en_yaygin
+                  ? <span className="inline-flex items-center justify-center gap-1 text-amber-500"><IkonCoz deger={istatistik.en_yaygin.ikon} className="w-4 h-4" /><span className="text-gray-900">{istatistik.en_yaygin.kazanan_sayisi}</span></span>
+                  : "—"],
               ].map(([l, v]) => (
                 <div key={l} className="bg-gray-50 rounded-lg p-2 text-center">
                   <div className="text-lg font-bold text-gray-900">{v}</div>

@@ -1,10 +1,66 @@
 import React, { useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Button } from "../ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "../ui/select";
+import { IkonCoz, LUCIDE_IKON_HARITA, IKON_SECENEKLERI } from "../../lib/ikonlar";
+
+/**
+ * IkonSecici — curated Lucide ikon grid'i (arama + tooltip). Seçilen değer
+ * Lucide ADI olarak saklanır (örn. "Brain"). Mevcut emoji değerler resolver ile
+ * gösterilmeye devam eder; kullanıcı seçince ada dönüşür.
+ */
+function IkonSecici({ deger, onSec }) {
+  const [acik, setAcik] = useState(false);
+  const [ara, setAra] = useState("");
+  const q = ara.toLocaleLowerCase("tr");
+  const secenekler = !q
+    ? IKON_SECENEKLERI
+    : IKON_SECENEKLERI.filter(
+        (o) => o.etiket.toLocaleLowerCase("tr").includes(q) || o.ad.toLowerCase().includes(ara.toLowerCase())
+      );
+  return (
+    <div className="relative">
+      <button
+        type="button" onClick={() => setAcik((a) => !a)}
+        className="w-full h-10 flex items-center justify-center gap-1 rounded-md border border-line bg-surface hover:bg-app transition-colors"
+        title="İkon seç"
+      >
+        <IkonCoz deger={deger} className="w-5 h-5" />
+        <ChevronDown className={`w-3 h-3 text-subtle transition-transform ${acik ? "rotate-180" : ""}`} />
+      </button>
+      {acik && (
+        <div className="absolute z-50 mt-1 left-0 right-0 min-w-[240px] bg-surface border border-line rounded-lg shadow-lg p-2">
+          <input
+            autoFocus value={ara} onChange={(e) => setAra(e.target.value)} placeholder="İkon ara…"
+            className="w-full mb-2 px-2 py-1 text-xs border border-line rounded bg-app"
+          />
+          <div className="grid grid-cols-6 gap-1 max-h-48 overflow-y-auto">
+            {secenekler.map((o) => {
+              const Comp = LUCIDE_IKON_HARITA[o.ad];
+              const secili = deger === o.ad;
+              return (
+                <button
+                  key={o.ad} type="button" title={o.etiket}
+                  onClick={() => { onSec(o.ad); setAcik(false); setAra(""); }}
+                  className={`aspect-square flex items-center justify-center rounded-md border transition-colors ${secili ? "bg-blue-100 border-blue-400 text-primary" : "border-transparent hover:bg-app text-content"}`}
+                >
+                  <Comp className="w-5 h-5" />
+                </button>
+              );
+            })}
+            {secenekler.length === 0 && (
+              <div className="col-span-6 text-center text-xs text-subtle py-3">Eşleşme yok</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** Backend core.rozet_kosullari.METRIK_ACIKLAMALARI ile eşleşen metrik listesi. */
 export const METRIKLER = {
@@ -51,7 +107,7 @@ export default function RozetFormu({ rozet, onKaydet, onIptal }) {
     rol: rozet?.rol || "student",
     ad: rozet?.ad || "",
     aciklama: rozet?.aciklama || "",
-    ikon: rozet?.ikon || "🏅",
+    ikon: rozet?.ikon || "Award",
     kategori: rozet?.kategori || "",
     seviye: rozet?.seviye || "bronz",
     odul_puan: rozet?.odul_puan ?? 0,
@@ -105,7 +161,7 @@ export default function RozetFormu({ rozet, onKaydet, onIptal }) {
         </div>
         <div>
           <Label className="text-[10px]">İkon</Label>
-          <Input className="text-center" value={f.ikon} onChange={(e) => set("ikon", e.target.value)} />
+          <IkonSecici deger={f.ikon} onSec={(ad) => set("ikon", ad)} />
         </div>
       </div>
 

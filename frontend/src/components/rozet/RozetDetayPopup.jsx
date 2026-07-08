@@ -1,5 +1,7 @@
 import React from "react";
+import { Lock } from "lucide-react";
 import { SEVIYE_RENK, rozetPuan } from "./RozetKarti";
+import { IkonCoz } from "../../lib/ikonlar";
 
 /**
  * RozetDetayPopup — bir rozetin detayını (koşul + durum) gösteren küçük pop-up.
@@ -15,7 +17,7 @@ export default function RozetDetayPopup({ rozet, kazanildi, kazanmaTarihi, onKap
       : "Manuel verilir");
   return (
     <div className="flex items-start gap-3 p-3 bg-white rounded-xl border border-gray-200 shadow-sm">
-      <div className="text-3xl">{kazanildi ? rozet.ikon : "🔒"}</div>
+      <div className="flex items-center text-amber-500">{kazanildi ? <IkonCoz deger={rozet.ikon} className="w-8 h-8" /> : <Lock className="w-7 h-7 text-gray-400" />}</div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-bold text-sm">{rozet.ad}</span>

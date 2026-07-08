@@ -1,4 +1,6 @@
 import React from "react";
+import { Lock } from "lucide-react";
+import { IkonCoz } from "../../lib/ikonlar";
 
 /**
  * RozetKarti — tek bir rozet kartı (kazanıldı/kilitli).
@@ -32,7 +34,7 @@ export default function RozetKarti({ tanim, kazanildi, secili, onKlik }) {
         kazanildi ? "bg-orange-50 border border-orange-200" : "opacity-25 hover:opacity-50"
       } ${secili ? "ring-2 ring-blue-400 scale-105" : ""}`}
     >
-      <div className="text-2xl leading-none">{kazanildi ? tanim.ikon : "🔒"}</div>
+      <div className="flex items-center justify-center h-8 text-amber-500">{kazanildi ? <IkonCoz deger={tanim.ikon} className="w-6 h-6" /> : <Lock className="w-5 h-5 text-gray-400" />}</div>
       <div className="mt-1 text-[10px] font-medium text-gray-700 truncate">{tanim.ad}</div>
       <span
         className={`inline-block mt-0.5 text-[9px] px-1 py-0.5 rounded-full border ${

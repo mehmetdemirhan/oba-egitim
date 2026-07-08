@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
+import { IkonCoz } from "../../lib/ikonlar";
 
 /**
  * OgretmenBasarilarim — öğretmene özel, tam genişlikte zengin başarı sayfası.
@@ -175,7 +176,7 @@ export default function OgretmenBasarilarim({ apiBase }) {
           <div className="flex flex-wrap gap-4">
             {veri.rozetler.son_kazanilanlar.map((r, i) => (
               <div key={i} className="flex flex-col items-center text-center w-24">
-                <div className="text-3xl">{r.ikon}</div>
+                <div className="flex items-center justify-center h-9 text-amber-500"><IkonCoz deger={r.ikon} className="w-7 h-7" /></div>
                 <div className="text-[11px] font-semibold text-gray-700 mt-1 leading-tight line-clamp-2">{r.ad}</div>
                 <div className="text-[10px] text-gray-400 mt-0.5">
                   {r.kazanma_tarihi ? new Date(r.kazanma_tarihi).toLocaleDateString("tr-TR") : ""}

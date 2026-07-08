@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
+import { IkonCoz } from "../../lib/ikonlar";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -49,7 +50,7 @@ export default function KazananlarDialog({ rozet, onKapat }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <span className="text-2xl">{rozet.ikon}</span>
+        <span className="text-amber-500"><IkonCoz deger={rozet.ikon} className="w-6 h-6" /></span>
         <div>
           <div className="font-bold text-sm">{rozet.ad}</div>
           <div className="text-[11px] text-gray-500">{rozet.rol} · {rozet.kod}</div>
