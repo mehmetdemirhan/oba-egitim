@@ -20,6 +20,10 @@
     "active": true
   },
   {
+    "name": "timi",
+    "active": true
+  },
+  {
     "name": "ayarlar",
     "active": true
   },
@@ -157,10 +161,6 @@
   },
   {
     "name": "instagram_beslemesi",
-    "active": true
-  },
-  {
-    "name": "timi",
     "active": true
   }
 ]

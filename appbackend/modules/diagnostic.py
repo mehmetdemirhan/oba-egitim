@@ -9,9 +9,9 @@ import os
 import re
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Body
 from fastapi.responses import StreamingResponse, Response
 from pydantic import BaseModel, Field
 
@@ -19,6 +19,10 @@ from core.db import db
 from core.auth import get_current_user, require_role, UserRole
 from core.sistem import get_puan_ayarlari
 from core.metin_zorluk import zorluk_hesapla
+from core.rapor_ayarlari import (
+    get_rapor_ayari, set_rapor_ayari, DUZENLENEBILIR_TIPLER,
+    RAPOR_AYAR_VARSAYILAN, VARSAYILAN_NORMLAR,
+)
 from modules.bildirim import bildirim_rapor_tamamlandi
 
 router = APIRouter()
@@ -69,23 +73,10 @@ def _serialize_metin(item: dict, role: str) -> dict:
     return item
 
 
-# Varsayılan norm tablosu (admin değiştirebilir)
-VARSAYILAN_NORMLAR = {
-    "1": {"dusuk": 25, "orta": 40, "yeterli": 60},
-    "2": {"dusuk": 55, "orta": 75, "yeterli": 95},
-    "3": {"dusuk": 65, "orta": 90, "yeterli": 115},
-    "4": {"dusuk": 80, "orta": 110, "yeterli": 140},
-    "5": {"dusuk": 90, "orta": 120, "yeterli": 150},
-    "6": {"dusuk": 100, "orta": 135, "yeterli": 170},
-    "7": {"dusuk": 110, "orta": 150, "yeterli": 185},
-    "8": {"dusuk": 120, "orta": 160, "yeterli": 200},
-}
-
+# Norm tablosu artık core.rapor_ayarlari üzerinden (DB → varsayılan). Getter'lar
+# geriye dönük uyum için burada kalıyor ama ayar panelinden yönetiliyor.
 async def get_norm_tablosu():
-    doc = await db.sistem_ayarlari.find_one({"tip": "okuma_hizi_normlari"})
-    if doc:
-        return doc.get("normlar", VARSAYILAN_NORMLAR)
-    return VARSAYILAN_NORMLAR
+    return await get_rapor_ayari("okuma_hizi_normlari")
 
 async def hiz_degerlendirme(sinif: str, wpm: float) -> str:
     normlar = await get_norm_tablosu()
@@ -102,12 +93,25 @@ async def hiz_degerlendirme(sinif: str, wpm: float) -> str:
 
 async def kur_onerisi_hesapla(wpm: float, dogruluk: float, sinif: str) -> str:
     hiz = await hiz_degerlendirme(sinif, wpm)
-    if dogruluk >= 97 and hiz in ("yeterli", "ileri"):
+    esik = await get_rapor_ayari("kur_onerisi_esikleri")
+    kur3 = esik.get("kur3_dogruluk", 97)
+    kur2 = esik.get("kur2_dogruluk", 93)
+    if dogruluk >= kur3 and hiz in ("yeterli", "ileri"):
         return "Kur 3"
-    elif dogruluk >= 93 and hiz in ("orta", "yeterli", "ileri"):
+    elif dogruluk >= kur2 and hiz in ("orta", "yeterli", "ileri"):
         return "Kur 2"
     else:
         return "Kur 1"
+
+
+async def dogruluk_seviyesi(dogruluk: float) -> str:
+    """Doğru okuma oranını (dogruluk_esikleri ayarına göre) etikete çevirir."""
+    esik = await get_rapor_ayari("dogruluk_esikleri")
+    if dogruluk >= esik.get("iyi", 98):
+        return "İyi"
+    if dogruluk >= esik.get("gelistirilmeli", 90):
+        return "Geliştirilmeli"
+    return "Yetersiz"
 
 
 # ── Norm Tablosu Yönetimi ──
@@ -126,6 +130,43 @@ async def update_normlar(data: NormGuncelle, current_user=Depends(require_role(U
         upsert=True
     )
     return {"message": "Norm tablosu güncellendi", "normlar": data.normlar}
+
+
+# ── Rapor Ölçütleri Yönetim Paneli (koordinatör/yönetici) ──
+# Tüm rapor ölçütleri sistem_ayarlari'nda tip bazında; panel bunları CRUD eder.
+@router.get("/admin/rapor-ayarlari")
+async def get_tum_rapor_ayarlari(current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+    """Tüm düzenlenebilir rapor ölçütlerini (DB → varsayılan) tek seferde döner."""
+    sonuc = {}
+    for tip in DUZENLENEBILIR_TIPLER:
+        sonuc[tip] = await get_rapor_ayari(tip)
+    return sonuc
+
+@router.get("/admin/rapor-ayarlari/{tip}")
+async def get_rapor_ayari_endpoint(tip: str, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+    if tip not in DUZENLENEBILIR_TIPLER:
+        raise HTTPException(status_code=404, detail=f"Bilinmeyen ayar tipi: {tip}")
+    return {"tip": tip, "degerler": await get_rapor_ayari(tip)}
+
+@router.put("/admin/rapor-ayarlari/{tip}")
+async def put_rapor_ayari_endpoint(tip: str, payload: dict = Body(...),
+                                   current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+    if tip not in DUZENLENEBILIR_TIPLER:
+        raise HTTPException(status_code=404, detail=f"Bilinmeyen ayar tipi: {tip}")
+    degerler = payload.get("degerler")
+    if degerler is None:
+        raise HTTPException(status_code=400, detail="'degerler' zorunlu")
+    ad = f"{current_user.get('ad','')} {current_user.get('soyad','')}".strip()
+    await set_rapor_ayari(tip, degerler, guncelleyen=ad)
+    return {"ok": True, "tip": tip, "degerler": degerler}
+
+@router.post("/admin/rapor-ayarlari/{tip}/varsayilana-don")
+async def rapor_ayari_varsayilana_don(tip: str, current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+    if tip not in DUZENLENEBILIR_TIPLER:
+        raise HTTPException(status_code=404, detail=f"Bilinmeyen ayar tipi: {tip}")
+    ad = f"{current_user.get('ad','')} {current_user.get('soyad','')}".strip()
+    await set_rapor_ayari(tip, RAPOR_AYAR_VARSAYILAN[tip], guncelleyen=ad)
+    return {"ok": True, "tip": tip, "degerler": RAPOR_AYAR_VARSAYILAN[tip]}
 
 
 
@@ -187,6 +228,122 @@ async def create_metin(data: MetinCreate, current_user=Depends(get_current_user)
 
     metin_doc.pop("_id", None)
     return metin_doc
+
+
+# ★ Metin GÜNCELLEME (tam ekran düzenleme ekranı → tek Kaydet)
+class MetinGuncelle(BaseModel):
+    baslik: Optional[str] = None
+    icerik: Optional[str] = None
+    kelime_sayisi: Optional[int] = None
+    sinif_seviyesi: Optional[str] = None
+    tur: Optional[str] = None
+    zorluk: Optional[str] = None
+    sorular: Optional[List[dict]] = None        # MCQ listesi (id ile birleştirilir)
+    acik_sorular: Optional[List[dict]] = None   # açık uçlu soru listesi
+
+
+@router.put("/diagnostic/texts/{metin_id}")
+async def metin_guncelle(metin_id: str, data: MetinGuncelle, current_user=Depends(get_current_user)):
+    """Metnin içeriğini/sorularını/cevap anahtarını düzenler (tam ekran editör).
+
+    Öğretmen/Koordinatör/Yönetici EŞİT yetkili. Görsel, gorsel_prompt, durum,
+    oylar, ekleyen ve kaynak alanlarına DOKUNULMAZ (onlar ayrı akışlarla yönetilir).
+    XP yalnız satır-içi hızlı düzeltmede (PATCH .../soru/...) verilir; toplu formda
+    verilmez (farming önlemi) — ama XP anti-farm meta'sı korunur.
+    """
+    from core.acik_soru import normalize_kategori
+    role = current_user.get("role", "")
+    if role not in KATKI_ROLLERI:
+        raise HTTPException(status_code=403, detail="Yetkisiz")
+
+    metin = await db.analiz_metinler.find_one({"id": metin_id})
+    if not metin:
+        raise HTTPException(status_code=404, detail="Metin bulunamadı")
+
+    now = datetime.now(timezone.utc).isoformat()
+    guncel = {}
+
+    if data.baslik is not None:
+        guncel["baslik"] = data.baslik
+    icerik = data.icerik if data.icerik is not None else metin.get("icerik", "")
+    if data.icerik is not None:
+        guncel["icerik"] = data.icerik
+    # Kelime sayısı: açıkça verildiyse onu, yoksa (içerik değiştiyse) yeniden hesapla
+    if data.kelime_sayisi is not None:
+        ks = data.kelime_sayisi
+    elif data.icerik is not None:
+        ks = len((data.icerik or "").strip().split())
+    else:
+        ks = None
+    if ks is not None:
+        guncel["kelime_sayisi"] = ks
+        guncel["seviye"] = ks   # seviye = kelime sayısı (senkron)
+    if data.tur is not None:
+        guncel["tur"] = data.tur
+    # Zorluk: verildiyse onu, yoksa içerik değiştiyse yeniden hesapla
+    if data.zorluk is not None:
+        guncel["zorluk"] = data.zorluk
+    elif data.icerik is not None:
+        guncel["zorluk"] = zorluk_hesapla(icerik or "")
+    # sinif_seviyesi: boş string → None (havuz metinleri sınıfsız)
+    if data.sinif_seviyesi is not None:
+        guncel["sinif_seviyesi"] = (data.sinif_seviyesi or None)
+
+    # ── MCQ soruları: id ile birleştir; XP anti-farm meta'sını koru ──
+    if data.sorular is not None:
+        mevcut = {s.get("id"): s for s in (metin.get("sorular") or [])}
+        yeni = []
+        for s in data.sorular:
+            sid = s.get("id") or str(uuid.uuid4())
+            onceki = mevcut.get(sid, {})
+            secenekler = s.get("secenekler", onceki.get("secenekler", {})) or {}
+            dogru = (s.get("dogru_cevap") if s.get("dogru_cevap") is not None else onceki.get("dogru_cevap") or "")
+            dogru = (dogru or "").strip().upper()
+            birlesik = {
+                "id": sid,
+                "soru": s.get("soru", onceki.get("soru", "")),
+                "secenekler": secenekler,
+                "dogru_cevap": dogru,
+                "dogru_cevap_kaynak": onceki.get("dogru_cevap_kaynak", "otomatik"),
+                "guven": s.get("guven", onceki.get("guven", "high")),
+                "kontrol_gerekli": bool(s.get("kontrol_gerekli", onceki.get("kontrol_gerekli", False))),
+                "ilk_duzelten_id": onceki.get("ilk_duzelten_id"),
+                "son_duzelten_id": onceki.get("son_duzelten_id"),
+                "son_duzelten_tarih": onceki.get("son_duzelten_tarih"),
+            }
+            # Doğru cevap değiştiyse: manuel işaretle, kontrol bayrağını düşür
+            if dogru and dogru != onceki.get("dogru_cevap"):
+                birlesik["dogru_cevap_kaynak"] = "manuel"
+                birlesik["kontrol_gerekli"] = False
+                birlesik["son_duzelten_id"] = current_user["id"]
+                birlesik["son_duzelten_tarih"] = now
+            yeni.append(birlesik)
+        guncel["sorular"] = yeni
+
+    # ── Açık uçlu sorular: içerik olarak değiştir (id korunur/atanır) ──
+    if data.acik_sorular is not None:
+        mevcut_a = {s.get("id"): s for s in (metin.get("acik_sorular") or []) if isinstance(s, dict)}
+        yeni_a = []
+        for i, s in enumerate(data.acik_sorular):
+            sid = s.get("id") or str(uuid.uuid4())
+            onceki = mevcut_a.get(sid, {})
+            kategori_ham = s.get("kategori_ham", s.get("kategori", onceki.get("kategori_ham")))
+            yeni_a.append({
+                "id": sid,
+                "no": s.get("no", onceki.get("no", i + 1)),
+                "kategori": normalize_kategori(s.get("kategori", onceki.get("kategori"))),
+                "kategori_ham": kategori_ham or None,
+                "soru": s.get("soru", onceki.get("soru", "")),
+                "model_cevap": s.get("model_cevap", onceki.get("model_cevap")),
+                "subjektif": bool(s.get("subjektif", onceki.get("subjektif", False))),
+            })
+        guncel["acik_sorular"] = yeni_a
+
+    if guncel:
+        await db.analiz_metinler.update_one({"id": metin_id}, {"$set": guncel})
+
+    yeni_metin = await db.analiz_metinler.find_one({"id": metin_id})
+    return _serialize_metin(yeni_metin, role)
 
 
 # ★ Metin listeleme endpoint'i (frontend: axios.get(`${API}/diagnostic/texts`))
@@ -455,9 +612,12 @@ class HataKaydi(BaseModel):
     tip: str  # atlama, yanlis_okuma, takilma, tekrar
     kelime: str = ""
 
+OTURUM_TIPLERI = ("ilk_analiz", "ara_analiz", "kur_sonu_analiz")
+
 class AnalizOturumBaslat(BaseModel):
     ogrenci_id: str
     metin_id: str
+    oturum_tipi: Optional[str] = None  # None → otomatik (ilk tamamlanmışsa ilk_analiz)
 
 class AnalizTamamla(BaseModel):
     sure_saniye: float
@@ -471,6 +631,7 @@ class DiagnosticOturum(BaseModel):
     metin_id: str
     ogretmen_id: str
     durum: str = "devam"
+    oturum_tipi: str = "ilk_analiz"  # ilk_analiz | ara_analiz | kur_sonu_analiz
     sure_saniye: float = 0
     hatalar: List[dict] = []
     gozlem_notu: str = ""
@@ -494,10 +655,18 @@ async def baslat_oturum(data: AnalizOturumBaslat, current_user=Depends(get_curre
     ogrenci = await db.students.find_one({"id": data.ogrenci_id})
     if not ogrenci:
         raise HTTPException(status_code=404, detail=f"Öğrenci bulunamadı: {data.ogrenci_id}")
+    # Oturum tipi: öğretmen elle seçebilir; seçmezse otomatik — öğrencinin ilk
+    # TAMAMLANMIŞ oturumu yoksa "ilk_analiz", varsa "ara_analiz".
+    oturum_tipi = data.oturum_tipi
+    if oturum_tipi not in OTURUM_TIPLERI:
+        tamamlanan = await db.diagnostic_oturumlar.count_documents(
+            {"ogrenci_id": data.ogrenci_id, "durum": "tamamlandi"})
+        oturum_tipi = "ilk_analiz" if tamamlanan == 0 else "ara_analiz"
     oturum = DiagnosticOturum(
         ogrenci_id=data.ogrenci_id,
         metin_id=data.metin_id,
-        ogretmen_id=current_user["id"]
+        ogretmen_id=current_user["id"],
+        oturum_tipi=oturum_tipi,
     )
     d = oturum.dict()
     d["olusturma_tarihi"] = d["olusturma_tarihi"].isoformat()
@@ -580,59 +749,25 @@ async def tamamla_oturum(oturum_id: str, data: AnalizTamamla, current_user=Depen
 
 
 # ── Rapor Sistemi ──
-class AnlamaVeri(BaseModel):
-    # 4.1 Sözcük düzeyinde
-    cumle_anlama: str = "orta"          # zayif / orta / iyi
-    bilinmeyen_sozcuk: str = "orta"
-    baglac_zamir: str = "orta"
-    # 4.2 Ana yapı
-    ana_fikir: str = "orta"
-    yardimci_fikir: str = "orta"
-    konu: str = "orta"
-    baslik_onerme: str = "orta"
-    # 4.3 Derin anlama
-    neden_sonuc: str = "orta"
-    cikarim: str = "orta"
-    ipuclari: str = "orta"
-    yorumlama: str = "orta"
-    # 4.4 Eleştirel
-    gorus_bildirme: str = "orta"
-    yazar_amaci: str = "orta"
-    alternatif_fikir: str = "orta"
-    guncelle_hayat: str = "orta"
-    # 4.5 Soru performansı
-    bilgi: str = "iyi"
-    kavrama: str = "iyi"
-    uygulama: str = "iyi"
-    analiz: str = "iyi"
-    sentez: str = "iyi"
-    degerlendirme: str = "iyi"
-    genel_yuzde: int = 0
-
-class ProzodikVeri(BaseModel):
-    noktalama: int = 3    # 1-4 puan
-    vurgu: int = 3
-    tonlama: int = 3
-    akicilik: int = 3
-    anlamli_gruplama: int = 3
-
+# Anlama ve prozodik ölçütleri DİNAMİK: maddeler/ölçütler core.rapor_ayarlari
+# panelinden gelir (eski sabit AnlamaVeri/ProzodikVeri modelleri kaldırıldı).
+#   anlama:   {madde_id → "zayif"|"orta"|"iyi"}  (4.1-4.4 rubrik + 4.5 bloom, düz)
+#   prozodik: {olcut_id → 1..4}
+# Geriye dönük uyum: eski raporlarda anlama/prozodik zaten aynı id'li düz sözlük.
 class RaporOlusturCreate(BaseModel):
     oturum_id: str
-    anlama: AnlamaVeri
-    prozodik: ProzodikVeri
+    anlama: Dict[str, str] = {}
+    prozodik: Dict[str, int] = {}
+    anlama_yuzde: Optional[int] = None   # verilmezse anlama'dan hesaplanır
     ogretmen_notu: str = ""
 
-def anlama_yuzde(anlama: AnlamaVeri) -> int:
-    alanlar = [
-        anlama.cumle_anlama, anlama.bilinmeyen_sozcuk, anlama.baglac_zamir,
-        anlama.ana_fikir, anlama.yardimci_fikir, anlama.konu, anlama.baslik_onerme,
-        anlama.neden_sonuc, anlama.cikarim, anlama.ipuclari, anlama.yorumlama,
-        anlama.gorus_bildirme, anlama.yazar_amaci, anlama.alternatif_fikir, anlama.guncelle_hayat,
-        anlama.bilgi, anlama.kavrama, anlama.uygulama, anlama.analiz, anlama.sentez, anlama.degerlendirme
-    ]
+def anlama_yuzde_hesapla(anlama: dict) -> int:
+    """Anlama sözlüğündeki zayif/orta/iyi değerlerinden ortalama yüzde (0-100)."""
     puan_map = {"zayif": 0, "orta": 1, "iyi": 2}
-    toplam = sum(puan_map.get(a, 1) for a in alanlar)
-    return round(toplam / (len(alanlar) * 2) * 100)
+    degerler = [puan_map.get(v, 1) for v in (anlama or {}).values() if isinstance(v, str)]
+    if not degerler:
+        return 0
+    return round(sum(degerler) / (len(degerler) * 2) * 100)
 
 def hiz_metni(hiz_deger: str) -> str:
     return {"dusuk": "düşük", "orta": "orta", "yeterli": "yeterli", "ileri": "ileri"}.get(hiz_deger, "orta")
@@ -681,8 +816,8 @@ async def olustur_rapor(data: RaporOlusturCreate, current_user=Depends(get_curre
     ogrenci = await db.students.find_one({"id": oturum.get("ogrenci_id")})
     ogretmen = await db.users.find_one({"id": oturum.get("ogretmen_id")})
 
-    prozodik_toplam = data.prozodik.noktalama + data.prozodik.vurgu + data.prozodik.tonlama + data.prozodik.akicilik + data.prozodik.anlamli_gruplama
-    anlama_pct = data.anlama.genel_yuzde if data.anlama.genel_yuzde > 0 else anlama_yuzde(data.anlama)
+    prozodik_toplam = sum(int(v) for v in (data.prozodik or {}).values())
+    anlama_pct = data.anlama_yuzde if data.anlama_yuzde else anlama_yuzde_hesapla(data.anlama)
 
     rapor_data = {
         "id": str(uuid.uuid4()),
@@ -701,17 +836,18 @@ async def olustur_rapor(data: RaporOlusturCreate, current_user=Depends(get_curre
         "hiz_deger": oturum.get("hiz_deger", ""),
         "atanan_kur": oturum.get("ogretmen_kur", ""),
         "hata_sayilari": _hata_sayilari_hesapla(oturum.get("hatalar", [])),
-        "anlama": data.anlama.dict(),
+        "anlama": data.anlama,
         "anlama_yuzde": anlama_pct,
-        "prozodik": data.prozodik.dict(),
+        "prozodik": data.prozodik,
         "prozodik_toplam": prozodik_toplam,
         "ogretmen_notu": data.ogretmen_notu,
+        "rapor_tipi": "olcum",   # olcum | gelisim
         "olusturma_tarihi": datetime.utcnow().isoformat(),
     }
     await db.diagnostic_raporlar.insert_one(rapor_data)
     rapor_data.pop("_id", None)
-    # Veliye bildirim gönder
-    try: await bildirim_rapor_tamamlandi(rapor_data.get("ogrenci_id"), rapor_data.get("baslik", "Giriş Analizi Raporu"))
+    # Veliye bildirim gönder (metin adıyla; eski hatalı "baslik" anahtarı düzeltildi)
+    try: await bildirim_rapor_tamamlandi(rapor_data.get("ogrenci_id"), rapor_data.get("metin_adi") or "Giriş Analizi Raporu")
     except: pass
     return rapor_data
 
@@ -730,6 +866,116 @@ async def get_rapor(rapor_id: str, current_user=Depends(get_current_user)):
     return rapor
 
 
+# ── Gelişim Raporu (ön test / son test karşılaştırması) ──
+class GelisimRaporCreate(BaseModel):
+    ogrenci_id: str
+    ilk_oturum_id: str
+    son_oturum_id: str
+    ders_sayisi: int = 12
+    ogretmen_notu: str = ""
+
+
+async def _oturum_olcum_raporu(oturum_id: str):
+    """Bir oturumun ölçüm raporunu (en yeni) döner; yoksa None."""
+    return await db.diagnostic_raporlar.find_one(
+        {"oturum_id": oturum_id, "rapor_tipi": "olcum"}, sort=[("olusturma_tarihi", -1)])
+
+
+def _degisim_duzeyi(metrik: str, degisim: float, esikler: dict) -> str:
+    """Değişim referans tablosu: Anlamlı Gelişim / Sabit-Sınırlı / Gerileme."""
+    e = esikler.get(metrik, {"anlamli": 0, "gerileme": 0})
+    if degisim <= e.get("gerileme", 0):
+        return "Gerileme"
+    if degisim >= e.get("anlamli", 0) and degisim > 0:
+        return "Anlamlı Gelişim"
+    return "Sabit/Sınırlı Gelişim"
+
+
+@router.post("/diagnostic/gelisim-raporu")
+async def olustur_gelisim_raporu(data: GelisimRaporCreate,
+                                 current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR, UserRole.TEACHER))):
+    ilk_ot = await db.diagnostic_oturumlar.find_one({"id": data.ilk_oturum_id})
+    son_ot = await db.diagnostic_oturumlar.find_one({"id": data.son_oturum_id})
+    if not ilk_ot or not son_ot:
+        raise HTTPException(status_code=404, detail="Oturum(lar) bulunamadı")
+    ilk_rapor = await _oturum_olcum_raporu(data.ilk_oturum_id)
+    son_rapor = await _oturum_olcum_raporu(data.son_oturum_id)
+    if not ilk_rapor or not son_rapor:
+        raise HTTPException(status_code=400,
+                            detail="Her iki oturum için de önce Ölçüm Raporu oluşturulmalı")
+
+    ogrenci = await db.students.find_one({"id": data.ogrenci_id})
+    ogretmen = await db.users.find_one({"id": son_ot.get("ogretmen_id")})
+    sinif = (ogrenci or {}).get("sinif", "")
+
+    esikler = await get_rapor_ayari("gelisim_degisim_esikleri")
+
+    def _sayi(r, k):
+        try:
+            return float(r.get(k, 0) or 0)
+        except Exception:
+            return 0.0
+
+    # Metrikler: (anahtar, etiket, ön değer, son değer, "normlara göre düzey" fonksiyonu)
+    metrik_tanim = [
+        ("wpm", "Okuma Hızı (kelime/dk)", _sayi(ilk_rapor, "wpm"), _sayi(son_rapor, "wpm")),
+        ("dogruluk", "Doğru Okuma Oranı (%)", _sayi(ilk_rapor, "dogruluk_yuzde"), _sayi(son_rapor, "dogruluk_yuzde")),
+        ("prozodik", "Prozodik Okuma (20 puan)", _sayi(ilk_rapor, "prozodik_toplam"), _sayi(son_rapor, "prozodik_toplam")),
+        ("anlama", "Okuduğunu Anlama (%)", _sayi(ilk_rapor, "anlama_yuzde"), _sayi(son_rapor, "anlama_yuzde")),
+    ]
+
+    ozet_tablo = []
+    for anahtar, etiket, on, son in metrik_tanim:
+        degisim = round(son - on, 1)
+        # Normlara göre düzey (son test)
+        if anahtar == "wpm":
+            duzey = (await hiz_degerlendirme(sinif, son)).capitalize()
+        elif anahtar == "dogruluk":
+            duzey = await dogruluk_seviyesi(son)
+        elif anahtar == "prozodik":
+            duzey = prozodik_seviye(int(son)).capitalize()
+        else:
+            duzey = anlama_seviye(int(son)).capitalize()
+        ozet_tablo.append({
+            "metrik": anahtar, "etiket": etiket,
+            "on_test": on, "son_test": son,
+            "degisim": degisim, "sayisal_artis": degisim,
+            "yon": "artis" if degisim > 0 else ("dusus" if degisim < 0 else "sabit"),
+            "normlara_gore_duzey": duzey,
+            "gelisim_duzeyi": _degisim_duzeyi(anahtar, degisim, esikler),
+        })
+
+    # Hata analizi gelişimi (ön/son)
+    hata_analizi = {
+        "on_test": _hata_sayilari_hesapla(ilk_ot.get("hatalar", [])),
+        "son_test": _hata_sayilari_hesapla(son_ot.get("hatalar", [])),
+    }
+
+    rapor = {
+        "id": str(uuid.uuid4()),
+        "rapor_tipi": "gelisim",
+        "ogrenci_id": data.ogrenci_id,
+        "ogretmen_id": son_ot.get("ogretmen_id"),
+        "ogrenci_ad": f"{(ogrenci or {}).get('ad','')} {(ogrenci or {}).get('soyad','')}".strip(),
+        "ogrenci_sinif": sinif,
+        "ogretmen_ad": f"{(ogretmen or {}).get('ad','')} {(ogretmen or {}).get('soyad','')}".strip(),
+        "ders_sayisi": data.ders_sayisi,
+        "ilk_oturum_id": data.ilk_oturum_id,
+        "son_oturum_id": data.son_oturum_id,
+        "ilk_rapor_id": ilk_rapor.get("id"),
+        "son_rapor_id": son_rapor.get("id"),
+        "ilk_metin_adi": ilk_rapor.get("metin_adi", ""),
+        "son_metin_adi": son_rapor.get("metin_adi", ""),
+        "ozet_tablo": ozet_tablo,
+        "hata_analizi": hata_analizi,
+        "ogretmen_notu": data.ogretmen_notu,
+        "olusturma_tarihi": datetime.utcnow().isoformat(),
+    }
+    await db.diagnostic_raporlar.insert_one(rapor)
+    rapor.pop("_id", None)
+    return rapor
+
+
 # ── PDF Rapor Üretimi ──
 def _tr_upper(text):
     """Türkçe büyük harf çevirimi (i→İ, ı→I)"""
@@ -738,12 +984,193 @@ def _tr_upper(text):
     tr_map = str.maketrans("abcçdefgğhıijklmnoöprsştuüvyz", "ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZ")
     return text.translate(tr_map)
 
+# Türkçe destekli PDF fontu — çok platformlu (Linux DejaVu, Windows Arial/Segoe,
+# macOS Arial). Bulunamazsa Helvetica'ya düşer (latin-1; TR karakterlerde patlar).
+_TR_FONT_ADAYLARI = [
+    ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+    ("C:/Windows/Fonts/arial.ttf", "C:/Windows/Fonts/arialbd.ttf"),
+    ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/segoeuib.ttf"),
+    ("/Library/Fonts/Arial.ttf", "/Library/Fonts/Arial Bold.ttf"),
+]
+_tr_font_kayitli = False
+
+def _tr_font():
+    """Türkçe destekli fontu (bir kez) kaydeder; (FONT, FONTB) ad çiftini döner."""
+    global _tr_font_kayitli
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    if _tr_font_kayitli:
+        return "TRFont", "TRFontBold"
+    for reg, bold in _TR_FONT_ADAYLARI:
+        if os.path.exists(reg) and os.path.exists(bold):
+            pdfmetrics.registerFont(TTFont("TRFont", reg))
+            pdfmetrics.registerFont(TTFont("TRFontBold", bold))
+            _tr_font_kayitli = True
+            return "TRFont", "TRFontBold"
+    return "Helvetica", "Helvetica-Bold"
+
+
+def _gelisim_raporu_pdf(rapor: dict):
+    """Gelişim (ön test/son test) raporu PDF'i — Word şablonundaki tabloları yansıtır."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Paragraph as RLPara, Spacer, Table as RLTable, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER
+
+    FONT, FONTB = _tr_font()
+
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(name='GT', fontSize=18, leading=22, alignment=TA_CENTER, spaceAfter=4, textColor=colors.HexColor('#1F4E79'), fontName=FONTB))
+    styles.add(ParagraphStyle(name='GS', fontSize=11, leading=14, alignment=TA_CENTER, spaceAfter=14, textColor=colors.HexColor('#666666'), fontName=FONT))
+    styles.add(ParagraphStyle(name='GSect', fontSize=12, leading=16, spaceBefore=14, spaceAfter=8, textColor=colors.HexColor('#1F4E79'), fontName=FONTB))
+    styles.add(ParagraphStyle(name='GBody', fontSize=9, leading=13, spaceAfter=4, fontName=FONT))
+
+    hdr_bg = colors.HexColor('#1F4E79')
+    alt_bg = colors.HexColor('#F2F7FB')
+    bdr = colors.HexColor('#CCCCCC')
+    YESIL, GRI, KIRMIZI = colors.HexColor('#1E8449'), colors.HexColor('#7F8C8D'), colors.HexColor('#C0392B')
+    duzey_renk = {"Anlamlı Gelişim": YESIL, "Sabit/Sınırlı Gelişim": GRI, "Gerileme": KIRMIZI}
+    yon_ikon = {"artis": "▲", "dusus": "▼", "sabit": "■"}
+
+    el = []
+    el.append(RLPara("Okuma Becerileri Akademisi", styles['GT']))
+    el.append(RLPara("Bireysel Gelişim Raporu", styles['GS']))
+
+    # Öğrenci bilgileri
+    el.append(RLPara("1. Öğrenci Bilgileri", styles['GSect']))
+    info = [
+        ["Adı Soyadı:", rapor.get("ogrenci_ad", "-"), "Sınıfı:", rapor.get("ogrenci_sinif", "-")],
+        ["Eğitimci:", rapor.get("ogretmen_ad", "-"), "Tarih:", rapor.get("olusturma_tarihi", "")[:10]],
+    ]
+    t = RLTable(info, colWidths=[3*cm, 5*cm, 3*cm, 5*cm])
+    t.setStyle(TableStyle([('FONTNAME', (0,0), (0,-1), FONTB), ('FONTNAME', (2,0), (2,-1), FONTB),
+        ('FONTNAME', (1,0), (1,-1), FONT), ('FONTNAME', (3,0), (3,-1), FONT), ('FONTSIZE', (0,0), (-1,-1), 9),
+        ('TEXTCOLOR', (0,0), (0,-1), hdr_bg), ('TEXTCOLOR', (2,0), (2,-1), hdr_bg),
+        ('TOPPADDING', (0,0), (-1,-1), 5), ('BOTTOMPADDING', (0,0), (-1,-1), 5)]))
+    el.append(t)
+
+    ders = rapor.get("ders_sayisi", 12)
+    el.append(Spacer(1, 6))
+    el.append(RLPara(f"<b>Raporun Amacı:</b> {ders} derslik yapılandırılmış okuma eğitimi süreci sonunda "
+                     "öğrencinin okuma becerilerindeki gelişimin ön test/son test karşılaştırmasıyla değerlendirilmesidir.", styles['GBody']))
+
+    # Metin tablosu (ön/son)
+    el.append(RLPara("2. Ölçüm Metinleri", styles['GSect']))
+    mt = [["", "Ön Test (İlk Ölçüm)", "Son Test (Kur Sonu)"],
+          ["Metin", _tr_upper(rapor.get("ilk_metin_adi", "-")), _tr_upper(rapor.get("son_metin_adi", "-"))]]
+    tm = RLTable(mt, colWidths=[3*cm, 6.5*cm, 6.5*cm])
+    tm.setStyle(TableStyle([('GRID', (0,0), (-1,-1), 0.5, bdr), ('FONTSIZE', (0,0), (-1,-1), 9),
+        ('FONTNAME', (0,0), (-1,-1), FONT), ('BACKGROUND', (0,0), (-1,0), hdr_bg), ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+        ('FONTNAME', (0,0), (-1,0), FONTB), ('FONTNAME', (0,1), (0,-1), FONTB),
+        ('TOPPADDING', (0,0), (-1,-1), 5), ('BOTTOMPADDING', (0,0), (-1,-1), 5)]))
+    el.append(tm)
+
+    # Bireysel Gelişim Özet Tablo
+    el.append(RLPara("3. Bireysel Gelişim Özet Tablosu", styles['GSect']))
+    head = ["Ölçüt", "Ön Test", "Son Test", "Değişim", "Normlara Göre", "Gelişim"]
+    rows = [head]
+    ozet = rapor.get("ozet_tablo", [])
+    for m in ozet:
+        deg = m.get("degisim", 0)
+        ok = yon_ikon.get(m.get("yon", "sabit"), "■")
+        isaret = "+" if deg > 0 else ""
+        rows.append([
+            m.get("etiket", m.get("metrik", "")),
+            _fmt_sayi(m.get("on_test")), _fmt_sayi(m.get("son_test")),
+            f"{ok} {isaret}{_fmt_sayi(deg)}",
+            m.get("normlara_gore_duzey", "-"),
+            m.get("gelisim_duzeyi", "-"),
+        ])
+    tw = [4.2*cm, 2*cm, 2*cm, 2.4*cm, 2.6*cm, 2.8*cm]
+    tt = RLTable(rows, colWidths=tw)
+    st = [('GRID', (0,0), (-1,-1), 0.5, bdr), ('FONTSIZE', (0,0), (-1,-1), 8.5), ('FONTNAME', (0,0), (-1,-1), FONT),
+          ('BACKGROUND', (0,0), (-1,0), hdr_bg), ('TEXTCOLOR', (0,0), (-1,0), colors.white), ('FONTNAME', (0,0), (-1,0), FONTB),
+          ('ALIGN', (1,0), (-1,-1), 'CENTER'), ('TOPPADDING', (0,0), (-1,-1), 5), ('BOTTOMPADDING', (0,0), (-1,-1), 5)]
+    for i, m in enumerate(ozet, start=1):
+        renk = duzey_renk.get(m.get("gelisim_duzeyi"), GRI)
+        st.append(('TEXTCOLOR', (5,i), (5,i), renk))
+        st.append(('TEXTCOLOR', (3,i), (3,i), renk))
+        if i % 2 == 0:
+            st.append(('BACKGROUND', (0,i), (-1,i), alt_bg))
+    tt.setStyle(TableStyle(st))
+    el.append(tt)
+
+    # Hata Analizi Gelişimi
+    el.append(RLPara("4. Hata Analizi Gelişimi", styles['GSect']))
+    ha = rapor.get("hata_analizi", {}) or {}
+    def _hmap(lst):
+        etk = {"atlama": "Atlama", "yanlis_okuma": "Yanlış Okuma", "takilma": "Takılma", "tekrar": "Tekrar"}
+        d = {etk.get(x.get("tur"), x.get("tur")): x.get("sayi", 0) for x in (lst or [])}
+        return d
+    on_h, son_h = _hmap(ha.get("on_test")), _hmap(ha.get("son_test"))
+    turler = ["Atlama", "Yanlış Okuma", "Takılma", "Tekrar"]
+    hrows = [["Hata Türü", "Ön Test", "Son Test", "Değişim"]]
+    for tr in turler:
+        o, s = on_h.get(tr, 0), son_h.get(tr, 0)
+        d = s - o
+        hrows.append([tr, str(o), str(s), ("+" if d > 0 else "") + str(d)])
+    th = RLTable(hrows, colWidths=[5*cm, 3.5*cm, 3.5*cm, 3*cm])
+    th.setStyle(TableStyle([('GRID', (0,0), (-1,-1), 0.5, bdr), ('FONTSIZE', (0,0), (-1,-1), 9), ('FONTNAME', (0,0), (-1,-1), FONT),
+        ('BACKGROUND', (0,0), (-1,0), hdr_bg), ('TEXTCOLOR', (0,0), (-1,0), colors.white), ('FONTNAME', (0,0), (-1,0), FONTB),
+        ('ALIGN', (1,0), (-1,-1), 'CENTER'), ('TOPPADDING', (0,0), (-1,-1), 5), ('BOTTOMPADDING', (0,0), (-1,-1), 5)]))
+    el.append(th)
+
+    # Değişim Referans Tablosu (lejant)
+    el.append(RLPara("5. Değişim Referans Tablosu", styles['GSect']))
+    ref = [["Gösterge", "Anlamı"],
+           ["▲ Anlamlı Gelişim", "Belirlenen eşiğin üzerinde ilerleme"],
+           ["■ Sabit / Sınırlı Gelişim", "Eşik altında, korunan düzey"],
+           ["▼ Gerileme (nadir)", "Ölçülen düzeyde düşüş"]]
+    tr_ = RLTable(ref, colWidths=[6*cm, 9*cm])
+    tr_.setStyle(TableStyle([('GRID', (0,0), (-1,-1), 0.5, bdr), ('FONTSIZE', (0,0), (-1,-1), 9), ('FONTNAME', (0,0), (-1,-1), FONT),
+        ('BACKGROUND', (0,0), (-1,0), hdr_bg), ('TEXTCOLOR', (0,0), (-1,0), colors.white), ('FONTNAME', (0,0), (-1,0), FONTB),
+        ('TEXTCOLOR', (0,1), (0,1), YESIL), ('TEXTCOLOR', (0,2), (0,2), GRI), ('TEXTCOLOR', (0,3), (0,3), KIRMIZI),
+        ('TOPPADDING', (0,0), (-1,-1), 5), ('BOTTOMPADDING', (0,0), (-1,-1), 5)]))
+    el.append(tr_)
+
+    # Genel değerlendirme (öğretmen notu)
+    if rapor.get("ogretmen_notu"):
+        el.append(RLPara("6. Genel Gelişim Değerlendirmesi", styles['GSect']))
+        el.append(RLPara(rapor.get("ogretmen_notu", ""), styles['GBody']))
+
+    buffer = io.BytesIO()
+    doc_pdf = SimpleDocTemplate(buffer, pagesize=A4, topMargin=1.5*cm, bottomMargin=1.5*cm, leftMargin=2*cm, rightMargin=2*cm)
+    doc_pdf.build(el)
+    buffer.seek(0)
+    ad = _ascii_dosya(rapor.get("ogrenci_ad", "ogrenci"))
+    return StreamingResponse(buffer, media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="Gelisim_Raporu_{ad}.pdf"'})
+
+
+def _fmt_sayi(v):
+    """Sayıyı gereksiz .0 olmadan yazar (100.0 → 100)."""
+    try:
+        f = float(v)
+        return str(int(f)) if f == int(f) else str(round(f, 1))
+    except Exception:
+        return str(v)
+
+
+def _ascii_dosya(ad: str) -> str:
+    """Dosya adını latin-1 HTTP başlığına güvenli ASCII'ye çevirir (Türkçe→ASCII)."""
+    tr = str.maketrans("şğıİöüçŞĞÖÜÇ ", "sgiIoucSGOUC_")
+    ad = (ad or "ogrenci").translate(tr)
+    temiz = "".join(c for c in ad if c.isalnum() or c in "_-")
+    return temiz or "ogrenci"
+
+
 @router.get("/diagnostic/rapor/{rapor_id}/pdf")
 async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     rapor = await db.diagnostic_raporlar.find_one({"id": rapor_id})
     if not rapor:
         raise HTTPException(status_code=404, detail="Rapor bulunamadı")
     rapor.pop("_id", None)
+
+    # Gelişim raporu → ayrı şablon
+    if rapor.get("rapor_tipi") == "gelisim":
+        return _gelisim_raporu_pdf(rapor)
 
     from reportlab.lib.pagesizes import A4
     from reportlab.lib import colors
@@ -754,25 +1181,8 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
 
-    # ── Türkçe Font Kaydı ──
-    font_paths = [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-    ]
-    font_registered = False
-    for fp in font_paths:
-        if os.path.exists(fp):
-            font_registered = True
-            break
-
-    if font_registered:
-        pdfmetrics.registerFont(TTFont("TRFont", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"))
-        pdfmetrics.registerFont(TTFont("TRFontBold", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"))
-        FONT = "TRFont"
-        FONTB = "TRFontBold"
-    else:
-        FONT = "Helvetica"
-        FONTB = "Helvetica-Bold"
+    # ── Türkçe Font Kaydı (çok platformlu ortak yardımcı) ──
+    FONT, FONTB = _tr_font()
 
     buffer = io.BytesIO()
     doc_pdf = SimpleDocTemplate(buffer, pagesize=A4, topMargin=1.5*cm, bottomMargin=1.5*cm, leftMargin=2*cm, rightMargin=2*cm)
@@ -1034,7 +1444,7 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     doc_pdf.build(el)
     buffer.seek(0)
 
-    ogrenci_ad = rapor.get("ogrenci_ad", "ogrenci").replace(" ", "_")
+    ogrenci_ad = _ascii_dosya(rapor.get("ogrenci_ad", "ogrenci"))
     tarih = rapor.get("olusturma_tarihi", "")[:10]
     filename = f"Rapor_{ogrenci_ad}_{tarih}.pdf"
 

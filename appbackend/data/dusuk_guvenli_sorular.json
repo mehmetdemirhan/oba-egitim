@@ -1,0 +1,3436 @@
+[
+  {
+    "title": "En Sevdiğim Oyuncak",
+    "wc": 36,
+    "question": "Yazarın en sevdiği oyuncak hangisidir?",
+    "options": {
+      "A": "Bir araba",
+      "B": "Bir bebek",
+      "C": "Kahverengi küçük ayıcık",
+      "D": "Oyuncak tren"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.67,
+      "D": 0.5
+    }
+  },
+  {
+    "title": "En Sevdiğim Oyuncak",
+    "wc": 36,
+    "question": "Yazar ayıcığını kaybederse nasıl hissedecektir?",
+    "options": {
+      "A": "Sevinçli",
+      "B": "Üzgün",
+      "C": "Kızgın",
+      "D": "Korkmuş"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Parkta Koşmak",
+    "wc": 44,
+    "question": "Metne göre parkta zaman geçirmek neden önemlidir?",
+    "options": {
+      "A": "Sadece eğlenceli olduğu için",
+      "B": "Sadece arkadaşlarla buluşmak için",
+      "C": "Hem eğlenceli hem de faydalı olduğu için",
+      "D": "Telefonla vakit geçirmek için"
+    },
+    "scores": {
+      "A": 0.25,
+      "B": 0.0,
+      "C": 0.5,
+      "D": 0.5
+    }
+  },
+  {
+    "title": "Hayvanat Bahçesine Gezinti",
+    "wc": 47,
+    "question": "Yazar hayvanat bahçesini neden sevmiştir?",
+    "options": {
+      "A": "Sadece eğlenceli olduğu için",
+      "B": "Orada arkadaşlarını gördüğü için",
+      "C": "Hayvanları daha yakından tanıdığı için",
+      "D": "Hayvanlara yiyecek verdiği için"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.25,
+      "C": 0.5,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Hayvanat Bahçesine Gezinti",
+    "wc": 47,
+    "question": "Yazar metnin sonunda ne söylüyor?",
+    "options": {
+      "A": "Hayvanat bahçesinden sıkıldığını",
+      "B": "Bir daha gitmek istemediğini",
+      "C": "Hayvanları çok sevdiğini",
+      "D": "Korktuğunu"
+    },
+    "scores": {
+      "A": 0.33,
+      "B": 0.5,
+      "C": 0.67,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "En İyi Arkadaşım",
+    "wc": 48,
+    "question": "Arkadaşlık yazar için ne anlam ifade ediyor?",
+    "options": {
+      "A": "Sıkıntı",
+      "B": "Eğlence ve destek",
+      "C": "Yalnızlık",
+      "D": "Zorluk"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Baharın Renkleri",
+    "wc": 51,
+    "question": "Yazar baharda neler yapmayı seviyor?",
+    "options": {
+      "A": "Evde kalmayı",
+      "B": "Dışarı çıkıp çiçekleri izlemeyi ve koşmayı",
+      "C": "Televizyon izlemeyi",
+      "D": "Kitap okumayı"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.2,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Baharın Renkleri",
+    "wc": 51,
+    "question": "Metnin sonunda yazar kendisini nasıl hissediyor?",
+    "options": {
+      "A": "Yorgun",
+      "B": "Üzgün",
+      "C": "Canlanmış ve enerjik",
+      "D": "Korkmuş ."
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Kitapların Sırrı",
+    "wc": 52,
+    "question": "Kitaplar yazar için neye benzetilmiştir?",
+    "options": {
+      "A": "Birer oyuncak",
+      "B": "Kapılar",
+      "C": "Yemekler",
+      "D": "Okullar"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Kitapların Sırrı",
+    "wc": 52,
+    "question": "Kitapları okurken yazar neler hissetti?",
+    "options": {
+      "A": "Sadece güldü",
+      "B": "Sadece düşündü",
+      "C": "Hem güldü hem düşündü",
+      "D": "Hiçbir şey hissetmedi"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Renkli Balonlar",
+    "wc": 58,
+    "question": "Yazar doğum gününü nasıl hatırlayacak?",
+    "options": {
+      "A": "Unutacak",
+      "B": "Çok eğlenip mutlu olduğu için unutmayacak",
+      "C": "Sıkıcı geçtiği için unutacak",
+      "D": "Ağlayarak hatırlayacak"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.17,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Ormanda Kamp Macerası",
+    "wc": 61,
+    "question": "Kamp sonunda ne oldu?",
+    "options": {
+      "A": "Arkadaşlıkları güçlendi ve unutulmaz bir deneyim oldu.",
+      "B": "Arkadaşlar kavga etti.",
+      "C": "Çok sıkıldılar.",
+      "D": "Kimse mutlu olmadı."
+    },
+    "scores": {
+      "A": 0.6,
+      "B": 0.0,
+      "C": 0.5,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Güneşli Bir Pazar Günü",
+    "wc": 62,
+    "question": "Parkta çocuklar ne yapıyordu?",
+    "options": {
+      "A": "Sessizce oturuyorlardı",
+      "B": "Kitap okuyorlardı",
+      "C": "Kahkahalarla oynuyorlardı",
+      "D": "Müzik dinliyorlardı"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Güneşli Bir Pazar Günü",
+    "wc": 62,
+    "question": "Metne göre yazar bu günü nasıl hatırlayacak?",
+    "options": {
+      "A": "Unutulmaz bir gün olarak",
+      "B": "Üzgün bir gün olarak",
+      "C": "Sıradan bir gün olarak",
+      "D": "Yorucu bir gün olarak"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Güneşli Bir Pazar Günü",
+    "wc": 62,
+    "question": "Yazar metnin sonunda ne anlatmak istemiştir?",
+    "options": {
+      "A": "Tatilde neler yapılmalı",
+      "B": "Sporun önemi",
+      "C": "Basit şeylerin bile mutlu edebileceği",
+      "D": "Parkta nasıl yürüyüş yapılır"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.4,
+      "D": 0.25
+    }
+  },
+  {
+    "title": "Dedemle Bahçede",
+    "wc": 64,
+    "question": "Metnin genel konusu nedir?",
+    "options": {
+      "A": "Yaz tatilinde yapılan geziler",
+      "B": "Dedeyle birlikte bahçede vakit geçirmek",
+      "C": "Okulda yapılan etkinlikler",
+      "D": "Hayvanat bahçesinde gezmek"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.2,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Yeni Hobim Resim",
+    "wc": 65,
+    "question": "Yazar resim yapmaya nasıl başlıyor?",
+    "options": {
+      "A": "Kitap okuyarak",
+      "B": "Renkleri karıştırarak ve çizim yaparak",
+      "C": "Kalemle yazı yazarak",
+      "D": "Film izleyerek"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.25,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Yeni Hobim Resim",
+    "wc": 65,
+    "question": "Yazarın resim konusunda ona yardımcı olan kişi kimdir?",
+    "options": {
+      "A": "Babası",
+      "B": "Öğretmeni",
+      "C": "Annesi",
+      "D": "Arkadaşı"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Yeni Hobim Resim",
+    "wc": 65,
+    "question": "Yazar resim yaparken nasıl hissediyor?",
+    "options": {
+      "A": "Sıkılıyor",
+      "B": "Korkuyor",
+      "C": "Üzülüyor",
+      "D": "Mutlu oluyor"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Rüyamdaki Uçan Bisiklet",
+    "wc": 66,
+    "question": "Pedala bastıkça ne oluyor?",
+    "options": {
+      "A": "Suya düşüyor.",
+      "B": "Havalanıyor.",
+      "C": "Kırılıyor.",
+      "D": "Duruyor."
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Rüyamdaki Uçan Bisiklet",
+    "wc": 66,
+    "question": "Çocuk rüyasında hangi duyguları hissediyor?",
+    "options": {
+      "A": "Üzüntü ve korku",
+      "B": "Şaşkınlık ve mutluluk",
+      "C": "Kızgınlık ve yalnızlık",
+      "D": "Üşüme ve endişe"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Rüyamdaki Uçan Bisiklet",
+    "wc": 66,
+    "question": "Bu metindeki ana fikir nedir?",
+    "options": {
+      "A": "Bisiklet sürmek tehlikelidir.",
+      "B": "Rüyalar gerçektir.",
+      "C": "Hayal kurmak güzeldir.",
+      "D": "Kuşlarla yarışmak zordur."
+    },
+    "scores": {
+      "A": 0.33,
+      "B": 0.0,
+      "C": 0.33,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "Güneş Enerjisi",
+    "wc": 67,
+    "question": "Metne göre insanların ne yapması önemlidir?",
+    "options": {
+      "A": "Televizyonu kapatması",
+      "B": "Güneş enerjisini öğrenip kullanması",
+      "C": "Elektrik faturasını azaltması",
+      "D": "Rüzgâr enerjisini bırakması"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.5,
+      "C": 0.33,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Güneş ve Ay'ın Hikâyesi",
+    "wc": 68,
+    "question": "Güneş ve Ay neden sırayla gökyüzünü aydınlatmaya başlamış?",
+    "options": {
+      "A": "Birbirlerinden sıkıldıkları için",
+      "B": "Dünya dönmediği için",
+      "C": "Birlikte daha parlak olmak için",
+      "D": "Birbirlerini tamamlamak için"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.25,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Sessiz Kütüphane",
+    "wc": 69,
+    "question": "Yazar kütüphaneye kiminle gitmiştir?",
+    "options": {
+      "A": "Babasıyla",
+      "B": "Arkadaşıyla",
+      "C": "Annesiyle",
+      "D": "Öğretmeniyle"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Bahçede Kelebekler",
+    "wc": 70,
+    "question": "Yazar kelebeklerle ne yapmıştır?",
+    "options": {
+      "A": "Onlardan korkmuştur.",
+      "B": "Onları kovalamıştır.",
+      "C": "Onları toplamaya çalışmıştır.",
+      "D": "Onları izlemiş ve takip etmiştir."
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.5,
+      "C": 0.33,
+      "D": 0.5
+    }
+  },
+  {
+    "title": "Bahçede Kelebekler",
+    "wc": 70,
+    "question": "Yazar kelebekler sayesinde neyi fark etmiştir?",
+    "options": {
+      "A": "Doğanın özel ve güzel olduğunu",
+      "B": "Kelebeklerin ses çıkardığını",
+      "C": "Bahçenin çok gürültülü olduğunu",
+      "D": "Çiçeklerin rengini değiştiğini"
+    },
+    "scores": {
+      "A": 0.75,
+      "B": 0.33,
+      "C": 0.5,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "İlk Kar Heyecanı",
+    "wc": 70,
+    "question": "Yazar dışarı çıkmadan önce ne yaptı?",
+    "options": {
+      "A": "Botlarını giydi.",
+      "B": "Montunu giydi ve eldivenlerini taktı.",
+      "C": "Şapkasını aldı",
+      "D": "Çoraplarını değiştirdi."
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Hayvanlar ve Mevsimler",
+    "wc": 70,
+    "question": "Mehmet hayvanların mevsimlere göre davranışlarını nasıl öğrendi?",
+    "options": {
+      "A": "Kitap okuyarak",
+      "B": "Gözlem yaparak",
+      "C": "Film izleyerek",
+      "D": "Arkadaşlarından dinleyerek"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Güneşli Günlerde Bisiklet Sürmek",
+    "wc": 70,
+    "question": "Bisiklet sürerken neler duyuyordu?",
+    "options": {
+      "A": "Araba sesleri",
+      "B": "Kuşların şarkıları",
+      "C": "Televizyon sesi",
+      "D": "Yağmur sesi"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Güneşli Günlerde Bisiklet Sürmek",
+    "wc": 70,
+    "question": "Bisiklet sürerken kimlerle yarış yaptı?",
+    "options": {
+      "A": "Komşularıyla",
+      "B": "Ailesiyle",
+      "C": "Arkadaşlarıyla",
+      "D": "Yalnız başına"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Kış Masalı",
+    "wc": 71,
+    "question": "Ceyda ve Muzaffer nerede kartopu oynadı?",
+    "options": {
+      "A": "Okulda",
+      "B": "Parkta",
+      "C": "Bahçede",
+      "D": "Sokakta"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Kış Masalı",
+    "wc": 71,
+    "question": "Ceyda kışın en çok neyi seviyor?",
+    "options": {
+      "A": "Sıcak çikolata içmeyi",
+      "B": "Dışarıda oynamayı ve sonra eve gelip ısınmayı",
+      "C": "Kardan adam yapmayı",
+      "D": "Kar yağmasını izlemeyi"
+    },
+    "scores": {
+      "A": 0.67,
+      "B": 0.67,
+      "C": 0.67,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "İlkbaharda Bahar Temizliği",
+    "wc": 71,
+    "question": "Bahar temizliği sırasında neler yaptılar?",
+    "options": {
+      "A": "Kapıları kapattılar ve evde oturdular",
+      "B": "Pencereleri açıp evi havalandırdılar, toz aldılar",
+      "C": "Bahçede oyun oynadılar",
+      "D": "Sadece eşyaları attılar"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.5,
+      "C": 0.0,
+      "D": 0.67
+    }
+  },
+  {
+    "title": "Annemin Mutfak Sırları",
+    "wc": 72,
+    "question": "Anlatıcı annesine nasıl yardım etti?",
+    "options": {
+      "A": "Oyun oynayarak",
+      "B": "Önce önlüğünü takıp ellerini yıkayarak, sonra kek yaparak",
+      "C": "Evde temizlik yaparak",
+      "D": "Yemekleri yiyerek"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.25,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Annemin Mutfak Sırları",
+    "wc": 72,
+    "question": "Kek yaparken hangi malzemelerden bahsediliyor?",
+    "options": {
+      "A": "Süt ve şeker",
+      "B": "Yumurtalar ve un",
+      "C": "Peynir ve domates",
+      "D": "Patates ve soğan"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Minik Kuşun Yolculuğu",
+    "wc": 73,
+    "question": "Kuş uçarken neye destek oldu?",
+    "options": {
+      "A": "Yağmura",
+      "B": "Rüzgâra",
+      "C": "Güneşe",
+      "D": "Kar'a"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Çorap Krallığı",
+    "wc": 77,
+    "question": "Kirli Çorap Canavarı ne yaptı?",
+    "options": {
+      "A": "Elif'i yakaladı.",
+      "B": "Çorap krallığını tehdit etti.",
+      "C": "Çoraplarla arkadaş oldu.",
+      "D": "Evden kaçtı."
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.25,
+      "C": 0.33,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Kütüphanede Gece Macerası",
+    "wc": 77,
+    "question": "Ali kütüphanede neden mahsur kaldı?",
+    "options": {
+      "A": "Kitapları okumaya çok dalmıştı.",
+      "B": "Kapanış saatini unuttuğu için.",
+      "C": "Kapılar kilitlendi.",
+      "D": "Görevliler onu içeride bıraktı."
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.25,
+      "C": 0.0,
+      "D": 0.25
+    }
+  },
+  {
+    "title": "Kütüphanede Gece Macerası",
+    "wc": 77,
+    "question": "Gece olunca kitaplara ne oldu?",
+    "options": {
+      "A": "Kitaplar kayboldu.",
+      "B": "Kitaplar canlandı ve Ali'yi farklı dünyalara götürdü.",
+      "C": "Kitaplar uçmaya başladı.",
+      "D": "Kitaplar konuşmaya başladı."
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.67,
+      "C": 0.33,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "Kardeşimle İlk Piknik",
+    "wc": 78,
+    "question": "Piknik nerede yapıldı?",
+    "options": {
+      "A": "Ormanda",
+      "B": "Parkta",
+      "C": "Sahilde",
+      "D": "Bahçede"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Kardeşimle İlk Piknik",
+    "wc": 78,
+    "question": "Pikniğe annem ne getirdi?",
+    "options": {
+      "A": "Kek ve çay",
+      "B": "Sandviç, meyve suyu ve kurabiye",
+      "C": "Meyve ve dondurma",
+      "D": "Patates kızartması ve su"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.75,
+      "C": 0.5,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Kardeşimle İlk Piknik",
+    "wc": 78,
+    "question": "Piknikte hangi aktiviteleri yaptılar?",
+    "options": {
+      "A": "Yüzme ve koşu",
+      "B": "Oyun oynama ve uçurtma uçurma",
+      "C": "Bisiklet sürme ve koşma",
+      "D": "Kitap okuma ve resim yapma"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.25,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Bahar Pikniği",
+    "wc": 82,
+    "question": "Pikniğe nerede gittiler?",
+    "options": {
+      "A": "Deniz kenarına",
+      "B": "Parka",
+      "C": "Ormana",
+      "D": "Dağa"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Yağmurdan Sonra Gökkuşağı",
+    "wc": 82,
+    "question": "Gökyüzü neden karardı?",
+    "options": {
+      "A": "Güneş battığı için",
+      "B": "Yağmur başladığı için",
+      "C": "Bulutlar dağıldığı için",
+      "D": "Rüzgâr estiği için"
+    },
+    "scores": {
+      "A": 0.67,
+      "B": 0.67,
+      "C": 0.33,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "Minik Bir Serçeye Yardım",
+    "wc": 83,
+    "question": "Serçe nasıl iyileştirildi?",
+    "options": {
+      "A": "Evde kendi başına kaldı",
+      "B": "Veterinere götürüldü ve dinlendi",
+      "C": "Ormanda bırakıldı",
+      "D": "Başka bir kuşla birlikte bakıldı"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.33,
+      "C": 0.0,
+      "D": 0.25
+    }
+  },
+  {
+    "title": "Okulda İlk Günüm",
+    "wc": 84,
+    "question": "Okula ilk başladığın gün ne yaptın?",
+    "options": {
+      "A": "Yeni formamı giymedim.",
+      "B": "Kalbim heyecanla attı.",
+      "C": "Sınıfta hiç kimse yoktu.",
+      "D": "Öğretmen sertti."
+    },
+    "scores": {
+      "A": 0.67,
+      "B": 0.67,
+      "C": 0.25,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Okulda İlk Günüm",
+    "wc": 84,
+    "question": "Öğretmen ne yaptı?",
+    "options": {
+      "A": "Adını söyledi ve oturacağın yeri gösterdi.",
+      "B": "Oyun oynamadı.",
+      "C": "Çok sinirlendi.",
+      "D": "Dersi iptal etti."
+    },
+    "scores": {
+      "A": 0.6,
+      "B": 0.5,
+      "C": 0.5,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Yeni Bir Kitap",
+    "wc": 85,
+    "question": "Kitabın kapağı nasıldı?",
+    "options": {
+      "A": "Sade ve düz",
+      "B": "Çok renkli ve dikkat çekici",
+      "C": "Siyah beyaz",
+      "D": "Yoktu"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.25,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Yeni Bir Kitap",
+    "wc": 85,
+    "question": "Kitap okumanın sana ne faydası oldu?",
+    "options": {
+      "A": "Sadece zaman kaybı",
+      "B": "Farklı dünyaların kapılarını açtı",
+      "C": "Çok sıkıcıydı",
+      "D": "Kitapları sevmememi sağladı"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.75,
+      "C": 0.5,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Minik Bahçıvan",
+    "wc": 87,
+    "question": "Deniz bahçesinde ne yaptı? -",
+    "options": {
+      "A": "Sebze yetiştirdi. -",
+      "B": "Küçük bir bahçe oluşturdu. -",
+      "C": "Ağaç dikti. -",
+      "D": "Sadece sulama yaptı."
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.33,
+      "C": 0.0,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "Minik Bahçıvan",
+    "wc": 87,
+    "question": "Deniz tohumları kontrol etmek için ne yaptı? -",
+    "options": {
+      "A": "Her sabah bahçeye gitti. -",
+      "B": "Sadece hafta sonları baktı. -",
+      "C": "Hiç kontrol etmedi. -",
+      "D": "Başkasına baktırdı."
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.0,
+      "C": 0.33,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Minik Bahçıvan",
+    "wc": 87,
+    "question": "Deniz bahçesi sayesinde ne öğrendi? -",
+    "options": {
+      "A": "Herkes çiçek sever. -",
+      "B": "Emek verince güzel şeyler olur. -",
+      "C": "Bahçe yapmak zor iş. -",
+      "D": "Toprak çok kirli."
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.6,
+      "C": 0.0,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "İlk Bisikletim",
+    "wc": 87,
+    "question": "Başta bisiklet sürerken ne zordu? -",
+    "options": {
+      "A": "Pedal çevirmek -",
+      "B": "Dengeyi sağlamak -",
+      "C": "Fren kullanmak -",
+      "D": "Bisikleti taşımak"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "İlk Bisikletim",
+    "wc": 87,
+    "question": "Bisiklet sürerken babam nasıl yardımcı oldu? -",
+    "options": {
+      "A": "Elimi tuttu ve destek oldu -",
+      "B": "Bisiklet sürdü -",
+      "C": "Beni izledi ama yardım etmedi -",
+      "D": "Bisikleti tamir etti"
+    },
+    "scores": {
+      "A": 0.75,
+      "B": 0.5,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Hayal Fırını",
+    "wc": 87,
+    "question": "Fırının özelliği neydi? -",
+    "options": {
+      "A": "Çok lezzetli ekmekler yapıyordu. -",
+      "B": "İstediklerini hayal edip pişiriyordu. -",
+      "C": "Çok eskiydi. -",
+      "D": "Sadece kurabiye yapıyordu."
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.5,
+      "C": 0.0,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "Hayal Fırını",
+    "wc": 87,
+    "question": "Fırın nasıl tekrar çalışmaya başladı? -",
+    "options": {
+      "A": "Mina tamir etti. -",
+      "B": "Mina ve arkadaşları birlikte paylaşarak pişirdi. -",
+      "C": "Kadın büyü yaptı. -",
+      "D": "Yeni fırın aldılar."
+    },
+    "scores": {
+      "A": 0.33,
+      "B": 0.6,
+      "C": 0.67,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "Teknoloji ve Eğitim",
+    "wc": 88,
+    "question": "Teknoloji eğitim alanında nasıl bir etki yapmıştır? -",
+    "options": {
+      "A": "Bilgiye ulaşmayı zorlaştırmıştır -",
+      "B": "Bilgiye hızlıca ulaşmayı sağlamıştır -",
+      "C": "Eğitim materyallerini azaltmıştır -",
+      "D": "Öğrencilerin derslerden soğumasına neden olmuştur"
+    },
+    "scores": {
+      "A": 0.33,
+      "B": 0.5,
+      "C": 0.33,
+      "D": 0.2
+    }
+  },
+  {
+    "title": "Teknoloji ve Eğitim",
+    "wc": 88,
+    "question": "Teknolojinin eğitimde sağladığı avantajlardan biri nedir? -",
+    "options": {
+      "A": "Öğretmenlerin dersleri daha etkili yapabilmesi -",
+      "B": "Öğrencilerin ders çalışmaması -",
+      "C": "Sosyal ilişkilerin artması -",
+      "D": "Ekran süresinin artırılması"
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.33,
+      "C": 0.33,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "Kaybolan Dişim",
+    "wc": 88,
+    "question": "Hikâyede dişin ne zaman sallanmaya başladı? -",
+    "options": {
+      "A": "Diş düştükten sonra -",
+      "B": "Kahvaltı ederken fark edildiğinde -",
+      "C": "Okula gidince -",
+      "D": "Gece uyurken"
+    },
+    "scores": {
+      "A": 0.67,
+      "B": 0.75,
+      "C": 0.0,
+      "D": 0.5
+    }
+  },
+  {
+    "title": "Kaybolan Dişim",
+    "wc": 88,
+    "question": "Çocuk dişini kaybettikten sonra ne hissetti? -",
+    "options": {
+      "A": "Üzgün ve korkmuş -",
+      "B": "Büyümüş gibi hissetti -",
+      "C": "Çok mutsuz -",
+      "D": "Hiçbir şey hissetmedi"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.5,
+      "C": 0.5,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "Sporun Faydaları",
+    "wc": 90,
+    "question": "Aileler ve öğretmenler neden spor yapmamızı önerir? -",
+    "options": {
+      "A": "Çünkü spor çok zor -",
+      "B": "Çünkü spor disiplin ve sabır gerektirir -",
+      "C": "Çünkü spor sıkıcıdır -",
+      "D": "Çünkü spor yalnızca eğlencedir"
+    },
+    "scores": {
+      "A": 0.75,
+      "B": 1.0,
+      "C": 0.67,
+      "D": 0.5
+    }
+  },
+  {
+    "title": "Evcil Hayvanım Boncuk",
+    "wc": 90,
+    "question": "Boncuk'un en sevdiği yer neresidir? -",
+    "options": {
+      "A": "Pencere kenarı -",
+      "B": "Kapı önü -",
+      "C": "Mutfak -",
+      "D": "Bahçe"
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.5,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Evcil Hayvanım Boncuk",
+    "wc": 90,
+    "question": "Boncuk'un mırlaması kişinin nasıl hissetmesini sağlar? -",
+    "options": {
+      "A": "Kızgın -",
+      "B": "Rahatlamasını -",
+      "C": "Üzülmesini -",
+      "D": "Korkmasını"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Kırmızı Balonun Peşinde",
+    "wc": 93,
+    "question": "Balon ilk olarak nereye kondu? -",
+    "options": {
+      "A": "Bir ağacın dalına -",
+      "B": "Bir çocuğun eline -",
+      "C": "Bir çatının üstüne -",
+      "D": "Bir bankın üzerine"
+    },
+    "scores": {
+      "A": 1.0,
+      "B": 0.0,
+      "C": 1.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Kırmızı Balonun Peşinde",
+    "wc": 93,
+    "question": "Mert balonu en sonunda ne yaptı? -",
+    "options": {
+      "A": "Patlattı -",
+      "B": "Sakladı -",
+      "C": "Eve götürdü -",
+      "D": "Serbest bıraktı"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.5,
+      "D": 0.5
+    }
+  },
+  {
+    "title": "Rüzgârın Getirdiği Mektup",
+    "wc": 93,
+    "question": "Mektubun sahibi bulunabildi mi? -",
+    "options": {
+      "A": "Evet, kolayca bulundu -",
+      "B": "Hayır, hiç aranmadı -",
+      "C": "Hayır, ama mektup anlamlı oldu -",
+      "D": "Evet, ama sonra kayboldu"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.25,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "Hayvanları Korumanın Önemi",
+    "wc": 94,
+    "question": "Aşağıdakilerden hangisi hayvanların insanlara sağladığı bir yarar değildir? -",
+    "options": {
+      "A": "Dostluk kurmak -",
+      "B": "Koruma sağlamak -",
+      "C": "Bilimsel araştırmalara katkı -",
+      "D": "Onları yarışmalarda kullanmak"
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.5,
+      "C": 0.33,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Su Kaynaklarını Koruma",
+    "wc": 95,
+    "question": "Su kaynakları neden tehdit altındadır? -",
+    "options": {
+      "A": "Suların çok sıcak olması nedeniyle -",
+      "B": "İnsanların suyu dikkatli kullanması nedeniyle -",
+      "C": "Su kaynaklarının azalması ve kirlenmesi nedeniyle -",
+      "D": "Su içmenin yasak olması nedeniyle"
+    },
+    "scores": {
+      "A": 0.2,
+      "B": 0.4,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Su Kaynaklarını Koruma",
+    "wc": 95,
+    "question": "Aşağıdakilerden hangisi suyu koruma yollarından biridir? -",
+    "options": {
+      "A": "Musluğu açık bırakmak -",
+      "B": "Gereksiz yere su kullanmak -",
+      "C": "Kirli suları doğaya bırakmak -",
+      "D": "Musluğu kapatmak ve israf etmemek"
+    },
+    "scores": {
+      "A": 0.67,
+      "B": 1.0,
+      "C": 0.75,
+      "D": 0.75
+    }
+  },
+  {
+    "title": "Su Kaynaklarını Koruma",
+    "wc": 95,
+    "question": "Su kaynaklarını korumak neye yardımcı olur? -",
+    "options": {
+      "A": "Yeni barajlar yapılmasına -",
+      "B": "Doğanın ve gelecek nesillerin korunmasına -",
+      "C": "Yağmurun daha az yağmasına -",
+      "D": "Suyun tadının değişmesine"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.25,
+      "C": 0.0,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "Gizemli Orman Yolu",
+    "wc": 96,
+    "question": "Ormanda vakit geçirmek çocuklara nasıl hissettirdi? -",
+    "options": {
+      "A": "Korkmuş -",
+      "B": "Yalnız -",
+      "C": "Sıkılmış -",
+      "D": "Huzurlu ve mutlu"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Gizemli Orman Yolu",
+    "wc": 96,
+    "question": "Bu orman yolunda çocuklar ne yaptı? -",
+    "options": {
+      "A": "Kampa gittiler -",
+      "B": "Kayboldular -",
+      "C": "Hikâyeler anlattılar ve doğayı keşfettiler -",
+      "D": "Ağaçlara tırmandılar"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.25,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Bahar Temizliği",
+    "wc": 97,
+    "question": "Temiz sınıf ortamı nasıl bir etki yaptı? -",
+    "options": {
+      "A": "Dersleri zorlaştırdı -",
+      "B": "Sınıfı karanlık gösterdi -",
+      "C": "Daha keyifli ders yapılmasını sağladı -",
+      "D": "Sınıfı boş gösterdi"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.33,
+      "C": 0.25,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "Teknoloji Bağımlılığı ve Zararları",
+    "wc": 97,
+    "question": "Metne göre teknoloji bağımlılığı çocuklarda ne gibi sorunlara yol açabilir? -",
+    "options": {
+      "A": "Okul başarısının artmasına -",
+      "B": "Daha fazla kitap okunmasına -",
+      "C": "Göz sağlığının bozulmasına -",
+      "D": "Spor yapma isteğinin artmasına"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.33,
+      "C": 0.33,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Teknoloji Bağımlılığı ve Zararları",
+    "wc": 97,
+    "question": "Teknolojinin yaşamımıza etkisiyle ilgili aşağıdakilerden hangisi doğrudur? -",
+    "options": {
+      "A": "Her zaman zararlıdır -",
+      "B": "Sadece eğlencelidir -",
+      "C": "Hiçbir işe yaramaz -",
+      "D": "Bilinçli kullanıldığında faydalıdır"
+    },
+    "scores": {
+      "A": 0.33,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "Sınıfımızdaki Yeni Bitki",
+    "wc": 98,
+    "question": "Bitkiye nasıl bakılması gerektiği öğretilmiştir? -",
+    "options": {
+      "A": "Ona şarkı söyleyerek -",
+      "B": "Güneşte kurutarak -",
+      "C": "Sulayarak ve sevgi göstererek -",
+      "D": "Toprağını değiştirmeden bırakmak"
+    },
+    "scores": {
+      "A": 0.33,
+      "B": 0.0,
+      "C": 0.33,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Sınıfımızdaki Yeni Bitki",
+    "wc": 98,
+    "question": "Sınıfın bitkiye sırayla su vermesi neyi öğretmiştir? -",
+    "options": {
+      "A": "Eğlenmeyi -",
+      "B": "Sorumluluk almayı -",
+      "C": "Hızlı çalışmayı -",
+      "D": "Yarış yapmayı"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Doğal Afetlere Hazırlık",
+    "wc": 99,
+    "question": "Afet sırasında paniği önlemek için ne yapılmalıdır?",
+    "options": {
+      "A": "Herkes bağırmalı",
+      "B": "Rastgele davranılmalı",
+      "C": "Önceden hazırlık yapılmalı",
+      "D": "Evden kaçılmalı"
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.0,
+      "C": 0.33,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Kayıp Oyuncak Ayı",
+    "wc": 100,
+    "question": "Can'ın oyuncak ayısı nerede kayboldu?",
+    "options": {
+      "A": "Okulda",
+      "B": "Evde",
+      "C": "Parkta",
+      "D": "Marketin içinde"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Kayıp Oyuncak Ayı",
+    "wc": 100,
+    "question": "Can ve Elif ayıyı bulmak için ne yaptı?",
+    "options": {
+      "A": "Oyun oynamaya devam etti",
+      "B": "Ev ve bahçeyi dikkatlice aradı",
+      "C": "Başka oyuncaklar aldı",
+      "D": "Hiçbir şey yapmadı"
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.67,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Kayıp Oyuncak Ayı",
+    "wc": 100,
+    "question": "Bu olay Can ve Elif'e neyi öğretti?",
+    "options": {
+      "A": "Oyuncak ayının önemsiz olduğunu",
+      "B": "Birlikte hareket etmenin ve küçük şeylerin değerini",
+      "C": "Oyuncak almanın kolay olduğunu",
+      "D": "Oyun oynamanın önemli olmadığını"
+    },
+    "scores": {
+      "A": 0.75,
+      "B": 0.83,
+      "C": 0.5,
+      "D": 0.25
+    }
+  },
+  {
+    "title": "Kitap Okumanın Önemi",
+    "wc": 100,
+    "question": "Kitap okumak aşağıdakilerden hangisini geliştirir?",
+    "options": {
+      "A": "Fiziksel güç",
+      "B": "Hayal gücü ve yaratıcılık",
+      "C": "Sadece kelime dağarcığı",
+      "D": "Sadece teknoloji kullanımı"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.33,
+      "C": 0.33,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Kış Günü ve Sıcak Çikolata",
+    "wc": 100,
+    "question": "Metinde anlatılan küçük mutluluklar neleri değiştirebilir?",
+    "options": {
+      "A": "Sadece dışarısını",
+      "B": "Sadece içimizi",
+      "C": "Hem dışarısını hem içimizi sıcacık yapabilir",
+      "D": "Hiçbir şeyi"
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.5,
+      "C": 0.67,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Minik Arının Çalışkanlığı",
+    "wc": 101,
+    "question": "Arının çalışkanlığı anlatıcıyı nasıl etkiledi?",
+    "options": {
+      "A": "Onu korkuttu",
+      "B": "Onu çok şaşırttı",
+      "C": "Onu etkiledi ve azmi öğretti",
+      "D": "Onu üzdü"
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.67,
+      "C": 0.75,
+      "D": 0.5
+    }
+  },
+  {
+    "title": "Minik Arının Çalışkanlığı",
+    "wc": 101,
+    "question": "Arının verdiği ders neydi?",
+    "options": {
+      "A": "Pes etmemek ve görevini severek yapmak",
+      "B": "Hızlı koşmak",
+      "C": "Sadece dinlenmek",
+      "D": "Hiçbir şey yapmamak"
+    },
+    "scores": {
+      "A": 0.6,
+      "B": 0.5,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Teknolojinin Hayatımızdaki Yeri",
+    "wc": 101,
+    "question": "Teknolojinin eğitimdeki rolü nedir?",
+    "options": {
+      "A": "Dersleri zorlaştırmak",
+      "B": "İstenilen bilgiye hızlı ulaşma ve çevrimiçi ders imkânı sağlamak",
+      "C": "Okulları kapatmak",
+      "D": "Sadece oyun oynamak için kullanılır"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.25,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Teknolojinin Hayatımızdaki Yeri",
+    "wc": 101,
+    "question": "Teknolojinin fazla ve kontrolsüz kullanımı ne gibi sorunlara yol açabilir?",
+    "options": {
+      "A": "Sağlık sorunları ve sosyal ilişkilerin zayıflaması",
+      "B": "Daha fazla oyun kazanmak",
+      "C": "Spor yapmayı artırmak",
+      "D": "İnsanları daha sosyal yapmak"
+    },
+    "scores": {
+      "A": 0.4,
+      "B": 0.33,
+      "C": 0.0,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "Hayvanları Koruma Yolları",
+    "wc": 101,
+    "question": "Sokak hayvanlarına nasıl yardım edebiliriz?",
+    "options": {
+      "A": "Onları görmezden gelerek",
+      "B": "Mama bırakarak ve barınaklara destek olarak",
+      "C": "Onlardan uzak durarak",
+      "D": "Onlara zarar vererek"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.75,
+      "C": 0.0,
+      "D": 0.67
+    }
+  },
+  {
+    "title": "Kitapların Sırrı",
+    "wc": 101,
+    "question": "Kütüphanede yazarın ilk dikkat ettiği şey neydi?",
+    "options": {
+      "A": "Kitapların fiyatı",
+      "B": "Kitapların sayısı",
+      "C": "Kitabın kapak resmi",
+      "D": "Kitapçıdaki sesler"
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.5,
+      "C": 0.67,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Kitapların Sırrı",
+    "wc": 101,
+    "question": "Kitap okurken yazar kendini nasıl hissetti?",
+    "options": {
+      "A": "Çok sıkıldı",
+      "B": "Ormandaymış gibi heyecanlandı",
+      "C": "Kitabı bıraktı",
+      "D": "Sadece yazıya odaklandı"
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "Kitapların Sırrı",
+    "wc": 101,
+    "question": "Metinden anlaşıldığına göre, kitaplar ne işe yarıyor?",
+    "options": {
+      "A": "Sadece kelimeleri gösteriyor",
+      "B": "Farklı hayatlara götürüyor ve dünyayı zenginleştiriyor",
+      "C": "Sadece okuma alıştırması yapmayı sağlıyor",
+      "D": "Kitapları toplamak için kullanılıyor"
+    },
+    "scores": {
+      "A": 0.33,
+      "B": 0.6,
+      "C": 0.2,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Tatilin Önemi",
+    "wc": 102,
+    "question": "Tatilin bizi nasıl etkilediği söyleniyor?",
+    "options": {
+      "A": "Bizi daha yorgun yapar",
+      "B": "Zihnimizi ve bedenimizi dinlendirir",
+      "C": "Başarıyı azaltır",
+      "D": "Zaman kaybıdır"
+    },
+    "scores": {
+      "A": 0.33,
+      "B": 0.67,
+      "C": 0.5,
+      "D": 0.5
+    }
+  },
+  {
+    "title": "Tatilin Önemi",
+    "wc": 102,
+    "question": "Tatilde aile ve arkadaşlarla vakit geçirmek neden önemlidir?",
+    "options": {
+      "A": "Daha çok çalışmak için",
+      "B": "Güzel anılar biriktirmek için",
+      "C": "Oyun oynamak istemediğimiz için",
+      "D": "Hiç önemli değildir"
+    },
+    "scores": {
+      "A": 0.67,
+      "B": 0.75,
+      "C": 0.25,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Doğayı Korumanın Önemi",
+    "wc": 102,
+    "question": "Doğa neden önemlidir?",
+    "options": {
+      "A": "Sadece insanların eğlenmesi için",
+      "B": "Tüm canlıların yaşam kaynağı olduğu için",
+      "C": "Sadece ağaçlar için",
+      "D": "Sadece su kaynakları için"
+    },
+    "scores": {
+      "A": 0.25,
+      "B": 0.67,
+      "C": 0.67,
+      "D": 0.67
+    }
+  },
+  {
+    "title": "Doğayı Korumanın Önemi",
+    "wc": 102,
+    "question": "İnsan faaliyetleri doğaya nasıl zarar verir?",
+    "options": {
+      "A": "Ormanları koruyarak",
+      "B": "Hava ve su kirliliği yaparak",
+      "C": "Doğal kaynakları dikkatli kullanarak",
+      "D": "Geri dönüşüm yaparak"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.67,
+      "C": 0.5,
+      "D": 0.67
+    }
+  },
+  {
+    "title": "Doğayı Korumanın Önemi",
+    "wc": 102,
+    "question": "Doğa ile uyum içinde yaşamanın faydası nedir?",
+    "options": {
+      "A": "Sadece bizim sağlığımız için",
+      "B": "Hem bizim hem diğer canlıların sağlıklı yaşaması için",
+      "C": "Sadece hayvanlar için",
+      "D": "Hiçbir faydası yoktur"
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.88,
+      "C": 0.67,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Sessiz Bir Sabah",
+    "wc": 102,
+    "question": "Yazar sabah sessizliğinde ne yaptı?",
+    "options": {
+      "A": "Kitap okudu",
+      "B": "Deftere hissettiklerini yazdı",
+      "C": "Oyun oynadı",
+      "D": "Müzik dinledi"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Sessiz Bir Sabah",
+    "wc": 102,
+    "question": "Yazar, sessiz sabahları neden seviyor?",
+    "options": {
+      "A": "Çünkü yalnız kalmak istiyor",
+      "B": "Çünkü iç huzur buluyor",
+      "C": "Çünkü dışarı çıkmak istemiyor",
+      "D": "Çünkü erken kalkmak zorunda"
+    },
+    "scores": {
+      "A": 0.25,
+      "B": 0.67,
+      "C": 0.5,
+      "D": 0.25
+    }
+  },
+  {
+    "title": "Kış Günü ve Sıcacık Atkı",
+    "wc": 102,
+    "question": "Atkının boyna dolanması ne sağladı?",
+    "options": {
+      "A": "Üşümeyi önledi.",
+      "B": "Koşmayı sağladı.",
+      "C": "Okulda popüler olmayı sağladı.",
+      "D": "Daha hızlı yürümeyi sağladı."
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Kış Günü ve Sıcacık Atkı",
+    "wc": 102,
+    "question": "Metnin sonunda yazar neyi anladı?",
+    "options": {
+      "A": "Kışın çok soğuk olduğunu",
+      "B": "Küçük şeylerin büyük mutluluklar yaratabileceğini",
+      "C": "Okulun güzel olduğunu",
+      "D": "Annesinin atkısının rengini"
+    },
+    "scores": {
+      "A": 0.75,
+      "B": 0.6,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Okul Bahçesinde Yeni Arkadaş",
+    "wc": 102,
+    "question": "Ali nereden gelmiş?",
+    "options": {
+      "A": "Aynı şehirden",
+      "B": "Başka bir şehirden",
+      "C": "Yurtdışından",
+      "D": "Okuldan"
+    },
+    "scores": {
+      "A": 1.0,
+      "B": 1.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Arkadaşlık ve Yardımlaşma",
+    "wc": 103,
+    "question": "Projede Eylül ne yaptı?",
+    "options": {
+      "A": "Projeyi çizdi",
+      "B": "Atıkları topladı",
+      "C": "Sunumu yaptı",
+      "D": "Fotoğraf çekti"
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.5,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Minik Serçenin Macerası",
+    "wc": 103,
+    "question": "Serçe pencerede nasıl bir haldeydi?",
+    "options": {
+      "A": "Mutlu ve neşeliydi",
+      "B": "Tüyleri dağınık ve biraz ürkmüştü",
+      "C": "Çok büyük ve korkutucuydu",
+      "D": "Renkli ve parlaktı"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.5,
+      "C": 0.33,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Minik Serçenin Macerası",
+    "wc": 103,
+    "question": "Rüzgâr sert olduğunda serçe ne yaptı?",
+    "options": {
+      "A": "Pencereye geldi",
+      "B": "Gitmedi ve ertesi gün tekrar geldi",
+      "C": "Hiç gelmedi",
+      "D": "Uçtu ama başka yere gitti"
+    },
+    "scores": {
+      "A": 1.0,
+      "B": 0.8,
+      "C": 0.5,
+      "D": 0.25
+    }
+  },
+  {
+    "title": "Empati Kurmanın Önemi",
+    "wc": 104,
+    "question": "Empati nedir?",
+    "options": {
+      "A": "Başkalarının düşüncelerini anlamak",
+      "B": "Başkalarının duygularını anlamak ve paylaşmak",
+      "C": "Kendi duygularımızı başkalarına anlatmak",
+      "D": "Sadece kendi hislerimizi önemsemek"
+    },
+    "scores": {
+      "A": 0.33,
+      "B": 0.5,
+      "C": 0.0,
+      "D": 0.25
+    }
+  },
+  {
+    "title": "Empati Kurmanın Önemi",
+    "wc": 104,
+    "question": "Empati neden önemlidir?",
+    "options": {
+      "A": "İnsanlar arasındaki güveni artırır",
+      "B": "Sorunları zorlaştırır",
+      "C": "İnsanları birbirinden uzaklaştırır",
+      "D": "İnsanları yalnız bırakır"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Kitap Okumanın Önemi",
+    "wc": 104,
+    "question": "Kitap okumak neyi geliştirir?",
+    "options": {
+      "A": "Sadece bedenimizi",
+      "B": "Hayal gücümüzü ve bilgimizi",
+      "C": "Sadece fiziksel becerilerimizi",
+      "D": "Hiçbir şeyi"
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.67,
+      "C": 0.67,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Arkadaşlığın Değeri",
+    "wc": 105,
+    "question": "Gerçek bir arkadaş ne zaman yanımızda olur?",
+    "options": {
+      "A": "Sadece oyun oynarken",
+      "B": "Yalnızca mutlu günlerde",
+      "C": "Sadece okulda",
+      "D": "Zor zamanlarımızda ve mutlu anlarımızda"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.33,
+      "C": 0.5,
+      "D": 0.75
+    }
+  },
+  {
+    "title": "Gizemli Komşu",
+    "wc": 106,
+    "question": "Kitap nasıldı?",
+    "options": {
+      "A": "Yepyeni ve parlaktı",
+      "B": "Sayfaları eksikti",
+      "C": "Sararmış ve kapağı yıpranmıştı",
+      "D": "Renkli resimlerle doluydu"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.5,
+      "C": 0.67,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Sağlıklı Uyku Alışkanlıkları",
+    "wc": 106,
+    "question": "Uyku ne işe yarar?",
+    "options": {
+      "A": "Bizi eğlendirir",
+      "B": "Beynimizi ve bedenimizi dinlendirir",
+      "C": "Oyun oynamamızı sağlar",
+      "D": "Yemek yememizi sağlar"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.33,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "Sağlıklı Uyku Alışkanlıkları",
+    "wc": 106,
+    "question": "Sağlıklı bir uyku için hangisi yapılmamalıdır?",
+    "options": {
+      "A": "Her gün aynı saatte uyumak",
+      "B": "Yatmadan önce televizyon izlemek",
+      "C": "Sessiz bir ortamda uyumak",
+      "D": "Yatak odasını karanlık tutmak"
+    },
+    "scores": {
+      "A": 0.8,
+      "B": 1.0,
+      "C": 0.33,
+      "D": 0.5
+    }
+  },
+  {
+    "title": "Zeynep'in Zaman Makinesi",
+    "wc": 108,
+    "question": "Zeynep nasıl bir çocuktu?",
+    "options": {
+      "A": "Sessiz ve çekingen",
+      "B": "Meraklı ve sorgulayıcı",
+      "C": "Sadece oyun oynayan biri",
+      "D": "Hiç soru sormayan biri"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Yardımlaşmanın Gücü",
+    "wc": 108,
+    "question": "Yardımlaşma sadece maddi yardım etmek midir?",
+    "options": {
+      "A": "Evet, sadece para vermektir",
+      "B": "Hayır, zaman ayırmak ve dinlemek de yardımdır",
+      "C": "Sadece hediye vermektir",
+      "D": "Sadece yemek paylaşmaktır"
+    },
+    "scores": {
+      "A": 0.25,
+      "B": 0.6,
+      "C": 0.33,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "Doğru Beslenme ve Sağlıklı Yaşam",
+    "wc": 109,
+    "question": "Sağlıklı beslenmede aşağıdakilerden hangisi önemli değildir?",
+    "options": {
+      "A": "Sebze ve meyve yemek",
+      "B": "Şekerli yiyecekleri çok fazla tüketmek",
+      "C": "Tam tahıl ürünlerini tercih etmek",
+      "D": "Protein kaynakları almak"
+    },
+    "scores": {
+      "A": 1.0,
+      "B": 0.2,
+      "C": 0.2,
+      "D": 1.0
+    }
+  },
+  {
+    "title": "Mutlu Bahçe",
+    "wc": 110,
+    "question": "Meltem, doğayı korumanın önemini ne zaman fark etti?",
+    "options": {
+      "A": "Bahçeyi satmak isteyince",
+      "B": "Arkadaşları geldiğinde",
+      "C": "Bahçesinde kuşları ve kelebekleri görünce",
+      "D": "Çiçekler solunca"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.5,
+      "D": 0.5
+    }
+  },
+  {
+    "title": "Sporun Faydaları",
+    "wc": 110,
+    "question": "Spor yapmak çocuklar için neden önemlidir?",
+    "options": {
+      "A": "Oyun saatini azaltmak için",
+      "B": "Büyüme ve gelişmeyi desteklediği için",
+      "C": "Daha çok tatlı yiyebilsinler diye",
+      "D": "Okula gitmesinler diye"
+    },
+    "scores": {
+      "A": 0.25,
+      "B": 0.5,
+      "C": 0.33,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Çevre Kirliliğinin Sonuçları",
+    "wc": 111,
+    "question": "Su kirliliği en çok neyi tehdit eder?",
+    "options": {
+      "A": "Toprağın verimini",
+      "B": "İçme suyu kaynaklarını",
+      "C": "Hava sıcaklığını",
+      "D": "Ağaçların boyunu"
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.67,
+      "C": 0.5,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Çevre Kirliliğinin Sonuçları",
+    "wc": 111,
+    "question": "Çevre kirliliğini azaltmak için ne yapılmalıdır?",
+    "options": {
+      "A": "Daha fazla plastik kullanılmalı",
+      "B": "Ormanlar kesilmeli",
+      "C": "Atıklar doğru şekilde bertaraf edilmeli",
+      "D": "Nehirler betonla kaplanmalı"
+    },
+    "scores": {
+      "A": 0.33,
+      "B": 0.0,
+      "C": 0.6,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Renklerin Dünyası",
+    "wc": 111,
+    "question": "Yazar, renklerin neyi anlattığını fark etmiştir?",
+    "options": {
+      "A": "Zamanı",
+      "B": "Şekilleri",
+      "C": "Duyguları",
+      "D": "Tatları"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Takım Çalışmasının Önemi",
+    "wc": 111,
+    "question": "Metne göre takım çalışması neyi geliştirir?",
+    "options": {
+      "A": "Yalnızlık duygusunu",
+      "B": "İletişimi",
+      "C": "Korkuyu",
+      "D": "Sessizliği"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Takım Çalışmasının Önemi",
+    "wc": 111,
+    "question": "Takım çalışması öğrenen çocuklar için ne söylenebilir?",
+    "options": {
+      "A": "Sosyal hayata hazırlanamazlar",
+      "B": "Daha bencil olurlar",
+      "C": "Gelecekte uyumlu bireyler olabilirler",
+      "D": "Yalnız çalışmayı tercih ederler"
+    },
+    "scores": {
+      "A": 0.67,
+      "B": 0.0,
+      "C": 0.75,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Sporun Faydaları",
+    "wc": 112,
+    "question": "Spor yapmanın fiziksel faydalarından biri aşağıdakilerden hangisidir?",
+    "options": {
+      "A": "Zihin yorgunluğunu artırmak",
+      "B": "Kasları geliştirmek",
+      "C": "Uykusuz kalmak",
+      "D": "Yemek yememek"
+    },
+    "scores": {
+      "A": 0.33,
+      "B": 0.5,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Sporun Faydaları",
+    "wc": 112,
+    "question": "Spor yapmanın ruh sağlığına etkisi nedir?",
+    "options": {
+      "A": "Stresi artırır",
+      "B": "Kaygıyı çoğaltır",
+      "C": "Ruh halini iyileştirir",
+      "D": "Üzgün hissettirir"
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.0,
+      "C": 0.33,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Geri Dönüşümün Önemi",
+    "wc": 112,
+    "question": "Geri dönüşüm ne demektir?",
+    "options": {
+      "A": "Atıkların yakılması",
+      "B": "Yeni ürünlerin çöpe atılması",
+      "C": "Atıkların tekrar işlenip kullanılması",
+      "D": "Atıkların doğaya bırakılması"
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.25,
+      "C": 0.5,
+      "D": 0.67
+    }
+  },
+  {
+    "title": "Geri Dönüşümün Önemi",
+    "wc": 112,
+    "question": "Metne göre geri dönüşüm ekonomiye nasıl katkı sağlar?",
+    "options": {
+      "A": "Yeni atıklar üretir.",
+      "B": "Geri dönüştürülen atıklar ham madde olarak kullanılır.",
+      "C": "Çöp dağlarını büyütür.",
+      "D": "Ürünleri daha pahalı yapar."
+    },
+    "scores": {
+      "A": 0.67,
+      "B": 0.5,
+      "C": 0.33,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Yıldızlarla Dans",
+    "wc": 112,
+    "question": "Seçil yıldızlar hakkında ne söyledi?",
+    "options": {
+      "A": "Yıldızlar sadece ışıktır.",
+      "B": "Yıldızlar çok uzak.",
+      "C": "Yıldızlar masaldan ibaret.",
+      "D": "Yıldızlar hikâye anlatır."
+    },
+    "scores": {
+      "A": 0.33,
+      "B": 0.67,
+      "C": 0.33,
+      "D": 0.67
+    }
+  },
+  {
+    "title": "Yıldızlarla Dans",
+    "wc": 112,
+    "question": "Macera sonunda Cenk ve Seçil ne hissetti?",
+    "options": {
+      "A": "Korktular.",
+      "B": "Macerayı unuttular.",
+      "C": "Hayal dünyasına inandılar.",
+      "D": "Macera gerçek olmasa da kalplerinde yaşadığını anladılar."
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.67,
+      "D": 0.83
+    }
+  },
+  {
+    "title": "Zaman Makinesiyle Bir Gün",
+    "wc": 112,
+    "question": "Geçmişteki köyde insanlar nasıl yolculuk ediyordu?",
+    "options": {
+      "A": "Bisikletle",
+      "B": "Trenle",
+      "C": "At arabasıyla",
+      "D": "Otobüsle"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Yaşlı Çınar Ağacı",
+    "wc": 113,
+    "question": "Çocuklar çınar ağacının gölgesinde ne yapıyor?",
+    "options": {
+      "A": "Resim yapıyor.",
+      "B": "Ders çalışıyor.",
+      "C": "Oyun oynayıp dinleniyor.",
+      "D": "Ağaç tırmanıyor."
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.0,
+      "C": 0.33,
+      "D": 0.5
+    }
+  },
+  {
+    "title": "Bir Tohumun Yolculuğu",
+    "wc": 114,
+    "question": "Öğretmen neden öğrencilere tohum verdi?",
+    "options": {
+      "A": "Oyun oynamaları için",
+      "B": "Bir bitkinin büyümesini izlemek için",
+      "C": "Resim yapmak için",
+      "D": "Toprak örneği için"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.25,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Bir Tohumun Yolculuğu",
+    "wc": 114,
+    "question": "Tohumun filizlenmesi için neler yapıldı?",
+    "options": {
+      "A": "Sadece su verildi",
+      "B": "Güneş ve su verildi",
+      "C": "Hiç bir şey yapılmadı",
+      "D": "Toprağa gömülmedi"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.5,
+      "C": 0.33,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Bir Tohumun Yolculuğu",
+    "wc": 114,
+    "question": "Filiz büyüyünce ne oldu?",
+    "options": {
+      "A": "Çiçek açtı hemen",
+      "B": "Saksıya dikildi",
+      "C": "Kuru kaldı",
+      "D": "Uçtu"
+    },
+    "scores": {
+      "A": 0.33,
+      "B": 0.5,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Bir Tohumun Yolculuğu",
+    "wc": 114,
+    "question": "Bu hikâye öğrenciler için neyi öğretti?",
+    "options": {
+      "A": "Sabır ve emekle büyümenin önemini",
+      "B": "Hızlı büyümenin yollarını",
+      "C": "Tohumların uçabildiğini",
+      "D": "Bitkilerin sadece toprakta büyüdüğünü"
+    },
+    "scores": {
+      "A": 0.25,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.25
+    }
+  },
+  {
+    "title": "Balıkçı Dede ile Denizde",
+    "wc": 114,
+    "question": "Dedem ne iş yapıyordu?",
+    "options": {
+      "A": "Çiftçilik",
+      "B": "Balıkçılık",
+      "C": "Öğretmenlik",
+      "D": "Doktorluk"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Balıkçı Dede ile Denizde",
+    "wc": 114,
+    "question": "Balık tutarken çocuk ne öğrendi?",
+    "options": {
+      "A": "Balık yakalamanın kolay olduğunu",
+      "B": "Balık yakalamanın sabır istediğini",
+      "C": "Balıkların konuştuğunu",
+      "D": "Balıkların çok hızlı yüzdüğünü"
+    },
+    "scores": {
+      "A": 0.25,
+      "B": 0.5,
+      "C": 0.5,
+      "D": 0.5
+    }
+  },
+  {
+    "title": "Balıkçı Dede ile Denizde",
+    "wc": 114,
+    "question": "Çocuğun balıkçı dedesiyle geçirdiği zaman onun için neden önemliydi?",
+    "options": {
+      "A": "Balıkların isimlerini öğrendiği için",
+      "B": "Dedemin bilgisini ve hikâyelerini öğrendiği için",
+      "C": "Oyun oynadığı için",
+      "D": "Tatil yaptığı için"
+    },
+    "scores": {
+      "A": 0.25,
+      "B": 0.2,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Doğal Besinlerin Faydaları",
+    "wc": 115,
+    "question": "Doğal beslenmenin önemi nedir?",
+    "options": {
+      "A": "Kilo kontrolü sağlar",
+      "B": "Çok fazla katkı maddesi içerir",
+      "C": "Sadece yetişkinlere faydalıdır",
+      "D": "Bağışıklığı zayıflatır"
+    },
+    "scores": {
+      "A": 0.67,
+      "B": 0.6,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Doğru Beslenme ve Sağlık",
+    "wc": 116,
+    "question": "Doğru beslenme vücudumuza ne sağlar?",
+    "options": {
+      "A": "Yalnızca enerji",
+      "B": "Vitamin, mineral ve enerji dengesi",
+      "C": "Yalnızca protein",
+      "D": "Sadece su"
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.75,
+      "C": 0.5,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Doğru Beslenme ve Sağlık",
+    "wc": 116,
+    "question": "Günlük beslenmede hangisi dengeli şekilde yer almalıdır?",
+    "options": {
+      "A": "Sadece meyve ve sebze",
+      "B": "Hazır ve işlenmiş gıdalar",
+      "C": "Sebze, meyve, tam tahıllar, protein ve sağlıklı yağlar",
+      "D": "Yalnızca tatlılar"
+    },
+    "scores": {
+      "A": 0.67,
+      "B": 1.0,
+      "C": 1.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Doğru Beslenme ve Sağlık",
+    "wc": 116,
+    "question": "Doğru beslenmenin ruh sağlığına etkisi nedir?",
+    "options": {
+      "A": "Olumsuz etkiler",
+      "B": "Gereksizdir",
+      "C": "Olumlu katkısı vardır",
+      "D": "Hiç etkisi yoktur"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Mevsimlerin Değişimi",
+    "wc": 117,
+    "question": "Yaz mevsiminde hangisi yaşanır?",
+    "options": {
+      "A": "Hava soğuk olur",
+      "B": "Günler kısalır",
+      "C": "İnsanlar tatillere çıkar ve denize girer",
+      "D": "Yapraklar dökülür"
+    },
+    "scores": {
+      "A": 1.0,
+      "B": 0.5,
+      "C": 0.8,
+      "D": 1.0
+    }
+  },
+  {
+    "title": "Ayakkabımın İçindeki Taş",
+    "wc": 119,
+    "question": "Metindeki \"taş\" kelimesi neyi simgeliyor?",
+    "options": {
+      "A": "Fiziksel bir engeli",
+      "B": "Küçük kırgınlıkları ve olumsuz duyguları",
+      "C": "Ayakkabı kalitesini",
+      "D": "Okulda yaşanan bir olayı"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.25,
+      "C": 0.0,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "Ayakkabımın İçindeki Taş",
+    "wc": 119,
+    "question": "Metinden çıkarılabilecek en önemli ders nedir?",
+    "options": {
+      "A": "Ayakkabı seçimine dikkat etmek gerekir",
+      "B": "Küçük sorunlar fark edilmezse büyür ve bizi zorlar",
+      "C": "Taşlar her zaman büyük olur",
+      "D": "Okulda taşlar sık görülür"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.43,
+      "C": 0.4,
+      "D": 0.25
+    }
+  },
+  {
+    "title": "Sorumluluk Sahibi Olmanın Önemi",
+    "wc": 122,
+    "question": "Sorumluluk sahibi olmak hangi özellikle ilgilidir?",
+    "options": {
+      "A": "Hataları gizlemek",
+      "B": "Hataları kabul etmek ve ders çıkarmak",
+      "C": "Hataları başkalarına yüklemek",
+      "D": "Hataları önemsememek"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.6,
+      "C": 0.33,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Kütüphane Sandığım Gibi Değilmiş",
+    "wc": 122,
+    "question": "Öğrenci kütüphaneye gitmeden önce ne düşünüyordu?",
+    "options": {
+      "A": "Çok heyecanlıydı.",
+      "B": "Sıkıcı olacağını düşünüyordu.",
+      "C": "Yeni arkadaşlar edineceğini sanıyordu.",
+      "D": "Kitaplardan çok hoşlanıyordu."
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.33,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Kütüphane Sandığım Gibi Değilmiş",
+    "wc": 122,
+    "question": "Öğrenci kütüphane hakkında sonunda ne düşünüyor?",
+    "options": {
+      "A": "Kütüphane sıkıcıdır.",
+      "B": "Kütüphane çok gürültülüdür.",
+      "C": "Kütüphane hayal gücünü geliştiren bir yerdir.",
+      "D": "Kitaplar işe yaramaz."
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.33,
+      "C": 0.4,
+      "D": 0.5
+    }
+  },
+  {
+    "title": "Balıklar Arasında Bir Gün",
+    "wc": 123,
+    "question": "Derin denize daldığında neyle karşılaştı?",
+    "options": {
+      "A": "Deniz canavarları",
+      "B": "Renkli balıklar ve mercanlar",
+      "C": "Gemiler",
+      "D": "Kum ve taşlar"
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.67,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Balıklar Arasında Bir Gün",
+    "wc": 123,
+    "question": "Maviş kimdi?",
+    "options": {
+      "A": "Derin'in babası",
+      "B": "Parlak mavi pullu büyük bir balık",
+      "C": "Bir deniz kaplumbağası",
+      "D": "Denizaltı robotu"
+    },
+    "scores": {
+      "A": 1.0,
+      "B": 0.8,
+      "C": 0.5,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Balıklar Arasında Bir Gün",
+    "wc": 123,
+    "question": "Derin su altında ne yaptı?",
+    "options": {
+      "A": "Yüzdü ve kitap okudu",
+      "B": "Su altı futbolu oynadı ve yosun kaydıraklarında kaydı",
+      "C": "Balık tuttu",
+      "D": "Deniz kabukları topladı"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.67,
+      "C": 0.5,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "Doğa ve İnsan İlişkisi",
+    "wc": 123,
+    "question": "Doğanın dengesini bozan en önemli insan faaliyetleri nelerdir?",
+    "options": {
+      "A": "Kitap okumak ve resim yapmak",
+      "B": "Ormanları yok etmek, su kaynaklarını kirletmek ve hava kirliliği",
+      "C": "Spor yapmak",
+      "D": "Hayvanları beslemek"
+    },
+    "scores": {
+      "A": 0.25,
+      "B": 0.43,
+      "C": 0.5,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Sağlıklı Uyku Alışkanlıkları",
+    "wc": 123,
+    "question": "İyi bir uyku ne sağlar?",
+    "options": {
+      "A": "Dikkati azaltır.",
+      "B": "Gün boyunca enerjik olmayı ve konsantrasyonu artırmayı sağlar.",
+      "C": "Zihni yorar.",
+      "D": "Sadece büyümeyi sağlar."
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.57,
+      "C": 0.0,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "Sağlıklı Uyku Alışkanlıkları",
+    "wc": 123,
+    "question": "Uyku düzeni özellikle kimler için çok önemlidir?",
+    "options": {
+      "A": "Yetişkinler için",
+      "B": "Okul çağındaki çocuklar için",
+      "C": "Sadece yaşlılar için",
+      "D": "Hiç kimse için"
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.75,
+      "C": 0.33,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "Kaybolan Eldiven",
+    "wc": 123,
+    "question": "Eldiven bulununca çocuk nasıl hissetti?",
+    "options": {
+      "A": "Üzgün",
+      "B": "Mutlu ve heyecanlı",
+      "C": "Kızgın",
+      "D": "Korkmuş"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Kaybolan Eldiven",
+    "wc": 123,
+    "question": "Bu olay çocuğa ne öğretti?",
+    "options": {
+      "A": "Eşyalarını dikkatli saklamayı ve paylaşmanın önemini",
+      "B": "Eldivenleri kaybetmeyi",
+      "C": "Arkadaşlardan uzak durmayı",
+      "D": "Soğuktan korunmayı"
+    },
+    "scores": {
+      "A": 0.4,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.5
+    }
+  },
+  {
+    "title": "Hayvanların Doğadaki Rolü",
+    "wc": 125,
+    "question": "Hayvanlar doğada neden önemlidir?",
+    "options": {
+      "A": "Yalnızca eğlenceli oldukları için",
+      "B": "Ekosistemde görevleri olduğu için",
+      "C": "İnsanlar onları sevdiği için",
+      "D": "Sadece ormanda yaşadıkları için"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.25,
+      "C": 0.25,
+      "D": 0.5
+    }
+  },
+  {
+    "title": "Hayvanların Doğadaki Rolü",
+    "wc": 125,
+    "question": "Hayvanların yok olması neye neden olur?",
+    "options": {
+      "A": "Doğadaki dengenin bozulmasına",
+      "B": "Daha fazla oyun alanı açılmasına",
+      "C": "İnsanların mutlu olmasına",
+      "D": "Bitkilerin çoğalmasına"
+    },
+    "scores": {
+      "A": 0.33,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.5
+    }
+  },
+  {
+    "title": "Gökkuşağı ve Küçük Kuş",
+    "wc": 128,
+    "question": "Kuş neden üzgündü?",
+    "options": {
+      "A": "Aç olduğu için",
+      "B": "Kanadı incindiği için",
+      "C": "Uçamayı sevmediği için",
+      "D": "Kaybolduğu için"
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.67,
+      "C": 0.33,
+      "D": 0.5
+    }
+  },
+  {
+    "title": "Kayıp Oyuncak Ayı",
+    "wc": 129,
+    "question": "Gökçe neden üzgündü?",
+    "options": {
+      "A": "Oyuncak ayısını kaybettiği için",
+      "B": "Arkadaşını göremediği için",
+      "C": "Annesi ona hediye vermediği için",
+      "D": "Okula gitmek istemediği için"
+    },
+    "scores": {
+      "A": 0.75,
+      "B": 0.33,
+      "C": 0.8,
+      "D": 0.25
+    }
+  },
+  {
+    "title": "Kayıp Oyuncak Ayı",
+    "wc": 129,
+    "question": "Gökçe ve Gönül ayıyı nerelerde aradı?",
+    "options": {
+      "A": "Yatak odasında, salonda, mutfakta ve bahçede",
+      "B": "Okulda ve parkta",
+      "C": "Sadece yatak odasında",
+      "D": "Sadece bahçede"
+    },
+    "scores": {
+      "A": 0.8,
+      "B": 0.0,
+      "C": 0.67,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Kayıp Oyuncak Ayı",
+    "wc": 129,
+    "question": "Bu hikâyeden çıkarılacak en önemli ders nedir?",
+    "options": {
+      "A": "Kaybettiklerimizi hemen buluruz.",
+      "B": "Sabırlı olmak ve birlikte hareket etmek önemlidir.",
+      "C": "Oyuncak ayılar çok değerlidir.",
+      "D": "Arkadaşlar oyun oynamayı sever."
+    },
+    "scores": {
+      "A": 0.67,
+      "B": 0.33,
+      "C": 0.5,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Doğa Yürüyüşü ve Keşifler",
+    "wc": 134,
+    "question": "Metnin sonunda yazar doğa yürüyüşleri için ne düşünüyor?",
+    "options": {
+      "A": "Artık yapmayacak.",
+      "B": "Daha sık yapmaya karar verdi.",
+      "C": "Çok yorucu buluyor.",
+      "D": "Sıkıcı olduğunu düşünüyor."
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.75,
+      "C": 0.33,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "Renkli Balonların Macerası",
+    "wc": 136,
+    "question": "Balon neden gökyüzüne yükseldi?",
+    "options": {
+      "A": "Betül balonu bıraktı.",
+      "B": "Rüzgâr balonun ipini elinden kaydırdı.",
+      "C": "Balon kendisi uçtu.",
+      "D": "Balon patladı."
+    },
+    "scores": {
+      "A": 0.67,
+      "B": 0.6,
+      "C": 0.33,
+      "D": 0.5
+    }
+  },
+  {
+    "title": "Deniz Altındaki Macera",
+    "wc": 138,
+    "question": "Can hazinenin orada kalması gerektiğini neden düşündü?",
+    "options": {
+      "A": "Çünkü hazineyi kimse bulmasın diye",
+      "B": "Çünkü hazine çok ağırdı",
+      "C": "Çünkü denizlerin ve canlıların korunması gerektiğini öğrendiği için",
+      "D": "Çünkü haritayı kaybetti"
+    },
+    "scores": {
+      "A": 0.25,
+      "B": 0.25,
+      "C": 0.57,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "Ayakkabı Ustasının Sihirli Çivisi",
+    "wc": 144,
+    "question": "Ayakkabıcı dedenin Kerem'in ayakkabısında kullandığı çivi nasıldı?",
+    "options": {
+      "A": "Çok büyük",
+      "B": "Parlayan ve sihirli",
+      "C": "Paslı",
+      "D": "Çivi değil, vida"
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.5,
+      "C": 0.0,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "Ayakkabı Ustasının Sihirli Çivisi",
+    "wc": 144,
+    "question": "Sihirli çivi hangi durumlarda çalışıyordu?",
+    "options": {
+      "A": "Hırsızlık yapanlara",
+      "B": "İyilik yapanlara",
+      "C": "Yalan söyleyenlere",
+      "D": "Spor yapanlara"
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.5,
+      "C": 0.0,
+      "D": 0.5
+    }
+  },
+  {
+    "title": "Ayakkabı Ustasının Sihirli Çivisi",
+    "wc": 144,
+    "question": "Hikâyenin sonunda Kerem mahallede ne oldu?",
+    "options": {
+      "A": "Çok yoruldu",
+      "B": "Mahalleden taşındı",
+      "C": "Mahallenin kahramanı oldu",
+      "D": "Ayakkabılarını sattı ."
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.0,
+      "C": 0.67,
+      "D": 0.5
+    }
+  },
+  {
+    "title": "Bakkal Amca'nın Zaman Makinesi",
+    "wc": 151,
+    "question": "Hikâyeden alınan mesaj nedir?",
+    "options": {
+      "A": "Tatil yapmanın önemi",
+      "B": "İyilik yapmanın önemini ve etkisini",
+      "C": "Zaman yolculuğunun zor olduğu",
+      "D": "Oyuncakların değerli olduğu"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.25,
+      "C": 0.25,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Gizemli Ormanın Sırrı",
+    "wc": 166,
+    "question": "Ormanın derinliklerinde ne buldular?",
+    "options": {
+      "A": "Büyük bir nehir",
+      "B": "Eski, yosunlu tahta bir kapı",
+      "C": "Dev bir ağaç ev",
+      "D": "Yüksek bir dağ"
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.75,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Gizemli Ormanın Sırrı",
+    "wc": 166,
+    "question": "Ormanın sırrı neydi?",
+    "options": {
+      "A": "Ormanda hazine vardı.",
+      "B": "Orman, doğa ve hayvanların korunduğu özel bir yerdi.",
+      "C": "Ormanda sihirli ağaçlar vardı.",
+      "D": "Ormanda herkes gizemliydi."
+    },
+    "scores": {
+      "A": 0.67,
+      "B": 0.83,
+      "C": 0.5,
+      "D": 0.67
+    }
+  },
+  {
+    "title": "Gizemli Ormanın Sırrı",
+    "wc": 166,
+    "question": "Kerem ve arkadaşları ormandan sonra ne yapmaya karar verdiler?",
+    "options": {
+      "A": "Ormanı daha fazla keşfetmek",
+      "B": "Ormanı korumak için söz vermek",
+      "C": "Ormanda kamp yapmak",
+      "D": "Ormanı köye götürmek"
+    },
+    "scores": {
+      "A": 0.67,
+      "B": 0.8,
+      "C": 0.33,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "Kayıp Oyuncak Ayı",
+    "wc": 172,
+    "question": "Emre ve arkadaşları nerelerde oyuncak ayıyı aradılar?",
+    "options": {
+      "A": "Evde ve sokakta",
+      "B": "Okulda ve okul bahçesinde",
+      "C": "Market ve evde",
+      "D": "Sahilde ve parkta"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.33,
+      "C": 0.0,
+      "D": 0.5
+    }
+  },
+  {
+    "title": "Kayıp Oyuncak Ayı",
+    "wc": 172,
+    "question": "Hikâyeden çıkarılacak en önemli ders nedir?",
+    "options": {
+      "A": "Oyuncakları paylaşmak güzeldir.",
+      "B": "Oyuncaklar sadece evde olmalı.",
+      "C": "Oyuncaklar çok pahalıdır.",
+      "D": "Arkadaşlar oyun oynarken dikkatli olmalı."
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.33,
+      "D": 0.2
+    }
+  },
+  {
+    "title": "Deniz Altındaki Macera",
+    "wc": 175,
+    "question": "Mağara nasıldı?",
+    "options": {
+      "A": "Çok aydınlıktı",
+      "B": "Karanlıktı ama yosunlar ve taşlar parlıyordu",
+      "C": "Sıcak ve kumluydu",
+      "D": "Büyük bir ev gibiydi"
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.75,
+      "C": 0.0,
+      "D": 0.5
+    }
+  },
+  {
+    "title": "Kayıp Kedinin Macerası",
+    "wc": 188,
+    "question": "Bu hikâyeden çıkarılacak önemli ders nedir?",
+    "options": {
+      "A": "Oyuncaklar kaybolur",
+      "B": "Pes etmeden aramak önemlidir ve sevdiğimize iyi bakmalıyız",
+      "C": "Kediler oyun oynamaz",
+      "D": "Park tehlikelidir"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.43,
+      "C": 0.33,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Ormanın Gizli Sesi",
+    "wc": 188,
+    "question": "Zeynep ormanın önemini öğrendikten sonra ne yaptı?",
+    "options": {
+      "A": "Köyde arkadaşlarına anlattı ve ormanı korumalarını istedi",
+      "B": "Ormandan uzaklaştı",
+      "C": "Ağaçları kesmeye başladı",
+      "D": "Melodiyi çalmaya karar verdi"
+    },
+    "scores": {
+      "A": 0.67,
+      "B": 0.0,
+      "C": 0.33,
+      "D": 0.75
+    }
+  },
+  {
+    "title": "Ay Işığı Altında Dostluk",
+    "wc": 200,
+    "question": "Üç arkadaş yürürken ne buldular?",
+    "options": {
+      "A": "Kayıp bir oyuncak",
+      "B": "Yavru bir kedi",
+      "C": "Eski bir harita",
+      "D": "Parlayan bir taş"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.5,
+      "C": 0.0,
+      "D": 0.5
+    }
+  },
+  {
+    "title": "Ay Işığı Altında Dostluk",
+    "wc": 200,
+    "question": "Veteriner kedinin durumunu nasıl değerlendirdi?",
+    "options": {
+      "A": "Kedi hasta ve çok kötü durumdaydı",
+      "B": "Kedi aç ve susuz kalmış ama iyiydi",
+      "C": "Kedi sağlıklı ve çok mutluydu",
+      "D": "Kedi çok yaşlıydı"
+    },
+    "scores": {
+      "A": 0.2,
+      "B": 0.5,
+      "C": 0.25,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "Küçük Bahçıvanın Sırrı",
+    "wc": 206,
+    "question": "Can ve Elif bahçede hangi tür bitkiler yetiştirmeye karar verdiler?",
+    "options": {
+      "A": "Sadece sebzeler",
+      "B": "Sadece çiçekler",
+      "C": "Hem sebzeler hem çiçekler",
+      "D": "Meyve ağaçları"
+    },
+    "scores": {
+      "A": 1.0,
+      "B": 1.0,
+      "C": 0.5,
+      "D": 0.5
+    }
+  },
+  {
+    "title": "Küçük Bahçıvanın Sırrı",
+    "wc": 206,
+    "question": "Bahçenin sonunda kasabadaki insanlar ne yaptı?",
+    "options": {
+      "A": "Bahçeyi eleştirdi.",
+      "B": "Can ve Elif'i tebrik etti.",
+      "C": "Bahçeyi yıkmaya karar verdi.",
+      "D": "Bahçeye yeni tohumlar ekledi."
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 1.0,
+      "C": 0.25,
+      "D": 0.75
+    }
+  },
+  {
+    "title": "Ormanın Sırrı",
+    "wc": 245,
+    "question": "Orman köylüler için neden gizemliydi?",
+    "options": {
+      "A": "Ağaçları çok sık olduğu için",
+      "B": "İçinde ne olduğunu kimse bilmediği için",
+      "C": "Hayvanlar yaşadığı için",
+      "D": "Hiç kimse ormana girmediği için"
+    },
+    "scores": {
+      "A": 0.6,
+      "B": 0.8,
+      "C": 0.33,
+      "D": 0.4
+    }
+  },
+  {
+    "title": "Ormanın Sırrı",
+    "wc": 245,
+    "question": "Bekir ve Ege'nin keşfinden sonra köydeki çocuklar ne yaptı?",
+    "options": {
+      "A": "Ormana girmemeye karar verdiler",
+      "B": "Bekir ve Ege'den uzaklaştılar",
+      "C": "Onlarla birlikte yeni maceralara atıldılar",
+      "D": "Ormandan korktukları için saklandılar"
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.5,
+      "C": 0.4,
+      "D": 0.25
+    }
+  },
+  {
+    "title": "Ormandaki Sürpriz",
+    "wc": 255,
+    "question": "Kenan ve Ece yürüyüşe nereye gitmişlerdir?",
+    "options": {
+      "A": "Sahile",
+      "B": "Parka",
+      "C": "Ormana",
+      "D": "Dağa"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Kayıp Kedi Mavikuyruk",
+    "wc": 274,
+    "question": "Mavikuyruk ismini neden almıştı?",
+    "options": {
+      "A": "Mavi gözleri olduğu için",
+      "B": "Mavi bir tasma taktığı için",
+      "C": "Kuyruğundaki mavi tüyler nedeniyle",
+      "D": "Kasabada en hızlı kedi olduğu için"
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.5,
+      "C": 0.5,
+      "D": 0.6
+    }
+  },
+  {
+    "title": "Kayıp Kedi Mavikuyruk",
+    "wc": 274,
+    "question": "Bu olaydan sonra çocuklar ne yapmaya karar verdiler?",
+    "options": {
+      "A": "Mavikuyruk'u dışarı çıkarmamaya",
+      "B": "Onunla daha çok oynamaya",
+      "C": "Onu daha iyi koruyup bakmaya",
+      "D": "Yeni bir kedi sahiplenmeye"
+    },
+    "scores": {
+      "A": 0.33,
+      "B": 0.67,
+      "C": 0.75,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "Ormanın Gizemli Sesi",
+    "wc": 278,
+    "question": "Duydukları gizemli sesin ne olduğu ortaya çıktı?",
+    "options": {
+      "A": "Bir hayvanın sesi",
+      "B": "Su sesi",
+      "C": "Rüzgârın yaprakları hışırdatması",
+      "D": "Ateşböceklerinin sesi"
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 1.0,
+      "C": 0.67,
+      "D": 1.0
+    }
+  },
+  {
+    "title": "Ormanda Macera",
+    "wc": 281,
+    "question": "Seda'nın yanında kim vardı?",
+    "options": {
+      "A": "Kardeşi",
+      "B": "Bir köpek",
+      "C": "Pamuk adında bir kedi",
+      "D": "Eda'nın kuşu"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.67,
+      "D": 0.67
+    }
+  },
+  {
+    "title": "Ormanda Macera",
+    "wc": 281,
+    "question": "Mağaranın içinde ne vardı?",
+    "options": {
+      "A": "Sadece karanlık",
+      "B": "Büyük bir gölet ve parlayan taşlar",
+      "C": "Çok sayıda hayvan",
+      "D": "Rüzgârla sallanan ağaçlar"
+    },
+    "scores": {
+      "A": 1.0,
+      "B": 1.0,
+      "C": 0.33,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Renkli Balonların Macerası",
+    "wc": 357,
+    "question": "Zehra neden kırmızı balonu çok istemişti?",
+    "options": {
+      "A": "Çünkü balon çok büyüktü",
+      "B": "Çünkü o balon en ucuzuydu",
+      "C": "Çünkü balon onun için çok özel ve güzeldi",
+      "D": "Çünkü arkadaşları da o balonu almıştı"
+    },
+    "scores": {
+      "A": 0.75,
+      "B": 0.67,
+      "C": 0.71,
+      "D": 0.75
+    }
+  },
+  {
+    "title": "Renkli Balonların Macerası",
+    "wc": 357,
+    "question": "Zehra balonunu kaybettiğinde ne yaptı?",
+    "options": {
+      "A": "Üzgün bir şekilde eve gitti",
+      "B": "Hemen yeni bir balon aldı",
+      "C": "Balonun peşinden koştu",
+      "D": "Balonu unutup parka gitti"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.75,
+      "C": 1.0,
+      "D": 0.25
+    }
+  },
+  {
+    "title": "Renkli Balonların Macerası",
+    "wc": 357,
+    "question": "Kuş, Zehra'ya nasıl yardım etmek istedi?",
+    "options": {
+      "A": "Onu sırtında taşıyarak",
+      "B": "Ona şarkı söyleyerek",
+      "C": "Balonun izini göstererek",
+      "D": "Önünde uçarak yön göstererek"
+    },
+    "scores": {
+      "A": 0.33,
+      "B": 0.33,
+      "C": 0.33,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Renkli Balonların Macerası",
+    "wc": 357,
+    "question": "Hikâyenin sonunda Zehra ne anladı?",
+    "options": {
+      "A": "Balonlar uçar, onları tutmak zordur",
+      "B": "Gerçek arkadaşlık, en değerli şeydir",
+      "C": "Maceralar hep tehlikelidir",
+      "D": "Sadece hızlı olanlar başarılı olur"
+    },
+    "scores": {
+      "A": 0.2,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.4
+    }
+  },
+  {
+    "title": "Gizemli Harita ve Orman Macerası",
+    "wc": 431,
+    "question": "İlk durak olan Baykuş Ağacı nasıl bulundu?",
+    "options": {
+      "A": "Ağaç kütüğünün altına bakarak",
+      "B": "Haritada yazan okla yön bulup gövdesindeki şekli fark ederek",
+      "C": "Kuşların sesini takip ederek",
+      "D": "Haritada ismi yazdığı için rastgele bulunarak"
+    },
+    "scores": {
+      "A": 0.25,
+      "B": 0.22,
+      "C": 0.25,
+      "D": 0.33
+    }
+  },
+  {
+    "title": "Gizemli Harita ve Orman Macerası",
+    "wc": 431,
+    "question": "Çocuklar göletin kenarında ne buldular?",
+    "options": {
+      "A": "Büyük bir taş ve altında kutu",
+      "B": "Su kabı",
+      "C": "Harita defteri",
+      "D": "Toprak kavanozu"
+    },
+    "scores": {
+      "A": 0.75,
+      "B": 0.0,
+      "C": 0.5,
+      "D": 0.5
+    }
+  },
+  {
+    "title": "Zaman Kutusu",
+    "wc": 432,
+    "question": "Elif yaz tatilini nerede geçirecekti?",
+    "options": {
+      "A": "Şehirdeki evinde",
+      "B": "Dedesiyle köydeki eski evde",
+      "C": "Tatil köyünde",
+      "D": "Arkadaşlarının yanında"
+    },
+    "scores": {
+      "A": 1.0,
+      "B": 0.75,
+      "C": 0.5,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Zaman Kutusu",
+    "wc": 432,
+    "question": "Elif, zaman kutusunu neden yapmak istedi?",
+    "options": {
+      "A": "Yeni oyuncaklar toplamak için",
+      "B": "Yaz tatilini hatırlamak ve önemli eşyalarını biriktirmek için",
+      "C": "Okula göstermek için",
+      "D": "Arkadaşlarına hediye etmek için"
+    },
+    "scores": {
+      "A": 0.25,
+      "B": 0.57,
+      "C": 0.33,
+      "D": 0.25
+    }
+  },
+  {
+    "title": "Kırmızı Bisikletin Sırrı",
+    "wc": 436,
+    "question": "Bisiklette ne dikkat çekiyordu?",
+    "options": {
+      "A": "Kilidi kırılmıştı",
+      "B": "Zinciri yoktu ve çok yeni görünüyordu",
+      "C": "Rengi solmuştu",
+      "D": "Üzerinde yazılar vardı"
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.8,
+      "C": 0.0,
+      "D": 0.67
+    }
+  },
+  {
+    "title": "Kırmızı Bisikletin Sırrı",
+    "wc": 436,
+    "question": "Yaşlı adam bisiklet hakkında ne söyledi?",
+    "options": {
+      "A": "Bisikleti kendisi yapmış ve hayal kuran çocuklara vermek istiyormuş",
+      "B": "Bisikletin satılık olduğunu söyledi",
+      "C": "Bisikletin eski olduğunu söyledi",
+      "D": "Bisikleti kimsenin alamayacağını söyledi"
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.5,
+      "C": 0.5,
+      "D": 0.25
+    }
+  },
+  {
+    "title": "Kırmızı Bisikletin Sırrı",
+    "wc": 436,
+    "question": "Ali bisikleti almadan önce ne yaptı?",
+    "options": {
+      "A": "Hemen binip evine gitti",
+      "B": "Bekledi ve çevreyi kontrol etti",
+      "C": "Bisikleti parka bıraktı",
+      "D": "Başka bir bisiklet aldı"
+    },
+    "scores": {
+      "A": 0.5,
+      "B": 0.5,
+      "C": 0.67,
+      "D": 0.67
+    }
+  },
+  {
+    "title": "Kayıp Kedi ve Yeni Arkadaş",
+    "wc": 440,
+    "question": "Pamuk kaybolunca Can ne yaptı?",
+    "options": {
+      "A": "Yeni bir kedi aldı",
+      "B": "Bahçeyi ve çevreyi dikkatlice aradı",
+      "C": "Hiç aramadı",
+      "D": "Parka gitmedi"
+    },
+    "scores": {
+      "A": 0.67,
+      "B": 0.75,
+      "C": 0.0,
+      "D": 0.0
+    }
+  },
+  {
+    "title": "Kayıp Kedi ve Yeni Arkadaş",
+    "wc": 440,
+    "question": "Can'ın yeni arkadaşı Elif'in kedisi neden önemliydi?",
+    "options": {
+      "A": "Elif'in kedisi de kaybolmuştu",
+      "B": "Elif'in kedisi çok büyük",
+      "C": "Elif'in kedisi hiç kaybolmamıştı",
+      "D": "Elif'in kedisi beyaz değildi"
+    },
+    "scores": {
+      "A": 1.0,
+      "B": 0.75,
+      "C": 0.5,
+      "D": 1.0
+    }
+  },
+  {
+    "title": "Kayıp Kedi ve Yeni Arkadaş",
+    "wc": 440,
+    "question": "Can ve Elif'in arkadaşlığı nasıl başladı?",
+    "options": {
+      "A": "Aynı sınıfta olmalarıyla",
+      "B": "Kayıp kedilerini ararken tanışmalarıyla",
+      "C": "Aynı oyunu oynarken",
+      "D": "Aynı mahallede oturdukları için"
+    },
+    "scores": {
+      "A": 0.0,
+      "B": 0.25,
+      "C": 0.0,
+      "D": 0.0
+    }
+  }
+]

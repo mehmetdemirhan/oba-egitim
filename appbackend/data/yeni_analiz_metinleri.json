@@ -1,0 +1,605 @@
+[
+  {
+    "title": "Piknikte",
+    "word_count": 67,
+    "body": "Mert sabah erkenden uyandı. Hava sıcaktı ama rüzgâr hafif esiyordu. Annesi, \"Bugün pikniğe gidiyoruz.\" dedi. Mert çok sevindi, topunu ve şapkasını aldı.\n\nAilesiyle birlikte ormana gittiler. Ağaçların altında güzel bir yer buldular. Annesi sandviç, meyve ve kek çıkardı. Mert kardeşiyle top oynadı, sonra ip atladı. Babası müzik açtı, birlikte şarkı söylediler. Öğle olunca herkes yemeğini yedi. Kuşlar cıvıldıyor, yapraklar hışırdıyordu. Akşam güneş batarken eşyaları topladılar. Eve döndüler.",
+    "questions": [
+      {
+        "no": 1,
+        "category": "Bilgi (Hatırlama)",
+        "question": "Mert nereye gitmiştir?",
+        "answer": "Pikniğe, ormana gitmiştir."
+      },
+      {
+        "no": 2,
+        "category": "Bilgi (Hatırlama)",
+        "question": "Piknikte hangi yiyecekler vardı?",
+        "answer": "Sandviç, meyve ve kek vardı."
+      },
+      {
+        "no": 3,
+        "category": "Kavrama (Anlama)",
+        "question": "Mert pikniğe gitmeden önce neden sevindi?",
+        "answer": "Çünkü pikniğe gideceklerdi."
+      },
+      {
+        "no": 4,
+        "category": "Kavrama (Anlama)",
+        "question": "Ormanda kuşlar ve yapraklar nasıl sesler çıkarıyordu?",
+        "answer": "Kuşlar cıvıldıyor, yapraklar hışırdıyordu."
+      },
+      {
+        "no": 5,
+        "category": "Uygulama",
+        "question": "Sen pikniğe gitsen yanında neler götürürdün?",
+        "answer": "(Öğrenci cevabı — örnek: su, meyve, top…)"
+      },
+      {
+        "no": 6,
+        "category": "Analiz",
+        "question": "Mert piknikte kardeşiyle neler yaptı?",
+        "answer": "Top oynadı ve ip atladı."
+      },
+      {
+        "no": 7,
+        "category": "Analiz",
+        "question": "Aile neden akşam olunca ormandan ayrıldı?",
+        "answer": "Çünkü güneş batıyordu / piknik zamanı bitmişti. (Mantıklı her cevap kabul edilir.)"
+      },
+      {
+        "no": 8,
+        "category": "Sentez (Yaratma)",
+        "question": "Metne bir cümle ekleseydin Mert piknikte başka ne yapardı?",
+        "answer": "(Öğrenci cevabı — örnek: uçurtma uçururdu.)"
+      },
+      {
+        "no": 9,
+        "category": "Değerlendirme",
+        "question": "Sence Mert'in piknikte en çok eğlendiği şey ne olabilir? Neden?",
+        "answer": "(Öğrenci cevabı.)"
+      },
+      {
+        "no": 10,
+        "category": "Değerlendirme",
+        "question": "Bu hikâyeyi nasıl buldun? Kendi düşünceni söyle.",
+        "answer": "(Öğrenci cevabı.)"
+      }
+    ]
+  },
+  {
+    "title": "Okulda",
+    "word_count": 76,
+    "body": "Zeynep sabah erkenden kalktı. Kahvaltısını yaptı, çantasını aldı. Okula yürüyerek gitti. Okulun bahçesinde arkadaşlarını gördü. Herkes neşeyle gülüyordu.\n\nZil çalınca sınıfa girdiler. Öğretmenleri yeni bir hikâye kitabı getirmişti. Zeynep kitabı çok merak etti. Öğretmen yüksek sesle okumaya başladı. Hikâyeyi dikkatle dinlediler. Daha sonra tahtaya birkaç soru yazdı. Zeynep hepsine doğru cevap verdi. Teneffüste arkadaşlarıyla ip atladı, misket oynadı. Günün sonunda öğretmeni onu tebrik etti. Zeynep eve dönerken \"Okulda her gün yeni bir şey öğreniyorum.\" dedi.",
+    "questions": [
+      {
+        "no": 1,
+        "category": "Bilgi (Hatırlama)",
+        "question": "Zeynep okula nasıl gitmiştir?",
+        "answer": "Okula yürüyerek gitmiştir."
+      },
+      {
+        "no": 2,
+        "category": "Bilgi (Hatırlama)",
+        "question": "Öğretmen sınıfa ne getirmiştir?",
+        "answer": "Yeni bir hikâye kitabı getirmişti."
+      },
+      {
+        "no": 3,
+        "category": "Kavrama (Anlama)",
+        "question": "Zeynep kitabı neden merak etti?",
+        "answer": "Çünkü yeni bir hikâye kitabıydı / içindekileri merak ediyordu."
+      },
+      {
+        "no": 4,
+        "category": "Kavrama (Anlama)",
+        "question": "Zeynep öğretmenin yazdığı sorulara nasıl cevap verdi?",
+        "answer": "Hepsine doğru cevap verdi."
+      },
+      {
+        "no": 5,
+        "category": "Uygulama",
+        "question": "Sen okula giderken yanında neler götürürsün?",
+        "answer": "(Öğrenci cevabı — örnek: çanta, su, kalem…)"
+      },
+      {
+        "no": 6,
+        "category": "Analiz",
+        "question": "Zeynep teneffüste hangi oyunları oynadı?",
+        "answer": "İp atladı ve misket oynadı."
+      },
+      {
+        "no": 7,
+        "category": "Analiz",
+        "question": "Günün sonunda öğretmen Zeynep'i neden tebrik etti?",
+        "answer": "Sorulara doğru cevap verdiği için."
+      },
+      {
+        "no": 8,
+        "category": "Sentez (Yaratma)",
+        "question": "Metne yeni bir cümle ekleseydin, Zeynep okulda başka ne yapardı?",
+        "answer": "(Öğrenci cevabı — örnek: resim yapardı.)"
+      },
+      {
+        "no": 9,
+        "category": "Değerlendirme",
+        "question": "Sence hikâyedeki en güzel bölüm hangisiydi? Neden?",
+        "answer": "(Öğrenci cevabı.)"
+      },
+      {
+        "no": 10,
+        "category": "Değerlendirme",
+        "question": "Okulda yeni bir şey öğrenmek sana nasıl hissettirir?",
+        "answer": "(Öğrenci cevabı.)"
+      }
+    ]
+  },
+  {
+    "title": "Denizde",
+    "word_count": 60,
+    "body": "Elif sabah erkenden uyandı. Hava çok güneşliydi. Annesi, \"Bugün denize gidiyoruz.\" dedi. Elif çok sevindi, hemen mayo ve şapkasını aldı.\n\nAilesiyle birlikte deniz kenarına gittiler. Elif kumdan büyük bir kale yaptı. Kardeşi Eren, kaleye bayrak dikti. Birlikte denize girdiler, yüzüp suyla oynadılar.\n\nBabası onlara dondurma aldı. Elif çilekli, Eren çikolatalı dondurma yedi. Akşam güneş batarken herkes eşyalarını topladı. Eve döndüler.",
+    "questions": [
+      {
+        "no": 1,
+        "category": "Bilgi (Hatırlama)",
+        "question": "Elif nereye gitmiştir?",
+        "answer": "Denize gitmiştir."
+      },
+      {
+        "no": 2,
+        "category": "Bilgi (Hatırlama)",
+        "question": "Elif deniz kenarında ne yapmıştır?",
+        "answer": "Kumdan büyük bir kale yapmıştır."
+      },
+      {
+        "no": 3,
+        "category": "Kavrama (Anlama)",
+        "question": "Elif denize gitmeden önce neden sevindi?",
+        "answer": "Çünkü denize gideceklerdi."
+      },
+      {
+        "no": 4,
+        "category": "Kavrama (Anlama)",
+        "question": "Elif ve Eren'in dondurmaları neden birbirinden farklıdır? Hangi dondurmaları yemeyi tercih ettiler?",
+        "answer": "Çünkü ikisinin beğenileri farklı olabilir. Elif çilekli, Eren çikolatalı dondurma yemiştir."
+      },
+      {
+        "no": 5,
+        "category": "Uygulama",
+        "question": "Sen denize gittiğinde yanında neler götürürdün?",
+        "answer": "(Öğrenci cevabı — örnek: mayo, şapka, havlu…)"
+      },
+      {
+        "no": 6,
+        "category": "Analiz",
+        "question": "Metinde Elif ile Eren'in birlikte yaptığı iki şeyi söyle.",
+        "answer": "Denize girdiler ve kumdan kale yaptılar. (Ya da: Yüzdüler, oynadılar.)"
+      },
+      {
+        "no": 7,
+        "category": "Analiz",
+        "question": "Sence aile neden akşam olunca eve döndü?",
+        "answer": "Çünkü hava kararmaya başlamıştı / deniz zamanı bitmişti. (Mantıklı herhangi bir açıklama kabul edilir.)"
+      },
+      {
+        "no": 8,
+        "category": "Sentez (Yaratma)",
+        "question": "Metne yeni bir cümle ekleseydin, Elif denizde başka ne yapardı?",
+        "answer": "(Öğrenci cevabı — örnek: Midye toplardı.)"
+      },
+      {
+        "no": 9,
+        "category": "Değerlendirme",
+        "question": "Sence Elif'in gününün en eğlenceli kısmı hangisiydi? Neden?",
+        "answer": "(Öğrenci cevabı — örnek: Dondurma yemek çünkü çok severim.)"
+      },
+      {
+        "no": 10,
+        "category": "Değerlendirme",
+        "question": "Bu hikâyeyi beğendin mi? Kendine göre değerlendir.",
+        "answer": "(Öğrenci cevabı.)"
+      }
+    ]
+  },
+  {
+    "title": "Gölde Bir Gün",
+    "word_count": 102,
+    "body": "Cumartesi sabahı Ece erkenden uyandı. Hava açık ve serindi. Babası kahvaltıyı hazırlıyordu. Ece mutfakta, \"Bugün ne yapacağız?\" diye sordu. Babası, \"Göl kıyısına gidiyoruz.\" dedi. Ece heyecanlandı. Defterini ve dürbününü çantasına koydu.\n\nKısa sürede hazırlandılar ve arabayla göle gittiler. Gölde ördekler yüzüyordu. Ece dürbünüyle etrafa baktı, kuşları izledi. Annesi örtüyü serdi, sandviçleri çıkardı. Ece biraz taş sektirdi, biraz da annesiyle fotoğraf çekti.\n\nÖğle saatlerinde hep birlikte yemek yediler. Hafif bir rüzgâr esiyordu. Bir süre sonra bulutlar gökyüzünü kapladı. Küçük bir sağanak başladı. Ece ve ailesi büyük çınar ağacının altına sığındılar. Yağmur durunca göl çok daha güzel görünüyordu. Eve dönerken Ece, \"Bugün harikaydı!\" dedi.",
+    "questions": [
+      {
+        "no": 1,
+        "category": "Bilgi (Hatırlama)",
+        "question": "Ece ve ailesi nereye gitmiştir?",
+        "answer": "Göl kıyısına gitmişlerdir."
+      },
+      {
+        "no": 2,
+        "category": "Bilgi (Hatırlama)",
+        "question": "Ece çantasına hangi eşyaları koymuştur?",
+        "answer": "Defter ve dürbününü koymuştur."
+      },
+      {
+        "no": 3,
+        "category": "Kavrama (Anlama)",
+        "question": "Ece gölde kuşları ve ördekleri neden izledi?",
+        "answer": "Çünkü kuşları ve ördekleri merak ediyordu / onları gözlemlemek istiyordu."
+      },
+      {
+        "no": 4,
+        "category": "Kavrama (Anlama)",
+        "question": "Yağmur başladığında aile ne yaptı?",
+        "answer": "Büyük çınar ağacının altına sığındılar."
+      },
+      {
+        "no": 5,
+        "category": "Uygulama",
+        "question": "Sen göle giderken hangi eşyaları yanında götürürdün? Neden?",
+        "answer": "(Öğrenci cevabı — örnek: su, şapka, dürbün… gerekçe beklenir.)"
+      },
+      {
+        "no": 6,
+        "category": "Analiz",
+        "question": "Ece gölde hangi etkinlikleri yaptı?",
+        "answer": "Taş sektirdi, resim yaptı, fotoğraf çekti."
+      },
+      {
+        "no": 7,
+        "category": "Analiz",
+        "question": "Gökyüzü ve hava durumundaki değişiklikler nelerdir?",
+        "answer": "Önce güneşliydi, sonra bulutlandı ve hafif yağmur başladı."
+      },
+      {
+        "no": 8,
+        "category": "Analiz",
+        "question": "Ece ve ailesi öğle yemeğini nerede yediler?",
+        "answer": "Örtü serdikleri göl kenarında yediler."
+      },
+      {
+        "no": 9,
+        "category": "Sentez (Yaratma)",
+        "question": "Metne bir cümle ekleseydin, Ece gölde başka ne yapardı?",
+        "answer": "(Öğrenci cevabı — örnek: gölde yüzen ördekleri çizerdi.)"
+      },
+      {
+        "no": 10,
+        "category": "Değerlendirme",
+        "question": "Sence Ece'nin gününün en güzel anı hangisiydi? Neden?",
+        "answer": "(Öğrenci cevabı.)"
+      }
+    ]
+  },
+  {
+    "title": "Orman Macerası",
+    "word_count": 112,
+    "body": "Pazar günü Arda çok erken uyandı. Dışarıda hava güneşliydi ama hafifçe serin bir rüzgâr esiyordu. Annesi kahvaltıyı hazırlarken Arda, \"Bugün nereye gidiyoruz?\" diye sordu. Annesi, \"Ormanda yürüyüş yapacağız.\" dedi. Arda çok sevindi. Çantasına su matarası ve büyütecini koydu.\n\nKısa bir yolculuktan sonra ormana ulaştılar. Ağaçların arasında kelebekler uçuyor, kuşlar şarkı söylüyordu. Arda büyüteciyle yapraklara baktı, böcekleri inceledi. Babası ona ormanda hangi hayvanların yaşadığını anlattı. Annesi sandviçleri çıkarınca hep birlikte güzel bir öğle yemeği yediler. Yemekten sonra ip atladılar, taşlarla küçük bir kule yaptılar. Bir süre sonra gökyüzü griye döndü ve hafif yağmur başladı. Çalıların altına sığındılar. Yağmur durduktan sonra ağaçların yaprakları parıl parıl görünüyordu. Arda eve dönerken, \"Bugün çok şey öğrendim.\" dedi.",
+    "questions": [
+      {
+        "no": 1,
+        "category": "Bilgi (Hatırlama)",
+        "question": "Arda ve ailesi ormana ne yapmak için gitmiştir?",
+        "answer": "Ormanda yürüyüş yapmak için gitmişlerdir."
+      },
+      {
+        "no": 2,
+        "category": "Bilgi (Hatırlama)",
+        "question": "Arda çantasına hangi eşyaları koymuştur?",
+        "answer": "Su matarası ve büyütecini koymuştur."
+      },
+      {
+        "no": 3,
+        "category": "Kavrama (Anlama)",
+        "question": "Arda ormanda hangi canlıları gözlemlemiştir?",
+        "answer": "Kelebekler, kuşlar, böcekler."
+      },
+      {
+        "no": 4,
+        "category": "Kavrama (Anlama)",
+        "question": "Hafif yağmur başlayınca aile ne yaptı?",
+        "answer": "Çalıların altına sığındılar."
+      },
+      {
+        "no": 5,
+        "category": "Uygulama",
+        "question": "Sen ormanda bir yürüyüşe çıksan hangi eşyaları yanına alırdın? Neden?",
+        "answer": "(Öğrenci cevabı — örnek: su, dürbün, büyüteç… gerekçe beklenir.)"
+      },
+      {
+        "no": 6,
+        "category": "Analiz",
+        "question": "Arda ormanda hangi etkinlikleri yapmıştır?",
+        "answer": "Büyüteçle yapraklara ve böceklere bakmış, ip atlamış, taşlarla kule yapmış."
+      },
+      {
+        "no": 7,
+        "category": "Analiz",
+        "question": "Ormanda hava nasıl değişmiştir?",
+        "answer": "Güneşli ve serindi, sonra hafif yağmur başlamıştır."
+      },
+      {
+        "no": 8,
+        "category": "Analiz",
+        "question": "Arda öğle yemeğini nerede yemiştir?",
+        "answer": "Ormanda, birlikte hazırladıkları yerde yemiştir."
+      },
+      {
+        "no": 9,
+        "category": "Sentez (Yaratma)",
+        "question": "Metne bir cümle ekleseydin, Arda yağmur durduktan sonra başka ne yapardı?",
+        "answer": "(Öğrenci cevabı — örnek: gökyüzündeki renkli yaprakları çizerdi.)"
+      },
+      {
+        "no": 10,
+        "category": "Değerlendirme",
+        "question": "Sence Arda'nın gününün en ilginç kısmı hangisiydi? Neden?",
+        "answer": "(Öğrenci cevabı.)"
+      }
+    ]
+  },
+  {
+    "title": "Piknik Günü",
+    "word_count": 115,
+    "body": "Pazar sabahı Ali erkenden uyandı. Hava çok güzeldi. Kuşlar cıvıldıyor, güneş parlıyordu. Annesi mutfakta kahvaltı hazırlıyordu. Ali, \"Anne, bugün nereye gideceğiz?\" diye sordu. Annesi gülerek, \"Bugün pikniğe gidiyoruz.\" dedi. Ali çok sevindi. Hemen boyalarını ve resim defterini çantasına koydu. Kısa sürede hazırlandılar ve arabayla göl kenarına gittiler.\n\nOrada kuşlar ve kelebekler uçuşuyordu. Önce ağacın altına örtü serdiler. Annesi sandviçleri çıkardı, babası müzik açtı. Ali biraz top oynadı, biraz da resim yaptı. Öğle olunca hep birlikte yemek yediler. Sonra ailesiyle saklambaç oynadı. Bir süre sonra gökyüzü bulutlandı. Hafif yağmur başladı. Ali ve ailesi çadırın içine girip yağmuru izlediler. Yağmur durunca gökyüzünde kocaman bir gökkuşağı belirdi. Ali çok mutlu oldu. Eve dönerken, \"Pikniğimiz çok güzel oldu.\" dedi.",
+    "questions": [
+      {
+        "no": 1,
+        "category": "Bilgi (Hatırlama)",
+        "question": "Ali ve ailesi pikniğe nereye gitmiştir?",
+        "answer": "Göl kenarına gitmişlerdir."
+      },
+      {
+        "no": 2,
+        "category": "Bilgi (Hatırlama)",
+        "question": "Ali çantasına neleri koymuştur?",
+        "answer": "Boyalarını ve resim defterini koymuştur."
+      },
+      {
+        "no": 3,
+        "category": "Kavrama (Anlama)",
+        "question": "Ali pikniğe gideceklerini duyunca neden sevinmiştir?",
+        "answer": "Çünkü pikniği çok sevmiştir / eğleneceğini düşünmüştür."
+      },
+      {
+        "no": 4,
+        "category": "Kavrama (Anlama)",
+        "question": "Metne göre hava neden değişmiştir? (Önce güneşliydi, sonra ne oldu?)",
+        "answer": "Önce güneşliydi, sonra bulutlandı ve hafif yağmur başladı."
+      },
+      {
+        "no": 5,
+        "category": "Uygulama",
+        "question": "Eğer sen pikniğe gitseydin, hangi eşyaları götürürdün? Neden?",
+        "answer": "(Öğrenci cevabı — örnek: top, su, şapka… gerekçe beklenir.)"
+      },
+      {
+        "no": 6,
+        "category": "Analiz",
+        "question": "Ali'nin piknikte yaptığı etkinlikleri sırayla söyle.",
+        "answer": "Resim yaptı, top oynadı, yemek yedi, saklambaç oynadı, yağmuru izledi."
+      },
+      {
+        "no": 7,
+        "category": "Analiz",
+        "question": "Ali ve ailesi yağmurdan korunmak için ne yapmıştır?",
+        "answer": "Çadırın içine girmişlerdir."
+      },
+      {
+        "no": 8,
+        "category": "Analiz",
+        "question": "Metinde geçen doğal olayları (hava durumlarını) listele.",
+        "answer": "Güneş açması, kuşların cıvıldaması, bulutlanma, yağmur, gökkuşağı."
+      },
+      {
+        "no": 9,
+        "category": "Sentez (Yaratma)",
+        "question": "Metne yeni bir bölüm ekleseydin, Ali yağmur durduktan sonra başka ne yapardı?",
+        "answer": "(Öğrenci cevabı — örnek: gökkuşağını çizerdi.)"
+      },
+      {
+        "no": 10,
+        "category": "Değerlendirme",
+        "question": "Sence Ali'nin pikniğinin en güzel anı hangisiydi? Neden böyle düşünüyorsun?",
+        "answer": "(Öğrenci cevabı.)"
+      }
+    ]
+  },
+  {
+    "title": "Bahçedeki Kuş",
+    "word_count": 169,
+    "body": "Okullar tatil olmuştu ve Mert üçüncü sınıfa geçmişti. Bir sabah Mert bahçeye çıktı ve oyun oynamaya başladı. Bahçe büyük ve ağaçlarla doluydu. Mert, top oynarken bir kuşun yere düştüğünü fark etti. Kuş kanadını incitmişti ve uçamıyordu. Mert kuşu eline aldı ve dikkatlice bir kutuya yerleştirdi. Mert, kuşun kendini güvende hissetmesi için saman ve su getirdi. Kuş biraz sakinleşti ve Mert onu izlerken çok mutlu oldu.\n\nMert, kuşu güvenli bir yere bırakmaya karar verdi. Annesi ve babasıyla birlikte bahçede ağaçların yakınına gittiler. Mert kuşu yavaşça serbest bıraktı. Kuş önce biraz bekledi, sonra kanatlarını açtı ve gökyüzüne doğru uçtu. Mert mutluluktan havalara uçuyordu. Daha sonra Mert bahçede top oynadı, ip atladı ve ağaçların arasında saklambaç oynadı. Güneş batarken eşyalarını topladı ve eve doğru yürüdü.\n\nYolda, gün boyunca yaşadığı olayları düşündü ve kendini çok iyi hissetti. \"Bugün hem eğlendim hem de küçük bir canlıya yardım ettim,\" dedi. Mert ayrıca doğada yaşayan canlılara yardım etmenin önemini fark etti. Kuşun tekrar özgürce uçmasını görmek ona sorumluluk sahibi olmanın ve cesur olmanın verdiği mutluluğu gösterdi.",
+    "questions": [
+      {
+        "no": 1,
+        "category": "Hatırlama",
+        "question": "Kuş neden uçamıyordu?",
+        "answer": "Kanadı incindiği için."
+      },
+      {
+        "no": 2,
+        "category": "Hatırlama",
+        "question": "Mert kuşu nereye koydu?",
+        "answer": "Küçük bir kutuya koydu."
+      },
+      {
+        "no": 3,
+        "category": "Anlama",
+        "question": "Mert kuş için neden kutu hazırladı?",
+        "answer": "Güvende olması için."
+      },
+      {
+        "no": 4,
+        "category": "Anlama",
+        "question": "Ailesi kuşu nereye götürdü?",
+        "answer": "Ağaçların yakınına götürdü."
+      },
+      {
+        "no": 5,
+        "category": "Uygulama",
+        "question": "Sen bahçede yaralı bir kuş bulsan ne yapardın?",
+        "answer": "(Öğrenci cevabı.)"
+      },
+      {
+        "no": 6,
+        "category": "Analiz",
+        "question": "Mert kuşa yardım etmeseydi ne olurdu?",
+        "answer": "Kuş zarar görebilirdi veya uçamazdı."
+      },
+      {
+        "no": 7,
+        "category": "Analiz",
+        "question": "Mert'in gün içinde yaptığı üç etkinliği söyle.",
+        "answer": "Top oynadı, ip atladı, saklambaç oynadı."
+      },
+      {
+        "no": 8,
+        "category": "Değerlendirme",
+        "question": "Mert'in davranışını nasıl değerlendirirsin?",
+        "answer": "Doğru bir davranış; bir hayvana yardım etti."
+      },
+      {
+        "no": 9,
+        "category": "Yaratma",
+        "question": "Kuş uçarken Mert ne düşünmüş olabilir?",
+        "answer": "(Öğrenci cevabı.)"
+      },
+      {
+        "no": 10,
+        "category": "Yaratma",
+        "question": "Hikâyeye yeni bir son yaz: Kuş ertesi gün geri gelse ne olur?",
+        "answer": "(Öğrenci cevabı.)"
+      }
+    ]
+  },
+  {
+    "title": "Ormandaki Tavşan",
+    "word_count": 210,
+    "body": "Yaz tatili başlamıştı ve Arda üçüncü sınıfa geçmişti. Bir sabah Arda hava güneşli ve hafif rüzgârlı olduğu için ormana yürüyüşe çıkmaya karar verdi. Sırt çantasını aldı, su matarasını ve büyütecini çantasına koydu.\n\nOrmana ulaştığında kuşların cıvıldadığını, yaprakların hışırdadığını fark etti. Yürürken etrafındaki çiçekleri, ağaç kabuklarını ve küçük böcekleri dikkatle inceledi. Bir süre sonra Arda çalılıkların arasında bir hareket gördü. Dikkatlice yaklaştığında bir tavşanın çalıların arasına sıkıştığını fark etti. Tavşan panikliyordu ve kurtulamıyordu. Arda önce ne yapacağını düşündü. Tavşanı dikkatle eline aldı ve kimseye zarar gelmemesi için onu güvenli bir yere taşımaya karar verdi. Tavşanı çimenlerin üzerine bıraktığında tavşan kısa süreliğine donakaldı sonra sevinçle zıplamaya başladı. Arda onu izlerken çok mutlu oldu ve \"Küçük bir canlının hayatını kurtardım.\" diye düşündü.\n\nArda yürüyüşüne devam etti. Yolda yaprakları, çiçekleri ve taşları inceledi, böcekleri büyüteciyle gözlemledi. Ormanda ilerlerken ağaçların arasında saklanan sincapları ve kuşları gördü. Arda, doğayı gözlemlemenin ve canlılara yardım etmenin verdiği mutluluğu hissetti. Öğle saatlerinde Arda, sırt çantasından sandviçini çıkardı ve bir ağaç gölgesinde yedi. Bir süre sonra hava değişti ve hafif bir sağanak başladı. Arda güvenliğini düşündü ve en yakın büyük ağacın altına sığındı. Yağmur durduktan sonra güneş tekrar açtı ve Arda eve dönerken, \"Bugün çok şey öğrendim ve küçük bir canlının hayatını kurtardım. Doğa ile ilgilenmek gerçekten çok güzel.\" dedi.",
+    "questions": [
+      {
+        "no": 1,
+        "category": "Hatırlama",
+        "question": "Arda ormana neden gitmişti?",
+        "answer": "Yürüyüş yapmak ve doğayı incelemek için."
+      },
+      {
+        "no": 2,
+        "category": "Hatırlama",
+        "question": "Tavşan nerede sıkışmıştı?",
+        "answer": "Çalıların arasında sıkışmıştı."
+      },
+      {
+        "no": 3,
+        "category": "Anlama",
+        "question": "Arda tavşanın neden yerini değiştirdi?",
+        "answer": "Güvende olması için."
+      },
+      {
+        "no": 4,
+        "category": "Anlama",
+        "question": "Arda büyüteçle neyi incelemiştir?",
+        "answer": "Böcekleri ve taşları."
+      },
+      {
+        "no": 5,
+        "category": "Uygulama",
+        "question": "Sen ormanda bir hayvan görsen ne yaparsın?",
+        "answer": "(Öğrenci cevabı.)"
+      },
+      {
+        "no": 6,
+        "category": "Analiz",
+        "question": "Arda tavşanı kurtarmasaydı ne olabilirdi?",
+        "answer": "Tavşan zarar görebilirdi."
+      },
+      {
+        "no": 7,
+        "category": "Analiz",
+        "question": "Metinde geçen doğa seslerinden iki tanesini söyle.",
+        "answer": "Kuş cıvıltıları ve yaprak hışırtısı."
+      },
+      {
+        "no": 8,
+        "category": "Değerlendirme",
+        "question": "Arda'nın davranışını nasıl değerlendirirsin? Neden?",
+        "answer": "Doğru bulurum, çünkü bir canlının hayatını kurtardı."
+      },
+      {
+        "no": 9,
+        "category": "Yaratma",
+        "question": "Ormana Arda ile gitseydin, başka hangi hayvanları görebilirdiniz?",
+        "answer": "(Öğrenci cevabı.)"
+      },
+      {
+        "no": 10,
+        "category": "Yaratma",
+        "question": "Bu hikâyeye yeni bir bölüm ekleseydin, yağmurdan sonra Arda ne yapardı?",
+        "answer": "(Öğrenci cevabı.)"
+      }
+    ]
+  },
+  {
+    "title": "Denizdeki Kaplumbağa",
+    "word_count": 214,
+    "body": "Okullar tatil olmuştu ve Elif üçüncü sınıfa geçmişti. Yaz tatilinde her gün sahile gidip deniz kenarında oynamayı çok seviyordu. Bir öğleden sonra hava güneşli ve deniz çok sakindi. Elif, kumdan büyük bir kale yaptıktan sonra denize girdi. Deniz sakin görünüyordu ama suyun altından gelen bir hareket dikkatini çekti. Elif dikkatle baktığında, ufak bir kaplumbağanın ağzının denizdeki bir plastik torbaya takıldığını fark etti. Kaplumbağa çırpınıyor ama çıkamıyordu. Elif çok şaşırdı ve ne yapacağını düşündü. Önce etrafına baktı, kimse yoktu. Elif hızlıca sudan çıktı, derin nefes aldı ve torbayı yavaşça açtı. Kaplumbağa özgür kaldı ve denize doğru yüzmeye başladı. Elif çok sevindi ve \"Artık rahatça yüzebilecek.\" dedi. Sonra sahile geri döndü.\n\nBabası ona dondurma aldı. Elif çilekli dondurmasını yerken kaplumbağayı düşündü. Sahildeki bazı çöplerin denizi kirlettiğini fark etti ve toplaması gerektiğini düşündü. Elif birkaç poşet çöp topladı, kumları süpürdü ve çöpleri çöp kutusuna attı. Güneş batarken Elif kumdan kaleyi bitirdi ve eşyalarını topladı. Eve dönerken, \"Bugün çok güzel bir gün geçirdim, hem eğlendim hem de küçük bir canlıya yardım ettim.\" diye düşündü. O gün Elif hem doğayı korumanın önemini anlamış hem de sorumluluk sahibi olmanın verdiği mutluluğu hissetmişti. Ayrıca sahilde oynayan diğer çocuklara çöpleri bırakmamalarını hatırlattı ve onlara doğayı korumayı anlattı. Bu şekilde Elif sadece kendi eğlencesini değil çevresini de düşünerek günü çok değerli geçirmiş oldu.",
+    "questions": [
+      {
+        "no": 1,
+        "category": "Hatırlama",
+        "question": "Elif nereye gitmeyi seviyordu?",
+        "answer": "Sahile gitmeyi seviyordu."
+      },
+      {
+        "no": 2,
+        "category": "Hatırlama",
+        "question": "Kaplumbağa neye takılmıştı?",
+        "answer": "Plastik torbaya takılmıştı."
+      },
+      {
+        "no": 3,
+        "category": "Anlama",
+        "question": "Elif neden kaplumbağayı kurtarmak istemiş olabilir?",
+        "answer": "Çünkü kaplumbağa zor durumdaydı ve canı acıyordu."
+      },
+      {
+        "no": 4,
+        "category": "Anlama",
+        "question": "Elif çöpleri neden toplamıştır?",
+        "answer": "Denizi temizlemek ve başka hayvanların zarar görmemesi için."
+      },
+      {
+        "no": 5,
+        "category": "Uygulama",
+        "question": "Sahilde olsan çevreyi korumak için sen ne yapardın?",
+        "answer": "(Öğrenci cevabı — örnek: çöpleri toplardım.)"
+      },
+      {
+        "no": 6,
+        "category": "Analiz",
+        "question": "Metinde geçen tehlikeli durum nedir?",
+        "answer": "Kaplumbağanın ağzına torba takılması."
+      },
+      {
+        "no": 7,
+        "category": "Analiz",
+        "question": "Elif kaplumbağayı kurtarmak için hangi adımları sırayla yaptı?",
+        "answer": "Fark etti, sudan çıktı, torbayı dikkatle açtı, kaplumbağayı kurtardı."
+      },
+      {
+        "no": 8,
+        "category": "Değerlendirme",
+        "question": "Elif'in davranışı doğru muydu? Neden?",
+        "answer": "Evet, çünkü bir canlıyı korudu."
+      },
+      {
+        "no": 9,
+        "category": "Yaratma",
+        "question": "Metne bir cümle ekleseydin, Elif eve gidince ailesine ne anlatırdı?",
+        "answer": "(Öğrenci cevabı.)"
+      },
+      {
+        "no": 10,
+        "category": "Yaratma",
+        "question": "Bu hikâyeye farklı bir son yazsaydın, kaplumbağayı başka nasıl kurtulabilirdi?",
+        "answer": "(Öğrenci cevabı — örnek: sahil görevlisi gelip yardım edebilirdi.)"
+      }
+    ]
+  }
+]
