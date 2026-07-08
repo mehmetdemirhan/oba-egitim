@@ -5457,7 +5457,7 @@ function OgretmenPaneli({ user, logout }) {
       <div className="max-w-4xl mx-auto p-4 space-y-4">
 
         {/* ═══ DASHBOARD ═══ */}
-        {aktifSekme === "dashboard" && (<>
+        {aktifSekme === "dashboard" && (<div className="space-y-5">
           {/* Motivasyon cümlesi — her girişte değişir */}
           {(() => {
             const motivasyonlar = [
@@ -5486,29 +5486,36 @@ function OgretmenPaneli({ user, logout }) {
             );
           })()}
 
-          {/* Özet kartlar — birleşik palet (mavi birincil + dikkat için amber) */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="bg-surface rounded-2xl p-4 shadow-sm border-l-4 border-l-blue-400">
-              <div className="text-3xl font-bold text-content">{ogrenciler.length}</div>
-              <div className="flex items-center gap-1.5 text-xs text-subtle"><Users className="w-3.5 h-3.5" /> Toplam Öğrenci</div>
+          {/* Özet KPI — asimetrik: 1 birincil (öne çıkan) + 3 ikincil */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Birincil metrik — öne çıkan */}
+            <div className="bg-surface rounded-2xl p-5 shadow-sm border border-line flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><Users className="w-6 h-6 text-blue-600" /></div>
+              <div>
+                <div className="text-4xl font-bold text-content tabular-nums leading-none">{ogrenciler.length}</div>
+                <div className="text-xs text-subtle mt-1.5">Toplam Öğrenci</div>
+              </div>
             </div>
-            <div className="bg-surface rounded-2xl p-4 shadow-sm border-l-4 border-l-blue-400">
-              <div className="text-3xl font-bold text-content">{riskler.filter(r => r.aktif_gunler_7 >= 4).length}</div>
-              <div className="flex items-center gap-1.5 text-xs text-subtle"><CheckCircle className="w-3.5 h-3.5" /> Hedefte ({riskler.length > 0 ? Math.round(riskler.filter(r => r.aktif_gunler_7 >= 4).length / riskler.length * 100) : 0}%)</div>
-            </div>
-            <div className="bg-surface rounded-2xl p-4 shadow-sm border-l-4 border-l-amber-400">
-              <div className="text-3xl font-bold text-amber-600">{atadiklarim.filter(g => g.durum === "bekliyor").length}</div>
-              <div className="flex items-center gap-1.5 text-xs text-subtle"><ClipboardList className="w-3.5 h-3.5" /> Bekleyen Görev</div>
-            </div>
-            <div className="bg-surface rounded-2xl p-4 shadow-sm border-l-4 border-l-blue-400">
-              <div className="text-3xl font-bold text-content">{okunmamisSayisi}</div>
-              <div className="flex items-center gap-1.5 text-xs text-subtle"><Mail className="w-3.5 h-3.5" /> Okunmamış Mesaj</div>
+            {/* 3 ikincil metrik */}
+            <div className="lg:col-span-2 grid grid-cols-3 gap-4">
+              <div className="bg-surface rounded-2xl p-4 shadow-sm border border-line">
+                <div className="text-2xl font-bold text-content tabular-nums">{riskler.filter(r => r.aktif_gunler_7 >= 4).length}</div>
+                <div className="flex items-center gap-1.5 text-xs text-subtle mt-1"><CheckCircle className="w-3.5 h-3.5" /> Hedefte ({riskler.length > 0 ? Math.round(riskler.filter(r => r.aktif_gunler_7 >= 4).length / riskler.length * 100) : 0}%)</div>
+              </div>
+              <div className="bg-surface rounded-2xl p-4 shadow-sm border border-line border-l-4 border-l-amber-400">
+                <div className="text-2xl font-bold text-amber-600 tabular-nums">{atadiklarim.filter(g => g.durum === "bekliyor").length}</div>
+                <div className="flex items-center gap-1.5 text-xs text-subtle mt-1"><ClipboardList className="w-3.5 h-3.5" /> Bekleyen Görev</div>
+              </div>
+              <div className="bg-surface rounded-2xl p-4 shadow-sm border border-line">
+                <div className="text-2xl font-bold text-content tabular-nums">{okunmamisSayisi}</div>
+                <div className="flex items-center gap-1.5 text-xs text-subtle mt-1"><Mail className="w-3.5 h-3.5" /> Okunmamış Mesaj</div>
+              </div>
             </div>
           </div>
 
           {/* Acil Müdahale — en aksiyon-değerli blok, KPI'ların hemen altına alındı */}
           {riskler.filter(r => r.risk_seviye === "yuksek").length > 0 && (
-            <Card className="border-0 shadow-sm border-l-4 border-l-red-500">
+            <Card className="border border-line shadow-sm rounded-2xl border-l-4 border-l-red-500">
               <CardHeader className="pb-2"><CardTitle className="text-sm text-red-700 flex items-center gap-1.5"><AlertTriangle className="w-4 h-4" /> Acil Müdahale Gerekli</CardTitle></CardHeader>
               <CardContent><div className="space-y-2">
                 {riskler.filter(r => r.risk_seviye === "yuksek").map(r => (
@@ -5522,39 +5529,39 @@ function OgretmenPaneli({ user, logout }) {
           )}
 
           {/* Hızlı eylemler — istatistiklerden hemen sonra (sık kullanılan aksiyonlar) */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <button onClick={() => setAktifSekme("ogrencilerim")} className="bg-surface rounded-2xl p-4 shadow-sm border text-left hover:shadow-md transition-all">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <button onClick={() => setAktifSekme("ogrencilerim")} className="bg-surface rounded-2xl p-4 shadow-sm border border-line text-left hover:shadow-md hover:border-blue-300 transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
               <Users className="w-5 h-5 mb-1.5 text-blue-600" /><div className="text-sm font-semibold text-content">Öğrencileri Gör</div><div className="text-[10px] text-subtle">Detaylı profil ve takip</div>
             </button>
-            <button onClick={() => { setAktifSekme("ogrencilerim"); setGorevAtaGoster(true); }} className="bg-surface rounded-2xl p-4 shadow-sm border text-left hover:shadow-md transition-all">
+            <button onClick={() => { setAktifSekme("ogrencilerim"); setGorevAtaGoster(true); }} className="bg-surface rounded-2xl p-4 shadow-sm border border-line text-left hover:shadow-md hover:border-blue-300 transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
               <ClipboardList className="w-5 h-5 mb-1.5 text-blue-600" /><div className="text-sm font-semibold text-content">Görev Ata</div><div className="text-[10px] text-subtle">Toplu veya tekli görev</div>
             </button>
-            <button onClick={() => setAktifSekme("giris-analizi")} className="bg-surface rounded-2xl p-4 shadow-sm border text-left hover:shadow-md transition-all">
+            <button onClick={() => setAktifSekme("giris-analizi")} className="bg-surface rounded-2xl p-4 shadow-sm border border-line text-left hover:shadow-md hover:border-blue-300 transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
               <FlaskConical className="w-5 h-5 mb-1.5 text-blue-600" /><div className="text-sm font-semibold text-content">Analiz Yap</div><div className="text-[10px] text-subtle">Giriş analizi başlat</div>
             </button>
-            <button onClick={() => setAktifSekme("mesajlar")} className="bg-surface rounded-2xl p-4 shadow-sm border text-left hover:shadow-md transition-all">
+            <button onClick={() => setAktifSekme("mesajlar")} className="bg-surface rounded-2xl p-4 shadow-sm border border-line text-left hover:shadow-md hover:border-blue-300 transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
               <Mail className="w-5 h-5 mb-1.5 text-blue-600" /><div className="text-sm font-semibold text-content">Mesajlar</div><div className="text-[10px] text-subtle">{okunmamisSayisi > 0 ? `${okunmamisSayisi} okunmamış` : "Tüm mesajlar"}</div>
             </button>
           </div>
 
           {/* Risk dağılımı */}
           {riskler.length > 0 && (
-            <Card className="border-0 shadow-sm">
+            <Card className="border border-line shadow-sm rounded-2xl">
               <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-1.5"><BarChart3 className="w-4 h-4" /> Öğrenci Risk Dağılımı</CardTitle></CardHeader>
               <CardContent>
                 <div className="grid grid-cols-3 gap-3 mb-4">
                   <div className="bg-green-50 rounded-xl p-3 text-center border border-green-200">
-                    <div className="text-2xl font-bold text-green-700">{riskler.filter(r => r.risk_seviye === "dusuk").length}</div>
+                    <div className="text-2xl font-bold tabular-nums text-green-700">{riskler.filter(r => r.risk_seviye === "dusuk").length}</div>
                     <div className="text-xs text-green-600 flex items-center justify-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" /> Düşük Risk</div>
                     <div className="text-[10px] text-subtle">Düzenli okuyor</div>
                   </div>
                   <div className="bg-yellow-50 rounded-xl p-3 text-center border border-yellow-200">
-                    <div className="text-2xl font-bold text-yellow-700">{riskler.filter(r => r.risk_seviye === "orta").length}</div>
+                    <div className="text-2xl font-bold tabular-nums text-yellow-700">{riskler.filter(r => r.risk_seviye === "orta").length}</div>
                     <div className="text-xs text-yellow-600 flex items-center justify-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500" /> Orta Risk</div>
                     <div className="text-[10px] text-subtle">Takip gerekli</div>
                   </div>
                   <div className="bg-red-50 rounded-xl p-3 text-center border border-red-200">
-                    <div className="text-2xl font-bold text-red-700">{riskler.filter(r => r.risk_seviye === "yuksek").length}</div>
+                    <div className="text-2xl font-bold tabular-nums text-red-700">{riskler.filter(r => r.risk_seviye === "yuksek").length}</div>
                     <div className="text-xs text-red-600 flex items-center justify-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" /> Yüksek Risk</div>
                     <div className="text-[10px] text-subtle">Müdahale gerekli</div>
                   </div>
@@ -5573,25 +5580,25 @@ function OgretmenPaneli({ user, logout }) {
 
           {/* Genel istatistikler */}
           {riskler.length > 0 && (
-            <div className="grid grid-cols-2 gap-3">
-              <Card className="border-0 shadow-sm"><CardContent className="p-4">
+            <div className="grid grid-cols-2 gap-4">
+              <Card className="border border-line shadow-sm rounded-2xl"><CardContent className="p-4">
                 <div className="flex items-center gap-1.5 text-xs text-subtle mb-1"><BookOpen className="w-3.5 h-3.5" /> Ortalama Haftalık Okuma</div>
-                <div className="text-2xl font-bold text-content">{riskler.length > 0 ? Math.round(riskler.reduce((t, r) => t + r.dakika_7, 0) / riskler.length) : 0} dk</div>
+                <div className="text-2xl font-bold tabular-nums text-content">{riskler.length > 0 ? Math.round(riskler.reduce((t, r) => t + r.dakika_7, 0) / riskler.length) : 0} dk</div>
                 <div className="text-[10px] text-subtle">öğrenci başına / hafta</div>
               </CardContent></Card>
-              <Card className="border-0 shadow-sm"><CardContent className="p-4">
+              <Card className="border border-line shadow-sm rounded-2xl"><CardContent className="p-4">
                 <div className="flex items-center gap-1.5 text-xs text-subtle mb-1"><Flame className="w-3.5 h-3.5" /> Ortalama Streak</div>
-                <div className="text-2xl font-bold text-content">{riskler.length > 0 ? Math.round(riskler.reduce((t, r) => t + r.streak, 0) / riskler.length * 10) / 10 : 0} gün</div>
+                <div className="text-2xl font-bold tabular-nums text-content">{riskler.length > 0 ? Math.round(riskler.reduce((t, r) => t + r.streak, 0) / riskler.length * 10) / 10 : 0} gün</div>
                 <div className="text-[10px] text-subtle">öğrenci başına</div>
               </CardContent></Card>
-              <Card className="border-0 shadow-sm"><CardContent className="p-4">
+              <Card className="border border-line shadow-sm rounded-2xl"><CardContent className="p-4">
                 <div className="flex items-center gap-1.5 text-xs text-subtle mb-1"><Star className="w-3.5 h-3.5" /> Toplam XP</div>
-                <div className="text-2xl font-bold text-content">{riskler.reduce((t, r) => t + (r.toplam_xp || 0), 0)}</div>
+                <div className="text-2xl font-bold tabular-nums text-content">{riskler.reduce((t, r) => t + (r.toplam_xp || 0), 0)}</div>
                 <div className="text-[10px] text-subtle">tüm öğrenciler</div>
               </CardContent></Card>
-              <Card className="border-0 shadow-sm"><CardContent className="p-4">
+              <Card className="border border-line shadow-sm rounded-2xl"><CardContent className="p-4">
                 <div className="flex items-center gap-1.5 text-xs text-subtle mb-1"><ClipboardList className="w-3.5 h-3.5" /> Görev Tamamlama</div>
-                <div className="text-2xl font-bold text-content">{atadiklarim.length > 0 ? Math.round(atadiklarim.filter(g => g.durum === "tamamlandi").length / atadiklarim.length * 100) : 0}%</div>
+                <div className="text-2xl font-bold tabular-nums text-content">{atadiklarim.length > 0 ? Math.round(atadiklarim.filter(g => g.durum === "tamamlandi").length / atadiklarim.length * 100) : 0}%</div>
                 <div className="text-[10px] text-subtle">{atadiklarim.filter(g => g.durum === "tamamlandi").length}/{atadiklarim.length} görev</div>
               </CardContent></Card>
             </div>
@@ -5599,7 +5606,7 @@ function OgretmenPaneli({ user, logout }) {
 
           {/* Bana atanan görevler */}
           {benimGorevlerim.filter(g => g.durum !== "tamamlandi").length > 0 && (
-            <Card className="border-0 shadow-sm border-l-4 border-l-blue-500">
+            <Card className="border border-line shadow-sm rounded-2xl border-l-4 border-l-blue-500">
               <CardHeader className="pb-2"><CardTitle className="text-sm text-blue-700 flex items-center gap-1.5"><ClipboardList className="w-4 h-4" /> Yöneticiden Gelen Görevlerim</CardTitle></CardHeader>
               <CardContent><div className="space-y-2">
                 {benimGorevlerim.filter(g => g.durum !== "tamamlandi").map(g => (
@@ -5614,7 +5621,7 @@ function OgretmenPaneli({ user, logout }) {
 
           {/* Öğrenci sıralaması */}
           {riskler.length > 0 && (
-            <Card className="border-0 shadow-sm">
+            <Card className="border border-line shadow-sm rounded-2xl">
               <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-1.5"><Trophy className="w-4 h-4" /> Öğrenci Sıralaması (XP)</CardTitle></CardHeader>
               <CardContent><div className="space-y-2">
                 {[...riskler].sort((a, b) => (b.toplam_xp || 0) - (a.toplam_xp || 0)).map((r, i) => (
@@ -5641,7 +5648,7 @@ function OgretmenPaneli({ user, logout }) {
             const kazanilanlar = rozetTanimlari.filter(r => rozetlerim.some(k => k.rozet_kodu === r.kod));
             const sonKazanilanlar = kazanilanlar.slice(0, 5);
             return (
-              <div className="bg-surface rounded-2xl p-4 shadow-sm border">
+              <div className="bg-surface rounded-2xl p-4 shadow-sm border border-line">
                 <div className="flex items-center justify-between cursor-pointer" onClick={() => setRozetDetayAcik(!rozetDetayAcik)}>
                   <div className="flex items-center gap-2">
                     <Award className="w-5 h-5 text-blue-600" />
@@ -5732,7 +5739,7 @@ function OgretmenPaneli({ user, logout }) {
 
           {/* Veli Değerlendirmesi — kompakt, tıkla-aç */}
           {anketOzet && anketOzet.anket_sayisi > 0 && (
-            <div className="bg-surface rounded-2xl p-4 shadow-sm border">
+            <div className="bg-surface rounded-2xl p-4 shadow-sm border border-line">
               <div className="flex items-center justify-between cursor-pointer" onClick={() => setAnketDetayAcik(!anketDetayAcik)}>
                 <div className="flex items-center gap-3">
                   <Heart className="w-5 h-5 text-blue-600" />
@@ -5821,9 +5828,9 @@ function OgretmenPaneli({ user, logout }) {
                 return (
                   <div className="mt-3 pt-3 border-t border-line space-y-3">
                     <div className="grid grid-cols-3 gap-3">
-                      <div className="text-center"><div className="text-2xl font-bold text-purple-600">⭐ {anketOzet.ortalama}</div><div className="text-[10px] text-subtle">/ 5 ortalama</div></div>
-                      <div className="text-center"><div className="text-2xl font-bold text-green-600">%{anketOzet.tavsiye_oran}</div><div className="text-[10px] text-subtle">tavsiye oranı</div></div>
-                      <div className="text-center"><div className="text-2xl font-bold text-primary">{anketOzet.anket_sayisi}</div><div className="text-[10px] text-subtle">anket</div></div>
+                      <div className="text-center"><div className="text-2xl font-bold tabular-nums text-purple-600">⭐ {anketOzet.ortalama}</div><div className="text-[10px] text-subtle">/ 5 ortalama</div></div>
+                      <div className="text-center"><div className="text-2xl font-bold tabular-nums text-green-600">%{anketOzet.tavsiye_oran}</div><div className="text-[10px] text-subtle">tavsiye oranı</div></div>
+                      <div className="text-center"><div className="text-2xl font-bold tabular-nums text-primary">{anketOzet.anket_sayisi}</div><div className="text-[10px] text-subtle">anket</div></div>
                     </div>
                     {Object.keys(anketOzet.kategoriler || {}).length > 0 && (
                       <div className="space-y-1">
@@ -5863,7 +5870,7 @@ function OgretmenPaneli({ user, logout }) {
           </div>
 
           {/* Hedeflerim — kompakt ilerleme kartı */}
-          <div className="bg-surface rounded-2xl p-4 shadow-sm border">
+          <div className="bg-surface rounded-2xl p-4 shadow-sm border border-line">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Target className="w-5 h-5 text-blue-600" />
@@ -5953,7 +5960,7 @@ function OgretmenPaneli({ user, logout }) {
             <InstagramWidget apiBase={API} compact />
           </div>
 
-        </>)}
+        </div>)}
 
         {/* ═══ ÖĞRENCİLERİM ═══ */}
         {aktifSekme === "ogrencilerim" && (<>
