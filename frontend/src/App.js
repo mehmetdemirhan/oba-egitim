@@ -42,6 +42,10 @@ import { saveAs } from 'file-saver';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
+
+// Ortak hata bildirimi — sessiz catch'ler yerine tutarlı kullanıcı uyarısı.
+const hataBildir = (toast, mesaj = "İşlem başarısız oldu. Lütfen tekrar deneyin.") =>
+  toast?.({ title: mesaj, variant: "destructive" });
 const LIG_ESIKLERI_FE = { bronz: 0, gumus: 200, altin: 500, elmas: 1000 };
 
 function roleLabel(role) {
@@ -2018,7 +2022,7 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
         : `${API}/diagnostic/texts`;
       const r = await axios.get(url);
       setMetinler(r.data);
-    } catch(e) {}
+    } catch(e) { hataBildir(toast, "Metinler yüklenemedi"); }
   };
 
   const fetchPuanAyarlari = async () => {
@@ -2059,7 +2063,7 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
       const r = await axios.post(`${API}/diagnostic/texts/oy`, { metin_id: metinId, onay, sebep });
       fetchMetinler(); setRedDialog(null); setRedSebep("");
       toast({ title: onay ? "✅ Onaylandı (+2 puan)" : "❌ Reddedildi", description: `Onay oranı: %${r.data.onay_orani}` });
-    } catch(e) { console.error('Session error:', e.response?.data); toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
+    } catch(e) { toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
   };
 
   const turLabel = { hikaye: "Hikaye", bilgilendirici: "Bilgilendirici", siir: "Şiir" };
@@ -3143,7 +3147,6 @@ JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
       setAiOlusturuldu(true);
       toast({ title: "✅ AI yorumları oluşturuldu!", description: "İnceleyip düzenleyebilirsiniz." });
     } catch (err) {
-      console.error("AI yorum hatası:", err);
       toast({ title: "AI Hatası", description: "Yorumlar oluşturulamadı. Lütfen tekrar deneyin.", variant: "destructive" });
     } finally {
       setAiYukleniyor(false);
@@ -4535,7 +4538,7 @@ function TimiModul({ user, students }) {
   const [kaydediliyor, setKaydediliyor] = useState(false);
 
   const fetchGecmis = useCallback(async () => {
-    try { const r = await axios.get(`${API}/timi/sessions`); setGecmis(r.data); } catch (e) {}
+    try { const r = await axios.get(`${API}/timi/sessions`); setGecmis(r.data); } catch (e) { hataBildir(toast, "Geçmiş uygulamalar yüklenemedi"); }
   }, []);
   useEffect(() => { fetchGecmis(); }, [fetchGecmis]);
 
@@ -4760,7 +4763,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
   const acMetinDuzenle = (m) => { setMetinDialogAcik(false); setDuzenlenecekMetin(m); setAdim("metin-duzenle"); };
 
   const fetchGecmis = useCallback(async () => {
-    try { const r = await axios.get(`${API}/diagnostic/sessions`); setGecmisOturumlar(r.data); } catch(e) {}
+    try { const r = await axios.get(`${API}/diagnostic/sessions`); setGecmisOturumlar(r.data); } catch(e) { hataBildir(toast, "Geçmiş analizler yüklenemedi"); }
   }, []);
 
   useEffect(() => { fetchGecmis(); }, [fetchGecmis]);
@@ -4771,13 +4774,11 @@ function GirisAnaliziModul({ user, students, teachers }) {
     if (!seciliMetin?.id) { toast({ title: "Geçersiz metin", description: "Lütfen metni tekrar seçin", variant: "destructive" }); return; }
     try {
       const payload = { ogrenci_id: seciliOgrenci.id, metin_id: seciliMetin.id, oturum_tipi: oturumTipi };
-      console.log("Session başlatılıyor:", payload);
       const r = await axios.post(`${API}/diagnostic/sessions`, payload);
-      console.log("Session response:", r.data);
       if (!r.data?.id) throw new Error('Oturum ID alınamadı');
       setAktifOturumId(r.data.id);
       setAdim("canli");
-    } catch(e) { console.error('Session error:', e.response?.data); toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
+    } catch(e) { toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
   };
 
   const analiziTamamla = async (veri) => {
@@ -4801,7 +4802,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
           });
           setAktifRapor(rRapor.data);
           setAdim("rapor-goruntule");
-        } catch(e2) { setAdim("sonuc"); }
+        } catch(e2) { setAdim("sonuc"); hataBildir(toast, "Rapor kaydedilemedi; sonuç ekranına geçildi"); }
       } else { setAdim("sonuc"); }
     } catch(e) {
       toast({ title: "Hata", description: e.response?.data?.detail || "Analiz tamamlanamadı", variant: "destructive" });
@@ -5188,7 +5189,7 @@ function OgretmenPaneli({ user, logout }) {
         axios.get(`${API}/gorevler?hedef_id=${ogrenci.id}&hedef_tip=ogrenci`),
       ]);
       setOgrenciDetay({ logs: logR.data, stat: statR.data, risk: riskR.data, xp: xpR.data, gorevler: gorevR.data });
-    } catch(e) { setOgrenciDetay(null); }
+    } catch(e) { setOgrenciDetay(null); hataBildir(toast, "Öğrenci verisi yüklenemedi"); }
     setAktifSekme("ogrenci-detay");
   };
 
@@ -5371,7 +5372,7 @@ function OgretmenPaneli({ user, logout }) {
                     axios.get(`${API}/ai/speech/gecmis/${seciliOgrenci.id}`),
                   ]);
                   setSpeechOgrData({ istatistik: statR.data, gecmis: gecmisR.data });
-                } catch(e) {}
+                } catch(e) { hataBildir(toast, "Konuşma verisi yüklenemedi"); }
                 setSpeechOgrYukleniyor(false);
               };
               const s = speechOgrData?.istatistik;
@@ -5602,7 +5603,7 @@ function OgretmenPaneli({ user, logout }) {
                 {benimGorevlerim.filter(g => g.durum !== "tamamlandi").map(g => (
                   <div key={g.id} className="flex items-center justify-between p-2 bg-indigo-50 rounded-xl">
                     <div><div className="font-medium text-sm">{g.baslik}</div><div className="text-[10px] text-subtle">Atayan: {g.atayan_ad}{g.son_tarih && ` • Son: ${new Date(g.son_tarih).toLocaleDateString('tr-TR')}`}</div></div>
-                    <Button size="sm" className="bg-green-600 text-white text-xs h-7" onClick={async () => { try { await axios.put(`${API}/gorevler/${g.id}/durum`, { durum: "tamamlandi" }); toast({ title: "✅ Tamamlandı" }); fetchAll(); } catch(e) {} }}>Tamamla</Button>
+                    <Button size="sm" className="bg-green-600 text-white text-xs h-7" onClick={async () => { try { await axios.put(`${API}/gorevler/${g.id}/durum`, { durum: "tamamlandi" }); toast({ title: "✅ Tamamlandı" }); fetchAll(); } catch(e) { hataBildir(toast, "Görev güncellenemedi"); } }}>Tamamla</Button>
                   </div>
                 ))}
               </div></CardContent>
@@ -5928,7 +5929,7 @@ function OgretmenPaneli({ user, logout }) {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className={`text-xs font-bold ${h.tamamlandi ? 'text-green-600' : h.ilerleme >= 75 ? 'text-primary' : 'text-subtle'}`}>{h.mevcut_deger}/{h.hedef_deger}</span>
-                        <button onClick={async () => { try { await axios.delete(`${API}/hedefler/${h.id}`); const r = await axios.get(`${API}/hedefler`); setHedefler(Array.isArray(r.data) ? r.data : []); } catch(e) {} }} className="text-gray-300 hover:text-red-400 text-xs">✕</button>
+                        <button onClick={async () => { try { await axios.delete(`${API}/hedefler/${h.id}`); const r = await axios.get(`${API}/hedefler`); setHedefler(Array.isArray(r.data) ? r.data : []); } catch(e) { hataBildir(toast, "Hedef silinemedi"); } }} className="text-gray-300 hover:text-red-400 text-xs">✕</button>
                       </div>
                     </div>
                     <div className="bg-surface rounded-full h-1.5 overflow-hidden">
@@ -6037,7 +6038,7 @@ function OgretmenPaneli({ user, logout }) {
             <h2 className="text-lg font-bold">📌 Görev Yönetimi</h2>
             <Button size="sm" onClick={() => { setAktifSekme("ogrencilerim"); setGorevAtaGoster(true); }} className="bg-orange-500 text-white text-xs"><Plus className="h-3 w-3 mr-1" />Yeni Görev Ata</Button>
           </div>
-          {benimGorevlerim.filter(g => g.durum !== "tamamlandi").length > 0 && (<div className="bg-indigo-50 rounded-xl p-3 border border-indigo-100"><div className="text-sm font-medium text-indigo-700 mb-2">📌 Bana Atanan Görevler</div>{benimGorevlerim.filter(g => g.durum !== "tamamlandi").map(g => (<div key={g.id} className="flex items-center justify-between py-1"><span className="text-sm">{g.baslik}</span><Button size="sm" className="bg-green-600 text-white text-xs h-7" onClick={async () => { try { await axios.put(`${API}/gorevler/${g.id}/durum`, { durum: "tamamlandi" }); toast({ title: "✅ Tamamlandı" }); fetchAll(); } catch(e) {} }}>Tamamla</Button></div>))}</div>)}
+          {benimGorevlerim.filter(g => g.durum !== "tamamlandi").length > 0 && (<div className="bg-indigo-50 rounded-xl p-3 border border-indigo-100"><div className="text-sm font-medium text-indigo-700 mb-2">📌 Bana Atanan Görevler</div>{benimGorevlerim.filter(g => g.durum !== "tamamlandi").map(g => (<div key={g.id} className="flex items-center justify-between py-1"><span className="text-sm">{g.baslik}</span><Button size="sm" className="bg-green-600 text-white text-xs h-7" onClick={async () => { try { await axios.put(`${API}/gorevler/${g.id}/durum`, { durum: "tamamlandi" }); toast({ title: "✅ Tamamlandı" }); fetchAll(); } catch(e) { hataBildir(toast, "Görev güncellenemedi"); } }}>Tamamla</Button></div>))}</div>)}
           <h3 className="text-sm font-medium text-subtle">Atadığım Görevler ({atadiklarim.length})</h3>
           {atadiklarim.length === 0 ? <p className="text-center text-subtle py-8">Henüz görev atamadınız</p> : atadiklarim.map(g => (
             <div key={g.id} className={`bg-surface rounded-xl p-3 shadow-sm border ${g.durum === "tamamlandi" ? "opacity-60" : ""}`}>
@@ -8858,7 +8859,7 @@ function TimiAnahtarPaneli() {
   };
   const varsayilana = async () => {
     if (!window.confirm("Doğrulanmış varsayılan anahtara dönülecek. Emin misiniz?")) return;
-    try { const r = await axios.post(`${API}/timi/anahtar/varsayilana-don`); setVeri(v => ({ ...v, ...r.data })); toast({ title: "↩️ Varsayılana dönüldü" }); } catch (e) {}
+    try { const r = await axios.post(`${API}/timi/anahtar/varsayilana-don`); setVeri(v => ({ ...v, ...r.data })); toast({ title: "↩️ Varsayılana dönüldü" }); } catch (e) { hataBildir(toast, "Varsayılana dönülemedi"); }
   };
 
   return (
@@ -13128,7 +13129,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
       const r = await axios.post(`${API}/gelisim/oy`, { icerik_id: hedef.id, onay, sebep });
       toast({ title: onay ? `✅ Onaylandı (+2 puan)` : "❌ Reddedildi", description: `Onay oranı: %${r.data.onay_orani}` });
       setRedDialogIcerik(null); setRedSebep(""); fetchAll();
-    } catch(e) { console.error('Session error:', e.response?.data); toast({ title: "Hata", description: e.response?.data?.detail || "Hata", variant: "destructive" }); }
+    } catch(e) { toast({ title: "Hata", description: e.response?.data?.detail || "Hata", variant: "destructive" }); }
   };
 
   const handleTamamla = async (testYapildi, icerikParam = null) => {
@@ -13140,7 +13141,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
       const r = await axios.post(`${API}/gelisim/tamamla`, data);
       setSonuc(r.data); setGorunum("sonuc"); fetchAll();
       toast({ title: `+${r.data.puan} puan kazandınız!` });
-    } catch(e) { console.error('Session error:', e.response?.data); toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
+    } catch(e) { toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
   };
 
   const soruEkle = () => {
@@ -13234,7 +13235,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
       try { await axios.delete(`${API}/kitaplar/sorular/${id}`);
         const r = await axios.get(`${API}/kitaplar/${soruYonetimiIcerik.id}/sorular`);
         setKitapSorulari(Array.isArray(r.data) ? r.data : []); toast({ title: "Silindi" });
-      } catch(e) {}
+      } catch(e) { hataBildir(toast, "Soru silinemedi"); }
     };
 
     return (
@@ -14262,7 +14263,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                     )
                   )}
                   {y.durum === 'yuklendi' && <button onClick={async () => { try { toast({ title: "🧠 AI işleme başlatılıyor..." }); await axios.post(`${API}/ai/bilgi-tabani/isle/${y.id}`); toast({ title: "✅ İşleme tamamlandı!" }); const r2 = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setAiYuklemeler(Array.isArray(r2.data)?r2.data:[]); } catch(e) { toast({ title: "İşleme hatası", variant: "destructive" }); } }} className="text-[10px] bg-orange-50 text-orange-700 border border-orange-200 px-2.5 py-1 rounded-lg hover:bg-orange-100 transition-all">🧠 AI ile İşle</button>}
-                  {!y.onayli && y.durum !== 'hata' && <button onClick={async () => { try { await axios.put(`${API}/ai/bilgi-tabani/onayla/${y.id}`); toast({ title: "✅ Onaylandı!" }); const r = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setAiYuklemeler(Array.isArray(r.data)?r.data:[]); } catch(e) {} }} className="text-[10px] bg-green-50 text-green-700 border border-green-200 px-2.5 py-1 rounded-lg hover:bg-green-100 transition-all">✅ Onayla</button>}
+                  {!y.onayli && y.durum !== 'hata' && <button onClick={async () => { try { await axios.put(`${API}/ai/bilgi-tabani/onayla/${y.id}`); toast({ title: "✅ Onaylandı!" }); const r = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setAiYuklemeler(Array.isArray(r.data)?r.data:[]); } catch(e) { hataBildir(toast, "Onaylanamadı"); } }} className="text-[10px] bg-green-50 text-green-700 border border-green-200 px-2.5 py-1 rounded-lg hover:bg-green-100 transition-all">✅ Onayla</button>}
                   <button onClick={async () => {
                     if (!window.confirm(`"${y.kitap_adi}" silinecek. Emin misiniz?`)) return;
                     try {
@@ -14596,7 +14597,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                           <div className="flex flex-col items-end gap-2">
                             {tamamlandi && <span className="flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium"><CheckCircle className="h-4 w-4"/>+{puan} puan</span>}
                             <div className="flex items-center gap-1">
-                              {(user.role === "admin" || user.role === "coordinator") && <Button variant="destructive" size="sm" onClick={async (e) => { e.stopPropagation(); try { await axios.delete(`${API}/gelisim/icerik/${icerik.id}`); fetchAll(); toast({title:"Silindi"}); } catch(e){} }}><Trash2 className="h-4 w-4"/></Button>}
+                              {(user.role === "admin" || user.role === "coordinator") && <Button variant="destructive" size="sm" onClick={async (e) => { e.stopPropagation(); try { await axios.delete(`${API}/gelisim/icerik/${icerik.id}`); fetchAll(); toast({title:"Silindi"}); } catch(e){ hataBildir(toast, "İçerik silinemedi"); } }}><Trash2 className="h-4 w-4"/></Button>}
                               <ChevronDown className={`h-4 w-4 text-subtle transition-transform ${isAcik ? 'rotate-180' : ''}`} />
                             </div>
                           </div>
