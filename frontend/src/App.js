@@ -1775,6 +1775,9 @@ function NormTablosu({ onClose }) {
     axios.get(`${API}/diagnostic/normlar`).then(r => {
       setNormlar(r.data);
       setLoading(false);
+    }).catch(() => {
+      setLoading(false);   // hata olsa da sonsuz "Yükleniyor" gösterme
+      toast({ title: "Norm tablosu yüklenemedi", variant: "destructive" });
     });
   }, []);
 
@@ -3471,6 +3474,7 @@ JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
 
 // ── RAPOR GÖRÜNTÜLE ──
 function RaporGoruntule({ rapor, ogrenci, onGeri }) {
+  const { toast } = useToast();
   const hizLabel = { dusuk: "Düşük", orta: "Orta", yeterli: "Yeterli", ileri: "İleri" };
   const seviyeRenk = { zayif: "text-red-600", orta: "text-yellow-600", iyi: "text-green-600" };
   const seviyeLabel = { zayif: "Zayıf", orta: "Orta", iyi: "İyi" };
@@ -3660,7 +3664,7 @@ function RaporGoruntule({ rapor, ogrenci, onGeri }) {
             const a = document.createElement('a'); a.href = url;
             a.download = `Rapor_${rapor.ogrenci_ad?.replace(/\s/g,'_')}_${rapor.olusturma_tarihi?.slice(0,10)}.pdf`;
             document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url);
-          } catch(e) { console.error(e); }
+          } catch(e) { toast({ title: "PDF indirilemedi", description: e.response?.data?.detail || "Rapor PDF'i oluşturulamadı.", variant: "destructive" }); }
         }} className="flex-1 bg-red-600 hover:bg-red-700 text-white">📄 PDF İndir</Button>
         <Button onClick={() => window.print()} variant="outline" className="flex-1">🖨️ Yazdır</Button>
         <Button onClick={onGeri} variant="outline" className="flex-1">← Geri</Button>
