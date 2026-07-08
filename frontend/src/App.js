@@ -4575,63 +4575,63 @@ function TimiModul({ user, students }) {
     const KartPanel = ({ ab }) => (
       <button
         onClick={() => secYap(ab)}
-        className={`group relative flex-1 rounded-2xl border-2 overflow-hidden transition-all bg-surface ${secili === ab ? "border-purple-600 ring-4 ring-purple-200" : "border-line hover:border-purple-400"}`}
+        className={`group relative flex-1 min-h-0 flex items-center justify-center rounded-2xl border-2 overflow-hidden transition-all bg-surface p-1.5 md:p-2 ${secili === ab ? "border-purple-600 ring-4 ring-purple-200" : "border-line hover:border-purple-400"}`}
       >
-        <img src={timiKartGorsel(kartNo, ab)} alt={`Kart ${kartNo} — ${ab}`} className="w-full h-auto object-contain select-none pointer-events-none" draggable="false" />
+        {/* max-h/max-w + object-contain: görsel kalan alana sığar, taşmaz, oran korunur */}
+        <img src={timiKartGorsel(kartNo, ab)} alt={`Kart ${kartNo} — ${ab}`} className="max-h-full max-w-full object-contain select-none pointer-events-none" draggable="false" />
         <div className={`absolute top-2 left-2 w-9 h-9 flex items-center justify-center rounded-full text-lg font-black shadow ${secili === ab ? "bg-purple-600 text-white" : "bg-white/90 text-purple-700"}`}>{ab}</div>
         {secili === ab && <div className="absolute top-2 right-2 w-9 h-9 flex items-center justify-center rounded-full bg-purple-600 text-white text-lg shadow">✓</div>}
       </button>
     );
+    // Sabit fullscreen layout: header + footer daima görünür, görsel alanı ortada
+    // kalan yüksekliği doldurur; sayfa scroll'u yok (1366x768 dahil tek ekrana sığar).
     return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <Button variant="outline" size="sm" onClick={() => { if (window.confirm("Envanterden çıkılsın mı? İşaretlenen cevaplar kaydedildi.")) listeyeDon(); }}>← Çık</Button>
-          <div className="text-sm font-semibold text-content">{seciliOgrenci ? `${seciliOgrenci.ad} ${seciliOgrenci.soyad}` : ""}</div>
-          <div className="text-sm font-bold text-purple-700">Kart {kartNo} / {TIMI_KART_SAYISI}</div>
+      <div className="fixed inset-0 z-50 bg-app flex flex-col p-3 md:p-4 gap-2.5 md:gap-3">
+        {/* ── HEADER (sabit) ── */}
+        <div className="shrink-0 space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <Button variant="outline" size="sm" onClick={() => { if (window.confirm("Envanterden çıkılsın mı? İşaretlenen cevaplar kaydedildi.")) listeyeDon(); }}>← Çık</Button>
+            <div className="text-sm font-semibold text-content truncate">{seciliOgrenci ? `${seciliOgrenci.ad} ${seciliOgrenci.soyad}` : ""}</div>
+            <div className="text-sm font-bold text-purple-700 whitespace-nowrap">Kart {kartNo} / {TIMI_KART_SAYISI}</div>
+          </div>
+          <div className="h-2.5 rounded-full bg-gray-100 overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full transition-all" style={{ width: `${(cevaplanan / TIMI_KART_SAYISI) * 100}%` }} />
+          </div>
+          <p className="text-center text-xs md:text-sm text-subtle">Öğrencinin kendini daha çok özdeşleştirdiği pandayı seçin</p>
         </div>
 
-        {/* İlerleme çubuğu */}
-        <div className="h-2.5 rounded-full bg-gray-100 overflow-hidden">
-          <div className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full transition-all" style={{ width: `${(cevaplanan / TIMI_KART_SAYISI) * 100}%` }} />
-        </div>
-
-        <p className="text-center text-sm text-subtle">Öğrencinin kendini daha çok özdeşleştirdiği pandayı seçin</p>
-
-        {/* İki görsel + ortada ayraç */}
-        <div className="flex items-stretch gap-2 md:gap-4">
+        {/* ── GÖRSEL ALANI (kalan alanı doldurur, taşmaz) ── */}
+        <div className="flex-1 min-h-0 flex items-stretch gap-2 md:gap-4">
           <KartPanel ab="A" />
-          <div className="w-px bg-line self-stretch my-4" />
+          <div className="w-px bg-line self-stretch" />
           <KartPanel ab="B" />
         </div>
 
-        {/* Öğretmen gözlem notu (son kartta) */}
-        {sonKart && (
-          <div>
-            <Label className="text-sm">Öğretmen Gözlem Notu (opsiyonel)</Label>
+        {/* ── FOOTER (sabit) ── */}
+        <div className="shrink-0 space-y-2">
+          {sonKart && (
             <textarea
               value={notlar}
               onChange={e => setNotlar(e.target.value)}
               rows={2}
-              placeholder="Uygulama sırasındaki gözlemlerinizi not edebilirsiniz..."
+              placeholder="Öğretmen gözlem notu (opsiyonel)…"
               className="w-full border border-line rounded-lg p-2 text-sm bg-surface focus:outline-none focus:border-purple-400"
             />
+          )}
+          <div className="flex items-center justify-between gap-3">
+            <Button variant="outline" onClick={() => setKartIndex(i => Math.max(0, i - 1))} disabled={kartIndex === 0}>← Önceki Kart</Button>
+            {!sonKart ? (
+              <Button variant="outline" onClick={() => setKartIndex(i => Math.min(TIMI_KART_SAYISI - 1, i + 1))} disabled={!secili}>Sonraki Kart →</Button>
+            ) : (
+              <Button onClick={tamamla} disabled={cevaplanan !== TIMI_KART_SAYISI || kaydediliyor} className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold">
+                {kaydediliyor ? "Kaydediliyor..." : "✅ Envanteri Tamamla"}
+              </Button>
+            )}
           </div>
-        )}
-
-        {/* Navigasyon */}
-        <div className="flex items-center justify-between gap-3">
-          <Button variant="outline" onClick={() => setKartIndex(i => Math.max(0, i - 1))} disabled={kartIndex === 0}>← Önceki Kart</Button>
-          {!sonKart ? (
-            <Button variant="outline" onClick={() => setKartIndex(i => Math.min(TIMI_KART_SAYISI - 1, i + 1))} disabled={!secili}>Sonraki Kart →</Button>
-          ) : (
-            <Button onClick={tamamla} disabled={cevaplanan !== TIMI_KART_SAYISI || kaydediliyor} className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold">
-              {kaydediliyor ? "Kaydediliyor..." : "✅ Envanteri Tamamla"}
-            </Button>
+          {sonKart && cevaplanan !== TIMI_KART_SAYISI && (
+            <p className="text-center text-xs text-amber-600">Eksik kart var ({cevaplanan}/28). Tamamlamak için tüm kartları işaretleyin.</p>
           )}
         </div>
-        {sonKart && cevaplanan !== TIMI_KART_SAYISI && (
-          <p className="text-center text-xs text-amber-600">Eksik kart var ({cevaplanan}/28). Tamamlamak için tüm kartları işaretleyin.</p>
-        )}
       </div>
     );
   }
