@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./components/ui/dialog";
 import { Badge } from "./components/ui/badge";
-import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send, Bell, Database, RefreshCw, GitBranch, AlertTriangle, Package, ClipboardList, Flame, Target, Award, Heart, FlaskConical, Medal, Lock, Sparkles, Lightbulb, MessageCircle, TrendingUp } from "lucide-react";
+import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send, Bell, Database, RefreshCw, GitBranch, AlertTriangle, Package, ClipboardList, Flame, Target, Award, Heart, FlaskConical, Medal, Lock, Sparkles, Lightbulb, MessageCircle, TrendingUp, PenLine, Link, Sprout, TreePine, Leaf, Mountain, Landmark, Home, Castle, Crosshair, Bug, ThumbsUp, Crown, Gem, Dumbbell, Pin, Book, Library, Search, Vote, Map as MapIcon, Rocket, Zap, Brain } from "lucide-react";
 import { useToast } from "./hooks/use-toast";
 import { Toaster } from "./components/ui/toaster";
 import ModulYonetimi from "./components/ModulYonetimi";
@@ -47,6 +47,30 @@ const API = `${BACKEND_URL}/api`;
 const hataBildir = (toast, mesaj = "İşlem başarısız oldu. Lütfen tekrar deneyin.") =>
   toast?.({ title: mesaj, variant: "destructive" });
 const LIG_ESIKLERI_FE = { bronz: 0, gumus: 200, altin: 500, elmas: 1000 };
+
+// ── İkon çözücü (Faz A) ─────────────────────────────────────────────────────
+// DB'de rozet/hedef ikonları hâlâ emoji olarak saklanıyor. Veriyi değiştirmeden,
+// render anında emoji'yi Lucide bileşenine çeviriyoruz. Bilinmeyen değerlerde
+// (gelecekte eklenecek yeni emoji vb.) fallback ikon gösterilir.
+const IKON_EMOJI_HARITA = {
+  "✅": CheckCircle, "✍️": PenLine, "⭐": Star, "🌉": Link, "🌟": Sparkles,
+  "🌱": Sprout, "🌳": TreePine, "🌿": Leaf, "🎓": GraduationCap, "🎖️": Medal,
+  "🎯": Target, "🏅": Award, "🏔️": Mountain, "🏛️": Landmark, "🏠": Home,
+  "🏰": Castle, "🏹": Crosshair, "🐛": Bug, "👁️": Eye, "👍": ThumbsUp,
+  "👑": Crown, "💎": Gem, "💜": Heart, "💡": Lightbulb, "💪": Dumbbell,
+  "💫": Sparkles, "💬": MessageCircle, "📋": ClipboardList, "📌": Pin, "📕": Book,
+  "📖": BookOpen, "📚": Library, "🔍": Search, "🔥": Flame, "🗳️": Vote,
+  "🗺️": MapIcon, "🚀": Rocket, "🛡️": Shield, "🥇": Medal, "🥈": Medal,
+  "🦸": Zap, "🧠": Brain, "👥": Users,
+};
+
+// deger: DB'deki ikon (emoji VEYA ileride Lucide bileşen adı). Eşleşme yoksa
+// fallback ikon döner (varsayılan Award). Kesinlikle ham emoji basmaz — tutarlı
+// ikon dili korunur.
+function IkonCoz({ deger, className = "w-5 h-5", fallback: Fallback = Award }) {
+  const Comp = (deger && IKON_EMOJI_HARITA[deger]) || Fallback;
+  return <Comp className={className} aria-hidden="true" />;
+}
 
 function roleLabel(role) {
   const labels = { admin: "Yönetici", coordinator: "Koordinatör", teacher: "Öğretmen", student: "Öğrenci", parent: "Veli" };
@@ -5660,7 +5684,7 @@ function OgretmenPaneli({ user, logout }) {
                 {/* Mini önizleme — son 5 rozet */}
                 {!rozetDetayAcik && kazanilanlar.length > 0 && (
                   <div className="flex gap-1.5 mt-2">{sonKazanilanlar.map(r => (
-                    <span key={r.kod} className="text-xl" title={r.ad}>{r.ikon}</span>
+                    <span key={r.kod} className="text-amber-500" title={r.ad}><IkonCoz deger={r.ikon} className="w-5 h-5" /></span>
                   ))}{kazanilanlar.length > 5 && <span className="text-xs text-subtle self-center">+{kazanilanlar.length - 5}</span>}</div>
                 )}
                 {/* Detay — tüm rozetler */}
@@ -5703,7 +5727,7 @@ function OgretmenPaneli({ user, logout }) {
                           return (
                             <div key={r.kod} onClick={(e) => { e.stopPropagation(); setSeciliRozet(seciliRozet?.kod === r.kod ? null : {...r, kazandi, kriter: rozetKriterleri[r.kod] || ""}); }}
                               className={`text-center p-1.5 rounded-lg cursor-pointer transition-all hover:scale-105 ${kazandi ? 'bg-orange-50 border border-orange-200' : 'opacity-25 hover:opacity-50'} ${seciliRozet?.kod === r.kod ? 'ring-2 ring-blue-400 scale-105' : ''}`}>
-                              <div className="text-lg flex items-center justify-center h-6">{kazandi ? r.ikon : <Lock className="w-4 h-4 text-subtle" />}</div>
+                              <div className="flex items-center justify-center h-6 text-amber-500">{kazandi ? <IkonCoz deger={r.ikon} className="w-5 h-5" /> : <Lock className="w-4 h-4 text-subtle" />}</div>
                               <div className="text-[8px] text-subtle truncate">{r.ad}</div>
                             </div>
                           );
@@ -5713,7 +5737,7 @@ function OgretmenPaneli({ user, logout }) {
                       {seciliRozet && (
                         <div className="mt-3 bg-gradient-to-r from-gray-50 to-white rounded-xl p-4 border border-line shadow-sm">
                           <div className="flex items-start gap-3">
-                            <div className="text-3xl flex items-center">{seciliRozet.kazandi ? seciliRozet.ikon : <Lock className="w-7 h-7 text-subtle" />}</div>
+                            <div className="flex items-center text-amber-500">{seciliRozet.kazandi ? <IkonCoz deger={seciliRozet.ikon} className="w-8 h-8" /> : <Lock className="w-7 h-7 text-subtle" />}</div>
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
                                 <span className="font-bold text-sm">{seciliRozet.ad}</span>
@@ -5901,7 +5925,7 @@ function OgretmenPaneli({ user, logout }) {
                     {sablonlar.map(s => (
                       <button key={s.kod} type="button" onClick={() => setHedefForm({...hedefForm, kod: s.kod, hedef_deger: s.ornek})}
                         className={`p-2 rounded-lg text-center transition-all border ${hedefForm.kod === s.kod ? 'bg-primary text-white border-blue-600' : 'bg-surface text-subtle border-line hover:bg-app'}`}>
-                        <div className="text-lg">{s.ikon}</div>
+                        <div className="flex justify-center"><IkonCoz deger={s.ikon} className="w-5 h-5" /></div>
                         <div className="text-[9px] leading-tight">{s.baslik}</div>
                       </button>
                     ))}
@@ -5931,7 +5955,7 @@ function OgretmenPaneli({ user, logout }) {
                   <div key={h.id} className={`rounded-xl p-3 border transition-all ${h.tamamlandi ? 'bg-green-50 border-green-200' : 'bg-app border-line'}`}>
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-lg">{h.tamamlandi ? "✅" : h.ikon}</span>
+                        <span className="flex items-center">{h.tamamlandi ? <CheckCircle className="w-5 h-5 text-green-600" /> : <IkonCoz deger={h.ikon} className="w-5 h-5 text-content" />}</span>
                         <div>
                           <span className="text-xs font-medium text-content">{h.baslik}</span>
                           {h.son_tarih && <span className="text-[9px] text-subtle ml-1">({h.son_tarih})</span>}
