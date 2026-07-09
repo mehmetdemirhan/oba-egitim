@@ -5161,14 +5161,15 @@ function OgretmenPaneli({ user, logout }) {
     setSeciliOgrenci(ogrenci);
     setAiRapor(null); setAiDna(null); setAiAcikKart(null); setSpeechOgrData(null); setSpeechOgrYukleniyor(false); // AI state reset
     try {
-      const [logR, statR, riskR, xpR, gorevR] = await Promise.all([
+      const [logR, statR, riskR, xpR, gorevR, kelimeR] = await Promise.all([
         axios.get(`${API}/reading-logs/${ogrenci.id}`),
         axios.get(`${API}/reading-logs/${ogrenci.id}/istatistik`),
         axios.get(`${API}/risk-skor/${ogrenci.id}`),
         axios.get(`${API}/xp/durum/${ogrenci.id}`).catch(() => ({ data: null })),
         axios.get(`${API}/gorevler?hedef_id=${ogrenci.id}&hedef_tip=ogrenci`),
+        axios.get(`${API}/ogrenci-kelime-ozet/${ogrenci.id}`).catch(() => ({ data: null })),
       ]);
-      setOgrenciDetay({ logs: logR.data, stat: statR.data, risk: riskR.data, xp: xpR.data, gorevler: gorevR.data });
+      setOgrenciDetay({ logs: logR.data, stat: statR.data, risk: riskR.data, xp: xpR.data, gorevler: gorevR.data, kelime: kelimeR.data });
     } catch(e) { setOgrenciDetay(null); hataBildir(toast, "Öğrenci verisi yüklenemedi"); }
     setAktifSekme("ogrenci-detay");
   };
@@ -5231,12 +5232,13 @@ function OgretmenPaneli({ user, logout }) {
         <div className="max-w-4xl mx-auto p-4 space-y-4">
           {d ? (<>
             {/* Risk + İstatistik */}
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-              <div className={`rounded-2xl p-3 text-center border ${riskRenk(d.risk?.seviye)}`}><div className="text-2xl font-bold">{d.risk?.risk_skoru || 0}</div><div className="text-xs">{riskIcon(d.risk?.seviye)} Risk</div></div>
-              <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-orange-600">{d.stat?.streak || 0}</div><div className="text-xs text-subtle">🔥 Streak</div></div>
-              <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-green-600">{d.stat?.bugun_dakika || 0}</div><div className="text-xs text-subtle">⏱ Bugün</div></div>
-              <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-primary">{d.stat?.toplam_kitap || 0}</div><div className="text-xs text-subtle">📚 Kitap</div></div>
-              <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-purple-600">{d.xp?.toplam_xp || 0}</div><div className="text-xs text-subtle">{d.xp?.lig_label || "XP"}</div></div>
+            <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+              <div className={`rounded-2xl p-3 text-center border ${riskRenk(d.risk?.seviye)}`}><div className="text-2xl font-bold tabular-nums">{d.risk?.risk_skoru || 0}</div><div className="text-xs">{riskIcon(d.risk?.seviye)} Risk</div></div>
+              <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-orange-600 tabular-nums">{d.stat?.streak || 0}</div><div className="text-xs text-subtle">🔥 Streak</div></div>
+              <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-green-600 tabular-nums">{d.stat?.bugun_dakika || 0}</div><div className="text-xs text-subtle">⏱ Bugün</div></div>
+              <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-primary tabular-nums">{d.stat?.toplam_kitap || 0}</div><div className="text-xs text-subtle">📚 Kitap</div></div>
+              <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-purple-600 tabular-nums">{d.xp?.toplam_xp || 0}</div><div className="text-xs text-subtle">{d.xp?.lig_label || "XP"}</div></div>
+              <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border border-l-4 border-l-teal-400"><div className="inline-flex items-center justify-center gap-1 text-2xl font-bold text-teal-600 tabular-nums"><BookMarked className="h-4 w-4" />{d.kelime?.ogrenilen ?? 0}</div><div className="text-xs text-subtle tabular-nums">Öğrenilen{d.kelime?.toplam_havuz ? ` / ${d.kelime.toplam_havuz}` : ""} kelime</div></div>
             </div>
             {/* Risk faktörleri */}
             {d.risk?.faktorler?.length > 0 && (<div className="bg-red-50 rounded-xl p-3 border border-red-100"><div className="text-xs font-medium text-red-700 mb-1">⚠️ Risk Faktörleri:</div>{d.risk.faktorler.map((f,i) => <div key={i} className="text-xs text-red-600">• {f}</div>)}</div>)}

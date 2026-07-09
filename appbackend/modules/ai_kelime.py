@@ -33,9 +33,26 @@ from core.sistem import (
     XP_TABLOSU_DEFAULT, LIG_ESIKLERI_DEFAULT, LIG_SIRA,
 )
 from core.ai import _gemini_call, call_claude, _mock_bilgi_tabani_response, get_ogrenci_ai_verileri
-from core.kelime_durum import leitner_ilerlet, durum_etiket, OGRENILDI_KUTU
+from core.kelime_durum import leitner_ilerlet, durum_etiket, OGRENILDI_KUTU, ogrenci_kelime_ozet
 
 router = APIRouter()
+
+
+@router.get("/ogrenci-kelime-ozet/{ogrenci_id}")
+async def ogrenci_kelime_ozet_ep(ogrenci_id: str, current_user=Depends(get_current_user)):
+    """Öğretmen paneli: bir öğrencinin öğrenilen kelime özeti (X / toplam MEB havuzu).
+    ogrenci_id = öğrenci RECORD id (db.students.id). Yalnız eğitimciler (admin/
+    koordinatör/öğretmen) erişebilir."""
+    if current_user.get("role") not in ("admin", "coordinator", "teacher"):
+        raise HTTPException(status_code=403, detail="Bu bilgiye erişim yetkiniz yok")
+    st = await db.students.find_one({"id": ogrenci_id})
+    sinif = 3
+    if st and st.get("sinif"):
+        try:
+            sinif = int(str(st.get("sinif")).strip().split()[0])
+        except Exception:
+            sinif = 3
+    return await ogrenci_kelime_ozet(ogrenci_id, sinif)
 
 
 @router.get("/ai/kelime-evrimi/{ogrenci_id}")
