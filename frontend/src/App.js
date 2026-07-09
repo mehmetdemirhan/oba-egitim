@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./components/ui/dialog";
 import { Badge } from "./components/ui/badge";
-import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send, Bell, Database, RefreshCw, GitBranch, AlertTriangle, Package, ClipboardList, Flame, Target, Award, Heart, FlaskConical, Medal, Lock, Sparkles, Lightbulb, MessageCircle, TrendingUp, Palette, Brain, XCircle, Check, Clock, Save, Image as ImageIcon, ArrowLeft } from "lucide-react";
+import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send, Bell, Database, RefreshCw, GitBranch, AlertTriangle, Package, ClipboardList, Flame, Target, Award, Heart, FlaskConical, Medal, Lock, Sparkles, Lightbulb, MessageCircle, TrendingUp, Palette, Brain, XCircle, Check, Clock, Save, Image as ImageIcon, ArrowLeft, ArrowRight, Play, Pause, Settings } from "lucide-react";
 import { useToast } from "./hooks/use-toast";
 import { IkonCoz } from "./lib/ikonlar";
 import { Toaster } from "./components/ui/toaster";
@@ -2585,10 +2585,10 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
   const FontKontrol = ({ light = false }) => (
     <div className="flex items-center gap-1">
       <button onClick={fontKucult} aria-label="Yazıyı küçült"
-        className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${light ? 'bg-white/70 hover:bg-surface text-content border border-line' : 'bg-gray-100 hover:bg-gray-200 text-content'}`}
+        className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${light ? 'bg-white/70 hover:bg-surface text-content border border-line' : 'bg-app hover:bg-line text-content'}`}
         disabled={fontSize <= 14}>A−</button>
       <button onClick={fontBuyut} aria-label="Yazıyı büyüt"
-        className={`w-8 h-8 rounded-lg text-sm font-bold transition-all ${light ? 'bg-white/70 hover:bg-surface text-content border border-line' : 'bg-gray-100 hover:bg-gray-200 text-content'}`}
+        className={`w-8 h-8 rounded-lg text-sm font-bold transition-all ${light ? 'bg-white/70 hover:bg-surface text-content border border-line' : 'bg-app hover:bg-line text-content'}`}
         disabled={fontSize >= 24}>A+</button>
     </div>
   );
@@ -2600,7 +2600,7 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
           {cumleler.map((c, ci) => (
             <React.Fragment key={ci}>
               <span>{c.cumle}</span>
-              <sup className="ml-1 mr-1.5 text-gray-300 hover:text-orange-500 transition-all inline-block cursor-default align-super select-none"
+              <sup className="ml-1 mr-1.5 text-gray-300 hover:text-primary transition-all inline-block cursor-default align-super select-none tabular-nums"
                 style={{ fontSize: '0.55em' }}
                 onMouseEnter={e => { e.currentTarget.style.fontSize = '0.85em'; }}
                 onMouseLeave={e => { e.currentTarget.style.fontSize = '0.55em'; }}
@@ -2699,7 +2699,7 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
 
   // ── ÖĞRETMEN/ADMİN: Bölünmüş ekran ──
   return (
-    <div className="fixed inset-0 bg-gray-100 z-50 flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-app z-50 flex flex-col overflow-hidden">
       {/* Üst bar */}
       <div className="bg-surface border-b px-4 py-2 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
@@ -2710,8 +2710,8 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
           <FontKontrol />
           <div className="text-3xl font-mono font-bold text-content tabular-nums">{formatSure(sure)}</div>
           <button onClick={toggleSayac}
-            className={`px-4 py-2 rounded-xl text-white font-medium transition-all ${calisıyor ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}>
-            {calisıyor ? "⏸ Durdur" : "▶ Başlat"}
+            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-white font-medium transition-all ${calisıyor ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}>
+            {calisıyor ? <><Pause className="h-4 w-4" />Durdur</> : <><Play className="h-4 w-4" />Başlat</>}
           </button>
         </div>
       </div>
@@ -2731,7 +2731,7 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
           <div className="flex border-b shrink-0">
             {["Hata Takibi","Anlama","Prozodik","Kur & Bitir"].map((label, i) => (
               <button key={i} onClick={() => setRaporAdim(i)}
-                className={`flex-1 py-2 text-xs font-medium transition-all ${raporAdim===i ? 'border-b-2 border-orange-500 text-orange-600' : 'text-subtle hover:text-subtle'}`}>
+                className={`flex-1 py-2 text-xs font-medium transition-all ${raporAdim===i ? 'border-b-2 border-primary text-primary' : 'text-subtle hover:text-subtle'}`}>
                 {label}
               </button>
             ))}
@@ -2755,7 +2755,7 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
                 <div>
                   <label className="text-xs font-medium text-subtle">Gözlem Notu</label>
                   <textarea value={gozlemNotu} onChange={e => setGozlemNotu(e.target.value)} rows={3}
-                    className="w-full mt-1 border border-line rounded-xl p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                    className="w-full mt-1 border border-line rounded-xl p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary" />
                 </div>
               </div>
             )}
@@ -2801,7 +2801,7 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
                     <div className="grid grid-cols-4 gap-1">
                       {[1,2,3,4].map(p => (
                         <button key={p} onClick={() => setProzodik({...prozodik, [alan]: p})}
-                          className={`p-1.5 rounded-lg text-xs border text-center transition-all ${prozodik[alan]===p ? 'border-orange-400 bg-orange-50 text-orange-700 font-bold' : 'border-line text-subtle hover:bg-app'}`}>
+                          className={`p-1.5 rounded-lg text-xs border text-center transition-all ${prozodik[alan]===p ? 'border-primary bg-blue-50 text-primary font-bold' : 'border-line text-subtle hover:bg-app'}`}>
                           <div className="font-bold">{p}</div>
                           <div className="text-[10px] leading-tight">{aciklamalar[p-1]}</div>
                         </button>
@@ -2809,8 +2809,8 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
                     </div>
                   </div>
                 ))}
-                <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-center">
-                  <div className="text-sm text-orange-700 font-medium">Toplam: <span className="text-2xl font-bold">{prozodikToplam}</span>/20</div>
+                <div className="bg-app border border-line rounded-xl p-3 text-center">
+                  <div className="text-sm text-subtle font-medium">Toplam: <span className="text-2xl font-bold text-content tabular-nums">{prozodikToplam}</span>/20</div>
                 </div>
               </div>
             )}
@@ -2822,27 +2822,27 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
                   <label className="text-xs font-medium text-subtle">Öğretmen Notu</label>
                   <textarea value={ogretmenNotu} onChange={e => setOgretmenNotu(e.target.value)} rows={4}
                     placeholder="Genel değerlendirme ve öneriler..."
-                    className="w-full mt-1 border border-line rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                    className="w-full mt-1 border border-line rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary" />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-subtle">Kur Kararı</label>
                   <div className="grid grid-cols-3 gap-2 mt-2">
                     {["Kur 1","Kur 2","Kur 3"].map(k => (
                       <button key={k} onClick={() => setKurKarari(k)}
-                        className={`py-3 rounded-xl border-2 font-bold text-sm transition-all ${kurKarari===k ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-line text-subtle hover:border-orange-300'}`}>
+                        className={`py-3 rounded-xl border-2 font-bold text-sm transition-all ${kurKarari===k ? 'border-primary bg-blue-50 text-primary' : 'border-line text-subtle hover:border-primary'}`}>
                         {k}
                       </button>
                     ))}
                   </div>
                 </div>
                 <div className="text-xs text-subtle bg-app rounded-xl p-3 space-y-1">
-                  <div>⏱ Süre: <strong>{formatSure(sure)}</strong></div>
-                  <div>❌ Toplam hata: <strong>{hatalar.length}</strong></div>
-                  <div>📊 Prozodik: <strong>{prozodikToplam}/20</strong></div>
+                  <div className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" />Süre: <strong className="tabular-nums">{formatSure(sure)}</strong></div>
+                  <div className="flex items-center gap-1.5"><XCircle className="h-3.5 w-3.5" />Toplam hata: <strong className="tabular-nums">{hatalar.length}</strong></div>
+                  <div className="flex items-center gap-1.5"><BarChart3 className="h-3.5 w-3.5" />Prozodik: <strong className="tabular-nums">{prozodikToplam}/20</strong></div>
                 </div>
                 <button onClick={tamamla} disabled={sure===0 || !kurKarari}
-                  className="w-full py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-all">
-                  {sure===0 ? "Önce süre sayacını başlatın" : !kurKarari ? "Kur kararı seçin" : "✅ Analizi Tamamla ve Raporu Oluştur"}
+                  className="w-full inline-flex items-center justify-center gap-1.5 py-4 bg-primary hover:bg-primary-hover text-white font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+                  {sure===0 ? "Önce süre sayacını başlatın" : !kurKarari ? "Kur kararı seçin" : <><CheckCircle className="h-5 w-5" />Analizi Tamamla ve Raporu Oluştur</>}
                 </button>
               </div>
             )}
@@ -2851,9 +2851,9 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
           {/* Alt navigasyon */}
           <div className="flex border-t p-3 gap-2 shrink-0">
             <button onClick={() => setRaporAdim(a => Math.max(0, a-1))} disabled={raporAdim===0}
-              className="flex-1 py-2 text-sm border border-line rounded-xl disabled:opacity-30 hover:bg-app">← Geri</button>
+              className="flex-1 inline-flex items-center justify-center gap-1 py-2 text-sm border border-line rounded-xl disabled:opacity-30 hover:bg-app"><ArrowLeft className="h-4 w-4" />Geri</button>
             <button onClick={() => setRaporAdim(a => Math.min(3, a+1))} disabled={raporAdim===3}
-              className="flex-1 py-2 text-sm bg-orange-500 text-white rounded-xl disabled:opacity-30 hover:bg-orange-600">İleri →</button>
+              className="flex-1 inline-flex items-center justify-center gap-1 py-2 text-sm bg-primary hover:bg-primary-hover text-white rounded-xl disabled:opacity-30">İleri<ArrowRight className="h-4 w-4" /></button>
           </div>
         </div>
       </div>
@@ -2879,23 +2879,23 @@ function AnalizSonucEkrani({ sonuc, ogrenci, onKaydet, onYeniAnaliz }) {
 
       {/* Temel İstatistikler */}
       <div className="grid grid-cols-3 gap-4">
-        <Card className="border-0 shadow-sm text-center">
+        <Card className="border border-line shadow-sm text-center">
           <CardContent className="p-5">
-            <div className="text-3xl font-bold text-primary">{sonuc.wpm}</div>
+            <div className="text-3xl font-bold text-primary tabular-nums">{sonuc.wpm}</div>
             <div className="text-xs text-subtle mt-1">kelime/dakika</div>
             <div className={`text-sm font-medium mt-1 ${hizRenk[sonuc.hiz_deger]}`}>{hizLabel[sonuc.hiz_deger]}</div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm text-center">
+        <Card className="border border-line shadow-sm text-center">
           <CardContent className="p-5">
-            <div className="text-3xl font-bold text-green-600">%{sonuc.dogruluk_yuzde}</div>
+            <div className="text-3xl font-bold text-green-600 tabular-nums">%{sonuc.dogruluk_yuzde}</div>
             <div className="text-xs text-subtle mt-1">doğruluk oranı</div>
-            <div className="text-sm font-medium mt-1 text-subtle">{sonuc.hata_sayilari ? Object.values(sonuc.hata_sayilari).reduce((a,b)=>a+b,0) : 0} hata</div>
+            <div className="text-sm font-medium mt-1 text-subtle tabular-nums">{sonuc.hata_sayilari ? Object.values(sonuc.hata_sayilari).reduce((a,b)=>a+b,0) : 0} hata</div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm text-center">
+        <Card className="border border-line shadow-sm text-center">
           <CardContent className="p-5">
-            <div className="text-3xl font-bold text-orange-600">{formatSure(sonuc.sure_saniye)}</div>
+            <div className="text-3xl font-bold text-content tabular-nums">{formatSure(sonuc.sure_saniye)}</div>
             <div className="text-xs text-subtle mt-1">okuma süresi</div>
           </CardContent>
         </Card>
@@ -2903,14 +2903,14 @@ function AnalizSonucEkrani({ sonuc, ogrenci, onKaydet, onYeniAnaliz }) {
 
       {/* Hata Dağılımı */}
       {sonuc.hata_sayilari && (
-        <Card className="border-0 shadow-sm">
+        <Card className="border border-line shadow-sm">
           <CardHeader><CardTitle className="text-base">Hata Dağılımı</CardTitle></CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-3">
-              {[["atlama","Atlama","red"],["yanlis_okuma","Yanlış Okuma","orange"],["takilma","Takılma","yellow"],["tekrar","Tekrar","purple"]].map(([key,label,color]) => (
-                <div key={key} className={`flex items-center justify-between p-3 bg-${color}-50 rounded-xl border border-${color}-200`}>
+              {[["atlama","Atlama","bg-red-50 border-red-200","text-red-600"],["yanlis_okuma","Yanlış Okuma","bg-orange-50 border-orange-200","text-orange-600"],["takilma","Takılma","bg-yellow-50 border-yellow-200","text-yellow-600"],["tekrar","Tekrar","bg-purple-50 border-purple-200","text-purple-600"]].map(([key,label,kutu,yazi]) => (
+                <div key={key} className={`flex items-center justify-between p-3 rounded-xl border ${kutu}`}>
                   <span className="text-sm font-medium">{label}</span>
-                  <span className={`text-lg font-bold text-${color}-600`}>{sonuc.hata_sayilari[key] || 0}</span>
+                  <span className={`text-lg font-bold tabular-nums ${yazi}`}>{sonuc.hata_sayilari[key] || 0}</span>
                 </div>
               ))}
             </div>
@@ -2919,14 +2919,14 @@ function AnalizSonucEkrani({ sonuc, ogrenci, onKaydet, onYeniAnaliz }) {
       )}
 
       {/* Kur Kararı */}
-      <Card className="border-2 border-orange-200 shadow-sm">
+      <Card className="border border-line shadow-sm border-l-4 border-l-primary">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="text-sm text-subtle">Sistem Önerisi</div>
-              <div className="text-2xl font-bold text-orange-600">{sonuc.sistem_kur}</div>
+              <div className="text-2xl font-bold text-primary">{sonuc.sistem_kur}</div>
             </div>
-            <div className="text-4xl">🎯</div>
+            <Target className="h-9 w-9 text-primary" />
           </div>
           <div>
             <Label>Öğretmen Kararı</Label>
@@ -2940,8 +2940,8 @@ function AnalizSonucEkrani({ sonuc, ogrenci, onKaydet, onYeniAnaliz }) {
             </Select>
           </div>
           <Button onClick={() => onKaydet(ogretmenKur)}
-            className="w-full mt-4 bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold py-3">
-            ✅ Onayla ve Kaydet
+            className="w-full mt-4 bg-primary hover:bg-primary-hover text-white font-bold py-3">
+            <CheckCircle className="h-4 w-4 mr-1" />Onayla ve Kaydet
           </Button>
         </CardContent>
       </Card>
@@ -4738,12 +4738,12 @@ function TimiModul({ user, students }) {
 // ── ANALİZ SEKMESİ — Giriş Analizi + TIMI kardeş modülleri ──
 function AnalizSekmesi({ user, students, teachers }) {
   const [altModul, setAltModul] = useState("giris"); // giris | timi
-  const sekmeClass = (aktif) => `px-4 py-2 rounded-xl text-sm font-medium border transition-all ${aktif ? "bg-primary text-white border-blue-600" : "bg-surface text-subtle border-line hover:bg-app"}`;
+  const sekmeClass = (aktif) => `inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${aktif ? "bg-primary text-white border-primary" : "bg-surface text-subtle border-line hover:bg-app"}`;
   return (
     <div className="space-y-4">
       <div className="flex gap-2 flex-wrap">
-        <button onClick={() => setAltModul("giris")} className={sekmeClass(altModul === "giris")}>🩺 Giriş Analizi</button>
-        <button onClick={() => setAltModul("timi")} className={sekmeClass(altModul === "timi")}>🧠 TIMI - Çoklu Zeka Envanteri</button>
+        <button onClick={() => setAltModul("giris")} className={sekmeClass(altModul === "giris")}><Stethoscope className="h-4 w-4" />Giriş Analizi</button>
+        <button onClick={() => setAltModul("timi")} className={sekmeClass(altModul === "timi")}><Brain className="h-4 w-4" />TIMI - Çoklu Zeka Envanteri</button>
       </div>
       {altModul === "giris" && <GirisAnaliziModul user={user} students={students} teachers={teachers} />}
       {altModul === "timi" && <TimiModul user={user} students={students} />}
@@ -4841,7 +4841,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => { setAdim("liste"); setAktifOturumId(null); }}>← Geri</Button>
+          <Button variant="outline" size="sm" onClick={() => { setAdim("liste"); setAktifOturumId(null); }}><ArrowLeft className="h-4 w-4 mr-1" />Geri</Button>
           <h2 className="text-xl font-bold">Canlı Analiz</h2>
         </div>
         <CanlıAnalizEkrani ogrenci={seciliOgrenci} metin={seciliMetin} oturumId={aktifOturumId} onTamamla={analiziTamamla} user={user} />
@@ -4854,7 +4854,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => { setAdim("liste"); setSonuc(null); setSeciliOgrenci(null); setSeciliMetin(null); setAktifOturumId(null); }}>← Listeye Dön</Button>
+          <Button variant="outline" size="sm" onClick={() => { setAdim("liste"); setSonuc(null); setSeciliOgrenci(null); setSeciliMetin(null); setAktifOturumId(null); }}><ArrowLeft className="h-4 w-4 mr-1" />Listeye Dön</Button>
           <span className="text-sm text-subtle">Raporu doldurup kaydedin veya atlayın</span>
         </div>
         <RaporFormu
@@ -4894,8 +4894,8 @@ function GirisAnaliziModul({ user, students, teachers }) {
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => setAdim("liste")}>← Geri</Button>
-          <h2 className="text-xl font-bold">📄 Metin Havuzu Yönetimi</h2>
+          <Button variant="outline" size="sm" onClick={() => setAdim("liste")}><ArrowLeft className="h-4 w-4 mr-1" />Geri</Button>
+          <h2 className="inline-flex items-center gap-2 text-xl font-bold"><FileText className="h-5 w-5" />Metin Havuzu Yönetimi</h2>
         </div>
         <MetinYonetimi tamEkran user={user} onDuzenle={acMetinDuzenle} />
       </div>
@@ -4921,11 +4921,11 @@ function GirisAnaliziModul({ user, students, teachers }) {
         <div className="flex gap-2">
           {(user.role === "admin" || user.role === "coordinator") && (
             <Button variant="outline" size="sm" onClick={() => setNormDialogAcik(true)}>
-              ⚙️ Norm Tablosu
+              <Settings className="h-4 w-4 mr-1" />Norm Tablosu
             </Button>
           )}
           <Button variant="outline" size="sm" onClick={() => setAdim("metin-yonetimi")}>
-            📄 Metinler
+            <FileText className="h-4 w-4 mr-1" />Metinler
           </Button>
         </div>
       </div>
@@ -4933,21 +4933,21 @@ function GirisAnaliziModul({ user, students, teachers }) {
       {/* Analiz Modu Seçimi: Ölçüm mü, Gelişim mi? */}
       <div className="grid grid-cols-2 gap-3">
         <button onClick={() => setAnalizModu("olcum")}
-          className={`p-4 rounded-2xl border-2 text-left transition-all ${analizModu === "olcum" ? "border-orange-400 bg-orange-50" : "border-line bg-surface hover:bg-app"}`}>
-          <div className="font-bold flex items-center gap-2">📊 Ölçüm Analizi{analizModu === "olcum" && " ✓"}</div>
+          className={`p-4 rounded-2xl border-2 text-left transition-all ${analizModu === "olcum" ? "border-primary bg-blue-50" : "border-line bg-surface hover:bg-app"}`}>
+          <div className="font-bold flex items-center gap-2"><BarChart3 className="h-4 w-4" />Ölçüm Analizi{analizModu === "olcum" && <Check className="h-4 w-4 text-primary" />}</div>
           <div className="text-xs text-subtle mt-1">Öğrenciyle canlı okuma; hız/doğruluk/anlama/prozodi ölçülür, ölçüm raporu üretilir.</div>
         </button>
         <button onClick={() => setAnalizModu("gelisim")}
-          className={`p-4 rounded-2xl border-2 text-left transition-all ${analizModu === "gelisim" ? "border-indigo-400 bg-indigo-50" : "border-line bg-surface hover:bg-app"}`}>
-          <div className="font-bold flex items-center gap-2">📈 Gelişim Analizi{analizModu === "gelisim" && " ✓"}</div>
+          className={`p-4 rounded-2xl border-2 text-left transition-all ${analizModu === "gelisim" ? "border-amber-400 bg-amber-50" : "border-line bg-surface hover:bg-app"}`}>
+          <div className="font-bold flex items-center gap-2"><TrendingUp className="h-4 w-4" />Gelişim Analizi{analizModu === "gelisim" && <Check className="h-4 w-4 text-amber-600" />}</div>
           <div className="text-xs text-subtle mt-1">İki ölçümü (ön test / son test) karşılaştırır, kur sonu gelişim raporu üretir.</div>
         </button>
       </div>
 
       {/* ÖLÇÜM: Yeni Analiz Başlat */}
       {analizModu === "olcum" && (
-      <Card className="border-2 border-orange-200 shadow-sm">
-        <CardHeader><CardTitle className="text-base flex items-center gap-2">🎯 Yeni Ölçüm Analizi Başlat</CardTitle></CardHeader>
+      <Card className="border border-line shadow-sm border-l-4 border-l-primary">
+        <CardHeader><CardTitle className="text-base flex items-center gap-2"><Target className="h-4 w-4 text-primary" />Yeni Ölçüm Analizi Başlat</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -4963,7 +4963,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
               <Label>Analiz Metni Seç</Label>
               <button onClick={() => setMetinDialogAcik(true)}
                 disabled={!seciliOgrenci}
-                className="w-full border border-line rounded-lg p-2 text-left text-sm hover:border-orange-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-line">
+                className="w-full border border-line rounded-lg p-2 text-left text-sm hover:border-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-line">
                 {seciliMetin ? <span className="font-medium">{seciliMetin.baslik} <span className="text-subtle font-normal">({seciliMetin.kelime_sayisi} kelime)</span></span> : <span className="text-subtle">{seciliOgrenci ? "Metin seçmek için tıklayın..." : "Önce öğrenci seçin..."}</span>}
               </button>
             </div>
@@ -4981,8 +4981,8 @@ function GirisAnaliziModul({ user, students, teachers }) {
             <p className="text-[11px] text-subtle mt-1">Gelişim raporu için "İlk Analiz" ve "Kur Sonu Analizi" karşılaştırılır.</p>
           </div>
           <Button onClick={analiziBaslat} disabled={!seciliOgrenci || !seciliMetin}
-            className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 font-bold">
-            ▶ Analizi Başlat
+            className="w-full bg-primary hover:bg-primary-hover text-white py-3 font-bold">
+            <Play className="h-4 w-4 mr-1" />Analizi Başlat
           </Button>
         </CardContent>
       </Card>
@@ -4990,8 +4990,8 @@ function GirisAnaliziModul({ user, students, teachers }) {
 
       {/* GELİŞİM: iki ölçümü karşılaştır */}
       {analizModu === "gelisim" && (
-      <Card className="border-2 border-indigo-200 shadow-sm">
-        <CardHeader><CardTitle className="text-base flex items-center gap-2">📈 Gelişim Analizi (Ön Test / Son Test)</CardTitle></CardHeader>
+      <Card className="border border-line shadow-sm border-l-4 border-l-amber-400">
+        <CardHeader><CardTitle className="text-base flex items-center gap-2"><TrendingUp className="h-4 w-4 text-amber-600" />Gelişim Analizi (Ön Test / Son Test)</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-subtle">Bir öğrencinin <b>İlk Analiz</b> ve <b>Kur Sonu Analizi</b> ölçümlerini karşılaştırarak gelişim raporu üretin. Her iki ölçümün de tamamlanmış ve ölçüm raporu oluşturulmuş olması gerekir.</p>
           <GelisimRaporuButonu students={students} />
@@ -5000,7 +5000,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
       )}
 
       {/* Geçmiş Analizler */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader><CardTitle className="text-base">Geçmiş Analizler</CardTitle></CardHeader>
         <CardContent>
           {gecmisOturumlar.length === 0 && <p className="text-subtle text-sm text-center py-8">Henüz analiz yapılmadı</p>}
@@ -5023,10 +5023,10 @@ function GirisAnaliziModul({ user, students, teachers }) {
                   <TableRow key={o.id}>
                     <TableCell className="font-medium">{ogr ? `${ogr.ad} ${ogr.soyad}` : "-"}</TableCell>
                     <TableCell className="text-sm text-subtle">{new Date(o.olusturma_tarihi).toLocaleDateString("tr-TR")}</TableCell>
-                    <TableCell className="font-bold text-primary">{o.wpm}</TableCell>
-                    <TableCell>%{o.dogruluk_yuzde}</TableCell>
-                    <TableCell><span className={`px-2 py-1 rounded-full text-xs font-medium ${hizRenk[o.hiz_deger] || "bg-gray-100 text-subtle"}`}>{hizLabel[o.hiz_deger] || "-"}</span></TableCell>
-                    <TableCell className="font-semibold text-orange-600">{o.ogretmen_kur || "-"}</TableCell>
+                    <TableCell className="font-bold text-primary tabular-nums">{o.wpm}</TableCell>
+                    <TableCell className="tabular-nums">%{o.dogruluk_yuzde}</TableCell>
+                    <TableCell><span className={`px-2 py-1 rounded-full text-xs font-medium ${hizRenk[o.hiz_deger] || "bg-app text-subtle"}`}>{hizLabel[o.hiz_deger] || "-"}</span></TableCell>
+                    <TableCell className="font-semibold text-primary">{o.ogretmen_kur || "-"}</TableCell>
                     <TableCell>
                       <Button size="sm" variant="outline" onClick={async () => {
                         try { const r = await axios.get(`${API}/diagnostic/rapor/ogrenci/${o.ogrenci_id}`);
@@ -5034,7 +5034,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
                           if (ogrRapor) { setAktifRapor(ogrRapor); setSeciliOgrenci(students.find(s => s.id === o.ogrenci_id) || {}); setAdim("rapor-goruntule"); }
                           else { toast({ title: "Bu analiz için rapor bulunamadı" }); }
                         } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
-                      }}>📄 Rapor</Button>
+                      }}><FileText className="h-4 w-4 mr-1" />Rapor</Button>
                     </TableCell>
                   </TableRow>
                 );
@@ -5048,7 +5048,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
       <Dialog open={normDialogAcik} onOpenChange={setNormDialogAcik}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>⚙️ Okuma Hızı Norm Tablosu</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><Settings className="h-5 w-5" />Okuma Hızı Norm Tablosu</DialogTitle>
             <DialogDescription>Sınıf bazlı okuma hızı sınır değerlerini düzenleyin (kelime/dakika)</DialogDescription>
           </DialogHeader>
           <NormTablosu onClose={() => setNormDialogAcik(false)} />
@@ -5059,7 +5059,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
       <Dialog open={metinDialogAcik} onOpenChange={setMetinDialogAcik}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>📄 Analiz Metinleri</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><FileText className="h-5 w-5" />Analiz Metinleri</DialogTitle>
             <DialogDescription>{seciliMetin ? "Farklı bir metin seçin veya yeni metin ekleyin" : "Analiz için metin seçin"}</DialogDescription>
           </DialogHeader>
           <MetinYonetimi secimModu={true} user={user} filtreSinif={seciliOgrenci?.sinif} onDuzenle={acMetinDuzenle} onMetinSec={m => { setSeciliMetin(m); setMetinDialogAcik(false); }} />
