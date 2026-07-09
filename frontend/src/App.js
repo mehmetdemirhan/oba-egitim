@@ -9202,23 +9202,23 @@ function SistemAyarlari({ user }) {
     setKayitEdiliyor(false);
   };
 
-  const xpEylemLabel = { okuma_gorevi: "📖 Okuma Görevi", anlama_testi: "📝 Anlama Testi", kelime_gorevi: "🔤 Kelime Görevi", gunluk_streak: "🔥 Günlük Streak", kitap_bitirme: "📚 Kitap Bitirme", yazili_ozet: "✍️ Yazılı Özet", egzersiz: "👁️ Egzersiz", gelisim_tamamla: "🎓 Gelişim Tamamla", gorev_tamamla: "✅ Görev Tamamla" };
-  const ligLabel = { bronz: "🥉 Bronz", gumus: "🥈 Gümüş", altin: "🥇 Altın", elmas: "💎 Elmas" };
+  const xpEylemLabel = { okuma_gorevi: "Okuma Görevi", anlama_testi: "Anlama Testi", kelime_gorevi: "Kelime Görevi", gunluk_streak: "Günlük Streak", kitap_bitirme: "Kitap Bitirme", yazili_ozet: "Yazılı Özet", egzersiz: "Egzersiz", gelisim_tamamla: "Gelişim Tamamla", gorev_tamamla: "Görev Tamamla" };
+  const ligLabel = { bronz: "Bronz", gumus: "Gümüş", altin: "Altın", elmas: "Elmas" };
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold">⚙️ Sistem Ayarları</h2>
+      <h2 className="inline-flex items-center gap-2 text-2xl font-bold"><Settings className="h-6 w-6" />Sistem Ayarları</h2>
       <p className="text-subtle text-sm">Rozet, XP, lig ve anket ayarlarını buradan yönetin. Değişiklikler anında uygulanır.</p>
 
       <div className="flex gap-2 flex-wrap">
-        {[{id:"ozellikler",l:"🎛️ Özellik Yönetimi"},{id:"xp",l:"💰 XP Değerleri"},{id:"ogretmen_xp",l:"👨‍🏫 Öğretmen XP"},{id:"lig",l:"🏆 Lig Eşikleri"},{id:"ogretmen_rozet",l:"🏅 Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"🎓 Öğrenci Rozetleri"},{id:"anket",l:"⭐ Anket Soruları"},{id:"kutulu_okuma",l:"📦 Kutulu Okuma"},{id:"rapor_olcutleri",l:"📋 Rapor Ölçütleri"},{id:"timi_anahtar",l:"🧠 TIMI Puanlama Anahtarı"},{id:"profil_gorunurluk",l:"👁️ Profil Görünürlüğü"},{id:"instagram",l:"📱 Instagram"},{id:"kvkk",l:"🔒 Veri & KVKK"},{id:"sezon",l:"🔄 Sezonluk Reset"}].map(s => (
+        {[{id:"ozellikler",l:"Özellik Yönetimi"},{id:"xp",l:"XP Değerleri"},{id:"ogretmen_xp",l:"Öğretmen XP"},{id:"lig",l:"Lig Eşikleri"},{id:"ogretmen_rozet",l:"Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"Öğrenci Rozetleri"},{id:"anket",l:"Anket Soruları"},{id:"kutulu_okuma",l:"Kutulu Okuma"},{id:"rapor_olcutleri",l:"Rapor Ölçütleri"},{id:"timi_anahtar",l:"TIMI Puanlama Anahtarı"},{id:"profil_gorunurluk",l:"Profil Görünürlüğü"},{id:"instagram",l:"Instagram"},{id:"kvkk",l:"Veri & KVKK"},{id:"sezon",l:"Sezonluk Reset"}].map(s => (
           <button key={s.id} onClick={() => setAyarSekme(s.id)}
             className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${ayarSekme === s.id ? 'bg-primary text-white border-blue-600' : 'bg-surface text-subtle border-line'}`}>{s.l}</button>
         ))}
       </div>
 
       {/* XP Değerleri */}
-      {ayarSekme === "xp" && (<Card className="border-0 shadow-sm"><CardHeader><CardTitle>💰 XP Değerleri</CardTitle><p className="text-sm text-subtle">Her eylem için kazanılan XP miktarı</p></CardHeader><CardContent><div className="space-y-3">
+      {ayarSekme === "xp" && (<Card className="border border-line shadow-sm"><CardHeader><CardTitle>XP Değerleri</CardTitle><p className="text-sm text-subtle">Her eylem için kazanılan XP miktarı</p></CardHeader><CardContent><div className="space-y-3">
         {Object.entries(xpTablosu).map(([key, val]) => (
           <div key={key} className="flex items-center justify-between gap-4">
             <Label className="text-sm flex-1">{xpEylemLabel[key] || key}</Label>
@@ -9230,7 +9230,7 @@ function SistemAyarlari({ user }) {
       </div></CardContent></Card>)}
 
       {/* Kutulu Okuma — kutu başına kelime genel varsayılanı */}
-      {ayarSekme === "kutulu_okuma" && (<Card className="border-0 shadow-sm"><CardHeader><CardTitle>📦 Kutulu Okuma</CardTitle><p className="text-sm text-subtle">Kutulu Okuma egzersizinde her kutuda kaç kelime gösterilsin (genel varsayılan). Öğrenci/eğitici egzersizi açtığında ayar çekmecesinden yine 1/2/3 olarak değiştirebilir.</p></CardHeader><CardContent><div className="space-y-4">
+      {ayarSekme === "kutulu_okuma" && (<Card className="border border-line shadow-sm"><CardHeader><CardTitle>Kutulu Okuma</CardTitle><p className="text-sm text-subtle">Kutulu Okuma egzersizinde her kutuda kaç kelime gösterilsin (genel varsayılan). Öğrenci/eğitici egzersizi açtığında ayar çekmecesinden yine 1/2/3 olarak değiştirebilir.</p></CardHeader><CardContent><div className="space-y-4">
         <div>
           <Label className="text-sm block mb-2">Kutu Başına Kelime Sayısı</Label>
           <div className="flex gap-2 max-w-xs">
@@ -9245,11 +9245,11 @@ function SistemAyarlari({ user }) {
       </div></CardContent></Card>)}
 
       {/* Öğretmen XP Ağırlıkları */}
-      {ayarSekme === "ogretmen_xp" && (<Card className="border-0 shadow-sm"><CardHeader><CardTitle>👨‍🏫 Öğretmen XP Ağırlıkları</CardTitle><p className="text-sm text-subtle">Öğretmen puanına etkinlik ve rozet dışında bu çıktılar da eklenir. Değişiklik anında sıralamaya yansır.</p></CardHeader><CardContent><div className="space-y-3">
+      {ayarSekme === "ogretmen_xp" && (<Card className="border border-line shadow-sm"><CardHeader><CardTitle>‍ Öğretmen XP Ağırlıkları</CardTitle><p className="text-sm text-subtle">Öğretmen puanına etkinlik ve rozet dışında bu çıktılar da eklenir. Değişiklik anında sıralamaya yansır.</p></CardHeader><CardContent><div className="space-y-3">
         {[
-          {key:"ogrenci_basi", l:"👥 Aldığın öğrenci", birim:"puan/öğrenci"},
-          {key:"kur_basi", l:"🎓 Kur atlatma", birim:"puan/kur"},
-          {key:"veli_yildiz", l:"⭐ Veli anketi", birim:"puan/yıldız"},
+          {key:"ogrenci_basi", l:"Aldığın öğrenci", birim:"puan/öğrenci"},
+          {key:"kur_basi", l:"Kur atlatma", birim:"puan/kur"},
+          {key:"veli_yildiz", l:"Veli anketi", birim:"puan/yıldız"},
         ].map(({key, l, birim}) => (
           <div key={key} className="flex items-center justify-between gap-4">
             <Label className="text-sm flex-1">{l}</Label>
@@ -9266,7 +9266,7 @@ function SistemAyarlari({ user }) {
       </div></CardContent></Card>)}
 
       {/* Lig Eşikleri */}
-      {ayarSekme === "lig" && (<Card className="border-0 shadow-sm"><CardHeader><CardTitle>🏆 Lig Eşikleri</CardTitle><p className="text-sm text-subtle">Her lig seviyesi için gereken minimum XP</p></CardHeader><CardContent><div className="space-y-3">
+      {ayarSekme === "lig" && (<Card className="border border-line shadow-sm"><CardHeader><CardTitle>Lig Eşikleri</CardTitle><p className="text-sm text-subtle">Her lig seviyesi için gereken minimum XP</p></CardHeader><CardContent><div className="space-y-3">
         {Object.entries(ligEsikleri).map(([key, val]) => (
           <div key={key} className="flex items-center justify-between gap-4">
             <Label className="text-sm flex-1">{ligLabel[key] || key}</Label>
@@ -9278,7 +9278,7 @@ function SistemAyarlari({ user }) {
       </div></CardContent></Card>)}
 
       {/* Öğretmen Rozetleri */}
-      {ayarSekme === "ogretmen_rozet" && (<Card className="border-0 shadow-sm"><CardHeader><CardTitle>🏅 Öğretmen Rozetleri ({ogretmenRozetler.length})</CardTitle></CardHeader><CardContent><div className="space-y-3">
+      {ayarSekme === "ogretmen_rozet" && (<Card className="border border-line shadow-sm"><CardHeader><CardTitle>Öğretmen Rozetleri ({ogretmenRozetler.length})</CardTitle></CardHeader><CardContent><div className="space-y-3">
         {ogretmenRozetler.map((r, i) => (
           <div key={r.kod} className="bg-app rounded-xl p-3 space-y-2">
             <div className="flex items-center gap-2"><span className="text-xl">{r.ikon}</span><span className="font-medium text-sm">{r.ad}</span><span className={`text-xs px-2 py-0.5 rounded-full ${r.seviye === "elmas" ? "bg-purple-100 text-purple-700" : r.seviye === "altin" ? "bg-yellow-100 text-yellow-700" : r.seviye === "gumus" ? "bg-gray-100 text-content" : "bg-orange-100 text-orange-700"}`}>{r.seviye}</span><span className="text-xs text-subtle">{r.kategori}</span></div>
@@ -9293,7 +9293,7 @@ function SistemAyarlari({ user }) {
       </div></CardContent></Card>)}
 
       {/* Öğrenci Rozetleri */}
-      {ayarSekme === "ogrenci_rozet" && (<Card className="border-0 shadow-sm"><CardHeader><CardTitle>🎓 Öğrenci Rozetleri ({ogrenciRozetler.length})</CardTitle></CardHeader><CardContent><div className="space-y-3">
+      {ayarSekme === "ogrenci_rozet" && (<Card className="border border-line shadow-sm"><CardHeader><CardTitle>Öğrenci Rozetleri ({ogrenciRozetler.length})</CardTitle></CardHeader><CardContent><div className="space-y-3">
         {ogrenciRozetler.map((r, i) => (
           <div key={r.kod} className="bg-app rounded-xl p-3 space-y-2">
             <div className="flex items-center gap-2"><span className="text-xl">{r.ikon}</span><span className="font-medium text-sm">{r.ad}</span><span className="text-xs text-subtle">{r.kategori}</span></div>
@@ -9308,7 +9308,7 @@ function SistemAyarlari({ user }) {
       </div></CardContent></Card>)}
 
       {/* Anket Soruları */}
-      {ayarSekme === "anket" && (<Card className="border-0 shadow-sm"><CardHeader><CardTitle>⭐ Veli Anket Soruları ({anketSorulari.length})</CardTitle><p className="text-sm text-subtle">Velilerin öğretmenleri değerlendirirken göreceği sorular</p></CardHeader><CardContent><div className="space-y-3">
+      {ayarSekme === "anket" && (<Card className="border border-line shadow-sm"><CardHeader><CardTitle>Veli Anket Soruları ({anketSorulari.length})</CardTitle><p className="text-sm text-subtle">Velilerin öğretmenleri değerlendirirken göreceği sorular</p></CardHeader><CardContent><div className="space-y-3">
         {anketSorulari.map((s, i) => (
           <div key={i} className="bg-app rounded-xl p-3 space-y-2">
             <div className="flex items-center gap-2"><span className="text-xs bg-blue-100 text-primary px-2 py-0.5 rounded-full">{s.tip}</span><span className="text-xs text-subtle">{s.kategori}</span></div>
@@ -9330,7 +9330,7 @@ function SistemAyarlari({ user }) {
       {ayarSekme === "timi_anahtar" && <TimiAnahtarPaneli />}
 
       {ayarSekme === "ozellikler" && (
-        <Card className="border-0 shadow-sm">
+        <Card className="border border-line shadow-sm">
           <CardContent className="pt-6">
             <OzellikYonetimi />
           </CardContent>
@@ -9633,9 +9633,9 @@ function KvkkVeriPaneli({ user }) {
 
   return (
     <div className="space-y-4">
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader>
-          <CardTitle>🔒 Kişisel Veri Yönetimi</CardTitle>
+          <CardTitle>Kişisel Veri Yönetimi</CardTitle>
           <p className="text-sm text-subtle">KVKK (6698 sayılı Kanun) Madde 11 kapsamında haklarınız</p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -9732,9 +9732,9 @@ function SezonlukReset({ user }) {
 
   return (
     <div className="space-y-4">
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader>
-          <CardTitle>🔄 Sezonluk Sıfırlama</CardTitle>
+          <CardTitle>Sezonluk Sıfırlama</CardTitle>
           <p className="text-sm text-subtle">Her dönem sonunda puanları sıfırla, başarıları koru</p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -9952,7 +9952,7 @@ function GorevYonetimi({ user, students, teachers }) {
   if (gorunum === "olustur") {
     return (
       <div className="max-w-3xl mx-auto">
-        <div className="flex items-center gap-3 mb-6"><Button variant="outline" size="sm" onClick={() => setGorunum("liste")}><ArrowLeft className="h-4 w-4 mr-1" />Geri</Button><h2 className="text-xl font-bold">Yeni Görev Ata</h2></div>
+        <div className="flex items-center gap-3 mb-6"><Button variant="outline" size="sm" onClick={() =>setGorunum("liste")}><ArrowLeft className="h-4 w-4 mr-1" />Geri</Button><h2 className="text-xl font-bold">Yeni Görev Ata</h2></div>
         <form onSubmit={gorevOlustur} className="space-y-6">
           <Card className="border border-line shadow-sm"><CardHeader><CardTitle className="text-base">1. Kime Atanacak?</CardTitle></CardHeader>
             <CardContent className="space-y-4">
@@ -10040,7 +10040,7 @@ function GorevYonetimi({ user, students, teachers }) {
       </div>)}
 
       {user.role === "teacher" && benimGorevlerim.filter(g => g.durum !== "tamamlandi").length > 0 && (
-        <Card className="border border-line shadow-sm border-l-4 border-l-primary"><CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Pin className="h-4 w-4 text-primary" />Bana Atanan Görevler <Badge className="bg-blue-100 text-primary tabular-nums">{benimGorevlerim.filter(g => g.durum !== "tamamlandi").length} aktif</Badge></CardTitle></CardHeader>
+        <Card className="border border-line shadow-sm border-l-4 border-l-primary"><CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Pin className="h-4 w-4 text-primary" />Bana Atanan Görevler <Badge className="bg-blue-100 text-primary tabular-nums">{benimGorevlerim.filter(g =>g.durum !== "tamamlandi").length} aktif</Badge></CardTitle></CardHeader>
           <CardContent><div className="space-y-2">
             {benimGorevlerim.filter(g => g.durum !== "tamamlandi").map(g => (<div key={g.id} className="flex items-center justify-between p-3 bg-app rounded-xl">
               <div className="flex items-center gap-3"><span className="text-lg">{turIcon(g.tur)}</span><div><div className="font-medium text-sm">{g.baslik}</div><div className="text-xs text-subtle">Atayan: {g.atayan_ad} {g.son_tarih && `• Son: ${new Date(g.son_tarih).toLocaleDateString('tr-TR')}`}</div></div></div>
@@ -10139,7 +10139,7 @@ function AiMerkezi({ user }) {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold flex items-center gap-2">🧠 AI Merkezi</h2>
+      <h2 className="text-2xl font-bold flex items-center gap-2"><Brain className="h-6 w-6" />AI Merkezi</h2>
 
       {/* Demo Veri Yükle butonu */}
       {user.role === "admin" && (
@@ -10150,13 +10150,13 @@ function AiMerkezi({ user }) {
             window.location.reload();
           } catch(e) { toast({ title: e.response?.data?.detail || "Hata", variant: "destructive" }); }
         }} className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-xl text-sm font-medium shadow hover:shadow-lg transition-all">
-          🚀 Demo Verileri Yükle / Yenile
+          Demo Verileri Yükle / Yenile
         </button>
       )}
 
       {/* Sekme butonları */}
       <div className="flex gap-1 flex-wrap">
-        {[["genel","📊 Genel"],["dna","🧬 DNA Profilleri"],["kocluk","🤖 Koçluk"],["kelimeler","📚 Kelime Haritası"],["yuklemeler","📁 Yüklemeler"],["socratic","💬 Socratic"],["simulasyon","📈 Simülasyon"],["hibrit","🛡️ Hibrit Onay"],["harita","🇹🇷 TR Haritası"],["kelime-harita","🌍 Global Kelime"],["peer-review","🏅 Peer Review"],["maliyet","💰 Maliyet"]].map(([k,l]) => (
+        {[["genel","Genel"],["dna","DNA Profilleri"],["kocluk","Koçluk"],["kelimeler","Kelime Haritası"],["yuklemeler","Yüklemeler"],["socratic","Socratic"],["simulasyon","Simülasyon"],["hibrit","Hibrit Onay"],["harita","TR Haritası"],["kelime-harita","Global Kelime"],["peer-review","Peer Review"],["maliyet","Maliyet"]].map(([k,l]) => (
           <button key={k} onClick={() => setAiSekme(k)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${aiSekme === k ? 'bg-cyan-600 text-white shadow' : 'bg-surface text-subtle border hover:bg-app'}`}>{l}</button>
         ))}
       </div>
@@ -10171,7 +10171,7 @@ function AiMerkezi({ user }) {
         </div>
         {maliyet && (
           <div className="bg-surface rounded-2xl p-4 border shadow-sm">
-            <h3 className="font-bold text-sm mb-3">💰 AI Maliyet Özeti</h3>
+            <h3 className="font-bold text-sm mb-3">AI Maliyet Özeti</h3>
             <div className="grid grid-cols-2 gap-4">
               <div><div className="text-xs text-subtle">Bugün</div><div className="text-lg font-bold text-cyan-600">{maliyet.gunluk?.istek || 0} istek</div><div className="text-sm text-subtle">${maliyet.gunluk?.maliyet_usd?.toFixed(4) || "0.00"}</div></div>
               <div><div className="text-xs text-subtle">Bu Ay</div><div className="text-lg font-bold text-primary">{maliyet.aylik?.istek || 0} istek</div><div className="text-sm text-subtle">${maliyet.aylik?.maliyet_usd?.toFixed(4) || "0.00"}</div></div>
@@ -10180,7 +10180,7 @@ function AiMerkezi({ user }) {
         )}
         {/* Son yüklemeler */}
         <div className="bg-surface rounded-2xl p-4 border shadow-sm">
-          <h3 className="font-bold text-sm mb-3">📁 Son Yüklemeler</h3>
+          <h3 className="font-bold text-sm mb-3">Son Yüklemeler</h3>
           <div className="space-y-2">{yuklemeler.slice(0, 5).map(y => (
             <div key={y.id} className="flex items-center justify-between p-2 bg-app rounded-lg">
               <div><div className="text-sm font-medium">{y.dosya_format === ".pdf" ? "📕" : "📘"} {y.kitap_adi}</div><div className="text-[10px] text-subtle">{y.yukleyen_ad} • {y.sinif}. sınıf • {new Date(y.tarih).toLocaleDateString('tr-TR')}</div></div>
@@ -10195,7 +10195,7 @@ function AiMerkezi({ user }) {
 
       {/* DNA PROFİLLERİ */}
       {aiSekme === "dna" && (<>
-        <h3 className="font-bold text-sm">🧬 Tüm Öğrenci DNA Profilleri ({dnaListesi.length})</h3>
+        <h3 className="font-bold text-sm">Tüm Öğrenci DNA Profilleri ({dnaListesi.length})</h3>
         <div className="space-y-3">{dnaListesi.map(d => {
           const b = d.boyutlar || {};
           const renk = (v) => v >= 70 ? "bg-green-500" : v >= 40 ? "bg-yellow-500" : "bg-red-500";
@@ -10224,7 +10224,7 @@ function AiMerkezi({ user }) {
 
       {/* KOÇLUK */}
       {aiSekme === "kocluk" && (<>
-        <h3 className="font-bold text-sm">🤖 AI Koçluk Raporları ({koclukListesi.length})</h3>
+        <h3 className="font-bold text-sm">AI Koçluk Raporları ({koclukListesi.length})</h3>
         {koclukListesi.length > 0 ? (
           <div className="space-y-3">{koclukListesi.map(k => {
             const a = k.ai_analiz || {};
@@ -10249,7 +10249,7 @@ function AiMerkezi({ user }) {
 
       {/* KELİME HARİTASI */}
       {aiSekme === "kelimeler" && (<>
-        <h3 className="font-bold text-sm">📚 MEB Kelime Haritası ({kelimeler.length} kelime)</h3>
+        <h3 className="font-bold text-sm">MEB Kelime Haritası ({kelimeler.length} kelime)</h3>
         {istatistik?.sinif_dagilimi && (
           <div className="grid grid-cols-4 gap-2">{Object.entries(istatistik.sinif_dagilimi).filter(([,v]) => v.kelime > 0).map(([s, c]) => (
             <div key={s} className="bg-surface rounded-xl p-3 border text-center"><div className="text-lg font-bold text-cyan-600">{c.kelime}</div><div className="text-[10px] text-subtle">{s}. Sınıf</div></div>
@@ -10257,7 +10257,7 @@ function AiMerkezi({ user }) {
         )}
         {istatistik?.top_contributors?.length > 0 && (
           <div className="bg-surface rounded-2xl p-4 border shadow-sm">
-            <h4 className="font-medium text-sm mb-2">🏆 En Çok Katkı Yapanlar</h4>
+            <h4 className="font-medium text-sm mb-2">En Çok Katkı Yapanlar</h4>
             <div className="space-y-1">{istatistik.top_contributors.map((t, i) => (
               <div key={i} className="flex items-center justify-between text-sm"><span>{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i+1}.`} {t.ad}</span><span className="text-xs text-subtle">{t.yukleme} dosya • {t.puan} puan</span></div>
             ))}</div>
@@ -10283,7 +10283,7 @@ function AiMerkezi({ user }) {
 
       {/* YÜKLEMELER */}
       {aiSekme === "yuklemeler" && (<>
-        <h3 className="font-bold text-sm">📁 Tüm Yüklemeler ({yuklemeler.length})</h3>
+        <h3 className="font-bold text-sm">Tüm Yüklemeler ({yuklemeler.length})</h3>
         <div className="space-y-2">{yuklemeler.map(y => (
           <div key={y.id} className="bg-surface rounded-xl p-3 border shadow-sm">
             <div className="flex items-center justify-between">
@@ -10300,7 +10300,7 @@ function AiMerkezi({ user }) {
 
       {/* SOCRATIC */}
       {aiSekme === "socratic" && (<>
-        <h3 className="font-bold text-sm">💬 Socratic Reading Geçmişi ({socraticListesi.length})</h3>
+        <h3 className="font-bold text-sm">Socratic Reading Geçmişi ({socraticListesi.length})</h3>
         <div className="space-y-2">{socraticListesi.map((s, i) => {
           const bloomRenk = {"bilgi":"bg-blue-100 text-primary","kavrama":"bg-green-100 text-green-700","analiz":"bg-orange-100 text-orange-700","sentez":"bg-red-100 text-red-700","degerlendirme":"bg-purple-100 text-purple-700"};
           return (
@@ -10344,7 +10344,7 @@ function AiMerkezi({ user }) {
 
       {/* MALİYET */}
       {aiSekme === "maliyet" && (<>
-        <h3 className="font-bold text-sm">💰 AI Maliyet Detayı</h3>
+        <h3 className="font-bold text-sm">AI Maliyet Detayı</h3>
         {maliyet ? (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
