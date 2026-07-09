@@ -8976,7 +8976,7 @@ function RaporOlcutleriPaneli() {
     setKayit("");
   };
   const varsayilana = async (tip) => {
-    try { const r = await axios.post(`${API}/admin/rapor-ayarlari/${tip}/varsayilana-don`); setTip(tip, r.data.degerler); toast({ title: "↩️ Varsayılana dönüldü" }); } catch (e) {}
+    try { const r = await axios.post(`${API}/admin/rapor-ayarlari/${tip}/varsayilana-don`); setTip(tip, r.data.degerler); toast({ title: "↩️ Varsayılana dönüldü" }); } catch (e) { hataBildir(toast, "Varsayılana dönülemedi"); }
   };
   const yeniId = (on) => `${on}_${Date.now()}`;
 
@@ -10297,7 +10297,7 @@ function AiMerkezi({ user }) {
               <div><div className="text-sm font-medium">{y.dosya_format === ".pdf" ? "📕" : "📘"} {y.kitap_adi}</div><div className="text-[10px] text-subtle">{y.yukleyen_ad} • {y.sinif}. sınıf • {y.tur} • {(y.dosya_boyut/1024/1024).toFixed(1)} MB</div></div>
               <div className="flex items-center gap-2">
                 <span className={`text-[10px] px-2 py-0.5 rounded-full ${y.durum === 'tamamlandi' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{y.durum}</span>
-                {!y.onayli && y.durum !== 'hata' && <button onClick={async () => { try { await axios.put(`${API}/ai/bilgi-tabani/onayla/${y.id}`); toast({ title: "✅ Onaylandı!" }); const r = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setYuklemeler(Array.isArray(r.data)?r.data:[]); } catch(e) {} }} className="text-xs bg-green-600 text-white px-2 py-1 rounded">Onayla</button>}
+                {!y.onayli && y.durum !== 'hata' && <button onClick={async () => { try { await axios.put(`${API}/ai/bilgi-tabani/onayla/${y.id}`); toast({ title: "✅ Onaylandı!" }); const r = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setYuklemeler(Array.isArray(r.data)?r.data:[]); } catch(e) { toast({ title: "Onaylanamadı", variant: "destructive" }); } }} className="text-xs bg-green-600 text-white px-2 py-1 rounded">Onayla</button>}
               </div>
             </div>
             {y.sonuc && y.sonuc.cikarilan_kelime > 0 && <div className="flex gap-3 mt-1 text-[10px] text-subtle"><span>📚 {y.sonuc.cikarilan_kelime} kelime</span><span>📖 {y.sonuc.okuma_parcasi} parça</span><span>📝 {y.sonuc.uretilen_soru} soru</span></div>}
