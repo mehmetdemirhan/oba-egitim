@@ -8202,11 +8202,11 @@ function VeliPaneli({ user, logout }) {
   const gidenMesajlar = mesajlar.filter(m => m.gonderen_id === user.id);
 
   const sekmeler = [
-    ozellikAktif("veli_dashboard")    && { id: "ozet",     label: "Özet",        icon: "📊" },
-    ozellikAktif("veli_okuma_gecmisi")&& { id: "okumalar", label: "Okumalar",    icon: "📖" },
-    ozellikAktif("veli_gorev_takip")  && { id: "gorevler", label: "Görevler",    icon: "📌" },
-    ozellikAktif("veli_anket")        && { id: "anket",    label: "Değerlendir", icon: "⭐" },
-    ozellikAktif("veli_mesajlar")     && { id: "mesajlar", label: "Mesajlar",    icon: "✉️", badge: okunmamisSayisi || null },
+    ozellikAktif("veli_dashboard")    && { id: "ozet",     label: "Özet",        icon: <BarChart3 className="h-4 w-4" /> },
+    ozellikAktif("veli_okuma_gecmisi")&& { id: "okumalar", label: "Okumalar",    icon: <BookOpen className="h-4 w-4" /> },
+    ozellikAktif("veli_gorev_takip")  && { id: "gorevler", label: "Görevler",    icon: <Pin className="h-4 w-4" /> },
+    ozellikAktif("veli_anket")        && { id: "anket",    label: "Değerlendir", icon: <Star className="h-4 w-4" /> },
+    ozellikAktif("veli_mesajlar")     && { id: "mesajlar", label: "Mesajlar",    icon: <Mail className="h-4 w-4" />, badge: okunmamisSayisi || null },
   ].filter(Boolean);
 
   return (
@@ -8257,7 +8257,7 @@ function VeliPaneli({ user, logout }) {
 
       <div className="max-w-2xl mx-auto p-4 space-y-5">
         {!seciliCocuk && cocuklar.length === 0 ? (
-          <div className="text-center py-16"><div className="text-5xl mb-4">👶</div><h3 className="font-bold text-content">Çocuk kaydı bulunamadı</h3><p className="text-subtle text-sm mt-1">Lütfen yöneticinize başvurun.</p></div>
+          <div className="text-center py-16"><Users className="h-12 w-12 mx-auto mb-4 text-subtle" /><h3 className="font-bold text-content">Çocuk kaydı bulunamadı</h3><p className="text-subtle text-sm mt-1">Lütfen yöneticinize başvurun.</p></div>
         ) : (<>
 
           {/* ÖZET */}
@@ -8274,16 +8274,16 @@ function VeliPaneli({ user, logout }) {
               <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-primary">{istatistik.toplam_kitap}</div><div className="text-xs text-subtle">📚 Kitap</div></div>
             </div>)}
             {istatistik && (<div className="bg-surface rounded-2xl p-4 shadow-sm border"><div className="text-sm font-medium text-content mb-2">Bu Hafta</div><div className="flex items-center gap-2"><div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden"><div className="h-full bg-gradient-to-r from-purple-400 to-pink-500 rounded-full" style={{ width: `${Math.min(100,(istatistik.aktif_gunler_7/4)*100)}%` }} /></div><span className="text-sm font-bold">{istatistik.aktif_gunler_7}/4 gün</span></div></div>)}
-            {istatistik && (<div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-4 text-center border"><div className="text-3xl font-bold text-purple-600">{istatistik.toplam_dakika}</div><div className="text-sm text-subtle">toplam dakika okuma</div></div>)}
+            {istatistik && (<div className="bg-app rounded-2xl p-4 text-center border border-line"><div className="text-3xl font-bold text-primary tabular-nums">{istatistik.toplam_dakika}</div><div className="text-sm text-subtle">toplam dakika okuma</div></div>)}
 
-            {/* 🤖 AI Gelişim Raporu */}
+            {/* AI Gelişim Raporu */}
             {istatistik && (
-              <div className="bg-gradient-to-r from-cyan-50 to-blue-50 rounded-2xl p-4 border border-cyan-200">
-                <div className="flex items-center gap-2 mb-3"><span className="text-lg">🤖</span><span className="font-bold text-sm text-cyan-800">AI Gelişim Raporu</span></div>
+              <div className="bg-blue-50 rounded-2xl p-4 border border-blue-200">
+                <div className="flex items-center gap-2 mb-3"><Sparkles className="h-5 w-5 text-primary" /><span className="font-bold text-sm text-primary">AI Gelişim Raporu</span></div>
                 <div className="space-y-2 text-xs text-subtle">
-                  <div className="flex items-center justify-between"><span>📚 Bu ay okunan kitap</span><span className="font-bold text-primary">{istatistik.toplam_kitap || 0}</span></div>
-                  <div className="flex items-center justify-between"><span>🔥 Mevcut streak</span><span className="font-bold text-orange-600">{istatistik.streak || 0} gün</span></div>
-                  <div className="flex items-center justify-between"><span>⏱ Günlük ortalama</span><span className="font-bold text-green-600">{Math.round((istatistik.toplam_dakika || 0) / Math.max(istatistik.aktif_gunler_7 || 1, 1))} dk</span></div>
+                  <div className="flex items-center justify-between"><span className="inline-flex items-center gap-1.5"><BookMarked className="h-3.5 w-3.5" />Bu ay okunan kitap</span><span className="font-bold text-primary tabular-nums">{istatistik.toplam_kitap || 0}</span></div>
+                  <div className="flex items-center justify-between"><span className="inline-flex items-center gap-1.5"><Flame className="h-3.5 w-3.5" />Mevcut streak</span><span className="font-bold text-orange-600 tabular-nums">{istatistik.streak || 0} gün</span></div>
+                  <div className="flex items-center justify-between"><span className="inline-flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" />Günlük ortalama</span><span className="font-bold text-green-600 tabular-nums">{Math.round((istatistik.toplam_dakika || 0) / Math.max(istatistik.aktif_gunler_7 || 1, 1))} dk</span></div>
                   {istatistik.streak >= 5 && <div className="bg-green-100 rounded-lg p-2 text-green-700 text-center">🎉 Harika! Çocuğunuz {istatistik.streak} gündür düzenli okuyor</div>}
                   {istatistik.streak < 2 && <div className="bg-yellow-100 rounded-lg p-2 text-yellow-700 text-center">💡 Birlikte 10 dakika okuma, alışkanlık oluşturur</div>}
                   {istatistik.streak >= 2 && istatistik.streak < 5 && <div className="bg-blue-100 rounded-lg p-2 text-primary text-center">👏 İyi gidiyor! Streak'i sürdürmek için bugün de okuyalım</div>}
@@ -8333,7 +8333,7 @@ function VeliPaneli({ user, logout }) {
           {/* MESAJLAR */}
           {/* ANKET */}
           {aktifSekme === "anket" && ozellikAktif("veli_anket") && (<div className="space-y-4">
-            <h2 className="text-xl font-bold">⭐ Öğretmen Değerlendirmesi</h2>
+            <h2 className="inline-flex items-center gap-2 text-xl font-bold"><Star className="h-5 w-5" />Öğretmen Değerlendirmesi</h2>
             {seciliCocuk ? (<>
               {(() => {
                 const ogretmenId = seciliCocuk.ogretmen_id;
@@ -8342,7 +8342,7 @@ function VeliPaneli({ user, logout }) {
 
                 if (zatenDoldurdu) return (
                   <div className="bg-green-50 rounded-2xl p-6 border border-green-200 text-center">
-                    <div className="text-4xl mb-2">✅</div><h3 className="font-bold text-green-800">Bu dönem için değerlendirmenizi yaptınız</h3>
+                    <CheckCircle className="h-10 w-10 mx-auto mb-2 text-green-600" /><h3 className="font-bold text-green-800">Bu dönem için değerlendirmenizi yaptınız</h3>
                     <p className="text-sm text-green-600 mt-1">Teşekkür ederiz! Sonraki dönemde tekrar doldurabilirsiniz.</p>
                   </div>
                 );
@@ -8367,7 +8367,7 @@ function VeliPaneli({ user, logout }) {
                 };
 
                 return (
-                  <Card className="border-0 shadow-sm"><CardContent className="p-5 space-y-5">
+                  <Card className="border border-line shadow-sm"><CardContent className="p-5 space-y-5">
                     <p className="text-sm text-subtle">{seciliCocuk.ad} {seciliCocuk.soyad}'ın öğretmenini değerlendirin. Yanıtlarınız anonim olarak iletilir.</p>
                     {anketSorulari.filter(s => s.tip === "puan").map(s => (
                       <div key={s.no}>
@@ -8386,7 +8386,7 @@ function VeliPaneli({ user, logout }) {
                       </div>
                     </div>
                     <div><Label className="text-sm">9. Eklemek istediğiniz not (opsiyonel)</Label><textarea value={anketNot} onChange={e => setAnketNot(e.target.value)} className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[60px] mt-1" placeholder="Düşünceleriniz..." /></div>
-                    <Button onClick={anketGonder} disabled={anketGonderiliyor} className="w-full bg-purple-600 text-white py-3">{anketGonderiliyor ? "Gönderiliyor..." : "⭐ Değerlendirmeyi Gönder"}</Button>
+                    <Button onClick={anketGonder} disabled={anketGonderiliyor} className="w-full bg-primary hover:bg-primary-hover text-white py-3">{anketGonderiliyor ? "Gönderiliyor..." : "⭐ Değerlendirmeyi Gönder"}</Button>
                   </CardContent></Card>
                 );
               })()}
@@ -8403,7 +8403,7 @@ function VeliPaneli({ user, logout }) {
           </div>)}
 
           {aktifSekme === "mesajlar" && ozellikAktif("veli_mesajlar") && (<div className="space-y-4">
-            <h2 className="text-xl font-bold">✉️ Mesajlar</h2>
+            <h2 className="inline-flex items-center gap-2 text-xl font-bold"><Mail className="h-5 w-5" />Mesajlar</h2>
             <div className="flex gap-2">
               {[{v:"gelen",l:`Gelen (${gelenMesajlar.length})`},{v:"giden",l:"Gönderilen"},{v:"yeni",l:"Yeni Mesaj"}].map(t => (
                 <button key={t.v} onClick={() => setMesajGorunum(t.v)} className={`px-3 py-1.5 rounded-xl text-xs font-medium border ${mesajGorunum === t.v ? 'bg-purple-500 text-white border-purple-500' : 'bg-surface text-subtle border-line'}`}>{t.l}</button>
@@ -8411,14 +8411,14 @@ function VeliPaneli({ user, logout }) {
             </div>
 
             {mesajGorunum === "yeni" && (
-              <Card className="border-0 shadow-sm"><CardContent className="p-4"><form onSubmit={mesajGonder} className="space-y-3">
+              <Card className="border border-line shadow-sm"><CardContent className="p-4"><form onSubmit={mesajGonder} className="space-y-3">
                 <div><Label className="text-xs">Alıcı *</Label>
                   <Select value={seciliAlici} onValueChange={setSeciliAlici}><SelectTrigger className="text-sm"><SelectValue placeholder="Öğretmen seçin..." /></SelectTrigger>
                     <SelectContent>{kullanicilar.map(u => (<SelectItem key={u.id} value={u.id}>{u.ad} {u.soyad} ({({admin:"Yönetici",coordinator:"Koord.",teacher:"Öğretmen"})[u.role]})</SelectItem>))}</SelectContent>
                   </Select></div>
                 <div><Label className="text-xs">Konu</Label><Input value={mesajForm.konu} onChange={e => setMesajForm({...mesajForm, konu: e.target.value})} placeholder="Konu..." className="text-sm" /></div>
                 <div><Label className="text-xs">Mesaj *</Label><textarea value={mesajForm.icerik} onChange={e => setMesajForm({...mesajForm, icerik: e.target.value})} required placeholder="Mesajınızı yazın..." className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px]" /></div>
-                <Button type="submit" disabled={mesajGonderiliyor} className="w-full bg-purple-600 text-white text-sm">{mesajGonderiliyor ? "..." : "✉️ Gönder"}</Button>
+                <Button type="submit" disabled={mesajGonderiliyor} className="w-full bg-primary hover:bg-primary-hover text-white text-sm">{mesajGonderiliyor ? "..." : "✉️ Gönder"}</Button>
               </form></CardContent></Card>
             )}
 
