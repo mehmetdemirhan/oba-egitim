@@ -624,21 +624,21 @@ function AppContent() {
                   {user.role !== "coordinator" && (<>
                   <Card className="border border-line shadow-sm">
                     <CardHeader><CardTitle>Finansal Durum</CardTitle></CardHeader>
-                    <CardContent><div className="h-64"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value">{pieData.map((e,i) => <Cell key={i} fill={e.color} />)}</Pie><Tooltip formatter={v => formatCurrency(v)} /></PieChart></ResponsiveContainer></div></CardContent>
+                    <CardContent><div className="h-64" role="img" aria-label="Finansal durum: öğrenci alacakları ve öğretmen borçları dağılımı"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value" nameKey="name" stroke="#fff" strokeWidth={2}>{pieData.map((e,i) => <Cell key={i} fill={e.color} />)}</Pie><Tooltip formatter={v => formatCurrency(v)} /><Legend verticalAlign="bottom" height={28} iconType="circle" /></PieChart></ResponsiveContainer></div></CardContent>
                   </Card>
                   <Card className="border border-line shadow-sm">
                     <CardHeader><CardTitle>Aylık İstatistikler</CardTitle></CardHeader>
-                    <CardContent><div className="h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={monthlyStats}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="ay" /><YAxis /><Tooltip /><Bar dataKey="yeni_ogrenciler" fill="#3b82f6" /><Bar dataKey="gelir" fill="#f97316" /></BarChart></ResponsiveContainer></div></CardContent>
+                    <CardContent><div className="h-64" role="img" aria-label="Aylık istatistikler: yeni öğrenci ve gelir grafiği"><ResponsiveContainer width="100%" height="100%"><BarChart data={monthlyStats}><CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" /><XAxis dataKey="ay" /><YAxis /><Tooltip /><Legend iconType="circle" /><Bar dataKey="yeni_ogrenciler" name="Yeni Öğrenci" fill="#3b82f6" /><Bar dataKey="gelir" name="Gelir" fill="#f97316" /></BarChart></ResponsiveContainer></div></CardContent>
                   </Card>
                   </>)}
                   {/* Öğrenci hareket grafikleri — HEM Yönetici HEM Koordinatör görür */}
                   <Card className="border border-line shadow-sm">
                     <CardHeader><CardTitle>Yeni Kayıt vs Kur Atlayan (Bu Ay)</CardTitle></CardHeader>
-                    <CardContent><div className="h-64"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={pieDataKoord} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value">{pieDataKoord.map((e,i) => <Cell key={i} fill={e.color} />)}</Pie><Tooltip formatter={(v,n) => [`${v} öğrenci`, n]} /></PieChart></ResponsiveContainer></div></CardContent>
+                    <CardContent><div className="h-64" role="img" aria-label="Bu ay yeni kayıt ve kur atlayan öğrenci dağılımı"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={pieDataKoord} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value" nameKey="name" stroke="#fff" strokeWidth={2}>{pieDataKoord.map((e,i) => <Cell key={i} fill={e.color} />)}</Pie><Tooltip formatter={(v,n) => [`${v} öğrenci`, n]} /><Legend verticalAlign="bottom" height={28} iconType="circle" /></PieChart></ResponsiveContainer></div></CardContent>
                   </Card>
                   <Card className="border border-line shadow-sm">
                     <CardHeader><CardTitle>Aylık Kur Atlayan Öğrenci</CardTitle></CardHeader>
-                    <CardContent><div className="h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={monthlyStats}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="ay" /><YAxis allowDecimals={false} /><Tooltip /><Bar dataKey="yeni_ogrenciler" fill="#3b82f6" name="Yeni Kayıt" /><Bar dataKey="kur_atlayan" fill="#059669" name="Kur Atlayan" /></BarChart></ResponsiveContainer></div></CardContent>
+                    <CardContent><div className="h-64" role="img" aria-label="Aylık kur atlayan öğrenci ve yeni kayıt grafiği"><ResponsiveContainer width="100%" height="100%"><BarChart data={monthlyStats}><CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" /><XAxis dataKey="ay" /><YAxis allowDecimals={false} /><Tooltip /><Legend iconType="circle" /><Bar dataKey="yeni_ogrenciler" fill="#3b82f6" name="Yeni Kayıt" /><Bar dataKey="kur_atlayan" fill="#059669" name="Kur Atlayan" /></BarChart></ResponsiveContainer></div></CardContent>
                   </Card>
                 </div>
 
@@ -1717,12 +1717,12 @@ function BekleyenlerKarti({ bekleyenler, onRefresh, onTabChange }) {
         <div className="bg-surface rounded-2xl w-full max-w-sm shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
           <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-t-2xl p-4 text-white">
             <div className="flex items-start justify-between">
-              <div><div className="text-xs opacity-70 mb-0.5">🧠 Zekâ Haritası</div><div className="font-bold text-base">{zekaModal.kitap_adi}</div></div>
+              <div><div className="inline-flex items-center gap-1 text-xs opacity-70 mb-0.5"><Brain className="h-3.5 w-3.5" />Zekâ Haritası</div><div className="font-bold text-base">{zekaModal.kitap_adi}</div></div>
               <button onClick={() => setZekaModal(null)} className="text-white/70 text-2xl leading-none ml-2">✕</button>
             </div>
           </div>
           {zekaModal.yukleniyor ? (
-            <div className="p-8 text-center"><div className="text-4xl mb-3">🧠</div><div className="text-sm text-subtle">AI analiz ediyor...</div></div>
+            <div className="p-8 text-center"><Brain className="h-10 w-10 mx-auto mb-3 text-purple-500 animate-pulse" /><div className="text-sm text-subtle">AI analiz ediyor...</div></div>
           ) : zekaModal.profil ? (
             <div className="p-4 space-y-3">
               {Object.entries({soyutluk:"Soyutluk",kelime_zorlugu:"Kelime Zorluğu",hayal_gucu:"Hayal Gücü",felsefi_derinlik:"Felsefi Derinlik",aksiyon:"Aksiyon",duygusal_yogunluk:"Duygusal Yoğunluk"}).map(([k,label]) => {
