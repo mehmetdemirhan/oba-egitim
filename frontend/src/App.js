@@ -4379,7 +4379,7 @@ function TimiRapor({ sonuc, ogrenci }) {
         </div>
         <div className="flex flex-wrap gap-2">
           {baskin.map(k => (
-            <span key={k} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-sm font-semibold shadow-sm">
+            <span key={k} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-primary text-white text-sm font-semibold shadow-sm tabular-nums">
               {TIMI_IKON[k]} {TIMI_TR[k]} ({puanlar[k] || 0}/8)
             </span>
           ))}
@@ -4388,9 +4388,9 @@ function TimiRapor({ sonuc, ogrenci }) {
 
       {/* Baskın alan vurgusu */}
       {baskin.length > 0 && (
-        <Card className="border-2 border-purple-200 bg-purple-50/40">
+        <Card className="border border-line shadow-sm border-l-4 border-l-primary">
           <CardContent className="py-4">
-            <div className="text-sm font-semibold text-purple-800 mb-1">🧠 Baskın Zeka Alanı{baskin.length > 1 ? "ları" : ""}</div>
+            <div className="inline-flex items-center gap-1.5 text-sm font-semibold text-content mb-1"><Brain className="h-4 w-4 text-primary" />Baskın Zeka Alanı{baskin.length > 1 ? "ları" : ""}</div>
             <div className="text-sm text-content">{baskin.map(k => TIMI_TR[k]).join(", ")}</div>
           </CardContent>
         </Card>
@@ -4398,7 +4398,7 @@ function TimiRapor({ sonuc, ogrenci }) {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Radar grafik */}
-        <Card className="border-0 shadow-sm">
+        <Card className="border border-line shadow-sm">
           <CardHeader><CardTitle className="text-base">Çoklu Zeka Profili</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -4414,7 +4414,7 @@ function TimiRapor({ sonuc, ogrenci }) {
         </Card>
 
         {/* Kategori tablosu */}
-        <Card className="border-0 shadow-sm">
+        <Card className="border border-line shadow-sm">
           <CardHeader><CardTitle className="text-base">Zeka Alanı Puanları</CardTitle></CardHeader>
           <CardContent className="space-y-2.5">
             {TIMI_SIRA.map(k => {
@@ -4423,11 +4423,11 @@ function TimiRapor({ sonuc, ogrenci }) {
               return (
                 <div key={k}>
                   <div className="flex items-center justify-between text-sm mb-1">
-                    <span className={`flex items-center gap-1.5 ${bask ? "font-bold text-purple-700" : "text-content"}`}>{TIMI_IKON[k]} {TIMI_TR[k]}</span>
-                    <span className={`font-semibold tabular-nums ${bask ? "text-purple-700" : "text-subtle"}`}>{p}/8</span>
+                    <span className={`flex items-center gap-1.5 ${bask ? "font-bold text-primary" : "text-content"}`}>{TIMI_IKON[k]} {TIMI_TR[k]}</span>
+                    <span className={`font-semibold tabular-nums ${bask ? "text-primary" : "text-subtle"}`}>{p}/8</span>
                   </div>
-                  <div className="h-2.5 rounded-full bg-gray-100 overflow-hidden">
-                    <div className={`h-full rounded-full ${bask ? "bg-gradient-to-r from-purple-500 to-indigo-500" : "bg-indigo-300"}`} style={{ width: `${(p / 8) * 100}%` }} />
+                  <div className="h-2.5 rounded-full bg-app overflow-hidden">
+                    <div className={`h-full rounded-full ${bask ? "bg-primary" : "bg-blue-200"}`} style={{ width: `${(p / 8) * 100}%` }} />
                   </div>
                 </div>
               );
@@ -4437,7 +4437,7 @@ function TimiRapor({ sonuc, ogrenci }) {
       </div>
 
       {/* Yorumlayıcı metin */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader><CardTitle className="text-base">Zeka Alanları — Kısa Açıklama</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           {[...baskin, ...TIMI_SIRA.filter(k => !baskin.includes(k))].map(k => (
@@ -4451,7 +4451,7 @@ function TimiRapor({ sonuc, ogrenci }) {
 
       {/* Öğretmen notu */}
       {sonuc?.notlar && (
-        <Card className="border-0 shadow-sm">
+        <Card className="border border-line shadow-sm">
           <CardHeader><CardTitle className="text-base">Öğretmen Gözlem Notu</CardTitle></CardHeader>
           <CardContent><p className="text-sm text-content whitespace-pre-wrap">{sonuc.notlar}</p></CardContent>
         </Card>
@@ -4459,8 +4459,8 @@ function TimiRapor({ sonuc, ogrenci }) {
 
       {/* Cevap detay tablosu (opsiyonel) */}
       <div>
-        <Button variant="outline" size="sm" onClick={() => setDetayAcik(a => !a)}>
-          {detayAcik ? "▼" : "▶"} Cevap Detayları ({(sonuc?.yanitlar || []).length} kart)
+        <Button variant="outline" size="sm" onClick={() => setDetayAcik(a => !a)} className="inline-flex items-center gap-1">
+          {detayAcik ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}Cevap Detayları ({(sonuc?.yanitlar || []).length} kart)
         </Button>
         {detayAcik && (
           <div className="mt-3 overflow-x-auto">
@@ -4476,7 +4476,7 @@ function TimiRapor({ sonuc, ogrenci }) {
                   return (
                     <TableRow key={y.kart_no}>
                       <TableCell className="font-medium">Kart {y.kart_no}</TableCell>
-                      <TableCell><span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">{y.secim}</span></TableCell>
+                      <TableCell><span className="px-2 py-0.5 rounded-full bg-blue-100 text-primary text-xs font-bold">{y.secim}</span></TableCell>
                       <TableCell className="text-sm">{catKey ? `${TIMI_IKON[catKey]} ${TIMI_TR[catKey]}` : "-"}</TableCell>
                     </TableRow>
                   );
@@ -4489,7 +4489,7 @@ function TimiRapor({ sonuc, ogrenci }) {
 
       {/* Psikometrik uyarı */}
       <div className="text-xs text-subtle bg-amber-50 border border-amber-200 rounded-lg p-3">
-        ⚠️ {TIMI_UYARI}
+        <AlertTriangle className="h-3.5 w-3.5 inline mr-1" />{TIMI_UYARI}
       </div>
     </div>
   );
@@ -4510,8 +4510,8 @@ function TimiOzetKart({ ogrenciId }) {
   if (!yuklendi) return null;
   const baskin = son?.baskin_zeka_alanlari || [];
   return (
-    <Card className="border-0 shadow-sm">
-      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5">🧠 TIMI — Çoklu Zeka</CardTitle></CardHeader>
+    <Card className="border border-line shadow-sm">
+      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><Brain className="h-4 w-4" />TIMI — Çoklu Zeka</CardTitle></CardHeader>
       <CardContent>
         {son ? (
           <div className="space-y-1.5">
@@ -4587,12 +4587,12 @@ function TimiModul({ user, students }) {
     const KartPanel = ({ ab }) => (
       <button
         onClick={() => secYap(ab)}
-        className={`group relative flex-1 min-h-0 flex items-center justify-center rounded-2xl border-2 overflow-hidden transition-all bg-surface p-1.5 md:p-2 ${secili === ab ? "border-purple-600 ring-4 ring-purple-200" : "border-line hover:border-purple-400"}`}
+        className={`group relative flex-1 min-h-0 flex items-center justify-center rounded-2xl border-2 overflow-hidden transition-all bg-surface p-1.5 md:p-2 ${secili === ab ? "border-primary ring-4 ring-blue-200" : "border-line hover:border-primary"}`}
       >
         {/* max-h/max-w + object-contain: görsel kalan alana sığar, taşmaz, oran korunur */}
         <img src={timiKartGorsel(kartNo, ab)} alt={`Kart ${kartNo} — ${ab}`} className="max-h-full max-w-full object-contain select-none pointer-events-none" draggable="false" />
-        <div className={`absolute top-2 left-2 w-9 h-9 flex items-center justify-center rounded-full text-lg font-black shadow ${secili === ab ? "bg-purple-600 text-white" : "bg-white/90 text-purple-700"}`}>{ab}</div>
-        {secili === ab && <div className="absolute top-2 right-2 w-9 h-9 flex items-center justify-center rounded-full bg-purple-600 text-white text-lg shadow">✓</div>}
+        <div className={`absolute top-2 left-2 w-9 h-9 flex items-center justify-center rounded-full text-lg font-black shadow ${secili === ab ? "bg-primary text-white" : "bg-white/90 text-primary"}`}>{ab}</div>
+        {secili === ab && <div className="absolute top-2 right-2 w-9 h-9 flex items-center justify-center rounded-full bg-primary text-white shadow"><Check className="h-5 w-5" /></div>}
       </button>
     );
     // Sabit fullscreen layout: header + footer daima görünür, görsel alanı ortada
@@ -4602,12 +4602,12 @@ function TimiModul({ user, students }) {
         {/* ── HEADER (sabit) ── */}
         <div className="shrink-0 space-y-2">
           <div className="flex items-center justify-between gap-3">
-            <Button variant="outline" size="sm" onClick={() => { if (window.confirm("Envanterden çıkılsın mı? İşaretlenen cevaplar kaydedildi.")) listeyeDon(); }}>← Çık</Button>
+            <Button variant="outline" size="sm" onClick={() => { if (window.confirm("Envanterden çıkılsın mı? İşaretlenen cevaplar kaydedildi.")) listeyeDon(); }}><ArrowLeft className="h-4 w-4 mr-1" />Çık</Button>
             <div className="text-sm font-semibold text-content truncate">{seciliOgrenci ? `${seciliOgrenci.ad} ${seciliOgrenci.soyad}` : ""}</div>
-            <div className="text-sm font-bold text-purple-700 whitespace-nowrap">Kart {kartNo} / {TIMI_KART_SAYISI}</div>
+            <div className="text-sm font-bold text-primary whitespace-nowrap tabular-nums">Kart {kartNo} / {TIMI_KART_SAYISI}</div>
           </div>
-          <div className="h-2.5 rounded-full bg-gray-100 overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full transition-all" style={{ width: `${(cevaplanan / TIMI_KART_SAYISI) * 100}%` }} />
+          <div className="h-2.5 rounded-full bg-app overflow-hidden">
+            <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${(cevaplanan / TIMI_KART_SAYISI) * 100}%` }} />
           </div>
           <p className="text-center text-xs md:text-sm text-subtle">Öğrencinin kendini daha çok özdeşleştirdiği pandayı seçin</p>
         </div>
@@ -4627,21 +4627,21 @@ function TimiModul({ user, students }) {
               onChange={e => setNotlar(e.target.value)}
               rows={2}
               placeholder="Öğretmen gözlem notu (opsiyonel)…"
-              className="w-full border border-line rounded-lg p-2 text-sm bg-surface focus:outline-none focus:border-purple-400"
+              className="w-full border border-line rounded-lg p-2 text-sm bg-surface focus:outline-none focus:border-primary"
             />
           )}
           <div className="flex items-center justify-between gap-3">
-            <Button variant="outline" onClick={() => setKartIndex(i => Math.max(0, i - 1))} disabled={kartIndex === 0}>← Önceki Kart</Button>
+            <Button variant="outline" onClick={() => setKartIndex(i => Math.max(0, i - 1))} disabled={kartIndex === 0}><ArrowLeft className="h-4 w-4 mr-1" />Önceki Kart</Button>
             {!sonKart ? (
-              <Button variant="outline" onClick={() => setKartIndex(i => Math.min(TIMI_KART_SAYISI - 1, i + 1))} disabled={!secili}>Sonraki Kart →</Button>
+              <Button variant="outline" onClick={() => setKartIndex(i => Math.min(TIMI_KART_SAYISI - 1, i + 1))} disabled={!secili}>Sonraki Kart<ArrowRight className="h-4 w-4 ml-1" /></Button>
             ) : (
-              <Button onClick={tamamla} disabled={cevaplanan !== TIMI_KART_SAYISI || kaydediliyor} className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold">
-                {kaydediliyor ? "Kaydediliyor..." : "✅ Envanteri Tamamla"}
+              <Button onClick={tamamla} disabled={cevaplanan !== TIMI_KART_SAYISI || kaydediliyor} className="bg-primary hover:bg-primary-hover text-white font-bold">
+                {kaydediliyor ? "Kaydediliyor..." : <><CheckCircle className="h-4 w-4 mr-1" />Envanteri Tamamla</>}
               </Button>
             )}
           </div>
           {sonKart && cevaplanan !== TIMI_KART_SAYISI && (
-            <p className="text-center text-xs text-amber-600">Eksik kart var ({cevaplanan}/28). Tamamlamak için tüm kartları işaretleyin.</p>
+            <p className="text-center text-xs text-amber-600 tabular-nums">Eksik kart var ({cevaplanan}/28). Tamamlamak için tüm kartları işaretleyin.</p>
           )}
         </div>
       </div>
@@ -4654,7 +4654,7 @@ function TimiModul({ user, students }) {
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={listeyeDon}>← Listeye Dön</Button>
+          <Button variant="outline" size="sm" onClick={listeyeDon}><ArrowLeft className="h-4 w-4 mr-1" />Listeye Dön</Button>
           <h2 className="text-lg font-bold">TIMI Sonuç Raporu</h2>
         </div>
         <TimiRapor sonuc={sonuc} ogrenci={ogr} />
@@ -4668,14 +4668,14 @@ function TimiModul({ user, students }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold">🧠 TIMI — Çoklu Zeka Envanteri</h2>
+          <h2 className="inline-flex items-center gap-2 text-lg font-bold"><Brain className="h-5 w-5" />TIMI — Çoklu Zeka Envanteri</h2>
           <p className="text-xs text-subtle">Teele Çoklu Zeka Envanteri (28 kart, zorlamalı seçim)</p>
         </div>
       </div>
 
       {/* Yeni Uygulama */}
-      <Card className="border-2 border-purple-200 shadow-sm">
-        <CardHeader><CardTitle className="text-base flex items-center gap-2">🎯 Yeni Uygulama Başlat</CardTitle></CardHeader>
+      <Card className="border border-line shadow-sm border-l-4 border-l-primary">
+        <CardHeader><CardTitle className="text-base flex items-center gap-2"><Target className="h-4 w-4 text-primary" />Yeni Uygulama Başlat</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div>
             <Label>Öğrenci Seç</Label>
@@ -4686,14 +4686,14 @@ function TimiModul({ user, students }) {
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={baslat} disabled={!seciliOgrenci} className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 font-bold">
-            ▶ Envanteri Başlat
+          <Button onClick={baslat} disabled={!seciliOgrenci} className="w-full bg-primary hover:bg-primary-hover text-white py-3 font-bold">
+            <Play className="h-4 w-4 mr-1" />Envanteri Başlat
           </Button>
         </CardContent>
       </Card>
 
       {/* Geçmiş Uygulamalar */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader><CardTitle className="text-base">Geçmiş Uygulamalar</CardTitle></CardHeader>
         <CardContent>
           {tamamlananlar.length === 0 && <p className="text-subtle text-sm text-center py-8">Henüz envanter uygulanmadı</p>}
@@ -8882,7 +8882,7 @@ function TimiAnahtarPaneli() {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-2xl font-bold">🧠 TIMI Puanlama Anahtarı</h2>
+        <h2 className="inline-flex items-center gap-2 text-2xl font-bold"><Brain className="h-6 w-6" />TIMI Puanlama Anahtarı</h2>
         <p className="text-subtle text-sm">28 kartın A/B görsellerinin hangi zekâ alanına puan yazdığını düzenleyin. Değişiklik yalnızca <b>yeni</b> uygulamalara etki eder; geçmiş sonuçlar korunur.</p>
       </div>
 
@@ -8943,8 +8943,8 @@ function TimiAnahtarPaneli() {
       </div>
 
       <div className="flex gap-2 sticky bottom-0 bg-surface/95 py-2 border-t border-line">
-        <Button onClick={kaydet} disabled={kaydediliyor} className="bg-primary text-white">💾 {kaydediliyor ? "Kaydediliyor…" : "Kaydet"}</Button>
-        <Button variant="outline" onClick={varsayilana}>↩️ Varsayılana Sıfırla</Button>
+        <Button onClick={kaydet} disabled={kaydediliyor} className="bg-primary hover:bg-primary-hover text-white"><Save className="h-4 w-4 mr-1" />{kaydediliyor ? "Kaydediliyor…" : "Kaydet"}</Button>
+        <Button variant="outline" onClick={varsayilana}><RefreshCw className="h-4 w-4 mr-1" />Varsayılana Sıfırla</Button>
       </div>
     </div>
   );
