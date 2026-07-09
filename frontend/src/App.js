@@ -114,7 +114,7 @@ function UserManagement({ teachers }) {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <Card className="lg:col-span-1 border-0 shadow-sm">
+      <Card className="lg:col-span-1 border border-line shadow-sm">
         <CardHeader><CardTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />Yeni Kullanıcı</CardTitle></CardHeader>
         <CardContent>
           <form onSubmit={createUser} className="space-y-4">
@@ -143,7 +143,7 @@ function UserManagement({ teachers }) {
           </form>
         </CardContent>
       </Card>
-      <Card className="lg:col-span-2 border-0 shadow-sm">
+      <Card className="lg:col-span-2 border border-line shadow-sm">
         <CardHeader><CardTitle>Kullanıcılar</CardTitle></CardHeader>
         <CardContent>
           <Table>
@@ -685,7 +685,7 @@ function AppContent() {
           {/* Teachers */}
           <TabsContent value="teachers">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="lg:col-span-1 border-0 shadow-sm">
+              <Card className="lg:col-span-1 border border-line shadow-sm">
                 <CardHeader><CardTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />Yeni Öğretmen</CardTitle></CardHeader>
                 <CardContent>
                   <form onSubmit={createTeacher} className="space-y-4">
@@ -743,7 +743,7 @@ function AppContent() {
                   </div>
                 </DialogContent>
               </Dialog>
-              <Card className="lg:col-span-2 border-0 shadow-sm">
+              <Card className="lg:col-span-2 border border-line shadow-sm">
                 <CardHeader><CardTitle className="flex items-center justify-between">Öğretmenler <label className="flex items-center gap-2 text-sm font-normal cursor-pointer"><input type="checkbox" checked={showArchived.teachers} onChange={e => setShowArchived(p => ({...p, teachers: e.target.checked}))} className="rounded" /> Arşivi göster</label></CardTitle></CardHeader>
                 <CardContent>
                   <div className="space-y-3">
@@ -826,7 +826,7 @@ function AppContent() {
           {/* Students */}
           <TabsContent value="students">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="lg:col-span-1 border-0 shadow-sm">
+              <Card className="lg:col-span-1 border border-line shadow-sm">
                 <CardHeader><CardTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />Yeni Öğrenci</CardTitle></CardHeader>
                 <CardContent>
                   <form onSubmit={createStudent} className="space-y-4">
@@ -864,7 +864,7 @@ function AppContent() {
                   </form>
                 </CardContent>
               </Card>
-              <Card className="lg:col-span-2 border-0 shadow-sm">
+              <Card className="lg:col-span-2 border border-line shadow-sm">
                 <CardHeader><CardTitle className="flex items-center justify-between">Öğrenciler <label className="flex items-center gap-2 text-sm font-normal cursor-pointer"><input type="checkbox" checked={showArchived.students} onChange={e => setShowArchived(p => ({...p, students: e.target.checked}))} className="rounded" /> Arşivi göster</label></CardTitle></CardHeader>
                 <CardContent>
                   <Table>
@@ -899,7 +899,7 @@ function AppContent() {
           {/* Courses */}
           <TabsContent value="courses">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="lg:col-span-1 border-0 shadow-sm">
+              <Card className="lg:col-span-1 border border-line shadow-sm">
                 <CardHeader><CardTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />Yeni Kurs</CardTitle></CardHeader>
                 <CardContent>
                   <form onSubmit={createCourse} className="space-y-4">
@@ -910,7 +910,7 @@ function AppContent() {
                   </form>
                 </CardContent>
               </Card>
-              <Card className="lg:col-span-2 border-0 shadow-sm">
+              <Card className="lg:col-span-2 border border-line shadow-sm">
                 <CardHeader><CardTitle className="flex items-center justify-between">Kurslar <label className="flex items-center gap-2 text-sm font-normal cursor-pointer"><input type="checkbox" checked={showArchived.courses} onChange={e => setShowArchived(p => ({...p, courses: e.target.checked}))} className="rounded" /> Arşivi göster</label></CardTitle></CardHeader>
                 <CardContent className="space-y-3">
                   {courses.filter(c => showArchived.courses || !c.arsivli).map(c => {
@@ -934,7 +934,7 @@ function AppContent() {
                         {isExpanded && (
                           <div className="border-t border-line bg-app p-4 space-y-4">
                             <div className="flex items-center justify-between">
-                              <h4 className="font-semibold text-sm">📚 Dersler</h4>
+                              <h4 className="font-semibold text-sm">Dersler</h4>
                               <Button size="sm" className="bg-primary hover:bg-primary-hover text-white" onClick={() => setYeniDersForm({kurs_id: c.id, baslik: '', ozet: '', _acik: true})}>+ Ders Ekle</Button>
                             </div>
                             {yeniDersForm?._acik && yeniDersForm?.kurs_id === c.id && (
@@ -1116,7 +1116,7 @@ function AppContent() {
           <TabsContent value="payments">
             {/* Özet Kartları */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <Card className="border-0 shadow-sm bg-gradient-to-br from-green-50 to-emerald-100">
+              <Card className="border border-line shadow-sm bg-gradient-to-br from-green-50 to-emerald-100">
                 <CardContent className="p-5 text-center">
                   <div className="text-sm text-green-700 font-medium mb-2">📥 Öğrenci Ödemeleri</div>
                   <div className="text-xs text-subtle mb-1">Alınması Gereken</div>
@@ -1127,7 +1127,7 @@ function AppContent() {
                   <div className="text-xs text-green-600 mt-1">{payments.filter(p => p.tip === 'ogrenci').length} tahsilat</div>
                 </CardContent>
               </Card>
-              <Card className="border-0 shadow-sm bg-gradient-to-br from-red-50 to-orange-100">
+              <Card className="border border-line shadow-sm bg-gradient-to-br from-red-50 to-orange-100">
                 <CardContent className="p-5 text-center">
                   <div className="text-sm text-red-700 font-medium mb-2">📤 Öğretmen Ücretleri</div>
                   <div className="text-xs text-subtle mb-1">Ödenecek</div>
@@ -1138,7 +1138,7 @@ function AppContent() {
                   <div className="text-xs text-red-600 mt-1">{payments.filter(p => p.tip === 'ogretmen').length} ödeme</div>
                 </CardContent>
               </Card>
-              <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-indigo-100">
+              <Card className="border border-line shadow-sm bg-gradient-to-br from-blue-50 to-indigo-100">
                 <CardContent className="p-5 text-center">
                   <div className="text-sm text-primary font-medium mb-2">🏦 Kasa Bakiyesi</div>
                   <div className="text-xs text-subtle mb-1">Alınan − Ödenen</div>
@@ -1154,7 +1154,7 @@ function AppContent() {
             {/* İki Sütunlu Tablo */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* SOL: Alacaklar (Öğrenci Tahsilatları) */}
-              <Card className="border-0 shadow-sm border-t-4" style={{borderTopColor: '#27ae60'}}>
+              <Card className="border border-line shadow-sm border-t-4" style={{borderTopColor: '#27ae60'}}>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center justify-between">
                     <span className="text-green-700">📥 Alacaklar (Öğrenci Ödemeleri)</span>
@@ -1235,7 +1235,7 @@ function AppContent() {
               </Card>
 
               {/* SAĞ: Ödenecekler (Öğretmen Ödemeleri) */}
-              <Card className="border-0 shadow-sm border-t-4" style={{borderTopColor: '#e74c3c'}}>
+              <Card className="border border-line shadow-sm border-t-4" style={{borderTopColor: '#e74c3c'}}>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center justify-between">
                     <span className="text-red-700">📤 Ödemeler (Öğretmen Ücretleri)</span>
@@ -1317,9 +1317,9 @@ function AppContent() {
             </div>
 
             {/* Aylık Özet Tablosu */}
-            <Card className="border-0 shadow-sm mt-6">
+            <Card className="border border-line shadow-sm mt-6">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">📅 Aylık Özet</CardTitle>
+                <CardTitle className="text-base flex items-center gap-2">Aylık Özet</CardTitle>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -5416,9 +5416,9 @@ function OgretmenPaneli({ user, logout }) {
             {/* Haftalık */}
             <div className="bg-surface rounded-2xl p-4 shadow-sm border"><div className="flex items-center justify-between mb-2"><span className="text-sm font-medium">Haftalık Aktivite</span><span className="font-bold">{d.stat?.aktif_gunler_7 || 0}/4 gün</span></div><div className="flex gap-1">{[0,1,2,3].map(i => (<div key={i} className={`flex-1 h-3 rounded-full ${i < (d.stat?.aktif_gunler_7 || 0) ? 'bg-gradient-to-r from-orange-400 to-red-500' : 'bg-gray-100'}`} />))}</div></div>
             {/* Görevler */}
-            {d.gorevler?.length > 0 && (<div><h3 className="font-bold text-sm mb-2">📌 Görevler ({d.gorevler.length})</h3>{d.gorevler.slice(0,5).map(g => (<div key={g.id} className="bg-surface rounded-xl p-3 shadow-sm border mb-2 flex items-center justify-between"><div className="text-sm">{g.baslik}</div><span className={`text-xs px-2 py-0.5 rounded-full ${g.durum === "tamamlandi" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>{g.durum === "tamamlandi" ? "✅" : "⏳"} {g.durum}</span></div>))}</div>)}
+            {d.gorevler?.length >0 && (<div><h3 className="font-bold text-sm mb-2">Görevler ({d.gorevler.length})</h3>{d.gorevler.slice(0,5).map(g =>(<div key={g.id} className="bg-surface rounded-xl p-3 shadow-sm border mb-2 flex items-center justify-between"><div className="text-sm">{g.baslik}</div><span className={`text-xs px-2 py-0.5 rounded-full ${g.durum === "tamamlandi" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>{g.durum === "tamamlandi" ? "" : ""} {g.durum}</span></div>))}</div>)}
             {/* Son okumalar */}
-            {d.logs?.length > 0 && (<div><h3 className="font-bold text-sm mb-2">📖 Son Okumalar</h3>{d.logs.slice(0,8).map(l => (<div key={l.id} className="bg-surface rounded-xl p-3 shadow-sm border mb-2 flex items-center justify-between"><div><div className="text-sm font-medium">{l.kitap_adi || "—"}</div><div className="text-xs text-subtle">{l.bolum} • {l.sure_dakika} dk</div></div><div className="text-xs text-subtle">{new Date(l.tarih).toLocaleDateString('tr-TR')}</div></div>))}</div>)}
+            {d.logs?.length >0 && (<div><h3 className="font-bold text-sm mb-2">Son Okumalar</h3>{d.logs.slice(0,8).map(l =>(<div key={l.id} className="bg-surface rounded-xl p-3 shadow-sm border mb-2 flex items-center justify-between"><div><div className="text-sm font-medium">{l.kitap_adi || "—"}</div><div className="text-xs text-subtle">{l.bolum} • {l.sure_dakika} dk</div></div><div className="text-xs text-subtle">{new Date(l.tarih).toLocaleDateString('tr-TR')}</div></div>))}</div>)}
           </>) : (<div className="text-center py-12 text-subtle">Yükleniyor...</div>)}
         </div>
         <Toaster />
@@ -5977,14 +5977,14 @@ function OgretmenPaneli({ user, logout }) {
             <div className="bg-red-50 rounded-xl p-3 text-center border border-red-100"><div className="text-xl font-bold text-red-700">{riskler.filter(r => r.risk_seviye === "yuksek").length}</div><div className="text-[10px] text-red-600">🔴 Yüksek Risk</div></div>
           </div>)}
 
-          <div className="flex items-center justify-between"><h2 className="text-lg font-bold">👥 Öğrencilerim</h2>
+          <div className="flex items-center justify-between"><h2 className="text-lg font-bold">Öğrencilerim</h2>
             <div className="flex gap-2">
               <Button size="sm" onClick={() => setYeniOgrenciAcik(true)} className="bg-primary text-white text-xs"><Plus className="h-3 w-3 mr-1" />Yeni Öğrenci</Button>
               <Button size="sm" onClick={() => setGorevAtaGoster(!gorevAtaGoster)} className="bg-orange-500 text-white text-xs"><Plus className="h-3 w-3 mr-1" />Görev Ata</Button>
             </div></div>
 
           {/* Hızlı görev atama */}
-          {gorevAtaGoster && (<Card className="border-0 shadow-sm border-l-4 border-l-orange-500"><CardContent className="p-4"><form onSubmit={gorevAta} className="space-y-3">
+          {gorevAtaGoster && (<Card className="border border-line shadow-sm border-l-4 border-l-orange-500"><CardContent className="p-4"><form onSubmit={gorevAta} className="space-y-3">
             <div className="text-sm font-medium text-content">Hızlı Görev Ata</div>
             <div className="flex flex-wrap gap-1">{ogrenciler.map(s => (<button key={s.id} type="button" onClick={() => setGorevHedefler(prev => prev.includes(s.id) ? prev.filter(x => x !== s.id) : [...prev, s.id])} className={`px-2 py-1 rounded-lg text-xs border ${gorevHedefler.includes(s.id) ? 'bg-orange-500 text-white border-orange-500' : 'bg-surface text-subtle border-line'}`}>{s.ad} {s.soyad}</button>))}<button type="button" onClick={() => setGorevHedefler(gorevHedefler.length === ogrenciler.length ? [] : ogrenciler.map(s => s.id))} className="text-xs text-primary px-2">{gorevHedefler.length === ogrenciler.length ? "Kaldır" : "Tümü"}</button></div>
             <div className="grid grid-cols-2 gap-2"><div><Label className="text-xs">Başlık *</Label><Input value={gorevForm.baslik} onChange={e => setGorevForm({...gorevForm, baslik: e.target.value})} required className="text-sm" /></div><div><Label className="text-xs">Son Tarih</Label><Input type="date" value={gorevForm.son_tarih} onChange={e => setGorevForm({...gorevForm, son_tarih: e.target.value})} className="text-sm" /></div></div>
@@ -5995,7 +5995,7 @@ function OgretmenPaneli({ user, logout }) {
           {/* Öğrenci listesi */}
           {(riskler.length > 0 ? riskler : ogrenciler).map(s => {
             const risk = riskler.find(r => r.id === s.id);
-            return (<Card key={s.id} className="border-0 shadow-sm cursor-pointer hover:shadow-md transition-all" onClick={() => ogrenciDetayCek(s)}>
+            return (<Card key={s.id} className="border border-line shadow-sm cursor-pointer hover:shadow-md transition-all" onClick={() => ogrenciDetayCek(s)}>
               <CardContent className="p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${risk ? riskRenk(risk.risk_seviye) : 'bg-gray-100 text-subtle'}`}>{risk ? riskIcon(risk.risk_seviye) : "👤"}</div>
@@ -6052,7 +6052,7 @@ function OgretmenPaneli({ user, logout }) {
         {/* ═══ GÖREVLER ═══ */}
         {aktifSekme === "gorevler" && (<div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold">📌 Görev Yönetimi</h2>
+            <h2 className="text-lg font-bold">Görev Yönetimi</h2>
             <Button size="sm" onClick={() => { setAktifSekme("ogrencilerim"); setGorevAtaGoster(true); }} className="bg-orange-500 text-white text-xs"><Plus className="h-3 w-3 mr-1" />Yeni Görev Ata</Button>
           </div>
           {benimGorevlerim.filter(g => g.durum !== "tamamlandi").length > 0 && (<div className="bg-indigo-50 rounded-xl p-3 border border-indigo-100"><div className="text-sm font-medium text-indigo-700 mb-2">📌 Bana Atanan Görevler</div>{benimGorevlerim.filter(g => g.durum !== "tamamlandi").map(g => (<div key={g.id} className="flex items-center justify-between py-1"><span className="text-sm">{g.baslik}</span><Button size="sm" className="bg-green-600 text-white text-xs h-7" onClick={async () => { try { await axios.put(`${API}/gorevler/${g.id}/durum`, { durum: "tamamlandi" }); toast({ title: "✅ Tamamlandı" }); fetchAll(); } catch(e) { hataBildir(toast, "Görev güncellenemedi"); } }}>Tamamla</Button></div>))}</div>)}
@@ -6088,7 +6088,7 @@ function OgretmenPaneli({ user, logout }) {
         {/* ═══ DERS PROGRAMI ═══ */}
         {aktifSekme === "program" && (
           <div className="space-y-3">
-            <h2 className="text-lg font-bold">📅 Ders Programı</h2>
+            <h2 className="text-lg font-bold">Ders Programı</h2>
             <HaftalikTakvim apiBase={API} user={user} ogrenciler={ogrenciler} />
           </div>
         )}
@@ -6098,13 +6098,13 @@ function OgretmenPaneli({ user, logout }) {
 
         {/* ═══ MESAJLAR ═══ */}
         {aktifSekme === "mesajlar" && (<div className="space-y-4">
-          <h2 className="text-lg font-bold">✉️ Mesajlar</h2>
+          <h2 className="text-lg font-bold">Mesajlar</h2>
           <div className="flex gap-2">
             {[{v:"gelen",l:`Gelen (${gelenMesajlar.length})`},{v:"giden",l:"Gönderilen"},{v:"yeni",l:"Yeni Mesaj"}].map(t => (
               <button key={t.v} onClick={() => setMesajGorunum(t.v)} className={`px-3 py-1.5 rounded-xl text-xs font-medium border ${mesajGorunum === t.v ? 'bg-primary text-white border-blue-600' : 'bg-surface text-subtle border-line'}`}>{t.l}</button>
             ))}
           </div>
-          {mesajGorunum === "yeni" && (<Card className="border-0 shadow-sm"><CardContent className="p-4"><form onSubmit={mesajGonder} className="space-y-3">
+          {mesajGorunum === "yeni" && (<Card className="border border-line shadow-sm"><CardContent className="p-4"><form onSubmit={mesajGonder} className="space-y-3">
             <div><Label className="text-xs">Alıcı *</Label><Select value={mesajAlici} onValueChange={setMesajAlici}><SelectTrigger className="text-sm"><SelectValue placeholder="Kişi seçin..." /></SelectTrigger><SelectContent>{kullanicilar.filter(u => u.id !== user.id).map(u => (<SelectItem key={u.id} value={u.id}>{u.ad} {u.soyad} ({({admin:"Yönetici",coordinator:"Koord.",teacher:"Öğretmen",student:"Öğrenci",parent:"Veli"})[u.role]})</SelectItem>))}</SelectContent></Select></div>
             <div><Label className="text-xs">Konu</Label><Input value={mesajForm.konu} onChange={e => setMesajForm({...mesajForm, konu: e.target.value})} className="text-sm" /></div>
             <div><Label className="text-xs">Mesaj *</Label><textarea value={mesajForm.icerik} onChange={e => setMesajForm({...mesajForm, icerik: e.target.value})} required className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px]" /></div>
@@ -6407,7 +6407,7 @@ function OgrenciPaneli({ user, logout }) {
           {/* Header */}
           <div className="flex items-center gap-3">
             <button onClick={() => { setAktifEkran(null); setSpeechSonuc(null); setSpeechKayit(false); clearInterval(speechSureRef.current); if(mediaRecorderRef.current?.state === "recording") { mediaRecorderRef.current.stop(); mediaRecorderRef.current.stream?.getTracks().forEach(t=>t.stop()); } }} className="text-purple-600 text-sm">← Geri</button>
-            <h2 className="text-lg font-bold text-purple-900">🎤 Sesli Okuma Analizi</h2>
+            <h2 className="text-lg font-bold text-purple-900">Sesli Okuma Analizi</h2>
           </div>
 
           {/* Sonuç ekranı */}
@@ -6601,7 +6601,7 @@ function OgrenciPaneli({ user, logout }) {
         <div className="max-w-md mx-auto p-4 space-y-4">
           <div className="flex items-center gap-3">
             <button onClick={() => setAktifEkran(null)} className="text-indigo-600 text-sm">← Geri</button>
-            <h2 className="text-base font-bold text-indigo-900">📖 Seviyeli Okuma</h2>
+            <h2 className="text-base font-bold text-indigo-900">Seviyeli Okuma</h2>
           </div>
           <div className="bg-surface rounded-2xl p-4 border shadow-sm">
             <div className="text-sm font-bold text-content mb-1">Hangi kitabı okumak istiyorsun?</div>
@@ -6679,7 +6679,7 @@ function OgrenciPaneli({ user, logout }) {
           {/* Header */}
           <div className="flex items-center gap-3">
             <button onClick={() => setAktifEkran(null)} className="text-indigo-600 text-sm">← Geri</button>
-            <h2 className="text-base font-bold text-indigo-900">📖 Seviyeli Okuma</h2>
+            <h2 className="text-base font-bold text-indigo-900">Seviyeli Okuma</h2>
           </div>
           <div className="text-center bg-surface rounded-2xl p-3 border shadow-sm">
             <div className="text-sm font-bold text-content">{scaffoldData.kitap_adi}</div>
@@ -6749,7 +6749,7 @@ function OgrenciPaneli({ user, logout }) {
     const dk = Math.max(1, Math.round(okumaSuresi / 60));
     return (
       <div className="min-h-screen bg-gradient-to-b from-orange-50 to-yellow-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full"><Card className="border border-line shadow-lg"><CardHeader className="text-center"><div className="text-4xl mb-2">🌳🌳🌳</div><CardTitle>Harika! {dk} dakika okudun.</CardTitle><p className="text-subtle text-sm">Bugün ne okudun?</p></CardHeader>
+        <div className="max-w-md w-full"><Card className="border border-line shadow-lg"><CardHeader className="text-center"><div className="text-4xl mb-2"></div><CardTitle>Harika! {dk} dakika okudun.</CardTitle><p className="text-subtle text-sm">Bugün ne okudun?</p></CardHeader>
           <CardContent><form onSubmit={okumaKaydet} className="space-y-4">
             <div><Label>Kitap Adı *</Label><Input value={neOkudunForm.kitap_adi} onChange={e => setNeOkudunForm({...neOkudunForm, kitap_adi: e.target.value})} required placeholder="Kitabın adı" /></div>
             <div><Label>Bölüm</Label><Input value={neOkudunForm.bolum} onChange={e => setNeOkudunForm({...neOkudunForm, bolum: e.target.value})} placeholder="Bölüm 3" /></div>
@@ -6763,7 +6763,7 @@ function OgrenciPaneli({ user, logout }) {
           {socraticSoru && (
             <Card className="border-2 border-cyan-300 shadow-lg">
               <CardHeader className="bg-gradient-to-r from-cyan-50 to-blue-50 pb-2">
-                <CardTitle className="text-base flex items-center gap-2">🤖 Okuma Koçun Soruyor</CardTitle>
+                <CardTitle className="text-base flex items-center gap-2">Okuma Koçun Soruyor</CardTitle>
               </CardHeader>
               <CardContent className="pt-3 space-y-3">
                 <p className="text-sm font-medium text-content">{socraticSoru.soru}</p>
@@ -6846,7 +6846,7 @@ function OgrenciPaneli({ user, logout }) {
         {aktifSekme === "ana" && (<>
           {/* Lig Durumu (XP yalnızca sıralama ekranında görünür) */}
           {xpDurum && (
-            <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl p-4 text-white">
+            <div className="bg-primary hover:bg-primary-hover rounded-2xl p-4 text-white">
               <div className="flex items-center justify-between mb-2">
                 <div className="text-lg font-bold">{xpDurum.lig_label}</div>
               </div>
@@ -6858,7 +6858,7 @@ function OgrenciPaneli({ user, logout }) {
             </div>
           )}
           {!xpDurum && (
-            <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl p-4 text-white">
+            <div className="bg-primary hover:bg-primary-hover rounded-2xl p-4 text-white">
               <div className="text-lg font-bold">{seviyeEmoji} Seviye {seviye}</div>
               <div className="bg-white/20 rounded-full h-2.5 overflow-hidden mt-2"><div className="h-full bg-surface rounded-full" style={{ width: `${seviyeIlerleme}%` }} /></div>
               <p className="text-xs opacity-70 mt-1">Sonraki seviye için {100 - seviyeIlerleme} dk oku</p>
@@ -7029,7 +7029,7 @@ function OgrenciPaneli({ user, logout }) {
 
           {/* Bekleyen görevler kısa */}
           {bekleyenGorevler.length > 0 && (<div className="bg-surface rounded-2xl p-4 shadow-sm border">
-            <div className="flex items-center justify-between mb-3"><h3 className="font-bold text-sm text-content">📌 Görevlerin</h3><button onClick={() => setAktifSekme("gorevler")} className="text-xs text-blue-600">Tümü →</button></div>
+            <div className="flex items-center justify-between mb-3"><h3 className="font-bold text-sm text-content">Görevlerin</h3><button onClick={() =>setAktifSekme("gorevler")} className="text-xs text-blue-600">Tümü →</button></div>
             <div className="space-y-2">{bekleyenGorevler.slice(0,3).map(g => (<div key={g.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-xl"><div className="text-sm font-medium truncate flex-1 mr-2">{g.baslik}</div><Button size="sm" className="bg-green-600 text-white text-[10px] px-2 h-7" onClick={() => gorevTamamla(g.id)}>Tamamla</Button></div>))}</div>
           </div>)}
 
@@ -7056,22 +7056,22 @@ function OgrenciPaneli({ user, logout }) {
 
           {/* Son 3 okuma */}
           {okumaKayitlari.length > 0 && (<div className="bg-surface rounded-2xl p-4 shadow-sm border">
-            <div className="flex items-center justify-between mb-2"><h3 className="font-bold text-sm text-content">📖 Son Okumalar</h3><button onClick={() => { setAktifSekme("gelisim"); setGelisimAltSekme("okumalarim"); }} className="text-xs text-blue-600">Tümü →</button></div>
+            <div className="flex items-center justify-between mb-2"><h3 className="font-bold text-sm text-content">Son Okumalar</h3><button onClick={() =>{ setAktifSekme("gelisim"); setGelisimAltSekme("okumalarim"); }} className="text-xs text-blue-600">Tümü →</button></div>
             {okumaKayitlari.slice(0,3).map(k => (<div key={k.id} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0"><div className="text-sm font-medium truncate flex-1">{k.kitap_adi || "—"}</div><div className="text-xs text-subtle">{k.sure_dakika} dk</div></div>))}
           </div>)}
         </>)}
 
         {/* ═══ GÖREVLERİM ═══ */}
-        {aktifSekme === "gorevler" && (<div className="space-y-3"><h2 className="text-lg font-bold">📌 Görevlerim</h2>
+        {aktifSekme === "gorevler" && (<div className="space-y-3"><h2 className="text-lg font-bold">Görevlerim</h2>
           {bekleyenGorevler.length === 0 && tamamlananGorevler.length === 0 ? (<div className="text-center py-12"><div className="text-5xl mb-3">✅</div><p className="text-subtle">Tüm görevler tamamlandı!</p></div>) : (<>
             {bekleyenGorevler.map(g => (<Card key={g.id} className="border border-line shadow-sm"><CardContent className="p-4 flex items-start justify-between gap-3"><div className="min-w-0"><div className="font-bold text-sm">{g.baslik}</div>{g.aciklama && <p className="text-xs text-subtle mt-1">{g.aciklama}</p>}<div className="text-xs text-subtle mt-1">{g.atayan_ad && `Atayan: ${g.atayan_ad}`}{g.son_tarih && ` • Son: ${new Date(g.son_tarih).toLocaleDateString('tr-TR')}`}</div>{g.film_link && <a href={g.film_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 block mt-1">🎬 Film Linki</a>}{g.makale_link && <a href={g.makale_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 block mt-1">📄 Makale</a>}</div><Button size="sm" className="bg-green-600 text-white text-xs shrink-0" onClick={() => gorevTamamla(g.id)}>Tamamla</Button></CardContent></Card>))}
-            {tamamlananGorevler.length > 0 && (<><h3 className="text-xs font-medium text-subtle mt-4">Tamamlanan ({tamamlananGorevler.length})</h3>{tamamlananGorevler.slice(0,5).map(g => (<div key={g.id} className="bg-green-50 rounded-xl p-3 border border-green-100 opacity-60 text-sm">✅ {g.baslik}</div>))}</>)}
+            {tamamlananGorevler.length >0 && (<><h3 className="text-xs font-medium text-subtle mt-4">Tamamlanan ({tamamlananGorevler.length})</h3>{tamamlananGorevler.slice(0,5).map(g =>(<div key={g.id} className="bg-green-50 rounded-xl p-3 border border-green-100 opacity-60 text-sm">{g.baslik}</div>))}</>)}
           </>)}
         </div>)}
 
         {/* ═══ GELİŞİM (İçerikler + Egzersizler + Okumalarım alt sekmeli) ═══ */}
         {aktifSekme === "gelisim" && (<div className="space-y-4">
-          <h2 className="text-lg font-bold">🎯 Gelişim</h2>
+          <h2 className="text-lg font-bold">Gelişim</h2>
           {/* Alt sekmeler — 2 satır */}
           <div className="grid grid-cols-4 gap-1">
             {[
@@ -7256,7 +7256,7 @@ function OgrenciPaneli({ user, logout }) {
                 {socraticSoru && (
                   <Card className="border-2 border-cyan-300 shadow-lg">
                     <CardHeader className="bg-gradient-to-r from-cyan-50 to-blue-50 pb-2">
-                      <CardTitle className="text-base flex items-center gap-2">🤖 Okuma Koçun Soruyor</CardTitle>
+                      <CardTitle className="text-base flex items-center gap-2">Okuma Koçun Soruyor</CardTitle>
                     </CardHeader>
                     <CardContent className="pt-3 space-y-3">
                       <p className="text-sm font-medium text-content">{socraticSoru.soru}</p>
@@ -7523,7 +7523,7 @@ function OgrenciPaneli({ user, logout }) {
 
 
               {kelimeData?.bekleyenler?.length > 0 && !oyunData && (<>
-                <h3 className="font-bold text-sm text-content">📝 Bugün Tekrar Edilecek Kelimeler</h3>
+                <h3 className="font-bold text-sm text-content">Bugün Tekrar Edilecek Kelimeler</h3>
                 {!aktifKelime ? (
                   <button onClick={() => { setAktifKelime(kelimeData.bekleyenler[0]); setCevapGosterim(false); }} className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl p-4 shadow-md">
                     <div className="text-lg font-bold">🧠 Tekrara Başla</div><div className="text-xs opacity-80">{kelimeData.bekleyenler.length} kelime bekliyor</div>
@@ -7835,7 +7835,7 @@ function OgrenciPaneli({ user, logout }) {
 
         {/* ═══ SIRALAMA (XP Lig Bazlı) ═══ */}
         {aktifSekme === "siralama" && (<div className="space-y-4">
-          <h2 className="text-lg font-bold">🏆 Lig Sıralaması</h2>
+          <h2 className="text-lg font-bold">Lig Sıralaması</h2>
           {xpDurum && (<div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-2xl p-4 border border-yellow-100 flex items-center justify-between">
             <div><div className="text-2xl font-bold">{xpDurum.lig_label}</div><div className="text-sm text-subtle">{xpDurum.toplam_xp} XP</div></div>
             {xpDurum.sonraki_lig && <div className="text-right"><div className="text-xs text-subtle">Sonraki: {({"gumus":"🥈 Gümüş","altin":"🥇 Altın","elmas":"💎 Elmas"})[xpDurum.sonraki_lig]}</div><div className="text-sm font-bold text-orange-600">{xpDurum.kalan_xp} XP kaldı</div></div>}
@@ -7857,9 +7857,9 @@ function OgrenciPaneli({ user, logout }) {
 
         {/* ═══ MESAJLAR ═══ */}
         {aktifSekme === "mesajlar" && (<div className="space-y-4">
-          <h2 className="text-lg font-bold">✉️ Mesajlar</h2>
+          <h2 className="text-lg font-bold">Mesajlar</h2>
           {profil?.ogretmen_bilgi && (
-            <Card className="border border-line shadow-sm border-l-4 border-l-blue-500"><CardHeader className="pb-2"><CardTitle className="text-sm">📝 Öğretmenime Mesaj</CardTitle><p className="text-xs text-subtle">{profil.ogretmen_bilgi.ad} {profil.ogretmen_bilgi.soyad}</p></CardHeader>
+            <Card className="border border-line shadow-sm border-l-4 border-l-blue-500"><CardHeader className="pb-2"><CardTitle className="text-sm">Öğretmenime Mesaj</CardTitle><p className="text-xs text-subtle">{profil.ogretmen_bilgi.ad} {profil.ogretmen_bilgi.soyad}</p></CardHeader>
               <CardContent><form onSubmit={mesajGonder} className="space-y-3">
                 <div><Label className="text-xs">Konu</Label><Input value={mesajForm.konu} onChange={e => setMesajForm({...mesajForm, konu: e.target.value})} placeholder="Konu..." className="text-sm" /></div>
                 <div><Label className="text-xs">Mesaj *</Label><textarea value={mesajForm.icerik} onChange={e => setMesajForm({...mesajForm, icerik: e.target.value})} required placeholder="Mesajınızı yazın..." className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px]" /></div>
@@ -8314,14 +8314,14 @@ function VeliPaneli({ user, logout }) {
           </>)}
 
           {/* OKUMALAR */}
-          {aktifSekme === "okumalar" && ozellikAktif("veli_okuma_gecmisi") && (<div className="space-y-3"><h2 className="text-xl font-bold">📖 Okuma Geçmişi</h2>
+          {aktifSekme === "okumalar" && ozellikAktif("veli_okuma_gecmisi") && (<div className="space-y-3"><h2 className="text-xl font-bold">Okuma Geçmişi</h2>
             {okumaKayitlari.length === 0 ? <p className="text-center text-subtle py-8">Henüz okuma kaydı yok</p> : (
               okumaKayitlari.map(k => (<div key={k.id} className="bg-surface rounded-xl p-3 shadow-sm border flex items-center justify-between"><div><div className="font-medium text-sm">{k.kitap_adi || "—"}</div><div className="text-xs text-subtle">{k.bolum && `${k.bolum} • `}⏱ {k.sure_dakika} dk</div></div><div className="text-xs text-subtle">{new Date(k.tarih).toLocaleDateString('tr-TR')}</div></div>))
             )}
           </div>)}
 
           {/* GÖREVLER */}
-          {aktifSekme === "gorevler" && ozellikAktif("veli_gorev_takip") && (<div className="space-y-3"><h2 className="text-xl font-bold">📌 Görevler</h2>
+          {aktifSekme === "gorevler" && ozellikAktif("veli_gorev_takip") && (<div className="space-y-3"><h2 className="text-xl font-bold">Görevler</h2>
             {gorevler.length === 0 ? <p className="text-center text-subtle py-8">Görev yok</p> : (
               gorevler.map(g => (<div key={g.id} className={`bg-surface rounded-xl p-3 shadow-sm border ${g.durum === "tamamlandi" ? "opacity-60" : ""}`}>
                 <div className="flex items-center justify-between"><div className="font-medium text-sm">{g.durum === "tamamlandi" ? "✅ " : ""}{g.baslik}</div><span className={`text-xs px-2 py-0.5 rounded-full ${g.durum === "tamamlandi" ? "bg-green-100 text-green-700" : g.durum === "bekliyor" ? "bg-yellow-100 text-yellow-700" : "bg-blue-100 text-primary"}`}>{g.durum === "tamamlandi" ? "Tamamlandı" : g.durum === "bekliyor" ? "Bekliyor" : "Devam"}</span></div>
@@ -8553,7 +8553,7 @@ function YedeklemeYonetimi() {
 
   return (
     <div className="space-y-6">
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5" />Yedekleme Yönet</CardTitle>
         </CardHeader>
@@ -8573,7 +8573,7 @@ function YedeklemeYonetimi() {
         </CardContent>
       </Card>
 
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader>
           <CardTitle>Yedek Geçmişi</CardTitle>
         </CardHeader>
@@ -8725,7 +8725,7 @@ function GuncellemeKontrol() {
 
   return (
     <div className="space-y-6">
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><GitBranch className="h-5 w-5" />Mevcut Sürüm</CardTitle>
         </CardHeader>
@@ -8751,7 +8751,7 @@ function GuncellemeKontrol() {
         </CardContent>
       </Card>
 
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span className="flex items-center gap-2"><RefreshCw className={"h-5 w-5 " + (checking ? "animate-spin" : "")} />Güncelleme Durumu</span>
@@ -9245,7 +9245,7 @@ function SistemAyarlari({ user }) {
       </div></CardContent></Card>)}
 
       {/* Öğretmen XP Ağırlıkları */}
-      {ayarSekme === "ogretmen_xp" && (<Card className="border border-line shadow-sm"><CardHeader><CardTitle>‍ Öğretmen XP Ağırlıkları</CardTitle><p className="text-sm text-subtle">Öğretmen puanına etkinlik ve rozet dışında bu çıktılar da eklenir. Değişiklik anında sıralamaya yansır.</p></CardHeader><CardContent><div className="space-y-3">
+      {ayarSekme === "ogretmen_xp" && (<Card className="border border-line shadow-sm"><CardHeader><CardTitle>Öğretmen XP Ağırlıkları</CardTitle><p className="text-sm text-subtle">Öğretmen puanına etkinlik ve rozet dışında bu çıktılar da eklenir. Değişiklik anında sıralamaya yansır.</p></CardHeader><CardContent><div className="space-y-3">
         {[
           {key:"ogrenci_basi", l:"Aldığın öğrenci", birim:"puan/öğrenci"},
           {key:"kur_basi", l:"Kur atlatma", birim:"puan/kur"},
@@ -12197,7 +12197,7 @@ function AiArkadasSekme({ apiBase, user }) {
             {m.rol === "assistant" && <span className="text-xl mr-1 mt-0.5">{kar.emoji}</span>}
             <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${
               m.rol === "user"
-                ? "bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-br-sm"
+                ? "bg-primary hover:bg-primary-hover text-white rounded-br-sm"
                 : `${kar.bg} ${kar.border} border text-content rounded-bl-sm`}`}>
               {m.icerik}
             </div>
@@ -14065,7 +14065,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
 
           {/* Yükleme formu */}
           <Card className="border border-line shadow-sm border-l-4 border-l-cyan-500">
-            <CardHeader className="pb-2"><CardTitle className="text-sm">📤 AI'a Kitap / Doküman Öğret</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-sm">AI'a Kitap / Doküman Öğret</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               <div className="bg-cyan-50 rounded-lg p-3 border border-cyan-100">
                 <p className="text-xs text-cyan-700">📚 PDF veya Word dosyası yükleyin ya da direkt link yapıştırın. AI içeriği analiz ederek kelime haritası, okuma parçaları ve Bloom taksonomili sorular üretecek.</p>
@@ -14134,7 +14134,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
               {aiSonuc && (aiSonuc.kelimeler?.length > 0 || aiSonuc.parcalar?.length > 0 || aiSonuc.sorular?.length > 0) && (
                 <div className="border-t-2 border-cyan-200 pt-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-bold text-sm text-cyan-800">🎉 AI Öğrenme Sonuçları</h3>
+                    <h3 className="font-bold text-sm text-cyan-800">AI Öğrenme Sonuçları</h3>
                     <button onClick={() => setAiSonuc(null)} className="text-xs text-subtle hover:text-red-400">✕ Kapat</button>
                   </div>
 
@@ -14210,7 +14210,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
 
           {/* Yükleme geçmişi */}
           {aiYuklemeler.length > 0 && (<div>
-            <h3 className="font-medium text-sm text-content mb-2">📋 Yükleme Geçmişi</h3>
+            <h3 className="font-medium text-sm text-content mb-2">Yükleme Geçmişi</h3>
             <div className="space-y-2">{aiYuklemeler.map(y => {
               const gs = y.guven_skoru;
               const gsRenk = gs ? (gs.toplam >= 70 ? 'text-green-600 bg-green-50' : gs.toplam >= 40 ? 'text-yellow-600 bg-yellow-50' : 'text-red-600 bg-red-50') : '';
@@ -14382,7 +14382,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
 
       {gelisimSekme === 'puan-ayar' && user.role === 'admin' && (
         <div className="bg-surface rounded-xl border border-line p-6">
-          <h3 className="font-bold mb-4">⚙️ Egzersiz Puan Ayarları</h3>
+          <h3 className="font-bold mb-4">Egzersiz Puan Ayarları</h3>
           <p className="text-sm text-subtle mb-4">Her egzersiz tamamlandığında öğrencinin kazanacağı puanı belirleyin.</p>
           <div className="space-y-3">
             {[
@@ -14437,7 +14437,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
           {/* Yönetici onayı bekleyenler */}
           {(user.role === "admin" || user.role === "coordinator") && bekleyenler.length > 0 && (
             <div>
-              <h3 className="font-semibold text-yellow-700 mb-3">⏳ Onay Bekleyenler ({bekleyenler.length})</h3>
+              <h3 className="font-semibold text-yellow-700 mb-3">Onay Bekleyenler ({bekleyenler.length})</h3>
               <div className="space-y-3">
                 {bekleyenler.map(icerik => {
                   const isAcik = acikDetayId === "bek-" + icerik.id;
@@ -14494,7 +14494,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
           {oylamadakiler.length > 0 && (user.role === "admin" || user.role === "teacher") && (
             <div>
 
-              <h3 className="font-semibold text-primary mb-3">🗳️ Oylaması Bekleyenler ({oylamadakiler.length})</h3>
+              <h3 className="font-semibold text-primary mb-3">Oylaması Bekleyenler ({oylamadakiler.length})</h3>
               <div className="space-y-3">
                 {oylamadakiler.map(icerik => {
                   const kullandi = oyKullandi(icerik);
@@ -14591,7 +14591,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
           {/* Yayındaki içerikler */}
           {yayindakiler.length > 0 && (
             <div>
-              <h3 className="font-semibold text-green-700 mb-3">✅ Yayındaki İçerikler ({yayindakiler.length})</h3>
+              <h3 className="font-semibold text-green-700 mb-3">Yayındaki İçerikler ({yayindakiler.length})</h3>
               <div className="space-y-3">
                 {yayindakiler.map(icerik => {
                   const tamamlandi = isTamamlandi(icerik.id);
@@ -14747,7 +14747,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
           {/* Puan Rehberi */}
           <Card className="border border-line shadow-sm bg-gradient-to-br from-orange-50 to-yellow-50">
             <CardContent className="p-5">
-              <h4 className="font-semibold text-content mb-3">🎯 Puan Rehberi</h4>
+              <h4 className="font-semibold text-content mb-3">Puan Rehberi</h4>
               <div className="space-y-2 text-sm text-subtle">
                 <div className="flex justify-between"><span>✅ İçerik tamamla</span><span className="font-bold text-orange-600">+1</span></div>
                 <div className="flex justify-between"><span>📝 Test çöz (tam puan)</span><span className="font-bold text-orange-600">+10</span></div>
