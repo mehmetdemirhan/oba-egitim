@@ -9,9 +9,10 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 /**
  * KazananlarDialog — bir rozetin kazananlarını listeler; manuel ver / geri al.
- * Props: rozet {rol, kod, ad}, onKapat()
+ * Props: rozet {rol, kod, ad}
+ * (Kapanış parent'ın Dialog onOpenChange'i ile yönetilir.)
  */
-export default function KazananlarDialog({ rozet, onKapat }) {
+export default function KazananlarDialog({ rozet }) {
   const { toast } = useToast();
   const [liste, setListe] = useState([]);
   const [yukleniyor, setYukleniyor] = useState(true);

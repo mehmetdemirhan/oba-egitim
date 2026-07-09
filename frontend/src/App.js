@@ -1739,40 +1739,8 @@ function BekleyenlerKarti({ bekleyenler, onRefresh, onTabChange }) {
   );
 }
 
-// ── Sadece havuzdaki metinleri listele (analiz için) ──
-function MetinSecimListesi({ onMetinSec }) {
-  const [metinler, setMetinler] = useState([]);
-  const [yukleniyor, setYukleniyor] = useState(true);
-  const turLabel = { hikaye: "Hikaye", bilgilendirici: "Bilgilendirici", siir: "Şiir" };
-
-  useEffect(() => {
-    axios.get(`${API}/diagnostic/texts`)
-      .then(r => { const d = Array.isArray(r.data) ? r.data : []; setMetinler(d.filter(m => m.durum === "havuzda")); })
-      .catch(() => {})
-      .finally(() => setYukleniyor(false));
-  }, []);
-
-  if (yukleniyor) return <div className="text-center py-8 text-subtle">Yükleniyor...</div>;
-  if (metinler.length === 0) return (
-    <div className="text-center py-8 text-subtle">
-      <p>Henüz onaylı metin yok.</p>
-      <p className="text-sm mt-1">Metinler sekmesinden metin ekleyip onaylayın.</p>
-    </div>
-  );
-
-  return (
-    <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
-      {metinler.map(m => (
-        <div key={m.id} onClick={() => onMetinSec(m)}
-          className="border border-line rounded-xl p-4 cursor-pointer hover:border-primary hover:bg-app transition-all">
-          <div className="font-semibold text-content">{m.baslik}</div>
-          <div className="text-xs text-subtle mt-1">{m.sinif_seviyesi}. Sınıf • {turLabel[m.tur] || m.tur} • {m.kelime_sayisi} kelime</div>
-          <p className="text-sm text-subtle mt-2 line-clamp-2">{m.icerik}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
+// (Yetim bileşen MetinSecimListesi kaldırıldı — hiç render edilmiyordu; metin
+//  seçimi MetinYonetimi'nin secimModu prop'uyla yapılıyor.)
 
 // ── NORM TABLOSU YÖNETİMİ (Admin) ──
 function NormTablosu({ onClose }) {

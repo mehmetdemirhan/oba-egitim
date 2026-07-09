@@ -121,8 +121,6 @@ async def call_claude(system_prompt: str, user_message: str, model: str = "sonne
         # Try to parse JSON from response
         import json as json_mod
         parsed = None
-        import json as json_mod
-        parsed = None
         try:
             clean = text.strip()
             if clean.startswith("```"):
