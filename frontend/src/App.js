@@ -2956,6 +2956,23 @@ function AnalizSonucEkrani({ sonuc, ogrenci, onKaydet, onYeniAnaliz }) {
 // Bu fonksiyonu App.js'deki eski RaporFormu ile değiştirin
 // ══════════════════════════════════════════════
 
+// Modül seviyesinde — RaporFormu render'ı içinde tanımlanınca her tuş vuruşunda
+// remount olup textarea focus'u kaybediyordu. State prop olarak geçiriliyor.
+function YorumAlani({ baslik, alan, placeholder, ikon: Ikon, yorumlar, setYorumlar }) {
+  return (
+    <div className="mb-4">
+      <label className="inline-flex items-center gap-1.5 text-sm font-semibold text-content mb-1">{Ikon && <Ikon className="h-4 w-4" />}{baslik}</label>
+      <textarea
+        value={yorumlar[alan]}
+        onChange={e => setYorumlar({ ...yorumlar, [alan]: e.target.value })}
+        rows={4}
+        placeholder={placeholder || "AI ile oluşturun veya el ile yazın..."}
+        className="w-full border border-line rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none leading-relaxed"
+      />
+    </div>
+  );
+}
+
 function RaporFormu({ oturum, sonuc, ogrenci, metin, onRaporTamamla }) {
   const { toast } = useToast();
 
@@ -3176,18 +3193,8 @@ JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
   };
 
   // ── Düzenlenebilir yorum bileşeni ──
-  const YorumAlani = ({ baslik, alan, placeholder, ikon: Ikon }) => (
-    <div className="mb-4">
-      <label className="inline-flex items-center gap-1.5 text-sm font-semibold text-content mb-1">{Ikon && <Ikon className="h-4 w-4" />}{baslik}</label>
-      <textarea
-        value={aiYorumlar[alan]}
-        onChange={e => setAiYorumlar({ ...aiYorumlar, [alan]: e.target.value })}
-        rows={4}
-        placeholder={placeholder || "AI ile oluşturun veya el ile yazın..."}
-        className="w-full border border-line rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none leading-relaxed"
-      />
-    </div>
-  );
+  // YorumAlani modül seviyesinde tanımlı (aşağıda); render içinde tanımlanınca
+  // her tuş vuruşunda remount olup textarea focus'unu kaybediyordu.
 
   // ── Kaydet ──
   const kaydet = async () => {
@@ -3452,12 +3459,12 @@ JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
           )}
           {(aiOlusturuldu || Object.values(aiYorumlar).some(v => v)) && (
             <>
-              <YorumAlani ikon={BarChart3} baslik="Okuma Hızı Değerlendirmesi" alan="hiz" placeholder="Okuma hızına ilişkin değerlendirme..." />
-              <YorumAlani ikon={CheckCircle} baslik="Doğru Okuma Oranı Değerlendirmesi" alan="dogruluk" placeholder="Doğruluk ve hata analizi..." />
-              <YorumAlani ikon={BookOpen} baslik="Okuduğunu Anlama Değerlendirmesi" alan="anlama" placeholder="Anlama becerileri değerlendirmesi..." />
-              <YorumAlani ikon={Music} baslik="Prozodik Okuma Değerlendirmesi" alan="prozodik" placeholder="Prozodik okuma değerlendirmesi..." />
-              <YorumAlani ikon={FileText} baslik="Sonuç ve Genel Yorum" alan="sonuc" placeholder="Genel sonuç ve yorum..." />
-              <YorumAlani ikon={Lightbulb} baslik="Eğitsel ve Ev Temelli Gelişim Önerileri" alan="oneriler" placeholder="Gelişim önerileri..." />
+              <YorumAlani ikon={BarChart3} baslik="Okuma Hızı Değerlendirmesi" alan="hiz" placeholder="Okuma hızına ilişkin değerlendirme..." yorumlar={aiYorumlar} setYorumlar={setAiYorumlar} />
+              <YorumAlani ikon={CheckCircle} baslik="Doğru Okuma Oranı Değerlendirmesi" alan="dogruluk" placeholder="Doğruluk ve hata analizi..." yorumlar={aiYorumlar} setYorumlar={setAiYorumlar} />
+              <YorumAlani ikon={BookOpen} baslik="Okuduğunu Anlama Değerlendirmesi" alan="anlama" placeholder="Anlama becerileri değerlendirmesi..." yorumlar={aiYorumlar} setYorumlar={setAiYorumlar} />
+              <YorumAlani ikon={Music} baslik="Prozodik Okuma Değerlendirmesi" alan="prozodik" placeholder="Prozodik okuma değerlendirmesi..." yorumlar={aiYorumlar} setYorumlar={setAiYorumlar} />
+              <YorumAlani ikon={FileText} baslik="Sonuç ve Genel Yorum" alan="sonuc" placeholder="Genel sonuç ve yorum..." yorumlar={aiYorumlar} setYorumlar={setAiYorumlar} />
+              <YorumAlani ikon={Lightbulb} baslik="Eğitsel ve Ev Temelli Gelişim Önerileri" alan="oneriler" placeholder="Gelişim önerileri..." yorumlar={aiYorumlar} setYorumlar={setAiYorumlar} />
             </>
           )}
         </CardContent>
