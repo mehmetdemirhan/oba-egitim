@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./components/ui/dialog";
 import { Badge } from "./components/ui/badge";
-import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send, Bell, Database, RefreshCw, GitBranch, AlertTriangle, Package, ClipboardList, Flame, Target, Award, Heart, FlaskConical, Medal, Lock, Sparkles, Lightbulb, MessageCircle, TrendingUp } from "lucide-react";
+import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send, Bell, Database, RefreshCw, GitBranch, AlertTriangle, Package, ClipboardList, Flame, Target, Award, Heart, FlaskConical, Medal, Lock, Sparkles, Lightbulb, MessageCircle, TrendingUp, Palette, Brain, XCircle } from "lucide-react";
 import { useToast } from "./hooks/use-toast";
 import { IkonCoz } from "./lib/ikonlar";
 import { Toaster } from "./components/ui/toaster";
@@ -503,17 +503,17 @@ function AppContent() {
             {user.role !== "coordinator" && <TabsTrigger value="payments" className={tabClass}><CreditCard className="h-4 w-4 mr-2" />Muhasebe</TabsTrigger>}
             {adminVeyaKoord && <TabsTrigger value="users" className={tabClass}><Shield className="h-4 w-4 mr-2" />Kullanıcılar</TabsTrigger>}
             <TabsTrigger value="gelisim" className={tabClass}><Trophy className="h-4 w-4 mr-2" />Gelişim</TabsTrigger>
-            <TabsTrigger value="ders-programi" className={tabClass}>📅 Ders Programı</TabsTrigger>
+            <TabsTrigger value="ders-programi" className={tabClass}><Calendar className="h-4 w-4 mr-2" />Ders Programı</TabsTrigger>
             <TabsTrigger value="giris-analizi" className={tabClass}><Stethoscope className="h-4 w-4 mr-2" />Analiz</TabsTrigger>
             <TabsTrigger value="mesajlar" className={tabClass}><Mail className="h-4 w-4 mr-2" />Mesajlar</TabsTrigger>
             {adminVeyaKoord && <TabsTrigger value="ayarlar" className={tabClass}><Star className="h-4 w-4 mr-2" />Ayarlar</TabsTrigger>}
             {user.role === "admin" && <TabsTrigger value="yedekleme" className={tabClass}><Database className="h-4 w-4 mr-2" />Yedekleme</TabsTrigger>}
             {user.role === "admin" && <TabsTrigger value="guncelleme" className={tabClass}><GitBranch className="h-4 w-4 mr-2" />Güncelleme</TabsTrigger>}
             {user.role === "admin" && <TabsTrigger value="moduller" className={tabClass}><Package className="h-4 w-4 mr-2" />Modüller</TabsTrigger>}
-            {adminVeyaKoord && <TabsTrigger value="tema-yonetimi" className={tabClass}>🎨 Tema</TabsTrigger>}
-            {adminVeyaKoord && <TabsTrigger value="rozet-yonetimi" className={tabClass}>🏅 Rozetler</TabsTrigger>}
-            {adminVeyaKoord && <TabsTrigger value="meb-kelime" className={tabClass}>📖 MEB Kelimeleri</TabsTrigger>}
-            <TabsTrigger value="ai-merkezi" className={tabClass}>🧠 AI Merkezi</TabsTrigger>
+            {adminVeyaKoord && <TabsTrigger value="tema-yonetimi" className={tabClass}><Palette className="h-4 w-4 mr-2" />Tema</TabsTrigger>}
+            {adminVeyaKoord && <TabsTrigger value="rozet-yonetimi" className={tabClass}><Medal className="h-4 w-4 mr-2" />Rozetler</TabsTrigger>}
+            {adminVeyaKoord && <TabsTrigger value="meb-kelime" className={tabClass}><BookMarked className="h-4 w-4 mr-2" />MEB Kelimeleri</TabsTrigger>}
+            <TabsTrigger value="ai-merkezi" className={tabClass}><Brain className="h-4 w-4 mr-2" />AI Merkezi</TabsTrigger>
           </TabsList>
           )}
 
@@ -552,33 +552,33 @@ function AppContent() {
                 {/* KPI: Risk Durumu + Okuma Aktivitesi */}
                 {ogrenciRiskler.length > 0 && (
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                    <div className="bg-gradient-to-br from-green-50 to-emerald-100 rounded-2xl p-4 border border-green-200">
-                      <div className="text-xs text-green-600 font-medium">🟢 Düşük Risk</div>
-                      <div className="text-3xl font-bold text-green-800">{ogrenciRiskler.filter(r => r.risk_seviye === "dusuk").length}</div>
-                      <div className="text-[10px] text-green-500">öğrenci</div>
+                    <div className="bg-surface rounded-2xl p-4 border border-line shadow-sm">
+                      <div className="flex items-center gap-1.5 text-xs text-subtle font-medium"><span className="w-2 h-2 rounded-full bg-green-500" />Düşük Risk</div>
+                      <div className="text-3xl font-bold text-content tabular-nums mt-1">{ogrenciRiskler.filter(r => r.risk_seviye === "dusuk").length}</div>
+                      <div className="text-xs text-subtle">öğrenci</div>
                     </div>
-                    <div className="bg-gradient-to-br from-yellow-50 to-amber-100 rounded-2xl p-4 border border-yellow-200">
-                      <div className="text-xs text-yellow-600 font-medium">🟡 Orta Risk</div>
-                      <div className="text-3xl font-bold text-yellow-800">{ogrenciRiskler.filter(r => r.risk_seviye === "orta").length}</div>
-                      <div className="text-[10px] text-yellow-500">öğrenci</div>
+                    <div className="bg-surface rounded-2xl p-4 border border-line shadow-sm">
+                      <div className="flex items-center gap-1.5 text-xs text-subtle font-medium"><span className="w-2 h-2 rounded-full bg-amber-500" />Orta Risk</div>
+                      <div className="text-3xl font-bold text-content tabular-nums mt-1">{ogrenciRiskler.filter(r => r.risk_seviye === "orta").length}</div>
+                      <div className="text-xs text-subtle">öğrenci</div>
                     </div>
-                    <div className="bg-gradient-to-br from-red-50 to-rose-100 rounded-2xl p-4 border border-red-200">
-                      <div className="text-xs text-red-600 font-medium">🔴 Yüksek Risk</div>
-                      <div className="text-3xl font-bold text-red-800">{ogrenciRiskler.filter(r => r.risk_seviye === "yuksek").length}</div>
-                      <div className="text-[10px] text-red-500">öğrenci — müdahale gerekli</div>
+                    <div className="bg-surface rounded-2xl p-4 border border-line shadow-sm border-l-4 border-l-red-500">
+                      <div className="flex items-center gap-1.5 text-xs text-red-600 font-medium"><span className="w-2 h-2 rounded-full bg-red-500" />Yüksek Risk</div>
+                      <div className="text-3xl font-bold text-red-700 tabular-nums mt-1">{ogrenciRiskler.filter(r => r.risk_seviye === "yuksek").length}</div>
+                      <div className="text-xs text-red-500">öğrenci — müdahale gerekli</div>
                     </div>
-                    <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-2xl p-4 border border-blue-200">
-                      <div className="text-xs text-primary font-medium">📊 North Star</div>
-                      <div className="text-3xl font-bold text-blue-800">{ogrenciRiskler.length > 0 ? Math.round(ogrenciRiskler.filter(r => r.aktif_gunler_7 >= 4).length / ogrenciRiskler.length * 100) : 0}%</div>
-                      <div className="text-[10px] text-blue-500">haftada 4+ gün okuyan</div>
+                    <div className="bg-surface rounded-2xl p-4 border border-line shadow-sm">
+                      <div className="flex items-center gap-1.5 text-xs text-subtle font-medium"><TrendingUp className="h-3.5 w-3.5 text-primary" />North Star</div>
+                      <div className="text-3xl font-bold text-content tabular-nums mt-1">{ogrenciRiskler.length > 0 ? Math.round(ogrenciRiskler.filter(r => r.aktif_gunler_7 >= 4).length / ogrenciRiskler.length * 100) : 0}%</div>
+                      <div className="text-xs text-subtle">haftada 4+ gün okuyan</div>
                     </div>
                   </div>
                 )}
 
                 {/* Riskli öğrenciler uyarısı */}
                 {ogrenciRiskler.filter(r => r.risk_seviye === "yuksek").length > 0 && (
-                  <Card className="border-0 shadow-sm border-l-4 border-l-red-500">
-                    <CardHeader className="pb-2"><CardTitle className="text-sm text-red-700">🚨 Yüksek Riskli Öğrenciler</CardTitle></CardHeader>
+                  <Card className="border border-line shadow-sm border-l-4 border-l-red-500">
+                    <CardHeader className="pb-2"><CardTitle className="text-sm text-red-700 flex items-center gap-2"><AlertTriangle className="h-4 w-4" />Yüksek Riskli Öğrenciler</CardTitle></CardHeader>
                     <CardContent><div className="space-y-2">
                       {ogrenciRiskler.filter(r => r.risk_seviye === "yuksek").slice(0,5).map(r => (
                         <div key={r.id} className="flex items-center justify-between p-2 bg-red-50 rounded-lg">
@@ -594,44 +594,49 @@ function AppContent() {
                   </Card>
                 )}
 
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-blue-100 cursor-pointer" onClick={() => setActiveTab("teachers")}>
-                    <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-primary">Öğretmen</p><p className="text-3xl font-bold text-blue-900">{dashboardStats.toplam_ogretmen}</p></div><div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center"><UserCheck className="h-6 w-6 text-white" /></div></div></CardContent>
+                {/* Onay Bekleyenler — en yüksek aksiyon değeri (admin + koordinatör) */}
+                {adminVeyaKoord && bekleyenler?.toplam > 0 && (
+                  <BekleyenlerKarti bekleyenler={bekleyenler} onRefresh={fetchAll} onTabChange={setActiveTab} />
+                )}
+
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                  <Card className="border border-line shadow-sm bg-surface cursor-pointer hover:border-primary/40 transition-colors lg:col-span-2" onClick={() => setActiveTab("students")}>
+                    <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-subtle">Öğrenci</p><p className="text-4xl font-bold text-content tabular-nums mt-1">{dashboardStats.toplam_ogrenci}</p></div><div className="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center"><Users className="h-6 w-6 text-green-600" /></div></div></CardContent>
                   </Card>
-                  <Card className="border-0 shadow-sm bg-gradient-to-br from-green-50 to-green-100 cursor-pointer" onClick={() => setActiveTab("students")}>
-                    <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-green-600">Öğrenci</p><p className="text-3xl font-bold text-green-900">{dashboardStats.toplam_ogrenci}</p></div><div className="w-12 h-12 bg-green-500 rounded-2xl flex items-center justify-center"><Users className="h-6 w-6 text-white" /></div></div></CardContent>
+                  <Card className="border border-line shadow-sm bg-surface cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setActiveTab("teachers")}>
+                    <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-subtle">Öğretmen</p><p className="text-3xl font-bold text-content tabular-nums mt-1">{dashboardStats.toplam_ogretmen}</p></div><div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center"><UserCheck className="h-6 w-6 text-primary" /></div></div></CardContent>
                   </Card>
-                  <Card className="border-0 shadow-sm bg-gradient-to-br from-orange-50 to-orange-100 cursor-pointer" onClick={() => setActiveTab("courses")}>
-                    <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-orange-600">Kurs</p><p className="text-3xl font-bold text-orange-900">{dashboardStats.toplam_kurs}</p></div><div className="w-12 h-12 bg-orange-500 rounded-2xl flex items-center justify-center"><BookOpen className="h-6 w-6 text-white" /></div></div></CardContent>
+                  <Card className="border border-line shadow-sm bg-surface cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setActiveTab("courses")}>
+                    <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-subtle">Kurs</p><p className="text-3xl font-bold text-content tabular-nums mt-1">{dashboardStats.toplam_kurs}</p></div><div className="w-12 h-12 bg-orange-100 rounded-2xl flex items-center justify-center"><BookOpen className="h-6 w-6 text-orange-600" /></div></div></CardContent>
                   </Card>
                   {user.role === "coordinator" ? (
-                  <Card className="border-0 shadow-sm bg-gradient-to-br from-purple-50 to-purple-100 cursor-pointer" onClick={() => setActiveTab("students")}>
-                    <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-purple-600">Bu Ay Yeni Kayıt</p><p className="text-3xl font-bold text-purple-900">{dashboardStats.bu_ay_yeni_kayit || 0}</p></div><div className="w-12 h-12 bg-purple-500 rounded-2xl flex items-center justify-center"><Calendar className="h-6 w-6 text-white" /></div></div></CardContent>
+                  <Card className="border border-line shadow-sm bg-surface cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setActiveTab("students")}>
+                    <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-subtle">Bu Ay Yeni Kayıt</p><p className="text-3xl font-bold text-content tabular-nums mt-1">{dashboardStats.bu_ay_yeni_kayit || 0}</p></div><div className="w-12 h-12 bg-purple-100 rounded-2xl flex items-center justify-center"><Calendar className="h-6 w-6 text-purple-600" /></div></div></CardContent>
                   </Card>
                   ) : (
-                  <Card className="border-0 shadow-sm bg-gradient-to-br from-purple-50 to-purple-100 cursor-pointer" onClick={() => setActiveTab("payments")}>
-                    <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-purple-600">Bu Ay</p><p className="text-xl font-bold text-purple-900">{formatCurrency(dashboardStats.bu_ay_odenen_toplam)}</p></div><div className="w-12 h-12 bg-purple-500 rounded-2xl flex items-center justify-center"><Calendar className="h-6 w-6 text-white" /></div></div></CardContent>
+                  <Card className="border border-line shadow-sm bg-surface cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setActiveTab("payments")}>
+                    <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-subtle">Bu Ay</p><p className="text-2xl font-bold text-content tabular-nums mt-1">{formatCurrency(dashboardStats.bu_ay_odenen_toplam)}</p></div><div className="w-12 h-12 bg-purple-100 rounded-2xl flex items-center justify-center"><Calendar className="h-6 w-6 text-purple-600" /></div></div></CardContent>
                   </Card>
                   )}
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Finansal grafikler — YALNIZ Yönetici (koordinatör/öğretmende gizli) */}
                   {user.role !== "coordinator" && (<>
-                  <Card className="border-0 shadow-sm">
+                  <Card className="border border-line shadow-sm">
                     <CardHeader><CardTitle>Finansal Durum</CardTitle></CardHeader>
                     <CardContent><div className="h-64"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value">{pieData.map((e,i) => <Cell key={i} fill={e.color} />)}</Pie><Tooltip formatter={v => formatCurrency(v)} /></PieChart></ResponsiveContainer></div></CardContent>
                   </Card>
-                  <Card className="border-0 shadow-sm">
+                  <Card className="border border-line shadow-sm">
                     <CardHeader><CardTitle>Aylık İstatistikler</CardTitle></CardHeader>
                     <CardContent><div className="h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={monthlyStats}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="ay" /><YAxis /><Tooltip /><Bar dataKey="yeni_ogrenciler" fill="#3b82f6" /><Bar dataKey="gelir" fill="#f97316" /></BarChart></ResponsiveContainer></div></CardContent>
                   </Card>
                   </>)}
                   {/* Öğrenci hareket grafikleri — HEM Yönetici HEM Koordinatör görür */}
-                  <Card className="border-0 shadow-sm">
+                  <Card className="border border-line shadow-sm">
                     <CardHeader><CardTitle>Yeni Kayıt vs Kur Atlayan (Bu Ay)</CardTitle></CardHeader>
                     <CardContent><div className="h-64"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={pieDataKoord} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value">{pieDataKoord.map((e,i) => <Cell key={i} fill={e.color} />)}</Pie><Tooltip formatter={(v,n) => [`${v} öğrenci`, n]} /></PieChart></ResponsiveContainer></div></CardContent>
                   </Card>
-                  <Card className="border-0 shadow-sm">
+                  <Card className="border border-line shadow-sm">
                     <CardHeader><CardTitle>Aylık Kur Atlayan Öğrenci</CardTitle></CardHeader>
                     <CardContent><div className="h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={monthlyStats}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="ay" /><YAxis allowDecimals={false} /><Tooltip /><Bar dataKey="yeni_ogrenciler" fill="#3b82f6" name="Yeni Kayıt" /><Bar dataKey="kur_atlayan" fill="#059669" name="Kur Atlayan" /></BarChart></ResponsiveContainer></div></CardContent>
                   </Card>
@@ -640,30 +645,30 @@ function AppContent() {
                 {/* Öğretmen Rozet + Veli Anket Özeti */}
                 {adminAnketOzet.length > 0 && (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <Card className="border-0 shadow-sm">
-                      <CardHeader><CardTitle className="text-base">🏅 Öğretmen Rozet Durumu</CardTitle></CardHeader>
+                    <Card className="border border-line shadow-sm">
+                      <CardHeader><CardTitle className="text-base flex items-center gap-2"><Medal className="h-4 w-4 text-primary" />Öğretmen Rozet Durumu</CardTitle></CardHeader>
                       <CardContent><div className="space-y-3">
                         {adminAnketOzet.map(o => (
                           <div key={o.id} className="flex items-center justify-between p-3 bg-app rounded-xl">
                             <div><div className="font-medium text-sm">{o.ad} {o.soyad}</div></div>
                             <div className="flex items-center gap-2">
-                              <div className="bg-orange-100 rounded-full h-2 w-24 overflow-hidden"><div className="h-2 bg-orange-500 rounded-full" style={{width: `${(o.rozet_sayisi / Math.max(o.rozet_toplam, 1)) * 100}%`}} /></div>
-                              <span className="text-xs font-medium text-orange-600">{o.rozet_sayisi}/{o.rozet_toplam}</span>
+                              <div className="bg-app rounded-full h-2 w-24 overflow-hidden border border-line"><div className="h-2 bg-primary rounded-full" style={{width: `${(o.rozet_sayisi / Math.max(o.rozet_toplam, 1)) * 100}%`}} /></div>
+                              <span className="text-xs font-medium text-subtle tabular-nums">{o.rozet_sayisi}/{o.rozet_toplam}</span>
                             </div>
                           </div>
                         ))}
                       </div></CardContent>
                     </Card>
-                    <Card className="border-0 shadow-sm">
-                      <CardHeader><CardTitle className="text-base">💜 Veli Değerlendirme Özeti</CardTitle></CardHeader>
+                    <Card className="border border-line shadow-sm">
+                      <CardHeader><CardTitle className="text-base flex items-center gap-2"><Heart className="h-4 w-4 text-primary" />Veli Değerlendirme Özeti</CardTitle></CardHeader>
                       <CardContent><div className="space-y-3">
                         {adminAnketOzet.map(o => (
                           <div key={o.id} className="flex items-center justify-between p-3 bg-app rounded-xl">
                             <div><div className="font-medium text-sm">{o.ad} {o.soyad}</div><div className="text-xs text-subtle">{o.anket?.anket_sayisi || 0} anket</div></div>
                             <div className="flex items-center gap-3">
                               {o.anket?.anket_sayisi > 0 ? (<>
-                                <span className="text-lg font-bold text-purple-600">⭐{o.anket.ortalama}</span>
-                                <span className="text-xs text-green-600 font-medium">%{o.anket.tavsiye_oran} tavsiye</span>
+                                <span className="inline-flex items-center gap-1 text-lg font-bold text-content tabular-nums"><Star className="h-4 w-4 text-amber-500 fill-amber-500" />{o.anket.ortalama}</span>
+                                <span className="text-xs text-green-600 font-medium tabular-nums">%{o.anket.tavsiye_oran} tavsiye</span>
                               </>) : (<span className="text-xs text-subtle">Anket yok</span>)}
                             </div>
                           </div>
@@ -1612,7 +1617,7 @@ function BekleyenlerKarti({ bekleyenler, onRefresh, onTabChange }) {
 
   const turLabel = { hikaye: "Hikaye", bilgilendirici: "Bilgilendirici", siir: "Şiir", hizmetici: "Hizmetiçi", film: "Film", kitap: "Kitap", makale: "Makale" };
   const tipRenk = { metin: "bg-blue-100 text-primary", gelisim: "bg-purple-100 text-purple-700", kitap: "bg-green-100 text-green-700" };
-  const tipIcon = { metin: "📄", gelisim: "🎓", kitap: "📚" };
+  const tipIcon = { metin: FileText, gelisim: GraduationCap, kitap: BookMarked };
   const tipLabel = { metin: "Metin", gelisim: "Gelişim", kitap: "Kitap" };
 
   const tumListe = [
@@ -1632,11 +1637,11 @@ function BekleyenlerKarti({ bekleyenler, onRefresh, onTabChange }) {
 
   return (
     <>
-    <Card className="border-2 border-orange-200 shadow-sm">
+    <Card className="border border-line shadow-sm border-l-4 border-l-amber-400">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-red-500 rounded-xl flex items-center justify-center"><span className="text-white font-bold text-sm">{bekleyenler.toplam}</span></div>
+            <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center"><span className="text-white font-bold text-sm tabular-nums">{bekleyenler.toplam}</span></div>
             <div><div className="text-base font-bold">Onay Bekleyenler</div>
               <div className="text-xs text-subtle font-normal">{(bekleyenler.metin_bekleyen?.length||0) + (bekleyenler.gelisim_bekleyen?.length||0) + (bekleyenler.kitap_bekleyen?.length||0)} karar • {(bekleyenler.metin_oylama?.length||0) + (bekleyenler.gelisim_oylama?.length||0) + (bekleyenler.kitap_oylama?.length||0)} oylama</div></div>
           </div>
@@ -1649,15 +1654,16 @@ function BekleyenlerKarti({ bekleyenler, onRefresh, onTabChange }) {
               const isBekleyen = item.durum === "beklemede";
               const isAcik = acikDetay === item.id;
               const k = karar(item);
+              const TipI = tipIcon[item._tip];
               return (
-                <div key={item.id} className={`rounded-xl border overflow-hidden ${isBekleyen ? 'border-yellow-200' : 'border-blue-100'}`}>
+                <div key={item.id} className={`rounded-xl border overflow-hidden ${isBekleyen ? 'border-amber-200' : 'border-blue-100'}`}>
                   {/* Başlık satırı - tıklanabilir */}
-                  <div className={`flex items-center justify-between p-3 cursor-pointer ${isBekleyen ? 'bg-yellow-50 hover:bg-yellow-100' : 'bg-blue-50 hover:bg-blue-100'} transition-colors`}
+                  <div className={`flex items-center justify-between p-3 cursor-pointer ${isBekleyen ? 'bg-amber-50 hover:bg-amber-100' : 'bg-blue-50 hover:bg-blue-100'} transition-colors`}
                     onClick={() => setAcikDetay(isAcik ? null : item.id)}>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${tipRenk[item._tip]}`}>{tipIcon[item._tip]} {tipLabel[item._tip]}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${isBekleyen ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-primary'}`}>{isBekleyen ? "⏳ Onay" : `🗳️ ${Object.keys(item.oylar || {}).length} oy`}</span>
+                        <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${tipRenk[item._tip]}`}><TipI className="h-3 w-3" />{tipLabel[item._tip]}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${isBekleyen ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-primary'}`}>{isBekleyen ? "Onay bekliyor" : `${Object.keys(item.oylar || {}).length} oy`}</span>
                       </div>
                       <div className="font-semibold text-sm text-content mt-1 truncate">{item.baslik}</div>
                       <div className="text-xs text-subtle">{item.ekleyen_ad} • {turLabel[item.tur] || item.tur} • {new Date(item.olusturma_tarihi).toLocaleDateString("tr-TR")}</div>
@@ -1672,29 +1678,29 @@ function BekleyenlerKarti({ bekleyenler, onRefresh, onTabChange }) {
                       {item.aciklama && <div className="text-sm text-content bg-app rounded-lg p-3 whitespace-pre-wrap">{item.aciklama}</div>}
                       {item._tip === "metin" && item.icerik && <div className="bg-app rounded-lg p-3 text-sm text-content max-h-48 overflow-y-auto whitespace-pre-wrap">{item.icerik}</div>}
                       {item._tip === "metin" && (<div className="flex gap-4 text-xs text-subtle"><span>Sınıf: {item.sinif_seviyesi}</span><span>Tür: {turLabel[item.tur] || item.tur}</span>{item.kelime_sayisi && <span>Kelime: {item.kelime_sayisi}</span>}</div>)}
-                      {item._tip === "gelisim" && item.makale_link && <a href={item.makale_link} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline block">📎 {item.makale_dosya_turu === "link" ? "Makale Linki" : "Dosya Linki"}</a>}
+                      {item._tip === "gelisim" && item.makale_link && <a href={item.makale_link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-primary hover:underline"><FileText className="h-3.5 w-3.5" />{item.makale_dosya_turu === "link" ? "Makale Linki" : "Dosya Linki"}</a>}
                       {item._tip === "gelisim" && item.hedef_kitle && <div className="text-xs text-subtle">Hedef: {({"hepsi":"Herkes","ogretmen":"Öğretmenler","ogrenci":"Öğrenciler"})[item.hedef_kitle] || item.hedef_kitle}</div>}
                       {item._tip === "kitap" && (<div className="flex items-center gap-4 text-xs text-subtle">{item.yazar && <span>Yazar: {item.yazar}</span>}{item.yayinevi && <span>Yayınevi: {item.yayinevi}</span>}{item.sayfa_sayisi && <span>Sayfa: {item.sayfa_sayisi}</span>}
                         <button onClick={async () => {
                           setZekaModal({kitap_adi:item.baslik,yazar:item.yazar||"",profil:null,yukleniyor:true});
                           try { const r = await axios.post(`${API}/ai/kitap-zeka/analiz`,{kitap_adi:item.baslik,yazar:item.yazar||"",kitap_id:item.id,sinif:3}); setZekaModal({kitap_adi:item.baslik,yazar:item.yazar||"",profil:r.data,yukleniyor:false}); } catch(e) { setZekaModal(null); }
-                        }} className="flex items-center gap-1 text-purple-600 font-medium hover:text-purple-800 ml-auto">🧠 Zekâ</button>
+                        }} className="flex items-center gap-1 text-purple-600 font-medium hover:text-purple-800 ml-auto"><Brain className="h-3.5 w-3.5" />Zekâ</button>
                       </div>)}
-                      {item.sorular?.length > 0 && (<div className="bg-blue-50 rounded-lg p-3"><div className="text-xs font-medium text-primary mb-2">📝 {item.sorular.length} Test Sorusu</div>{item.sorular.map((s, i) => (<div key={i} className="text-sm text-content mb-3 pb-3 border-b border-blue-100 last:border-0"><div className="font-medium mb-1">{i+1}. {s.soru}</div><div className="grid grid-cols-2 gap-1 ml-4">{(s.secenekler || []).map((sec, j) => (<div key={j} className={`text-xs px-2 py-1 rounded ${j === s.dogru_cevap ? 'bg-green-100 text-green-700 font-bold' : 'bg-surface text-subtle'}`}>{['A','B','C','D'][j]}) {sec}</div>))}</div></div>))}</div>)}
+                      {item.sorular?.length > 0 && (<div className="bg-blue-50 rounded-lg p-3"><div className="inline-flex items-center gap-1 text-xs font-medium text-primary mb-2"><ClipboardList className="h-3.5 w-3.5" />{item.sorular.length} Test Sorusu</div>{item.sorular.map((s, i) => (<div key={i} className="text-sm text-content mb-3 pb-3 border-b border-blue-100 last:border-0"><div className="font-medium mb-1">{i+1}. {s.soru}</div><div className="grid grid-cols-2 gap-1 ml-4">{(s.secenekler || []).map((sec, j) => (<div key={j} className={`text-xs px-2 py-1 rounded ${j === s.dogru_cevap ? 'bg-green-100 text-green-700 font-bold' : 'bg-surface text-subtle'}`}>{['A','B','C','D'][j]}) {sec}</div>))}</div></div>))}</div>)}
 
                       {/* Oylama durumu */}
                       {!isBekleyen && Object.keys(item.oylar || {}).length > 0 && (
                         <div className="bg-app rounded-lg p-3"><div className="text-xs font-medium text-subtle mb-1">Oylar ({Object.keys(item.oylar).length})</div>
-                          {Object.entries(item.oylar).map(([uid, oy]) => (<div key={uid} className="text-xs flex items-center gap-2">{oy.onay ? "✅" : "❌"} <span className="text-subtle">{oy.sebep || "Onayladı"}</span></div>))}
+                          {Object.entries(item.oylar).map(([uid, oy]) => (<div key={uid} className="text-xs flex items-center gap-2">{oy.onay ? <CheckCircle className="h-3.5 w-3.5 text-green-600 shrink-0" /> : <XCircle className="h-3.5 w-3.5 text-red-600 shrink-0" />} <span className="text-subtle">{oy.sebep || "Onayladı"}</span></div>))}
                         </div>
                       )}
 
                       {/* Karar butonları */}
                       {isBekleyen && (
                         <div className="flex gap-2 pt-2">
-                          <Button size="sm" className="bg-green-600 text-white flex-1" onClick={() => k.onayla(true)}>✅ Direkt Onayla</Button>
-                          <Button size="sm" className="bg-primary text-white flex-1" onClick={() => k.onayla(false)}>🗳️ Oylamaya Al</Button>
-                          <Button size="sm" variant="destructive" className="flex-1" onClick={() => k.reddet()}>❌ Reddet</Button>
+                          <Button size="sm" className="bg-green-600 text-white flex-1" onClick={() => k.onayla(true)}><CheckCircle className="h-4 w-4 mr-1" />Direkt Onayla</Button>
+                          <Button size="sm" className="bg-primary text-white flex-1" onClick={() => k.onayla(false)}><Users className="h-4 w-4 mr-1" />Oylamaya Al</Button>
+                          <Button size="sm" variant="destructive" className="flex-1" onClick={() => k.reddet()}><XCircle className="h-4 w-4 mr-1" />Reddet</Button>
                         </div>
                       )}
                     </div>
