@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./components/ui/dialog";
 import { Badge } from "./components/ui/badge";
-import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send, Bell, Database, RefreshCw, GitBranch, AlertTriangle, Package, ClipboardList, Flame, Target, Award, Heart, FlaskConical, Medal, Lock, Sparkles, Lightbulb, MessageCircle, TrendingUp, Palette, Brain, XCircle, Check, Clock, Save, Image as ImageIcon, ArrowLeft, ArrowRight, Play, Pause, Settings, Music, Printer } from "lucide-react";
+import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send, Bell, Database, RefreshCw, GitBranch, AlertTriangle, Package, ClipboardList, Flame, Target, Award, Heart, FlaskConical, Medal, Lock, Sparkles, Lightbulb, MessageCircle, TrendingUp, Palette, Brain, XCircle, Check, Clock, Save, Image as ImageIcon, ArrowLeft, ArrowRight, Play, Pause, Settings, Music, Printer, Search, Link2, Pin } from "lucide-react";
 import { useToast } from "./hooks/use-toast";
 import { IkonCoz } from "./lib/ikonlar";
 import { Toaster } from "./components/ui/toaster";
@@ -9840,19 +9840,19 @@ function GorevYonetimi({ user, students, teachers }) {
     try { const r = await axios.get(`${API}/gelisim/icerik`); const gd = Array.isArray(r.data) ? r.data : []; setGelisimIcerikleri(gd.filter(i => i.durum === "yayinda")); } catch(e) {}
   };
 
-  const turIcon = (tur) => ({ ozel: "📝", film: "🎬", kitap: "📚", makale: "📄", hizmetici: "🎓", egzersiz: "🎯" }[tur] || "📋");
+  const turIcon = (tur) => ({ ozel: <FileText className="h-4 w-4"/>, film: <Film className="h-4 w-4"/>, kitap: <BookMarked className="h-4 w-4"/>, makale: <FileText className="h-4 w-4"/>, hizmetici: <GraduationCap className="h-4 w-4"/>, egzersiz: <Target className="h-4 w-4"/> }[tur] || <ClipboardList className="h-4 w-4"/>);
   const turLabelGorev = (tur) => ({ ozel: "Özel Görev", film: "Film", kitap: "Kitap", makale: "Makale", hizmetici: "Hizmetiçi Eğitim", egzersiz: "Egzersiz" }[tur] || tur);
-  const turColorGorev = (tur) => ({ ozel: "bg-gray-100 text-subtle", film: "bg-purple-100 text-purple-600", kitap: "bg-green-100 text-green-600", makale: "bg-orange-100 text-orange-600", hizmetici: "bg-blue-100 text-primary", egzersiz: "bg-pink-100 text-pink-600" }[tur] || "bg-gray-100 text-subtle");
+  const turColorGorev = (tur) => ({ ozel: "bg-app text-subtle", film: "bg-purple-100 text-purple-600", kitap: "bg-green-100 text-green-600", makale: "bg-orange-100 text-orange-600", hizmetici: "bg-blue-100 text-primary", egzersiz: "bg-pink-100 text-pink-600" }[tur] || "bg-app text-subtle");
   const durumBadgeGorev = (d) => ({
-    bekliyor: <span className="px-2.5 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full font-medium">⏳ Bekliyor</span>,
-    devam_ediyor: <span className="px-2.5 py-1 bg-blue-100 text-primary text-xs rounded-full font-medium">🔄 Devam Ediyor</span>,
-    tamamlandi: <span className="px-2.5 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium">✅ Tamamlandı</span>,
-    suresi_doldu: <span className="px-2.5 py-1 bg-red-100 text-red-700 text-xs rounded-full font-medium">⏰ Süresi Doldu</span>,
+    bekliyor: <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-100 text-amber-700 text-xs rounded-full font-medium"><Clock className="h-3 w-3" />Bekliyor</span>,
+    devam_ediyor: <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-100 text-primary text-xs rounded-full font-medium"><RefreshCw className="h-3 w-3" />Devam Ediyor</span>,
+    tamamlandi: <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium"><CheckCircle className="h-3 w-3" />Tamamlandı</span>,
+    suresi_doldu: <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-100 text-red-700 text-xs rounded-full font-medium"><Clock className="h-3 w-3" />Süresi Doldu</span>,
   }[d] || null);
 
   const hedefTipBadge = (tip) => tip === "ogretmen"
-    ? <span className="px-2 py-0.5 bg-indigo-100 text-indigo-600 text-xs rounded-full font-medium">👩‍🏫 Öğretmen</span>
-    : <span className="px-2 py-0.5 bg-emerald-100 text-emerald-600 text-xs rounded-full font-medium">🎓 Öğrenci</span>;
+    ? <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-primary text-xs rounded-full font-medium"><Users className="h-3 w-3" />Öğretmen</span>
+    : <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-600 text-xs rounded-full font-medium"><GraduationCap className="h-3 w-3" />Öğrenci</span>;
 
   const resetForm = () => setForm({ baslik: "", aciklama: "", tur: "ozel", hedef_tip: form.hedef_tip, son_tarih: "", icerik_id: "", makale_link: "", kitap_yazar: "", kitap_isbn: "", kitap_link: "", kitap_kapak: "", film_link: "" });
 
@@ -9930,19 +9930,19 @@ function GorevYonetimi({ user, students, teachers }) {
     return (
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => { setTamamlamaDialogu(null); setTamamlamaNotu(""); }}>← Geri</Button>
+          <Button variant="outline" size="sm" onClick={() => { setTamamlamaDialogu(null); setTamamlamaNotu(""); }}><ArrowLeft className="h-4 w-4 mr-1" />Geri</Button>
           <h2 className="text-xl font-bold">Görevi Tamamla</h2>
         </div>
-        <Card className="border-0 shadow-sm"><CardHeader><div className="flex items-center gap-2"><span className="text-2xl">{turIcon(g.tur)}</span><CardTitle>{g.baslik}</CardTitle></div>
+        <Card className="border border-line shadow-sm"><CardHeader><div className="flex items-center gap-2"><span className="text-primary">{turIcon(g.tur)}</span><CardTitle>{g.baslik}</CardTitle></div>
           {g.aciklama && <p className="text-subtle text-sm mt-1">{g.aciklama}</p>}
-          {g.kitap_yazar && <p className="text-sm text-subtle">📚 {g.kitap_yazar}</p>}
-          {g.film_link && <a href={g.film_link} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline">🎬 Film Linki</a>}
-          {g.makale_link && <a href={g.makale_link} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline">📄 Makale Linki</a>}
+          {g.kitap_yazar && <p className="inline-flex items-center gap-1.5 text-sm text-subtle"><BookMarked className="h-3.5 w-3.5" />{g.kitap_yazar}</p>}
+          {g.film_link && <a href={g.film_link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"><Film className="h-3.5 w-3.5" />Film Linki</a>}
+          {g.makale_link && <a href={g.makale_link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"><FileText className="h-3.5 w-3.5" />Makale Linki</a>}
         </CardHeader></Card>
         <div><Label>Tamamlama Notu (opsiyonel)</Label><Input value={tamamlamaNotu} onChange={e => setTamamlamaNotu(e.target.value)} placeholder="Ne yaptığınızı kısaca yazın..." /></div>
         <Button onClick={() => durumGuncelle(g.id, "tamamlandi", { not: tamamlamaNotu })}
-          className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3">
-          Görevi Tamamla ✅
+          className="w-full inline-flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white py-3">
+          <CheckCircle className="h-4 w-4" />Görevi Tamamla
         </Button>
       </div>
     );
@@ -9952,18 +9952,18 @@ function GorevYonetimi({ user, students, teachers }) {
   if (gorunum === "olustur") {
     return (
       <div className="max-w-3xl mx-auto">
-        <div className="flex items-center gap-3 mb-6"><Button variant="outline" size="sm" onClick={() => setGorunum("liste")}>← Geri</Button><h2 className="text-xl font-bold">Yeni Görev Ata</h2></div>
+        <div className="flex items-center gap-3 mb-6"><Button variant="outline" size="sm" onClick={() => setGorunum("liste")}><ArrowLeft className="h-4 w-4 mr-1" />Geri</Button><h2 className="text-xl font-bold">Yeni Görev Ata</h2></div>
         <form onSubmit={gorevOlustur} className="space-y-6">
-          <Card className="border-0 shadow-sm"><CardHeader><CardTitle className="text-base">1. Kime Atanacak?</CardTitle></CardHeader>
+          <Card className="border border-line shadow-sm"><CardHeader><CardTitle className="text-base">1. Kime Atanacak?</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               {(user.role === "admin" || user.role === "coordinator") && (
                 <div className="flex gap-2">
                   <button type="button" onClick={() => { setForm({ ...form, hedef_tip: "ogretmen" }); setSeciliHedefler([]); }}
-                    className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all border ${form.hedef_tip === "ogretmen" ? 'bg-indigo-500 text-white border-indigo-500 shadow' : 'bg-surface text-subtle border-line hover:border-indigo-300'}`}>
-                    👩‍🏫 Öğretmenlere</button>
+                    className={`flex-1 inline-flex items-center justify-center gap-1.5 py-3 rounded-xl text-sm font-medium transition-all border ${form.hedef_tip === "ogretmen" ? 'bg-primary text-white border-primary shadow' : 'bg-surface text-subtle border-line hover:border-primary'}`}>
+                    <Users className="h-4 w-4" />Öğretmenlere</button>
                   <button type="button" onClick={() => { setForm({ ...form, hedef_tip: "ogrenci" }); setSeciliHedefler([]); }}
-                    className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all border ${form.hedef_tip === "ogrenci" ? 'bg-emerald-500 text-white border-emerald-500 shadow' : 'bg-surface text-subtle border-line hover:border-emerald-300'}`}>
-                    🎓 Öğrencilere</button>
+                    className={`flex-1 inline-flex items-center justify-center gap-1.5 py-3 rounded-xl text-sm font-medium transition-all border ${form.hedef_tip === "ogrenci" ? 'bg-emerald-500 text-white border-emerald-500 shadow' : 'bg-surface text-subtle border-line hover:border-emerald-300'}`}>
+                    <GraduationCap className="h-4 w-4" />Öğrencilere</button>
                 </div>)}
               <div className="flex items-center justify-between">
                 <Label className="text-sm text-subtle">{seciliHedefler.length} / {hedefKisiler.length} kişi seçildi</Label>
@@ -9971,40 +9971,40 @@ function GorevYonetimi({ user, students, teachers }) {
               </div>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-1">
                 {hedefKisiler.map(k => (<button key={k.id} type="button" onClick={() => toggleHedef(k.id)}
-                  className={`p-2.5 rounded-xl text-sm text-left transition-all border ${seciliHedefler.includes(k.id) ? 'bg-orange-50 border-orange-400 ring-2 ring-orange-200' : 'bg-surface border-line hover:border-line'}`}>
+                  className={`p-2.5 rounded-xl text-sm text-left transition-all border ${seciliHedefler.includes(k.id) ? 'bg-blue-50 border-primary ring-2 ring-blue-200' : 'bg-surface border-line hover:border-line'}`}>
                   <div className="font-medium truncate">{k.ad}</div>{k.sinif && <div className="text-xs text-subtle">{k.sinif}. sınıf</div>}</button>))}
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-sm"><CardHeader><div className="flex items-center justify-between"><CardTitle className="text-base">2. Görev Detayı</CardTitle>
+          <Card className="border border-line shadow-sm"><CardHeader><div className="flex items-center justify-between"><CardTitle className="text-base">2. Görev Detayı</CardTitle>
             <button type="button" onClick={() => { fetchGelisimIcerikleri(); setIcerikSecDialogu(true); }} className="text-xs text-primary hover:underline flex items-center gap-1"><BookOpen className="h-3 w-3" /> Mevcut içerikten seç</button></div></CardHeader>
             <CardContent className="space-y-4">
               <div><Label className="mb-2 block">Görev Türü</Label><div className="flex flex-wrap gap-2">
-                {[{v:"ozel",l:"📝 Özel Görev"},{v:"hizmetici",l:"🎓 Hizmetiçi"},{v:"film",l:"🎬 Film"},{v:"kitap",l:"📚 Kitap"},{v:"makale",l:"📄 Makale"},{v:"egzersiz",l:"🎯 Egzersiz"}].map(t => (
+                {[{v:"ozel",l:"Özel Görev"},{v:"hizmetici",l:"Hizmetiçi"},{v:"film",l:"Film"},{v:"kitap",l:"Kitap"},{v:"makale",l:"Makale"},{v:"egzersiz",l:"Egzersiz"}].map(t => (
                   <button key={t.v} type="button" onClick={() => setForm({...form, tur: t.v})}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${form.tur === t.v ? 'bg-orange-500 text-white border-orange-500 shadow' : 'bg-surface text-subtle border-line hover:border-orange-300'}`}>{t.l}</button>))}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${form.tur === t.v ? 'bg-primary text-white border-primary shadow' : 'bg-surface text-subtle border-line hover:border-primary'}`}>{t.l}</button>))}
               </div></div>
               <div><Label>Başlık *</Label><Input value={form.baslik} onChange={e => setForm({...form, baslik: e.target.value})} required placeholder="Görev başlığı..." /></div>
               <div><Label>Açıklama</Label><textarea value={form.aciklama} onChange={e => setForm({...form, aciklama: e.target.value})} placeholder="Detaylı açıklama..." className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px]" /></div>
               <div><Label>Son Tarih</Label><Input type="date" value={form.son_tarih} onChange={e => setForm({...form, son_tarih: e.target.value})} /></div>
 
-              {form.tur === "film" && (<div className="p-4 bg-purple-50 border border-purple-200 rounded-xl space-y-3"><div className="font-semibold text-sm text-purple-800">🎬 Film Bilgileri</div><div><Label>Film Linki</Label><Input value={form.film_link} onChange={e => setForm({...form, film_link: e.target.value})} placeholder="https://..." /></div></div>)}
+              {form.tur === "film" && (<div className="p-4 bg-app border border-line rounded-xl space-y-3"><div className="inline-flex items-center gap-1.5 font-semibold text-sm text-content"><Film className="h-4 w-4" />Film Bilgileri</div><div><Label>Film Linki</Label><Input value={form.film_link} onChange={e => setForm({...form, film_link: e.target.value})} placeholder="https://..." /></div></div>)}
 
-              {form.tur === "kitap" && (<div className="p-4 bg-green-50 border border-green-200 rounded-xl space-y-3"><div className="font-semibold text-sm text-green-800">📚 Kitap Bilgileri</div>
+              {form.tur === "kitap" && (<div className="p-4 bg-app border border-line rounded-xl space-y-3"><div className="inline-flex items-center gap-1.5 font-semibold text-sm text-content"><BookMarked className="h-4 w-4" />Kitap Bilgileri</div>
                 <div className="flex gap-2"><Input placeholder="ISBN veya Barkod" value={form.kitap_isbn} onChange={e => setForm({...form, kitap_isbn: e.target.value})} className="flex-1" />
-                  <Button type="button" size="sm" className="bg-green-600 text-white" disabled={kitapYukleniyor || !form.kitap_isbn.trim()} onClick={() => kitapBilgiCekGorev(form.kitap_isbn, 'isbn')}>{kitapYukleniyor ? '⏳' : '🔍'} Ara</Button></div>
+                  <Button type="button" size="sm" className="bg-primary hover:bg-primary-hover text-white" disabled={kitapYukleniyor || !form.kitap_isbn.trim()} onClick={() => kitapBilgiCekGorev(form.kitap_isbn, 'isbn')}>{kitapYukleniyor ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}<span className="ml-1">Ara</span></Button></div>
                 <div className="flex gap-2"><Input placeholder="Kitap sitesi linki" value={form.kitap_link} onChange={e => setForm({...form, kitap_link: e.target.value})} className="flex-1" />
-                  <Button type="button" size="sm" className="bg-primary text-white" disabled={kitapYukleniyor || !form.kitap_link.trim()} onClick={() => kitapBilgiCekGorev(form.kitap_link, 'link')}>{kitapYukleniyor ? '⏳' : '🔗'} Çek</Button></div>
+                  <Button type="button" size="sm" className="bg-primary hover:bg-primary-hover text-white" disabled={kitapYukleniyor || !form.kitap_link.trim()} onClick={() => kitapBilgiCekGorev(form.kitap_link, 'link')}>{kitapYukleniyor ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}<span className="ml-1">Çek</span></Button></div>
                 {form.kitap_kapak && <img src={form.kitap_kapak} alt="Kapak" className="h-32 rounded-lg shadow" onError={e => { e.target.style.display='none'; }} />}
                 <div><Label>Yazar</Label><Input value={form.kitap_yazar} onChange={e => setForm({...form, kitap_yazar: e.target.value})} /></div></div>)}
 
-              {form.tur === "makale" && (<div className="p-4 bg-orange-50 border border-orange-200 rounded-xl space-y-3"><div className="font-semibold text-sm text-orange-800">📄 Makale Linki</div><Input value={form.makale_link} onChange={e => setForm({...form, makale_link: e.target.value})} placeholder="https://..." /></div>)}
+              {form.tur === "makale" && (<div className="p-4 bg-app border border-line rounded-xl space-y-3"><div className="inline-flex items-center gap-1.5 font-semibold text-sm text-content"><FileText className="h-4 w-4" />Makale Linki</div><Input value={form.makale_link} onChange={e => setForm({...form, makale_link: e.target.value})} placeholder="https://..." /></div>)}
             </CardContent>
           </Card>
 
           <div className="flex gap-3">
-            <Button type="submit" className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white py-3">{seciliHedefler.length > 1 ? `${seciliHedefler.length} Kişiye Görev Ata` : "Görev Ata"}</Button>
+            <Button type="submit" className="flex-1 bg-primary hover:bg-primary-hover text-white py-3">{seciliHedefler.length > 1 ? `${seciliHedefler.length} Kişiye Görev Ata` : "Görev Ata"}</Button>
             <Button type="button" variant="outline" onClick={() => setGorunum("liste")} className="flex-1">İptal</Button>
           </div>
         </form>
@@ -10013,8 +10013,8 @@ function GorevYonetimi({ user, students, teachers }) {
           <div className="max-h-96 overflow-y-auto space-y-2">
             {gelisimIcerikleri.length === 0 && <p className="text-subtle text-sm text-center py-8">Yayında içerik yok</p>}
             {gelisimIcerikleri.map(ic => (<button key={ic.id} onClick={() => iceriktenGorev(ic)}
-              className="w-full text-left p-3 rounded-xl border border-line hover:border-orange-300 hover:bg-orange-50 transition-all">
-              <div className="flex items-center gap-2"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${turColorGorev(ic.tur)}`}>{turIcon(ic.tur)} {turLabelGorev(ic.tur)}</span><span className="font-medium text-sm">{ic.baslik}</span></div>
+              className="w-full text-left p-3 rounded-xl border border-line hover:border-primary hover:bg-app transition-all">
+              <div className="flex items-center gap-2"><span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${turColorGorev(ic.tur)}`}>{turIcon(ic.tur)} {turLabelGorev(ic.tur)}</span><span className="font-medium text-sm">{ic.baslik}</span></div>
               {ic.aciklama && <p className="text-xs text-subtle mt-1 truncate">{ic.aciklama}</p>}</button>))}
           </div></DialogContent></Dialog>
       </div>
@@ -10027,22 +10027,22 @@ function GorevYonetimi({ user, students, teachers }) {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div><h2 className="text-2xl font-bold text-content">Görev Yönetimi</h2>
           <p className="text-subtle text-sm mt-1">{user.role === "teacher" ? "Öğrencilerinize ödev atayın ve görevlerinizi takip edin" : "Öğretmenlere ve öğrencilere görev atayın, takip edin"}</p></div>
-        <Button onClick={() => { setGorunum("olustur"); setSeciliHedefler([]); }} className="bg-gradient-to-r from-orange-500 to-red-500 text-white"><Plus className="h-4 w-4 mr-2" /> Yeni Görev Ata</Button>
+        <Button onClick={() => { setGorunum("olustur"); setSeciliHedefler([]); }} className="bg-primary hover:bg-primary-hover text-white"><Plus className="h-4 w-4 mr-2" /> Yeni Görev Ata</Button>
       </div>
 
       {istatistik && (<div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        {[{ label: "Toplam", value: (istatistik.ogretmen?.toplam||0)+(istatistik.ogrenci?.toplam||0), color: "bg-app text-content", icon: "📋" },
-          { label: "Bekliyor", value: (istatistik.ogretmen?.bekliyor||0)+(istatistik.ogrenci?.bekliyor||0), color: "bg-yellow-50 text-yellow-700", icon: "⏳" },
-          { label: "Devam Ediyor", value: (istatistik.ogretmen?.devam_ediyor||0)+(istatistik.ogrenci?.devam_ediyor||0), color: "bg-blue-50 text-primary", icon: "🔄" },
-          { label: "Tamamlandı", value: (istatistik.ogretmen?.tamamlandi||0)+(istatistik.ogrenci?.tamamlandi||0), color: "bg-green-50 text-green-700", icon: "✅" },
-          { label: "Süresi Doldu", value: (istatistik.ogretmen?.suresi_doldu||0)+(istatistik.ogrenci?.suresi_doldu||0), color: "bg-red-50 text-red-700", icon: "⏰" },
-        ].map((s, i) => (<div key={i} className={`${s.color} rounded-xl p-3 text-center`}><div className="text-2xl font-bold">{s.value}</div><div className="text-xs font-medium">{s.icon} {s.label}</div></div>))}
+        {[{ label: "Toplam", value: (istatistik.ogretmen?.toplam||0)+(istatistik.ogrenci?.toplam||0), color: "bg-app text-content border-line", Icon: ClipboardList },
+          { label: "Bekliyor", value: (istatistik.ogretmen?.bekliyor||0)+(istatistik.ogrenci?.bekliyor||0), color: "bg-amber-50 text-amber-700 border-amber-200", Icon: Clock },
+          { label: "Devam Ediyor", value: (istatistik.ogretmen?.devam_ediyor||0)+(istatistik.ogrenci?.devam_ediyor||0), color: "bg-blue-50 text-primary border-blue-200", Icon: RefreshCw },
+          { label: "Tamamlandı", value: (istatistik.ogretmen?.tamamlandi||0)+(istatistik.ogrenci?.tamamlandi||0), color: "bg-green-50 text-green-700 border-green-200", Icon: CheckCircle },
+          { label: "Süresi Doldu", value: (istatistik.ogretmen?.suresi_doldu||0)+(istatistik.ogrenci?.suresi_doldu||0), color: "bg-red-50 text-red-700 border-red-200", Icon: Clock },
+        ].map((s, i) => (<div key={i} className={`${s.color} border rounded-xl p-3 text-center`}><div className="text-2xl font-bold tabular-nums">{s.value}</div><div className="inline-flex items-center gap-1 text-xs font-medium"><s.Icon className="h-3 w-3" />{s.label}</div></div>))}
       </div>)}
 
       {user.role === "teacher" && benimGorevlerim.filter(g => g.durum !== "tamamlandi").length > 0 && (
-        <Card className="border-0 shadow-sm border-l-4 border-l-indigo-500"><CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2">📌 Bana Atanan Görevler <Badge className="bg-indigo-100 text-indigo-700">{benimGorevlerim.filter(g => g.durum !== "tamamlandi").length} aktif</Badge></CardTitle></CardHeader>
+        <Card className="border border-line shadow-sm border-l-4 border-l-primary"><CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Pin className="h-4 w-4 text-primary" />Bana Atanan Görevler <Badge className="bg-blue-100 text-primary tabular-nums">{benimGorevlerim.filter(g => g.durum !== "tamamlandi").length} aktif</Badge></CardTitle></CardHeader>
           <CardContent><div className="space-y-2">
-            {benimGorevlerim.filter(g => g.durum !== "tamamlandi").map(g => (<div key={g.id} className="flex items-center justify-between p-3 bg-indigo-50 rounded-xl">
+            {benimGorevlerim.filter(g => g.durum !== "tamamlandi").map(g => (<div key={g.id} className="flex items-center justify-between p-3 bg-app rounded-xl">
               <div className="flex items-center gap-3"><span className="text-lg">{turIcon(g.tur)}</span><div><div className="font-medium text-sm">{g.baslik}</div><div className="text-xs text-subtle">Atayan: {g.atayan_ad} {g.son_tarih && `• Son: ${new Date(g.son_tarih).toLocaleDateString('tr-TR')}`}</div></div></div>
               <div className="flex items-center gap-2">{durumBadgeGorev(g.durum)}
                 {g.durum !== "tamamlandi" && (<Button size="sm" className="bg-green-600 text-white text-xs" onClick={() => { setTamamlamaDialogu(g); setTamamlamaNotu(""); }}>Tamamla</Button>)}
@@ -10052,28 +10052,28 @@ function GorevYonetimi({ user, students, teachers }) {
       <div className="flex flex-wrap gap-2 items-center">
         <Input placeholder="Görev veya kişi ara..." value={aramaMetni} onChange={e => setAramaMetni(e.target.value)} className="w-64" />
         <div className="flex gap-1">
-          {[{v:"hepsi",l:"Hepsi"},{v:"bekliyor",l:"⏳ Bekliyor"},{v:"devam_ediyor",l:"🔄 Devam"},{v:"tamamlandi",l:"✅ Tamamlandı"}].map(f => (
-            <button key={f.v} onClick={() => setFiltre(f.v)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${filtre === f.v ? 'bg-orange-500 text-white border-orange-500' : 'bg-surface text-subtle border-line hover:border-orange-300'}`}>{f.l}</button>))}
+          {[{v:"hepsi",l:"Hepsi"},{v:"bekliyor",l:"Bekliyor"},{v:"devam_ediyor",l:"Devam"},{v:"tamamlandi",l:"Tamamlandı"}].map(f => (
+            <button key={f.v} onClick={() => setFiltre(f.v)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${filtre === f.v ? 'bg-primary text-white border-primary' : 'bg-surface text-subtle border-line hover:border-primary'}`}>{f.l}</button>))}
         </div>
         {(user.role === "admin" || user.role === "coordinator") && (<div className="flex gap-1 ml-2">
-          {[{v:"hepsi",l:"Tümü"},{v:"ogretmen",l:"👩‍🏫 Öğretmen"},{v:"ogrenci",l:"🎓 Öğrenci"}].map(f => (
-            <button key={f.v} onClick={() => setHedefTipFiltre(f.v)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${hedefTipFiltre === f.v ? 'bg-primary text-white border-blue-500' : 'bg-surface text-subtle border-line hover:border-blue-300'}`}>{f.l}</button>))}
+          {[{v:"hepsi",l:"Tümü"},{v:"ogretmen",l:"Öğretmen"},{v:"ogrenci",l:"Öğrenci"}].map(f => (
+            <button key={f.v} onClick={() => setHedefTipFiltre(f.v)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${hedefTipFiltre === f.v ? 'bg-primary text-white border-primary' : 'bg-surface text-subtle border-line hover:border-primary'}`}>{f.l}</button>))}
         </div>)}
       </div>
 
       {filtrelenmisGorevler.length === 0 ? (
-        <div className="text-center py-16"><div className="text-6xl mb-4">📋</div><h3 className="text-lg font-bold text-content">Henüz görev yok</h3><p className="text-subtle text-sm mt-1">Yeni bir görev oluşturarak başlayın.</p></div>
+        <div className="text-center py-16"><ClipboardList className="h-14 w-14 mx-auto mb-4 text-subtle" /><h3 className="text-lg font-bold text-content">Henüz görev yok</h3><p className="text-subtle text-sm mt-1">Yeni bir görev oluşturarak başlayın.</p></div>
       ) : (<div className="space-y-3">
         {filtrelenmisGorevler.map(g => (
-          <Card key={g.id} className={`border-0 shadow-sm transition-all hover:shadow-md ${g.durum === "tamamlandi" ? "opacity-70" : ""}`}><CardContent className="p-4"><div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3 flex-1 min-w-0"><span className="text-2xl mt-0.5">{turIcon(g.tur)}</span><div className="min-w-0 flex-1">
+          <Card key={g.id} className={`border border-line shadow-sm transition-all hover:shadow-md ${g.durum === "tamamlandi" ? "opacity-70" : ""}`}><CardContent className="p-4"><div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3 flex-1 min-w-0"><span className="text-primary mt-1">{turIcon(g.tur)}</span><div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap"><h4 className="font-bold text-content truncate">{g.baslik}</h4><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${turColorGorev(g.tur)}`}>{turLabelGorev(g.tur)}</span>{hedefTipBadge(g.hedef_tip)}</div>
               {g.aciklama && <p className="text-subtle text-sm mt-1 line-clamp-2">{g.aciklama}</p>}
               <div className="flex items-center gap-3 mt-2 text-xs text-subtle flex-wrap">
-                <span>📌 {g.hedef_ad}</span><span>🔄 Atayan: {g.atayan_ad}</span>
-                {g.son_tarih && <span>📅 Son: {new Date(g.son_tarih).toLocaleDateString('tr-TR')}</span>}
+                <span className="inline-flex items-center gap-1"><Pin className="h-3 w-3" />{g.hedef_ad}</span><span className="inline-flex items-center gap-1"><UserCheck className="h-3 w-3" />Atayan: {g.atayan_ad}</span>
+                {g.son_tarih && <span className="inline-flex items-center gap-1"><Calendar className="h-3 w-3" />Son: {new Date(g.son_tarih).toLocaleDateString('tr-TR')}</span>}
               </div>
-              {g.tamamlama_notu && <p className="text-xs text-primary mt-1 italic">💬 "{g.tamamlama_notu}"</p>}
+              {g.tamamlama_notu && <p className="inline-flex items-start gap-1 text-xs text-primary mt-1 italic"><MessageCircle className="h-3 w-3 mt-0.5 shrink-0" />"{g.tamamlama_notu}"</p>}
             </div></div>
             <div className="flex items-center gap-2 shrink-0">
               {durumBadgeGorev(g.durum)}
@@ -12032,26 +12032,26 @@ function MikroHedefMotor({ user, aiMotMesaj, apiBase }) {
   const ilerleme = secilenDk > 0 ? Math.min(100, Math.round(okunanDk / secilenDk * 100)) : 0;
 
   return (
-    <div className="bg-gradient-to-r from-cyan-50 to-blue-50 rounded-2xl p-4 border border-cyan-200">
+    <div className="bg-blue-50 rounded-2xl p-4 border border-blue-200">
       {/* AI Koç mesajı */}
       {aiMotMesaj && (
         <div className="flex items-start gap-2 mb-3">
-          <span className="text-xl">🤖</span>
+          <Sparkles className="h-5 w-5 text-primary shrink-0" />
           <div>
-            <div className="text-[10px] font-bold text-cyan-700 uppercase tracking-wide">AI Koçun Diyor ki</div>
+            <div className="text-[11px] font-bold text-primary uppercase tracking-wide">AI Koçun Diyor ki</div>
             <p className="text-sm text-content mt-0.5">{aiMotMesaj}</p>
           </div>
         </div>
       )}
 
       {/* Mikro hedef seçimi */}
-      <div className="border-t border-cyan-100 pt-3">
-        <div className="text-xs font-bold text-content mb-2">⏱ Bugün ne kadar okuyacaksın?</div>
+      <div className="border-t border-blue-100 pt-3">
+        <div className="inline-flex items-center gap-1.5 text-xs font-bold text-content mb-2"><Clock className="h-3.5 w-3.5" />Bugün ne kadar okuyacaksın?</div>
         {!secilenDk ? (
           <div className="flex gap-2">
             {[5, 10, 15, 20].map(dk => (
               <button key={dk} onClick={() => hedefSec(dk)}
-                className="flex-1 bg-surface border-2 border-cyan-300 hover:border-cyan-500 hover:bg-cyan-50 rounded-xl py-2 text-sm font-bold text-cyan-700 transition-all active:scale-95">
+                className="flex-1 bg-surface border-2 border-blue-300 hover:border-primary hover:bg-blue-50 rounded-xl py-2 text-sm font-bold text-primary transition-all active:scale-95 tabular-nums">
                 {dk} dk
               </button>
             ))}
@@ -12059,22 +12059,22 @@ function MikroHedefMotor({ user, aiMotMesaj, apiBase }) {
         ) : (
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs text-subtle">
-              <span>{tamamlandi ? "🎉 Hedef tamamlandı!" : sayacAktif ? "⏱ Okuma devam ediyor..." : "⏸ Duraklatıldı"}</span>
-              <span className="font-bold">{okunanDk} / {secilenDk} dk</span>
+              <span className="inline-flex items-center gap-1">{tamamlandi ? <><CheckCircle className="h-3.5 w-3.5 text-green-600" />Hedef tamamlandı!</> : sayacAktif ? <><Clock className="h-3.5 w-3.5" />Okuma devam ediyor...</> : <><Pause className="h-3.5 w-3.5" />Duraklatıldı</>}</span>
+              <span className="font-bold tabular-nums">{okunanDk} / {secilenDk} dk</span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div className={`h-2 rounded-full transition-all ${tamamlandi ? "bg-green-500" : "bg-gradient-to-r from-cyan-400 to-blue-500"}`}
+            <div className="w-full bg-app rounded-full h-2">
+              <div className={`h-2 rounded-full transition-all ${tamamlandi ? "bg-green-500" : "bg-primary"}`}
                 style={{ width: `${ilerleme}%` }} />
             </div>
             <div className="flex gap-2">
               <button onClick={() => setSayacAktif(a => !a)}
-                className={`flex-1 text-xs py-1.5 rounded-lg border font-medium transition-all
-                  ${sayacAktif ? "bg-orange-50 border-orange-300 text-orange-600" : "bg-green-50 border-green-300 text-green-600"}`}>
-                {sayacAktif ? "⏸ Duraklat" : "▶ Devam Et"}
+                className={`flex-1 inline-flex items-center justify-center gap-1 text-xs py-1.5 rounded-lg border font-medium transition-all
+                  ${sayacAktif ? "bg-amber-50 border-amber-300 text-amber-600" : "bg-green-50 border-green-300 text-green-600"}`}>
+                {sayacAktif ? <><Pause className="h-3.5 w-3.5" />Duraklat</> : <><Play className="h-3.5 w-3.5" />Devam Et</>}
               </button>
               <button onClick={() => { setSecilenDk(0); setOkunanDk(0); setSayacAktif(false); try { localStorage.removeItem(bugunKey); } catch {} }}
-                className="text-xs py-1.5 px-3 rounded-lg border border-line text-subtle hover:text-subtle">
-                ↺
+                className="inline-flex items-center text-xs py-1.5 px-3 rounded-lg border border-line text-subtle hover:text-subtle" aria-label="Sıfırla">
+                <RefreshCw className="h-3.5 w-3.5" />
               </button>
             </div>
           </div>
