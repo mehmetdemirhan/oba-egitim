@@ -10622,6 +10622,12 @@ function KitapOyunGorunum({ oyun, oyunDurum, setOyunDurum, onBitir, onKapat }) {
   const sesCalYanlis = () => { try { const ctx=new AudioContext(); const o=ctx.createOscillator(); const g=ctx.createGain(); o.connect(g); g.connect(ctx.destination); o.frequency.setValueAtTime(200,ctx.currentTime); g.gain.setValueAtTime(0.3,ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+0.4); o.start(); o.stop(ctx.currentTime+0.4); } catch(e){} };
 
   const [cevaplanmis, setCevaplanmis] = React.useState({});
+  // Alt-oyun state'leri koşullu return'lerden ÖNCE tanımlı (Rules of Hooks) —
+  // her tür yalnız kendi state'ini kullanır.
+  const [secilenSol, setSecilenSol] = React.useState(null);
+  const [eslesmeler, setEslesmeler] = React.useState({});
+  const [yanlisMis, setYanlisMis] = React.useState(null);
+  const [cevaplanmis2, setCevaplanmis2] = React.useState({});
 
   const Header = () => (
     <div className="flex items-center justify-between mb-3">
@@ -10688,9 +10694,6 @@ function KitapOyunGorunum({ oyun, oyunDurum, setOyunDurum, onBitir, onKapat }) {
   if (oyun.tur === "eslestirme") {
     const ciftler = oyun.ciftler || [];
     const karisikSaglar = oyun.karisikSaglar || ciftler.map(c => c.sag);
-    const [secilenSol, setSecilenSol] = React.useState(null);
-    const [eslesmeler, setEslesmeler] = React.useState({});
-    const [yanlisMis, setYanlisMis] = React.useState(null);
 
     const tamamlandi = Object.keys(eslesmeler).length === ciftler.length;
     if (tamamlandi) {
@@ -10750,7 +10753,6 @@ function KitapOyunGorunum({ oyun, oyunDurum, setOyunDurum, onBitir, onKapat }) {
   // Boşluk doldurma
   if (oyun.tur === "bosluk_doldurma" || oyun.tur === "bosluk") {
     const sorular = oyun.sorular || [];
-    const [cevaplanmis2, setCevaplanmis2] = React.useState({});
     const dogruSayisi = Object.values(cevaplanmis2).filter(Boolean).length;
     if (Object.keys(cevaplanmis2).length === sorular.length && sorular.length > 0) {
       setTimeout(() => onBitir(dogruSayisi, sorular.length), 500);
