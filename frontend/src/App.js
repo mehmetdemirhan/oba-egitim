@@ -6392,8 +6392,8 @@ function OgrenciPaneli({ user, logout }) {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center p-8 max-w-sm">
           <div className="text-5xl mb-4">🔒</div>
-          <h3 className="font-bold text-gray-900 text-lg">Bu özellik devre dışı</h3>
-          <p className="text-gray-500 text-sm mt-2">Sistem yöneticisi sesli okuma analizini kapatmıştır.</p>
+          <h3 className="font-bold text-content text-lg">Bu özellik devre dışı</h3>
+          <p className="text-subtle text-sm mt-2">Sistem yöneticisi sesli okuma analizini kapatmıştır.</p>
           <button onClick={() => setAktifEkran(null)} className="mt-4 px-4 py-2 bg-gray-200 rounded-xl text-sm font-medium">← Geri Dön</button>
         </div>
       </div>
@@ -6415,7 +6415,7 @@ function OgrenciPaneli({ user, logout }) {
             <div className="space-y-3">
               <div className={`rounded-2xl border p-4 text-center ${skorBg(speechSonuc.genel_skor)}`}>
                 <div className="text-5xl font-bold mb-1 text-purple-700">{speechSonuc.genel_skor}<span className="text-lg">/100</span></div>
-                <div className="text-sm font-medium text-gray-600 capitalize">{speechSonuc.seviye}</div>
+                <div className="text-sm font-medium text-subtle capitalize">{speechSonuc.seviye}</div>
                 <div className="text-xs text-green-600 font-bold mt-1">+{speechSonuc.xp_kazanildi} XP kazandın! 🎉</div>
               </div>
 
@@ -6427,10 +6427,10 @@ function OgrenciPaneli({ user, logout }) {
                   { label: "Tonlama", val: speechSonuc.tonlama_skoru, icon: "🎵" },
                   { label: "Vurgu", val: speechSonuc.vurgu_skoru, icon: "💥" },
                 ].map(m => (
-                  <div key={m.label} className="bg-white rounded-xl p-3 border text-center">
+                  <div key={m.label} className="bg-surface rounded-xl p-3 border text-center">
                     <div className="text-xl">{m.icon}</div>
                     <div className={`text-xl font-bold ${skorRenk(m.val)}`}>{m.val}</div>
-                    <div className="text-xs text-gray-500">{m.label}</div>
+                    <div className="text-xs text-subtle">{m.label}</div>
                     <div className="mt-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                       <div className={`h-1.5 rounded-full ${m.val>=80?"bg-green-500":m.val>=60?"bg-yellow-400":"bg-red-400"}`} style={{width:`${m.val}%`}} />
                     </div>
@@ -6439,14 +6439,14 @@ function OgrenciPaneli({ user, logout }) {
               </div>
 
               {/* WPM */}
-              <div className="bg-white rounded-xl border p-3 flex justify-between items-center">
+              <div className="bg-surface rounded-xl border p-3 flex justify-between items-center">
                 <div>
-                  <div className="text-xs text-gray-500">Okuma Hızın</div>
-                  <div className={`text-2xl font-bold ${skorRenk(speechSonuc.akicilik_skoru)}`}>{speechSonuc.wpm} <span className="text-sm font-normal text-gray-400">kelime/dk</span></div>
+                  <div className="text-xs text-subtle">Okuma Hızın</div>
+                  <div className={`text-2xl font-bold ${skorRenk(speechSonuc.akicilik_skoru)}`}>{speechSonuc.wpm} <span className="text-sm font-normal text-subtle">kelime/dk</span></div>
                 </div>
                 <div className="text-right">
-                  <div className="text-xs text-gray-500">Sınıf Normu</div>
-                  <div className="text-lg font-bold text-gray-400">{speechSonuc.norm_wpm} <span className="text-xs font-normal">kelime/dk</span></div>
+                  <div className="text-xs text-subtle">Sınıf Normu</div>
+                  <div className="text-lg font-bold text-subtle">{speechSonuc.norm_wpm} <span className="text-xs font-normal">kelime/dk</span></div>
                 </div>
               </div>
 
@@ -6454,7 +6454,7 @@ function OgrenciPaneli({ user, logout }) {
               {speechSonuc.ogrenci_mesaj && (
                 <div className="bg-gradient-to-r from-purple-100 to-indigo-100 rounded-xl p-3 border border-purple-200">
                   <div className="text-xs font-medium text-purple-700 mb-1">🤖 AI Koçun Diyor:</div>
-                  <p className="text-sm text-gray-700">{speechSonuc.ogrenci_mesaj}</p>
+                  <p className="text-sm text-content">{speechSonuc.ogrenci_mesaj}</p>
                 </div>
               )}
 
@@ -6493,24 +6493,24 @@ function OgrenciPaneli({ user, logout }) {
                 </div>
               </div>
 
-              <div className="bg-white rounded-2xl border-2 border-purple-200 p-4">
+              <div className="bg-surface rounded-2xl border-2 border-purple-200 p-4">
                 <div className="text-xs font-bold text-purple-700 mb-2">📖 Okunan Metin:</div>
-                <p className="text-sm text-gray-800 leading-relaxed font-medium">{seciliSpeechMetin.metin}</p>
+                <p className="text-sm text-content leading-relaxed font-medium">{seciliSpeechMetin.metin}</p>
               </div>
 
               <button onClick={speechBitir} disabled={speechYukleniyor || speechSure < 3}
                 className="w-full py-4 rounded-2xl bg-gradient-to-r from-red-500 to-pink-600 text-white font-bold text-lg disabled:opacity-50">
                 {speechYukleniyor ? "⏳ Analiz ediliyor..." : "⏹️ Bitir & Analiz Et"}
               </button>
-              {speechSure < 3 && <p className="text-xs text-center text-gray-400">En az 3 saniye kayıt gerekiyor</p>}
+              {speechSure < 3 && <p className="text-xs text-center text-subtle">En az 3 saniye kayıt gerekiyor</p>}
             </div>
           )}
 
           {/* Yükleniyor */}
           {speechYukleniyor && !speechKayit && (
-            <div className="bg-white rounded-2xl border p-8 text-center">
+            <div className="bg-surface rounded-2xl border p-8 text-center">
               <div className="text-4xl mb-3 animate-bounce">🤖</div>
-              <div className="text-sm font-medium text-gray-600">AI sesin analiz ediyor...</div>
+              <div className="text-sm font-medium text-subtle">AI sesin analiz ediyor...</div>
               <div className="mt-3 flex justify-center gap-1">
                 {[0,1,2].map(i => <div key={i} className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{animationDelay:`${i*0.15}s`}} />)}
               </div>
@@ -6520,17 +6520,17 @@ function OgrenciPaneli({ user, logout }) {
           {/* Metin seçimi */}
           {!speechSonuc && !speechKayit && !speechYukleniyor && (
             <div className="space-y-3">
-              <p className="text-sm text-gray-600 text-center">Bir metin seç ve yüksek sesle oku 📖</p>
+              <p className="text-sm text-subtle text-center">Bir metin seç ve yüksek sesle oku 📖</p>
               {speechMetinler.length === 0 && (
-                <div className="text-center text-gray-400 text-sm py-4">Metin yükleniyor...</div>
+                <div className="text-center text-subtle text-sm py-4">Metin yükleniyor...</div>
               )}
               {speechMetinler.map(m => (
-                <div key={m.id} className="bg-white rounded-2xl border-2 border-purple-100 hover:border-purple-300 p-4 cursor-pointer transition-all" onClick={() => speechBaslat(m)}>
+                <div key={m.id} className="bg-surface rounded-2xl border-2 border-purple-100 hover:border-purple-300 p-4 cursor-pointer transition-all" onClick={() => speechBaslat(m)}>
                   <div className="flex justify-between items-start mb-2">
-                    <div className="font-semibold text-gray-800 text-sm">{m.baslik}</div>
+                    <div className="font-semibold text-content text-sm">{m.baslik}</div>
                     <div className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">{m.kelime_sayisi} kelime</div>
                   </div>
-                  <p className="text-xs text-gray-500 line-clamp-2">{m.metin}</p>
+                  <p className="text-xs text-subtle line-clamp-2">{m.metin}</p>
                   <button className="mt-3 w-full py-2 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-600 text-white text-sm font-medium">🎤 Bu Metni Oku</button>
                 </div>
               ))}
@@ -6538,17 +6538,17 @@ function OgrenciPaneli({ user, logout }) {
               {/* Geçmiş */}
               {speechGecmis.length > 0 && (
                 <div className="mt-4">
-                  <div className="text-xs font-bold text-gray-500 mb-2">📊 Son Okumalar</div>
+                  <div className="text-xs font-bold text-subtle mb-2">📊 Son Okumalar</div>
                   <div className="space-y-2">
                     {speechGecmis.slice(0,3).map((k,i) => (
-                      <div key={i} className="bg-white rounded-xl border p-3 flex justify-between items-center">
+                      <div key={i} className="bg-surface rounded-xl border p-3 flex justify-between items-center">
                         <div>
-                          <div className="text-xs font-medium text-gray-700">{k.metin_baslik}</div>
-                          <div className="text-xs text-gray-400">{k.tarih?.slice(0,10)}</div>
+                          <div className="text-xs font-medium text-content">{k.metin_baslik}</div>
+                          <div className="text-xs text-subtle">{k.tarih?.slice(0,10)}</div>
                         </div>
                         <div className="text-right">
                           <div className={`text-lg font-bold ${skorRenk(k.analiz?.genel_skor||0)}`}>{k.analiz?.genel_skor||0}</div>
-                          <div className="text-xs text-gray-400">{k.analiz?.wpm||0} k/dk</div>
+                          <div className="text-xs text-subtle">{k.analiz?.wpm||0} k/dk</div>
                         </div>
                       </div>
                     ))}
@@ -6577,7 +6577,7 @@ function OgrenciPaneli({ user, logout }) {
             <Button onClick={() => setOkumaDuraklatildi(!okumaDuraklatildi)} variant="outline" className="rounded-full px-8 py-3 text-lg border-green-300 text-green-700">{okumaDuraklatildi ? "▶ Devam Et" : "⏸ Duraklat"}</Button>
             <Button onClick={okumaBitir} className="rounded-full px-8 py-3 text-lg bg-gradient-to-r from-green-500 to-emerald-600 text-white" disabled={okumaSuresi < 30}>✅ Bitirdim</Button>
           </div>
-          {okumaSuresi < 30 && <p className="text-xs text-gray-400">En az 30 saniye okuman gerekiyor</p>}
+          {okumaSuresi < 30 && <p className="text-xs text-subtle">En az 30 saniye okuman gerekiyor</p>}
         </div>
       </div>
     );
@@ -6589,8 +6589,8 @@ function OgrenciPaneli({ user, logout }) {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center p-8 max-w-sm">
           <div className="text-5xl mb-4">🔒</div>
-          <h3 className="font-bold text-gray-900 text-lg">Bu özellik devre dışı</h3>
-          <p className="text-gray-500 text-sm mt-2">Sistem yöneticisi seviyeli okumayı kapatmıştır.</p>
+          <h3 className="font-bold text-content text-lg">Bu özellik devre dışı</h3>
+          <p className="text-subtle text-sm mt-2">Sistem yöneticisi seviyeli okumayı kapatmıştır.</p>
           <button onClick={() => setAktifEkran(null)} className="mt-4 px-4 py-2 bg-gray-200 rounded-xl text-sm font-medium">← Geri Dön</button>
         </div>
       </div>
@@ -6603,12 +6603,12 @@ function OgrenciPaneli({ user, logout }) {
             <button onClick={() => setAktifEkran(null)} className="text-indigo-600 text-sm">← Geri</button>
             <h2 className="text-base font-bold text-indigo-900">📖 Seviyeli Okuma</h2>
           </div>
-          <div className="bg-white rounded-2xl p-4 border shadow-sm">
-            <div className="text-sm font-bold text-gray-800 mb-1">Hangi kitabı okumak istiyorsun?</div>
-            <div className="text-xs text-gray-500 mb-4">AI kitabı Kolay → Orta → Orijinal olarak hazırlar</div>
+          <div className="bg-surface rounded-2xl p-4 border shadow-sm">
+            <div className="text-sm font-bold text-content mb-1">Hangi kitabı okumak istiyorsun?</div>
+            <div className="text-xs text-subtle mb-4">AI kitabı Kolay → Orta → Orijinal olarak hazırlar</div>
             {havuzKitaplar.length > 0 && (
               <div className="mb-4">
-                <div className="text-xs font-medium text-gray-500 mb-2">📚 Kitap Havuzundan Seç</div>
+                <div className="text-xs font-medium text-subtle mb-2">📚 Kitap Havuzundan Seç</div>
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                   {havuzKitaplar.map(k => (
                     <button key={k.id} disabled={scaffoldYukleniyor}
@@ -6626,15 +6626,15 @@ function OgrenciPaneli({ user, logout }) {
                       className="w-full text-left bg-indigo-50 border-2 border-indigo-100 hover:border-indigo-400 rounded-xl p-3 transition-all disabled:opacity-50 flex items-center gap-3 active:scale-[0.98]">
                       <span className="text-2xl flex-shrink-0">📚</span>
                       <div className="min-w-0">
-                        <div className="font-semibold text-sm text-gray-800 truncate">{k.baslik}</div>
-                        {k.kitap_yazar && <div className="text-xs text-gray-500">{k.kitap_yazar}</div>}
+                        <div className="font-semibold text-sm text-content truncate">{k.baslik}</div>
+                        {k.kitap_yazar && <div className="text-xs text-subtle">{k.kitap_yazar}</div>}
                       </div>
                       {scaffoldYukleniyor && <span className="ml-auto text-indigo-400 text-lg">⏳</span>}
                     </button>
                   ))}
                 </div>
                 <div className="flex items-center gap-2 my-4">
-                  <div className="flex-1 h-px bg-gray-200"/><span className="text-xs text-gray-400">veya farklı kitap</span><div className="flex-1 h-px bg-gray-200"/>
+                  <div className="flex-1 h-px bg-gray-200"/><span className="text-xs text-subtle">veya farklı kitap</span><div className="flex-1 h-px bg-gray-200"/>
                 </div>
               </div>
             )}
@@ -6644,7 +6644,7 @@ function OgrenciPaneli({ user, logout }) {
                 <div className="flex gap-2">
                   <input value={manuelAd} onChange={e => setManuelAd(e.target.value)}
                     placeholder="Kitap adını yaz..."
-                    className="flex-1 border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-400" />
+                    className="flex-1 border-2 border-line rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-400" />
                   <button disabled={!manuelAd.trim() || scaffoldYukleniyor}
                     onClick={async () => {
                       setScaffoldYukleniyor(true);
@@ -6681,9 +6681,9 @@ function OgrenciPaneli({ user, logout }) {
             <button onClick={() => setAktifEkran(null)} className="text-indigo-600 text-sm">← Geri</button>
             <h2 className="text-base font-bold text-indigo-900">📖 Seviyeli Okuma</h2>
           </div>
-          <div className="text-center bg-white rounded-2xl p-3 border shadow-sm">
-            <div className="text-sm font-bold text-gray-800">{scaffoldData.kitap_adi}</div>
-            <div className="text-xs text-gray-500 mt-0.5">{scaffoldData.zpd_aciklama}</div>
+          <div className="text-center bg-surface rounded-2xl p-3 border shadow-sm">
+            <div className="text-sm font-bold text-content">{scaffoldData.kitap_adi}</div>
+            <div className="text-xs text-subtle mt-0.5">{scaffoldData.zpd_aciklama}</div>
           </div>
 
           {/* Seviye seçici */}
@@ -6693,7 +6693,7 @@ function OgrenciPaneli({ user, logout }) {
               const onerilen = scaffoldData.onerilen_seviye === sev;
               return (
                 <button key={sev} onClick={() => setScaffoldSeviye(sev)}
-                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold border-2 transition-all ${scaffoldSeviye===sev?"border-indigo-500 bg-indigo-500 text-white":"border-gray-200 bg-white text-gray-600 hover:border-indigo-300"}`}>
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold border-2 transition-all ${scaffoldSeviye===sev?"border-indigo-500 bg-indigo-500 text-white":"border-line bg-surface text-subtle hover:border-indigo-300"}`}>
                   {etiket}{onerilen && <span className="block text-[9px] opacity-80">⭐ Önerilen</span>}
                 </button>
               );
@@ -6701,15 +6701,15 @@ function OgrenciPaneli({ user, logout }) {
           </div>
 
           {/* Metin */}
-          <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+          <div className="bg-surface rounded-2xl border shadow-sm overflow-hidden">
             <div className={`px-4 py-3 border-b ${scaffoldSeviye==="kolay"?"bg-green-50 border-green-100":scaffoldSeviye==="orta"?"bg-yellow-50 border-yellow-100":"bg-indigo-50 border-indigo-100"}`}>
               <div className="flex items-center justify-between">
-                <div className="font-bold text-sm text-gray-800">{mevcut.baslik}</div>
-                <div className="text-xs text-gray-400">{mevcut.kelime_sayisi} kelime</div>
+                <div className="font-bold text-sm text-content">{mevcut.baslik}</div>
+                <div className="text-xs text-subtle">{mevcut.kelime_sayisi} kelime</div>
               </div>
             </div>
             <div className="p-4">
-              <p className="text-sm text-gray-800 leading-relaxed">{mevcut.metin}</p>
+              <p className="text-sm text-content leading-relaxed">{mevcut.metin}</p>
             </div>
             {mevcut.anahtar_kelimeler?.length > 0 && (
               <div className="px-4 pb-4 flex flex-wrap gap-1.5">
@@ -6749,13 +6749,13 @@ function OgrenciPaneli({ user, logout }) {
     const dk = Math.max(1, Math.round(okumaSuresi / 60));
     return (
       <div className="min-h-screen bg-gradient-to-b from-orange-50 to-yellow-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full"><Card className="border-0 shadow-lg"><CardHeader className="text-center"><div className="text-4xl mb-2">🌳🌳🌳</div><CardTitle>Harika! {dk} dakika okudun.</CardTitle><p className="text-gray-500 text-sm">Bugün ne okudun?</p></CardHeader>
+        <div className="max-w-md w-full"><Card className="border border-line shadow-lg"><CardHeader className="text-center"><div className="text-4xl mb-2">🌳🌳🌳</div><CardTitle>Harika! {dk} dakika okudun.</CardTitle><p className="text-subtle text-sm">Bugün ne okudun?</p></CardHeader>
           <CardContent><form onSubmit={okumaKaydet} className="space-y-4">
             <div><Label>Kitap Adı *</Label><Input value={neOkudunForm.kitap_adi} onChange={e => setNeOkudunForm({...neOkudunForm, kitap_adi: e.target.value})} required placeholder="Kitabın adı" /></div>
             <div><Label>Bölüm</Label><Input value={neOkudunForm.bolum} onChange={e => setNeOkudunForm({...neOkudunForm, bolum: e.target.value})} placeholder="Bölüm 3" /></div>
             <div className="grid grid-cols-2 gap-3"><div><Label>Başlangıç Sayfa</Label><Input type="number" value={neOkudunForm.baslangic_sayfa} onChange={e => setNeOkudunForm({...neOkudunForm, baslangic_sayfa: e.target.value})} /></div><div><Label>Bitiş Sayfa</Label><Input type="number" value={neOkudunForm.bitis_sayfa} onChange={e => setNeOkudunForm({...neOkudunForm, bitis_sayfa: e.target.value})} /></div></div>
             <div><Label>Not</Label><Input value={neOkudunForm.not_text} onChange={e => setNeOkudunForm({...neOkudunForm, not_text: e.target.value})} placeholder="Kısa not..." /></div>
-            <Button type="submit" className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 rounded-xl">Kaydet 📝</Button>
+            <Button type="submit" className="w-full bg-primary hover:bg-primary-hover text-white py-3 rounded-xl"><Save className="h-4 w-4 mr-1" />Kaydet</Button>
             <Button type="button" variant="outline" className="w-full" onClick={() => { setOkumaSuresi(0); setAktifEkran(null); setSocraticSoru(null); }}>Atla</Button>
           </form></CardContent></Card>
 
@@ -6766,7 +6766,7 @@ function OgrenciPaneli({ user, logout }) {
                 <CardTitle className="text-base flex items-center gap-2">🤖 Okuma Koçun Soruyor</CardTitle>
               </CardHeader>
               <CardContent className="pt-3 space-y-3">
-                <p className="text-sm font-medium text-gray-800">{socraticSoru.soru}</p>
+                <p className="text-sm font-medium text-content">{socraticSoru.soru}</p>
                 {socraticSoru.ipucu && <p className="text-xs text-cyan-600 italic">💡 İpucu: {socraticSoru.ipucu}</p>}
                 {!socraticSonuc ? (<>
                   <textarea value={socraticCevap} onChange={e => setSocraticCevap(e.target.value)} className="w-full border rounded-lg p-2 text-sm min-h-[60px]" placeholder="Düşünceni yaz..." />
@@ -6785,7 +6785,7 @@ function OgrenciPaneli({ user, logout }) {
                       {[1,2,3,4,5].map(s => <span key={s} className={`text-lg ${s <= socraticSonuc.puan ? '⭐' : '☆'}`}>{s <= socraticSonuc.puan ? '⭐' : '☆'}</span>)}
                       <span className="text-xs text-green-600 font-bold">+{socraticSonuc.xp} XP</span>
                     </div>
-                    <p className="text-sm text-gray-700 bg-cyan-50 p-2 rounded-lg">{socraticSonuc.geri_bildirim}</p>
+                    <p className="text-sm text-content bg-cyan-50 p-2 rounded-lg">{socraticSonuc.geri_bildirim}</p>
                     <Button className="w-full bg-green-600 text-white text-sm" onClick={() => { setSocraticSoru(null); setSocraticSonuc(null); setAktifEkran(null); }}>Tamam ✅</Button>
                   </div>
                 )}
@@ -6809,11 +6809,11 @@ function OgrenciPaneli({ user, logout }) {
     <div className="min-h-screen bg-gray-50">
       {/* Header — tam ekran egzersiz modunda gizlenir */}
       {!isFullscreen && (
-      <div className="bg-white border-b sticky top-0 z-30">
+      <div className="bg-surface border-b sticky top-0 z-30">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-red-500 rounded-xl flex items-center justify-center"><BookOpen className="h-5 w-5 text-white" /></div>
-            <div><div className="font-bold text-gray-900 text-sm">{user.ad} {user.soyad}</div><div className="text-xs text-gray-500">{profil?.kur ? `Kur: ${profil.kur}` : "Öğrenci"} {profil?.sinif ? `• ${profil.sinif}. sınıf` : ""}</div></div>
+            <div><div className="font-bold text-content text-sm">{user.ad} {user.soyad}</div><div className="text-xs text-subtle">{profil?.kur ? `Kur: ${profil.kur}` : "Öğrenci"} {profil?.sinif ? `• ${profil.sinif}. sınıf` : ""}</div></div>
           </div>
           <div className="flex items-center gap-2">
             <div className="text-center"><div className="text-lg font-bold text-orange-600">{seviyeEmoji} Sv.{seviye}</div></div>
@@ -6826,11 +6826,11 @@ function OgrenciPaneli({ user, logout }) {
 
       {/* 5 Tab — temiz, taşmaz — tam ekran egzersiz modunda gizlenir */}
       {!isFullscreen && (
-      <div className="bg-white border-b sticky top-[60px] z-20">
+      <div className="bg-surface border-b sticky top-[60px] z-20">
         <div className="max-w-2xl mx-auto px-2 flex justify-between py-2">
           {sekmeler.map(s => (
             <button key={s.id} onClick={() => setAktifSekme(s.id)}
-              className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl text-[11px] font-medium transition-all min-w-0 flex-1 ${aktifSekme === s.id ? 'bg-orange-500 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>
+              className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl text-[11px] font-medium transition-all min-w-0 flex-1 ${aktifSekme === s.id ? 'bg-primary text-white shadow' : 'text-subtle hover:bg-app'}`}>
               <span className="text-base">{s.icon}</span>
               <span className="truncate">{s.label}</span>
               {s.badge > 0 && <span className={`px-1.5 rounded-full text-[9px] font-bold ${aktifSekme === s.id ? 'bg-white/30' : 'bg-red-100 text-red-600'}`}>{s.badge}</span>}
@@ -6851,7 +6851,7 @@ function OgrenciPaneli({ user, logout }) {
                 <div className="text-lg font-bold">{xpDurum.lig_label}</div>
               </div>
               {xpDurum.sonraki_lig && (<>
-                <div className="bg-white/20 rounded-full h-2.5 overflow-hidden"><div className="h-full bg-white rounded-full transition-all" style={{ width: `${Math.min(100, ((xpDurum.toplam_xp - (LIG_ESIKLERI_FE[xpDurum.lig] || 0)) / Math.max(1, xpDurum.sonraki_esik - (LIG_ESIKLERI_FE[xpDurum.lig] || 0))) * 100)}%` }} /></div>
+                <div className="bg-white/20 rounded-full h-2.5 overflow-hidden"><div className="h-full bg-surface rounded-full transition-all" style={{ width: `${Math.min(100, ((xpDurum.toplam_xp - (LIG_ESIKLERI_FE[xpDurum.lig] || 0)) / Math.max(1, xpDurum.sonraki_esik - (LIG_ESIKLERI_FE[xpDurum.lig] || 0))) * 100)}%` }} /></div>
                 <p className="text-xs opacity-70 mt-1">Sonraki lig: {({"gumus":"🥈 Gümüş","altin":"🥇 Altın","elmas":"💎 Elmas"})[xpDurum.sonraki_lig]}</p>
               </>)}
               {!xpDurum.sonraki_lig && <p className="text-xs opacity-80 mt-1">En yüksek lige ulaştın! 🎉</p>}
@@ -6860,19 +6860,19 @@ function OgrenciPaneli({ user, logout }) {
           {!xpDurum && (
             <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl p-4 text-white">
               <div className="text-lg font-bold">{seviyeEmoji} Seviye {seviye}</div>
-              <div className="bg-white/20 rounded-full h-2.5 overflow-hidden mt-2"><div className="h-full bg-white rounded-full" style={{ width: `${seviyeIlerleme}%` }} /></div>
+              <div className="bg-white/20 rounded-full h-2.5 overflow-hidden mt-2"><div className="h-full bg-surface rounded-full" style={{ width: `${seviyeIlerleme}%` }} /></div>
               <p className="text-xs opacity-70 mt-1">Sonraki seviye için {100 - seviyeIlerleme} dk oku</p>
             </div>
           )}
 
           {/* 2x3 istatistik grid */}
           <div className="grid grid-cols-3 gap-2">
-            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-orange-600">{istatistik?.streak || 0}</div><div className="text-[10px] text-gray-500">🔥 Gün Streak</div></div>
-            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-green-600">{istatistik?.bugun_dakika || 0}</div><div className="text-[10px] text-gray-500">⏱ Bugün (dk)</div></div>
-            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-blue-600">{istatistik?.toplam_kitap || 0}</div><div className="text-[10px] text-gray-500">📚 Kitap</div></div>
-            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-purple-600">{toplamOkumaSaati}</div><div className="text-[10px] text-gray-500">⏳ Saat Okuma</div></div>
-            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-pink-600">{okunanSayfa}</div><div className="text-[10px] text-gray-500">📄 Sayfa</div></div>
-            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-teal-600">{tamamlananGorevSayisi + tamamlananGelisim}</div><div className="text-[10px] text-gray-500">✅ Tamamlanan</div></div>
+            <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-orange-600">{istatistik?.streak || 0}</div><div className="text-[10px] text-subtle">🔥 Gün Streak</div></div>
+            <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-green-600">{istatistik?.bugun_dakika || 0}</div><div className="text-[10px] text-subtle">⏱ Bugün (dk)</div></div>
+            <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-blue-600">{istatistik?.toplam_kitap || 0}</div><div className="text-[10px] text-subtle">📚 Kitap</div></div>
+            <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-purple-600">{toplamOkumaSaati}</div><div className="text-[10px] text-subtle">⏳ Saat Okuma</div></div>
+            <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-pink-600">{okunanSayfa}</div><div className="text-[10px] text-subtle">📄 Sayfa</div></div>
+            <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-teal-600">{tamamlananGorevSayisi + tamamlananGelisim}</div><div className="text-[10px] text-subtle">✅ Tamamlanan</div></div>
           </div>
 
           {/* 🤖 AI Günlük Motivasyon + Mikro Hedef */}
@@ -6884,7 +6884,7 @@ function OgrenciPaneli({ user, logout }) {
           )}
 
           {/* Haftalık hedef */}
-          {istatistik && (<div className="bg-white rounded-2xl p-4 shadow-sm border"><div className="flex items-center justify-between mb-2"><div className="text-sm font-medium text-gray-700">Haftalık Hedef</div><span className="text-sm font-bold text-gray-700">{istatistik.aktif_gunler_7}/4 gün</span></div><div className="flex gap-1">{[0,1,2,3].map(i => (<div key={i} className={`flex-1 h-3 rounded-full ${i < istatistik.aktif_gunler_7 ? 'bg-gradient-to-r from-orange-400 to-red-500' : 'bg-gray-100'}`} />))}</div><p className="text-xs text-gray-400 mt-2">Haftada en az 4 gün okuma 📖</p></div>)}
+          {istatistik && (<div className="bg-surface rounded-2xl p-4 shadow-sm border"><div className="flex items-center justify-between mb-2"><div className="text-sm font-medium text-content">Haftalık Hedef</div><span className="text-sm font-bold text-content">{istatistik.aktif_gunler_7}/4 gün</span></div><div className="flex gap-1">{[0,1,2,3].map(i => (<div key={i} className={`flex-1 h-3 rounded-full ${i < istatistik.aktif_gunler_7 ? 'bg-gradient-to-r from-orange-400 to-red-500' : 'bg-gray-100'}`} />))}</div><p className="text-xs text-subtle mt-2">Haftada en az 4 gün okuma 📖</p></div>)}
 
           {/* 🧠 Okuma Zekâm */}
           {dnaData && (() => {
@@ -6900,7 +6900,7 @@ function OgrenciPaneli({ user, logout }) {
             const guclu = satirlar.filter(s => (boyutlar[s.key]||0) >= 70);
             const gelistir = satirlar.filter(s => (boyutlar[s.key]||0) < 50);
             return (
-              <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+              <div className="bg-surface rounded-2xl border shadow-sm overflow-hidden">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -6919,12 +6919,12 @@ function OgrenciPaneli({ user, logout }) {
                     return (
                       <div key={key}>
                         <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-1.5 text-xs text-gray-700 font-medium">
+                          <div className="flex items-center gap-1.5 text-xs text-content font-medium">
                             <span>{emoji}</span><span>{label}</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-gray-800">{val}</span>
-                            <span className="text-[9px] text-gray-400">/100</span>
+                            <span className="text-xs font-bold text-content">{val}</span>
+                            <span className="text-[9px] text-subtle">/100</span>
                           </div>
                         </div>
                         <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
@@ -6965,12 +6965,12 @@ function OgrenciPaneli({ user, logout }) {
               <div className="space-y-2">
                 {kitapTavsiye.slice(0,3).map((k,i) => (
                   <div key={i} onClick={() => setZekaModal({kitap_adi:k.kitap_adi,yazar:k.yazar,profil:k,yukleniyor:false})}
-                    className="bg-white rounded-xl p-3 flex items-center justify-between gap-2 cursor-pointer hover:bg-purple-50 transition-all border border-purple-100 active:scale-[0.98]">
+                    className="bg-surface rounded-xl p-3 flex items-center justify-between gap-2 cursor-pointer hover:bg-purple-50 transition-all border border-purple-100 active:scale-[0.98]">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-2xl flex-shrink-0">{["🥇","🥈","🥉"][i]}</span>
-                      <div className="min-w-0"><div className="font-semibold text-xs text-gray-800 truncate">{k.kitap_adi}</div>{k.yazar && <div className="text-[10px] text-gray-400 truncate">{k.yazar}</div>}</div>
+                      <div className="min-w-0"><div className="font-semibold text-xs text-content truncate">{k.kitap_adi}</div>{k.yazar && <div className="text-[10px] text-subtle truncate">{k.yazar}</div>}</div>
                     </div>
-                    <div className="flex flex-col items-end flex-shrink-0"><div className="text-xs font-bold text-purple-600">%{Math.round(k.uyum_skoru)}</div><div className="text-[9px] text-gray-400">uyum</div></div>
+                    <div className="flex flex-col items-end flex-shrink-0"><div className="text-xs font-bold text-purple-600">%{Math.round(k.uyum_skoru)}</div><div className="text-[9px] text-subtle">uyum</div></div>
                   </div>
                 ))}
               </div>
@@ -6994,33 +6994,33 @@ function OgrenciPaneli({ user, logout }) {
           {/* ═══ AI ÖZELLİKLERİ KISAYOLLAR ═══ */}
           {(ozellikAktif("ogrenci_scaffold") || ozellikAktif("ogrenci_hikaye") || ozellikAktif("ogrenci_materyal")) && (
           <div>
-            <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 px-1">🤖 AI Araçları</div>
+            <div className="text-xs font-bold text-subtle uppercase tracking-wide mb-2 px-1">🤖 AI Araçları</div>
             <div className="grid grid-cols-3 gap-2">
               {/* Scaffold Reading */}
               {ozellikAktif("ogrenci_scaffold") && (
               <button onClick={() => { setScaffoldData(null); setAktifEkran("scaffold"); }}
-                className="bg-white rounded-2xl p-3 border shadow-sm text-center hover:border-indigo-400 hover:bg-indigo-50 transition-all active:scale-95 group">
+                className="bg-surface rounded-2xl p-3 border shadow-sm text-center hover:border-indigo-400 hover:bg-indigo-50 transition-all active:scale-95 group">
                 <div className="text-2xl mb-1.5">📖</div>
-                <div className="text-[11px] font-bold text-gray-800 group-hover:text-indigo-700">Seviyeli Okuma</div>
-                <div className="text-[9px] text-gray-400 mt-0.5">Kolay → Orta → Zor</div>
+                <div className="text-[11px] font-bold text-content group-hover:text-indigo-700">Seviyeli Okuma</div>
+                <div className="text-[9px] text-subtle mt-0.5">Kolay → Orta → Zor</div>
               </button>
               )}
               {/* Adaptive Story */}
               {ozellikAktif("ogrenci_hikaye") && (
               <button onClick={() => { setAktifSekme("gelisim"); setGelisimAltSekme("hikayem"); }}
-                className="bg-white rounded-2xl p-3 border shadow-sm text-center hover:border-pink-400 hover:bg-pink-50 transition-all active:scale-95 group">
+                className="bg-surface rounded-2xl p-3 border shadow-sm text-center hover:border-pink-400 hover:bg-pink-50 transition-all active:scale-95 group">
                 <div className="text-2xl mb-1.5">✨</div>
-                <div className="text-[11px] font-bold text-gray-800 group-hover:text-pink-700">Bana Özel Hikâye</div>
-                <div className="text-[9px] text-gray-400 mt-0.5">AI hikâye yazar</div>
+                <div className="text-[11px] font-bold text-content group-hover:text-pink-700">Bana Özel Hikâye</div>
+                <div className="text-[9px] text-subtle mt-0.5">AI hikâye yazar</div>
               </button>
               )}
               {/* Materyal Üretici */}
               {ozellikAktif("ogrenci_materyal") && (
               <button onClick={() => { setAktifSekme("gelisim"); setGelisimAltSekme("materyal"); }}
-                className="bg-white rounded-2xl p-3 border shadow-sm text-center hover:border-teal-400 hover:bg-teal-50 transition-all active:scale-95 group">
+                className="bg-surface rounded-2xl p-3 border shadow-sm text-center hover:border-teal-400 hover:bg-teal-50 transition-all active:scale-95 group">
                 <div className="text-2xl mb-1.5">📋</div>
-                <div className="text-[11px] font-bold text-gray-800 group-hover:text-teal-700">Materyal Üret</div>
-                <div className="text-[9px] text-gray-400 mt-0.5">Soru seti, kelime</div>
+                <div className="text-[11px] font-bold text-content group-hover:text-teal-700">Materyal Üret</div>
+                <div className="text-[9px] text-subtle mt-0.5">Soru seti, kelime</div>
               </button>
               )}
             </div>
@@ -7028,8 +7028,8 @@ function OgrenciPaneli({ user, logout }) {
           )}
 
           {/* Bekleyen görevler kısa */}
-          {bekleyenGorevler.length > 0 && (<div className="bg-white rounded-2xl p-4 shadow-sm border">
-            <div className="flex items-center justify-between mb-3"><h3 className="font-bold text-sm text-gray-900">📌 Görevlerin</h3><button onClick={() => setAktifSekme("gorevler")} className="text-xs text-blue-600">Tümü →</button></div>
+          {bekleyenGorevler.length > 0 && (<div className="bg-surface rounded-2xl p-4 shadow-sm border">
+            <div className="flex items-center justify-between mb-3"><h3 className="font-bold text-sm text-content">📌 Görevlerin</h3><button onClick={() => setAktifSekme("gorevler")} className="text-xs text-blue-600">Tümü →</button></div>
             <div className="space-y-2">{bekleyenGorevler.slice(0,3).map(g => (<div key={g.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-xl"><div className="text-sm font-medium truncate flex-1 mr-2">{g.baslik}</div><Button size="sm" className="bg-green-600 text-white text-[10px] px-2 h-7" onClick={() => gorevTamamla(g.id)}>Tamamla</Button></div>))}</div>
           </div>)}
 
@@ -7038,34 +7038,34 @@ function OgrenciPaneli({ user, logout }) {
             {(ligSiralama || siralama) && (<div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-2xl p-4 border border-yellow-100 cursor-pointer" onClick={() => setAktifSekme("siralama")}>
               <div className="text-xs font-medium text-yellow-800">🏆 Sıralaman</div>
               <div className="text-3xl font-bold text-orange-600 mt-1">{ligSiralama?.benim_siram || siralama?.benim_siram || "—"}.</div>
-              <div className="text-[10px] text-gray-500">{ligSiralama?.toplam || siralama?.toplam_ogrenci || 0} öğrenci</div>
+              <div className="text-[10px] text-subtle">{ligSiralama?.toplam || siralama?.toplam_ogrenci || 0} öğrenci</div>
             </div>)}
             {profil?.ogretmen_bilgi && (<div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-4 border border-blue-100 cursor-pointer" onClick={() => setAktifSekme("mesajlar")}>
               <div className="text-xs font-medium text-blue-800">👩‍🏫 Öğretmenin</div>
-              <div className="font-bold text-gray-900 text-sm mt-1">{profil.ogretmen_bilgi.ad} {profil.ogretmen_bilgi.soyad}</div>
+              <div className="font-bold text-content text-sm mt-1">{profil.ogretmen_bilgi.ad} {profil.ogretmen_bilgi.soyad}</div>
               <div className="text-[10px] text-blue-600 mt-1">✉️ Mesaj gönder</div>
             </div>)}
           </div>
 
           {/* Rozetlerim */}
           {ogrenciRozetTanim.length > 0 && (
-            <div className="bg-white rounded-2xl p-4 shadow-sm border">
+            <div className="bg-surface rounded-2xl p-4 shadow-sm border">
               <RozetGrid tanimlar={ogrenciRozetTanim} kazanilanlar={ogrenciRozetler} baslik="🏅 Rozetlerim" />
             </div>
           )}
 
           {/* Son 3 okuma */}
-          {okumaKayitlari.length > 0 && (<div className="bg-white rounded-2xl p-4 shadow-sm border">
-            <div className="flex items-center justify-between mb-2"><h3 className="font-bold text-sm text-gray-900">📖 Son Okumalar</h3><button onClick={() => { setAktifSekme("gelisim"); setGelisimAltSekme("okumalarim"); }} className="text-xs text-blue-600">Tümü →</button></div>
-            {okumaKayitlari.slice(0,3).map(k => (<div key={k.id} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0"><div className="text-sm font-medium truncate flex-1">{k.kitap_adi || "—"}</div><div className="text-xs text-gray-400">{k.sure_dakika} dk</div></div>))}
+          {okumaKayitlari.length > 0 && (<div className="bg-surface rounded-2xl p-4 shadow-sm border">
+            <div className="flex items-center justify-between mb-2"><h3 className="font-bold text-sm text-content">📖 Son Okumalar</h3><button onClick={() => { setAktifSekme("gelisim"); setGelisimAltSekme("okumalarim"); }} className="text-xs text-blue-600">Tümü →</button></div>
+            {okumaKayitlari.slice(0,3).map(k => (<div key={k.id} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0"><div className="text-sm font-medium truncate flex-1">{k.kitap_adi || "—"}</div><div className="text-xs text-subtle">{k.sure_dakika} dk</div></div>))}
           </div>)}
         </>)}
 
         {/* ═══ GÖREVLERİM ═══ */}
         {aktifSekme === "gorevler" && (<div className="space-y-3"><h2 className="text-lg font-bold">📌 Görevlerim</h2>
-          {bekleyenGorevler.length === 0 && tamamlananGorevler.length === 0 ? (<div className="text-center py-12"><div className="text-5xl mb-3">✅</div><p className="text-gray-500">Tüm görevler tamamlandı!</p></div>) : (<>
-            {bekleyenGorevler.map(g => (<Card key={g.id} className="border-0 shadow-sm"><CardContent className="p-4 flex items-start justify-between gap-3"><div className="min-w-0"><div className="font-bold text-sm">{g.baslik}</div>{g.aciklama && <p className="text-xs text-gray-500 mt-1">{g.aciklama}</p>}<div className="text-xs text-gray-400 mt-1">{g.atayan_ad && `Atayan: ${g.atayan_ad}`}{g.son_tarih && ` • Son: ${new Date(g.son_tarih).toLocaleDateString('tr-TR')}`}</div>{g.film_link && <a href={g.film_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 block mt-1">🎬 Film Linki</a>}{g.makale_link && <a href={g.makale_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 block mt-1">📄 Makale</a>}</div><Button size="sm" className="bg-green-600 text-white text-xs shrink-0" onClick={() => gorevTamamla(g.id)}>Tamamla</Button></CardContent></Card>))}
-            {tamamlananGorevler.length > 0 && (<><h3 className="text-xs font-medium text-gray-400 mt-4">Tamamlanan ({tamamlananGorevler.length})</h3>{tamamlananGorevler.slice(0,5).map(g => (<div key={g.id} className="bg-green-50 rounded-xl p-3 border border-green-100 opacity-60 text-sm">✅ {g.baslik}</div>))}</>)}
+          {bekleyenGorevler.length === 0 && tamamlananGorevler.length === 0 ? (<div className="text-center py-12"><div className="text-5xl mb-3">✅</div><p className="text-subtle">Tüm görevler tamamlandı!</p></div>) : (<>
+            {bekleyenGorevler.map(g => (<Card key={g.id} className="border border-line shadow-sm"><CardContent className="p-4 flex items-start justify-between gap-3"><div className="min-w-0"><div className="font-bold text-sm">{g.baslik}</div>{g.aciklama && <p className="text-xs text-subtle mt-1">{g.aciklama}</p>}<div className="text-xs text-subtle mt-1">{g.atayan_ad && `Atayan: ${g.atayan_ad}`}{g.son_tarih && ` • Son: ${new Date(g.son_tarih).toLocaleDateString('tr-TR')}`}</div>{g.film_link && <a href={g.film_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 block mt-1">🎬 Film Linki</a>}{g.makale_link && <a href={g.makale_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 block mt-1">📄 Makale</a>}</div><Button size="sm" className="bg-green-600 text-white text-xs shrink-0" onClick={() => gorevTamamla(g.id)}>Tamamla</Button></CardContent></Card>))}
+            {tamamlananGorevler.length > 0 && (<><h3 className="text-xs font-medium text-subtle mt-4">Tamamlanan ({tamamlananGorevler.length})</h3>{tamamlananGorevler.slice(0,5).map(g => (<div key={g.id} className="bg-green-50 rounded-xl p-3 border border-green-100 opacity-60 text-sm">✅ {g.baslik}</div>))}</>)}
           </>)}
         </div>)}
 
@@ -7088,8 +7088,8 @@ function OgrenciPaneli({ user, logout }) {
               <button key={s.id} onClick={() => setGelisimAltSekme(s.id)}
                 className={`flex flex-col items-center gap-0.5 py-2 px-1 rounded-xl text-[10px] font-medium transition-all
                   ${gelisimAltSekme === s.id
-                    ? 'bg-orange-500 text-white shadow-md'
-                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                    ? 'bg-primary text-white shadow-md'
+                    : 'bg-app text-subtle hover:bg-line'}`}>
                 <span className="text-base">{s.emoji}</span>
                 <span className="leading-none">{s.l}</span>
               </button>
@@ -7164,7 +7164,7 @@ function OgrenciPaneli({ user, logout }) {
                   <div key={i} className="bg-orange-50 border border-orange-200 rounded-xl p-2 text-center">
                     <div className="text-2xl mb-1">{f.emoji}</div>
                     <div className="text-[10px] font-bold text-orange-700">{f.baslik}</div>
-                    <div className="text-[9px] text-gray-500 mt-0.5">{f.aciklama}</div>
+                    <div className="text-[9px] text-subtle mt-0.5">{f.aciklama}</div>
                   </div>
                 ))}
               </div>
@@ -7173,11 +7173,11 @@ function OgrenciPaneli({ user, logout }) {
 
           {/* İçerikler */}
           {gelisimAltSekme === "icerikler" && (<>
-            {gelisimIcerikleri.length === 0 ? (<div className="text-center py-8"><p className="text-gray-500 text-sm">Henüz içerik yok</p></div>) : (
+            {gelisimIcerikleri.length === 0 ? (<div className="text-center py-8"><p className="text-subtle text-sm">Henüz içerik yok</p></div>) : (
               gelisimIcerikleri.map(ic => { const done = isTamamlandi(ic.id); return (
-                <Card key={ic.id} className={`border-0 shadow-sm ${done ? 'opacity-60' : ''}`}><CardContent className="p-4"><div className="flex items-start justify-between gap-3"><div>
+                <Card key={ic.id} className={`border border-line shadow-sm ${done ? 'opacity-60' : ''}`}><CardContent className="p-4"><div className="flex items-start justify-between gap-3"><div>
                   <div className="flex items-center gap-2"><span className="text-lg">{({hizmetici:"🎓",film:"🎬",kitap:"📚",makale:"📄"})[ic.tur] || "📋"}</span><div className="font-bold text-sm truncate">{ic.baslik}</div></div>
-                  {ic.aciklama && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{ic.aciklama}</p>}
+                  {ic.aciklama && <p className="text-xs text-subtle mt-1 line-clamp-2">{ic.aciklama}</p>}
                   {ic.tur === "kitap" && (
                     <div className="flex items-center gap-3 mt-1">
                       <button onClick={async () => {
@@ -7238,7 +7238,7 @@ function OgrenciPaneli({ user, logout }) {
             <ExerciseStarter title="Sokratik Okuma" icon="🤖"
               description="Okuduğun kitabı yaz, okuma koçun sana düşündürücü sorular sorsun.">
               <div className="space-y-3">
-                <div className="bg-white rounded-2xl p-4 border shadow-sm space-y-3">
+                <div className="bg-surface rounded-2xl p-4 border shadow-sm space-y-3">
                   <div><Label className="text-xs">Kitap Adı *</Label><Input value={sokratikForm.kitap_adi} onChange={e => setSokratikForm({...sokratikForm, kitap_adi: e.target.value})} placeholder="Hangi kitabı okudun?" /></div>
                   <div><Label className="text-xs">Bölüm</Label><Input value={sokratikForm.bolum} onChange={e => setSokratikForm({...sokratikForm, bolum: e.target.value})} placeholder="Bölüm 3 (isteğe bağlı)" /></div>
                   <Button disabled={!sokratikForm.kitap_adi.trim() || sokratikYukleniyor} onClick={async () => {
@@ -7259,7 +7259,7 @@ function OgrenciPaneli({ user, logout }) {
                       <CardTitle className="text-base flex items-center gap-2">🤖 Okuma Koçun Soruyor</CardTitle>
                     </CardHeader>
                     <CardContent className="pt-3 space-y-3">
-                      <p className="text-sm font-medium text-gray-800">{socraticSoru.soru}</p>
+                      <p className="text-sm font-medium text-content">{socraticSoru.soru}</p>
                       {socraticSoru.ipucu && <p className="text-xs text-cyan-600 italic">💡 İpucu: {socraticSoru.ipucu}</p>}
                       {!socraticSonuc ? (<>
                         <textarea value={socraticCevap} onChange={e => setSocraticCevap(e.target.value)} className="w-full border rounded-lg p-2 text-sm min-h-[60px]" placeholder="Düşünceni yaz..." />
@@ -7273,7 +7273,7 @@ function OgrenciPaneli({ user, logout }) {
                             {[1,2,3,4,5].map(s => <span key={s} className="text-lg">{s <= socraticSonuc.puan ? '⭐' : '☆'}</span>)}
                             <span className="text-xs text-green-600 font-bold">+{socraticSonuc.xp} XP</span>
                           </div>
-                          <p className="text-sm text-gray-700 bg-cyan-50 p-2 rounded-lg">{socraticSonuc.geri_bildirim}</p>
+                          <p className="text-sm text-content bg-cyan-50 p-2 rounded-lg">{socraticSonuc.geri_bildirim}</p>
                           <Button className="w-full bg-green-600 text-white text-sm" onClick={() => { setSocraticSoru(null); setSocraticSonuc(null); setSocraticCevap(""); }}>Tekrar Sor 🔄</Button>
                         </div>
                       )}
@@ -7286,8 +7286,8 @@ function OgrenciPaneli({ user, logout }) {
 
           {/* Okumalarım */}
           {gelisimAltSekme === "okumalarim" && (<>
-            {okumaKayitlari.length === 0 ? (<div className="text-center py-8"><p className="text-gray-500 text-sm">Henüz okuma kaydı yok</p><Button onClick={okumaBaslat} className="mt-3 bg-green-600 text-white text-sm">🌳 Okumaya Başla</Button></div>) : (
-              okumaKayitlari.map(k => (<Card key={k.id} className="border-0 shadow-sm"><CardContent className="p-3 flex items-center justify-between"><div><div className="font-medium text-sm">{k.kitap_adi || "—"}</div><div className="text-xs text-gray-400">{k.bolum && `${k.bolum} • `}⏱ {k.sure_dakika} dk {k.baslangic_sayfa && k.bitis_sayfa && `• s.${k.baslangic_sayfa}-${k.bitis_sayfa}`}</div>{k.not_text && <p className="text-[10px] text-blue-600 mt-0.5">💬 {k.not_text}</p>}</div><div className="text-[10px] text-gray-400">{new Date(k.tarih).toLocaleDateString('tr-TR')}</div></CardContent></Card>))
+            {okumaKayitlari.length === 0 ? (<div className="text-center py-8"><p className="text-subtle text-sm">Henüz okuma kaydı yok</p><Button onClick={okumaBaslat} className="mt-3 bg-green-600 text-white text-sm">🌳 Okumaya Başla</Button></div>) : (
+              okumaKayitlari.map(k => (<Card key={k.id} className="border border-line shadow-sm"><CardContent className="p-3 flex items-center justify-between"><div><div className="font-medium text-sm">{k.kitap_adi || "—"}</div><div className="text-xs text-subtle">{k.bolum && `${k.bolum} • `}⏱ {k.sure_dakika} dk {k.baslangic_sayfa && k.bitis_sayfa && `• s.${k.baslangic_sayfa}-${k.bitis_sayfa}`}</div>{k.not_text && <p className="text-[10px] text-blue-600 mt-0.5">💬 {k.not_text}</p>}</div><div className="text-[10px] text-subtle">{new Date(k.tarih).toLocaleDateString('tr-TR')}</div></CardContent></Card>))
             )}
           </>)}
 
@@ -7328,8 +7328,8 @@ function OgrenciPaneli({ user, logout }) {
                       setOyunData(d);
                       oyunSureRef.current = setInterval(() => setOyunSure(s => s+1), 1000);
                     } catch(e2) {}
-                  }} className="bg-white rounded-xl p-4 border shadow-sm text-center hover:bg-cyan-50 transition-all active:scale-95">
-                    <div className="text-2xl mb-1">{e}</div><div className="text-xs font-medium text-gray-700">{l}</div>
+                  }} className="bg-surface rounded-xl p-4 border shadow-sm text-center hover:bg-cyan-50 transition-all active:scale-95">
+                    <div className="text-2xl mb-1">{e}</div><div className="text-xs font-medium text-content">{l}</div>
                   </button>
                 ))}
               </div>
@@ -7338,13 +7338,13 @@ function OgrenciPaneli({ user, logout }) {
               {oyunSkor && !oyunData && (
                 <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-2xl p-5 border-2 border-yellow-300 text-center shadow-md">
                   <div className="text-4xl mb-2">{oyunSkor.yeniRekor ? "🏆" : "🎮"}</div>
-                  <h3 className="font-bold text-gray-800 text-base mb-1">{oyunSkor.yeniRekor ? "Yeni Rekor!" : "Tamamlandı!"}</h3>
+                  <h3 className="font-bold text-content text-base mb-1">{oyunSkor.yeniRekor ? "Yeni Rekor!" : "Tamamlandı!"}</h3>
                   <div className="grid grid-cols-2 gap-3 my-3">
-                    <div className="bg-white rounded-xl p-3 border"><div className="text-2xl font-bold text-indigo-600 font-mono">{`${Math.floor(oyunSkor.sure/60).toString().padStart(2,'0')}:${(oyunSkor.sure%60).toString().padStart(2,'0')}`}</div><div className="text-xs text-gray-500">⏱ Bu Süre</div></div>
-                    <div className="bg-white rounded-xl p-3 border"><div className="text-2xl font-bold text-green-600 font-mono">{`${Math.floor(oyunSkor.rekor/60).toString().padStart(2,'0')}:${(oyunSkor.rekor%60).toString().padStart(2,'0')}`}</div><div className="text-xs text-gray-500">🥇 En İyi</div></div>
+                    <div className="bg-surface rounded-xl p-3 border"><div className="text-2xl font-bold text-indigo-600 font-mono">{`${Math.floor(oyunSkor.sure/60).toString().padStart(2,'0')}:${(oyunSkor.sure%60).toString().padStart(2,'0')}`}</div><div className="text-xs text-subtle">⏱ Bu Süre</div></div>
+                    <div className="bg-surface rounded-xl p-3 border"><div className="text-2xl font-bold text-green-600 font-mono">{`${Math.floor(oyunSkor.rekor/60).toString().padStart(2,'0')}:${(oyunSkor.rekor%60).toString().padStart(2,'0')}`}</div><div className="text-xs text-subtle">🥇 En İyi</div></div>
                   </div>
                   <div className="text-sm font-bold text-orange-600 mb-3">+{oyunSkor.xp} XP kazandın!</div>
-                  <button onClick={() => setOyunSkor(null)} className="text-xs text-gray-400 underline">Kapat</button>
+                  <button onClick={() => setOyunSkor(null)} className="text-xs text-subtle underline">Kapat</button>
                 </div>
               )}
 
@@ -7371,7 +7371,7 @@ function OgrenciPaneli({ user, logout }) {
                     <h3 className="font-bold text-sm">{emoji} {baslik}</h3>
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-sm font-bold text-indigo-600">⏱ {sureFmt(oyunSure)}</span>
-                      <button onClick={() => { clearInterval(oyunSureRef.current); setOyunData(null); }} className="text-gray-400 text-xl leading-none">✕</button>
+                      <button onClick={() => { clearInterval(oyunSureRef.current); setOyunData(null); }} className="text-subtle text-xl leading-none">✕</button>
                     </div>
                   </div>
                 );
@@ -7379,18 +7379,18 @@ function OgrenciPaneli({ user, logout }) {
                 if (oyunData.tur === "cumle_kurma") {
                   const sorular = oyunData.sorular || [];
                   return (
-                    <div className="bg-white rounded-2xl p-4 border-2 border-cyan-300 shadow-md">
+                    <div className="bg-surface rounded-2xl p-4 border-2 border-cyan-300 shadow-md">
                       <SayacHeader emoji="📝" baslik={oyunData.baslik} />
-                      <p className="text-xs text-gray-500 mb-3">{oyunData.aciklama}</p>
+                      <p className="text-xs text-subtle mb-3">{oyunData.aciklama}</p>
                       <div className="space-y-4">
                         {sorular.map((s, si) => {
                           const secilen = oyunDurum[`ck_${si}`] || [];
                           const tamamlandi = oyunDurum[`ck_${si}_ok`];
                           const yanlis = oyunDurum[`ck_${si}_yanlis`];
                           return (
-                            <div key={si} className={`rounded-xl p-3 border-2 transition-all ${tamamlandi?"border-green-400 bg-green-50":yanlis?"border-red-300 bg-red-50":"border-gray-200 bg-gray-50"}`}>
-                              <div className="text-[10px] text-gray-400 mb-1">Hedef: <b>{s.hedef_kelime}</b></div>
-                              <div className={`min-h-[32px] flex flex-wrap gap-1 rounded-lg p-2 mb-2 border ${tamamlandi?"border-green-300 bg-green-100":yanlis?"border-red-200":"border-dashed border-gray-300 bg-white"}`}>
+                            <div key={si} className={`rounded-xl p-3 border-2 transition-all ${tamamlandi?"border-green-400 bg-green-50":yanlis?"border-red-300 bg-red-50":"border-line bg-gray-50"}`}>
+                              <div className="text-[10px] text-subtle mb-1">Hedef: <b>{s.hedef_kelime}</b></div>
+                              <div className={`min-h-[32px] flex flex-wrap gap-1 rounded-lg p-2 mb-2 border ${tamamlandi?"border-green-300 bg-green-100":yanlis?"border-red-200":"border-dashed border-gray-300 bg-surface"}`}>
                                 {secilen.length===0 && <span className="text-[10px] text-gray-300">Kelimelere tıkla...</span>}
                                 {secilen.map((k,ki) => (<span key={ki} onClick={() => { if(tamamlandi) return; setOyunDurum(d=>({...d,[`ck_${si}`]:secilen.filter((_,i)=>i!==ki),[`ck_${si}_yanlis`]:false})); }} className="bg-blue-500 text-white text-xs px-2 py-0.5 rounded cursor-pointer hover:bg-red-400">{k}</span>))}
                               </div>
@@ -7405,7 +7405,7 @@ function OgrenciPaneli({ user, logout }) {
                                       if(dogruMu) { sesCalDogru(); setOyunDurum(d=>({...d,[`ck_${si}_ok`]:true})); }
                                       else { sesCalYanlis(); setOyunDurum(d=>({...d,[`ck_${si}_yanlis`]:true})); setTimeout(()=>setOyunDurum(d=>({...d,[`ck_${si}`]:[],[`ck_${si}_yanlis`]:false})),800); }
                                     }
-                                  }} className={`text-xs px-2 py-1 rounded border transition-all ${secildi||tamamlandi?"opacity-30 cursor-not-allowed bg-gray-100":"bg-white hover:bg-cyan-50 hover:border-cyan-400 cursor-pointer"}`}>{k}</button>);
+                                  }} className={`text-xs px-2 py-1 rounded border transition-all ${secildi||tamamlandi?"opacity-30 cursor-not-allowed bg-gray-100":"bg-surface hover:bg-cyan-50 hover:border-cyan-400 cursor-pointer"}`}>{k}</button>);
                                 })}
                               </div>
                               {tamamlandi && <div className="text-xs text-green-600 font-bold mt-1">✅ Doğru!</div>}
@@ -7424,9 +7424,9 @@ function OgrenciPaneli({ user, logout }) {
                 if (oyunData.tur === "bosluk_doldurma") {
                   const sorular = oyunData.sorular || [];
                   return (
-                    <div className="bg-white rounded-2xl p-4 border-2 border-cyan-300 shadow-md">
+                    <div className="bg-surface rounded-2xl p-4 border-2 border-cyan-300 shadow-md">
                       <SayacHeader emoji="⬜" baslik={oyunData.baslik} />
-                      <p className="text-xs text-gray-500 mb-3">{oyunData.aciklama}</p>
+                      <p className="text-xs text-subtle mb-3">{oyunData.aciklama}</p>
                       <div className="space-y-4">
                         {sorular.map((s, si) => {
                           const secilen = oyunDurum[`bd_${si}`];
@@ -7434,9 +7434,9 @@ function OgrenciPaneli({ user, logout }) {
                           const yanlis = oyunDurum[`bd_${si}_yanlis`];
                           const cumle = s.cumle_bos || "";
                           return (
-                            <div key={si} className={`rounded-xl p-3 border-2 transition-all ${tamamlandi?"border-green-400 bg-green-50":yanlis?"border-red-300 bg-red-50":"border-gray-200 bg-gray-50"}`}>
-                              <p className="text-sm font-medium mb-2 text-gray-800">
-                                {cumle.split("__").map((part,pi) => (<span key={pi}>{part}{pi<cumle.split("__").length-1 && (<span className={`inline-block mx-1 px-3 py-0.5 rounded-lg border-2 font-bold text-sm min-w-[60px] text-center transition-all ${tamamlandi?"bg-green-200 border-green-400 text-green-700":yanlis?"bg-red-100 border-red-300 text-red-600":"bg-white border-dashed border-gray-400 text-gray-400"}`}>{secilen || "___"}</span>)}</span>))}
+                            <div key={si} className={`rounded-xl p-3 border-2 transition-all ${tamamlandi?"border-green-400 bg-green-50":yanlis?"border-red-300 bg-red-50":"border-line bg-gray-50"}`}>
+                              <p className="text-sm font-medium mb-2 text-content">
+                                {cumle.split("__").map((part,pi) => (<span key={pi}>{part}{pi<cumle.split("__").length-1 && (<span className={`inline-block mx-1 px-3 py-0.5 rounded-lg border-2 font-bold text-sm min-w-[60px] text-center transition-all ${tamamlandi?"bg-green-200 border-green-400 text-green-700":yanlis?"bg-red-100 border-red-300 text-red-600":"bg-surface border-dashed border-gray-400 text-subtle"}`}>{secilen || "___"}</span>)}</span>))}
                               </p>
                               <div className="flex flex-wrap gap-2">
                                 {(s.secenekler||[]).map((sec,j) => (<button key={j} disabled={!!tamamlandi} onClick={() => {
@@ -7444,7 +7444,7 @@ function OgrenciPaneli({ user, logout }) {
                                   setOyunDurum(d=>({...d,[`bd_${si}`]:sec}));
                                   if(dogruMu) { sesCalDogru(); setTimeout(()=>setOyunDurum(d=>({...d,[`bd_${si}_ok`]:true})),300); }
                                   else { sesCalYanlis(); setOyunDurum(d=>({...d,[`bd_${si}_yanlis`]:true})); setTimeout(()=>setOyunDurum(d=>({...d,[`bd_${si}`]:null,[`bd_${si}_yanlis`]:false})),700); }
-                                }} className={`text-xs px-3 py-1.5 rounded-lg border-2 font-medium transition-all ${tamamlandi?"opacity-40 cursor-not-allowed":"hover:border-cyan-400 hover:bg-cyan-50 cursor-pointer bg-white border-gray-200"}`}>{sec}</button>))}
+                                }} className={`text-xs px-3 py-1.5 rounded-lg border-2 font-medium transition-all ${tamamlandi?"opacity-40 cursor-not-allowed":"hover:border-cyan-400 hover:bg-cyan-50 cursor-pointer bg-surface border-line"}`}>{sec}</button>))}
                               </div>
                               {tamamlandi && <div className="text-xs text-green-600 font-bold mt-1">✅ Doğru!</div>}
                               {yanlis && <div className="text-xs text-red-500 mt-1">❌ Yanlış, tekrar dene!</div>}
@@ -7464,7 +7464,7 @@ function OgrenciPaneli({ user, logout }) {
                   const tumKelimeler = oyunData.tumKelimeler || hedefler;
                   const bulunanlar = oyunDurum.ka_bulunanlar || [];
                   return (
-                    <div className="bg-white rounded-2xl p-4 border-2 border-cyan-300 shadow-md">
+                    <div className="bg-surface rounded-2xl p-4 border-2 border-cyan-300 shadow-md">
                       <SayacHeader emoji="🔍" baslik={oyunData.baslik} />
                       <div className="flex flex-wrap gap-1 mb-3">
                         {hedefler.map((h,i) => (<span key={i} className={`text-xs px-2 py-1 rounded-full border font-medium transition-all ${bulunanlar.includes(h)?"bg-green-500 text-white border-green-500 line-through":"bg-yellow-50 text-yellow-700 border-yellow-300"}`}>{h}</span>))}
@@ -7476,10 +7476,10 @@ function OgrenciPaneli({ user, logout }) {
                           return (<button key={i} disabled={bulundu} onClick={() => {
                             if(hedefMi) { sesCalDogru(); setOyunDurum(d=>({...d,ka_bulunanlar:[...(d.ka_bulunanlar||[]),k]})); }
                             else { sesCalYanlis(); setOyunDurum(d=>({...d,ka_yanlis:k})); setTimeout(()=>setOyunDurum(d=>({...d,ka_yanlis:null})),600); }
-                          }} className={`text-xs px-3 py-1.5 rounded-xl border-2 font-medium transition-all ${bulundu?"bg-green-500 text-white border-green-500 cursor-not-allowed":oyunDurum.ka_yanlis===k?"bg-red-100 border-red-400 text-red-600 animate-pulse":"bg-white border-gray-200 hover:border-cyan-400 hover:bg-cyan-50 cursor-pointer"}`}>{k}</button>);
+                          }} className={`text-xs px-3 py-1.5 rounded-xl border-2 font-medium transition-all ${bulundu?"bg-green-500 text-white border-green-500 cursor-not-allowed":oyunDurum.ka_yanlis===k?"bg-red-100 border-red-400 text-red-600 animate-pulse":"bg-surface border-line hover:border-cyan-400 hover:bg-cyan-50 cursor-pointer"}`}>{k}</button>);
                         })}
                       </div>
-                      <div className="text-xs text-gray-400 mt-2">{bulunanlar.length}/{hedefler.length} bulundu</div>
+                      <div className="text-xs text-subtle mt-2">{bulunanlar.length}/{hedefler.length} bulundu</div>
                       {bulunanlar.length === hedefler.length && (
                         <button className="w-full mt-3 bg-green-600 text-white rounded-xl py-2 text-sm font-bold" onClick={() => oyunuBitir(oyunData.tur, hedefler.length, hedefler.length)}>🏆 Tamamla!</button>
                       )}
@@ -7494,9 +7494,9 @@ function OgrenciPaneli({ user, logout }) {
                   const eslesmiş = oyunDurum.es_eslesmis || [];
                   const yanlisPair = oyunDurum.es_yanlis;
                   return (
-                    <div className="bg-white rounded-2xl p-4 border-2 border-cyan-300 shadow-md">
+                    <div className="bg-surface rounded-2xl p-4 border-2 border-cyan-300 shadow-md">
                       <SayacHeader emoji="🎲" baslik={oyunData.baslik} />
-                      <p className="text-xs text-gray-500 mb-3">Bir kelime seç, sonra anlamına tıkla!</p>
+                      <p className="text-xs text-subtle mb-3">Bir kelime seç, sonra anlamına tıkla!</p>
                       <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-2">
                           {kelimeler.map((k,i) => (<button key={i} disabled={eslesmiş.includes(i)} onClick={() => setOyunDurum(d=>({...d,es_seciliKelime:i===seciliKelime?null:i}))}
@@ -7508,10 +7508,10 @@ function OgrenciPaneli({ user, logout }) {
                             const dogruMu = a.gercekIdx === seciliKelime;
                             if(dogruMu) { sesCalDogru(); setOyunDurum(d=>({...d,es_eslesmis:[...(d.es_eslesmis||[]),seciliKelime],es_seciliKelime:null})); }
                             else { sesCalYanlis(); setOyunDurum(d=>({...d,es_yanlis:[seciliKelime,a.gercekIdx]})); setTimeout(()=>setOyunDurum(d=>({...d,es_yanlis:null,es_seciliKelime:null})),800); }
-                          }} className={`w-full text-[10px] px-2 py-2 rounded-xl border-2 text-left transition-all ${eslesmiş.includes(a.gercekIdx)?"bg-green-100 border-green-400 text-green-700 cursor-not-allowed":yanlisPair?.includes(a.gercekIdx)?"bg-red-100 border-red-400 animate-pulse":seciliKelime!==null&&seciliKelime!==undefined?"border-purple-300 hover:bg-purple-50 cursor-pointer bg-white":"bg-white border-gray-200 cursor-not-allowed opacity-50"}`}>{a.anlam}</button>))}
+                          }} className={`w-full text-[10px] px-2 py-2 rounded-xl border-2 text-left transition-all ${eslesmiş.includes(a.gercekIdx)?"bg-green-100 border-green-400 text-green-700 cursor-not-allowed":yanlisPair?.includes(a.gercekIdx)?"bg-red-100 border-red-400 animate-pulse":seciliKelime!==null&&seciliKelime!==undefined?"border-purple-300 hover:bg-purple-50 cursor-pointer bg-surface":"bg-surface border-line cursor-not-allowed opacity-50"}`}>{a.anlam}</button>))}
                         </div>
                       </div>
-                      <div className="text-xs text-gray-400 mt-2 text-center">{eslesmiş.length}/{kelimeler.length} eşleşti</div>
+                      <div className="text-xs text-subtle mt-2 text-center">{eslesmiş.length}/{kelimeler.length} eşleşti</div>
                       {eslesmiş.length === kelimeler.length && (
                         <button className="w-full mt-3 bg-green-600 text-white rounded-xl py-2 text-sm font-bold" onClick={() => oyunuBitir(oyunData.tur, kelimeler.length, kelimeler.length)}>🏆 Tamamla!</button>
                       )}
@@ -7523,19 +7523,19 @@ function OgrenciPaneli({ user, logout }) {
 
 
               {kelimeData?.bekleyenler?.length > 0 && !oyunData && (<>
-                <h3 className="font-bold text-sm text-gray-700">📝 Bugün Tekrar Edilecek Kelimeler</h3>
+                <h3 className="font-bold text-sm text-content">📝 Bugün Tekrar Edilecek Kelimeler</h3>
                 {!aktifKelime ? (
                   <button onClick={() => { setAktifKelime(kelimeData.bekleyenler[0]); setCevapGosterim(false); }} className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl p-4 shadow-md">
                     <div className="text-lg font-bold">🧠 Tekrara Başla</div><div className="text-xs opacity-80">{kelimeData.bekleyenler.length} kelime bekliyor</div>
                   </button>
                 ) : (
-                  <div className="bg-white rounded-xl p-4 border-2 border-cyan-300 shadow-md text-center space-y-3">
-                    <div className="text-xs text-gray-400">Kutu {aktifKelime.kutu}/5 • Tekrar #{(aktifKelime.tekrar_sayisi||0)+1}</div>
+                  <div className="bg-surface rounded-xl p-4 border-2 border-cyan-300 shadow-md text-center space-y-3">
+                    <div className="text-xs text-subtle">Kutu {aktifKelime.kutu}/5 • Tekrar #{(aktifKelime.tekrar_sayisi||0)+1}</div>
                     <div className="text-2xl font-bold text-cyan-700">{aktifKelime.kelime}</div>
                     {!cevapGosterim ? (
                       <Button onClick={() => setCevapGosterim(true)} className="bg-yellow-500 text-white">Anlamını Göster 👀</Button>
                     ) : (<>
-                      <div className="bg-cyan-50 rounded-lg p-3"><p className="text-sm font-medium">{aktifKelime.anlam}</p>{aktifKelime.ornek_cumle && <p className="text-xs text-gray-500 mt-1 italic">"{aktifKelime.ornek_cumle}"</p>}</div>
+                      <div className="bg-cyan-50 rounded-lg p-3"><p className="text-sm font-medium">{aktifKelime.anlam}</p>{aktifKelime.ornek_cumle && <p className="text-xs text-subtle mt-1 italic">"{aktifKelime.ornek_cumle}"</p>}</div>
                       <div className="flex gap-2">
                         <Button className="flex-1 bg-red-500 text-white text-sm" onClick={async () => { try { await axios.post(`${API}/ai/kelime-evrimi/cevapla`, { kelime_id: aktifKelime.id, dogru: false }); } catch(e) {} const kalan = kelimeData.bekleyenler.filter(k => k.id !== aktifKelime.id); setKelimeData({...kelimeData, bekleyenler: kalan}); setAktifKelime(kalan[0] || null); setCevapGosterim(false); if (!kalan[0]) toast({ title: "🎉 Tamamlandı!" }); }}>❌ Bilmiyordum</Button>
                         <Button className="flex-1 bg-green-500 text-white text-sm" onClick={async () => { try { await axios.post(`${API}/ai/kelime-evrimi/cevapla`, { kelime_id: aktifKelime.id, dogru: true }); } catch(e) {} const kalan = kelimeData.bekleyenler.filter(k => k.id !== aktifKelime.id); setKelimeData({...kelimeData, bekleyenler: kalan}); setAktifKelime(kalan[0] || null); setCevapGosterim(false); if (!kalan[0]) toast({ title: "🎉 Tamamlandı!" }); }}>✅ Biliyordum</Button>
@@ -7546,7 +7546,7 @@ function OgrenciPaneli({ user, logout }) {
               </>)}
 
               {kelimeData?.bekleyenler?.length === 0 && !oyunData && (
-                <div className="text-center py-8 text-gray-500"><div className="text-3xl mb-2">🎉</div><p className="text-sm">Bugün tekrar edilecek kelime yok!</p><p className="text-xs text-gray-400 mt-1">Yeni kelimeler okudukça eklenecek</p></div>
+                <div className="text-center py-8 text-subtle"><div className="text-3xl mb-2">🎉</div><p className="text-sm">Bugün tekrar edilecek kelime yok!</p><p className="text-xs text-subtle mt-1">Yeni kelimeler okudukça eklenecek</p></div>
               )}
             </div>);
             })()}
@@ -7559,26 +7559,26 @@ function OgrenciPaneli({ user, logout }) {
               description="DNA profilin ve ilgi alanına göre AI hikâye yazar, Bloom soruları üretir.">
             <div className="space-y-4">
               {!hikayeData ? (
-                <div className="bg-white rounded-2xl p-5 border shadow-sm space-y-4">
+                <div className="bg-surface rounded-2xl p-5 border shadow-sm space-y-4">
                   <div className="flex items-center gap-3 mb-1">
                     <div className="w-10 h-10 bg-gradient-to-br from-pink-400 to-purple-500 rounded-xl flex items-center justify-center text-xl">✨</div>
-                    <div><div className="font-bold text-sm">Bana Özel Hikâye</div><div className="text-xs text-gray-500">AI senin için kişisel hikâye yazar</div></div>
+                    <div><div className="font-bold text-sm">Bana Özel Hikâye</div><div className="text-xs text-subtle">AI senin için kişisel hikâye yazar</div></div>
                   </div>
 
                   <div>
-                    <div className="text-xs text-gray-600 font-medium mb-2">Kahraman adın</div>
+                    <div className="text-xs text-subtle font-medium mb-2">Kahraman adın</div>
                     <input value={hikayeForm.kahraman_ad} onChange={e => setHikayeForm(f=>({...f,kahraman_ad:e.target.value}))}
                       placeholder={`${user.ad || "Kahraman"}`}
                       className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300" />
                   </div>
 
                   <div>
-                    <div className="text-xs text-gray-600 font-medium mb-2">İlgi alanın</div>
+                    <div className="text-xs text-subtle font-medium mb-2">İlgi alanın</div>
                     <div className="grid grid-cols-3 gap-2">
                       {[["macera","🗺️","Macera"],["hayvan","🐾","Hayvan"],["uzay","🚀","Uzay"],["tarih","🏰","Tarih"],["spor","⚽","Spor"],["arkadaşlık","🤝","Arkadaşlık"]].map(([v,e,l]) => (
                         <button key={v} onClick={() => setHikayeForm(f=>({...f,ilgi_alani:v}))}
                           className={`py-3 rounded-xl text-center border-2 transition-all ${hikayeForm.ilgi_alani===v?"border-purple-500 bg-purple-50":"border-gray-100 bg-gray-50 hover:border-purple-200"}`}>
-                          <div className="text-2xl">{e}</div><div className="text-[10px] font-medium text-gray-700 mt-0.5">{l}</div>
+                          <div className="text-2xl">{e}</div><div className="text-[10px] font-medium text-content mt-0.5">{l}</div>
                         </button>
                       ))}
                     </div>
@@ -7606,7 +7606,7 @@ function OgrenciPaneli({ user, logout }) {
               ) : (
                 <div className="space-y-4">
                   {/* Hikâye metni */}
-                  <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+                  <div className="bg-surface rounded-2xl border shadow-sm overflow-hidden">
                     <div className="bg-gradient-to-r from-pink-500 to-purple-600 p-4 text-white">
                       <div className="text-xs opacity-70 mb-1">✨ Senin Hikâyen</div>
                       <div className="font-bold text-base">{hikayeData.baslik}</div>
@@ -7616,7 +7616,7 @@ function OgrenciPaneli({ user, logout }) {
                       </div>
                     </div>
                     <div className="p-4">
-                      <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-line">{hikayeData.hikaye}</p>
+                      <p className="text-sm text-content leading-relaxed whitespace-pre-line">{hikayeData.hikaye}</p>
                     </div>
                   </div>
 
@@ -7634,7 +7634,7 @@ function OgrenciPaneli({ user, logout }) {
 
                   {/* Bloom Soruları */}
                   {hikayeData.bloom_sorulari?.length > 0 && (
-                    <div className="bg-white rounded-2xl border shadow-sm p-4">
+                    <div className="bg-surface rounded-2xl border shadow-sm p-4">
                       <div className="font-bold text-sm mb-3">🎯 Düşünme Soruları</div>
                       <div className="space-y-2">
                         {hikayeData.bloom_sorulari.map((s,i) => (
@@ -7644,9 +7644,9 @@ function OgrenciPaneli({ user, logout }) {
                               <div className="flex items-center gap-2">
                                 <span className="text-xs bg-purple-100 text-purple-700 font-bold px-2 py-0.5 rounded-full">{s.basamak}</span>
                               </div>
-                              <span className="text-gray-400 text-xs">{hikayeBloom===i?"▲":"▼"}</span>
+                              <span className="text-subtle text-xs">{hikayeBloom===i?"▲":"▼"}</span>
                             </div>
-                            <p className="text-sm font-medium text-gray-800 mt-1.5">{s.soru}</p>
+                            <p className="text-sm font-medium text-content mt-1.5">{s.soru}</p>
                             {hikayeBloom===i && <p className="text-xs text-purple-600 mt-1.5 italic">💡 İpucu: {s.ipucu}</p>}
                           </div>
                         ))}
@@ -7656,13 +7656,13 @@ function OgrenciPaneli({ user, logout }) {
 
                   {/* Kelime Kartları */}
                   {hikayeData.kelime_kartlari?.length > 0 && (
-                    <div className="bg-white rounded-2xl border shadow-sm p-4">
+                    <div className="bg-surface rounded-2xl border shadow-sm p-4">
                       <div className="font-bold text-sm mb-3">🃏 Kelime Kartları</div>
                       <div className="space-y-2">
                         {hikayeData.kelime_kartlari.map((k,i) => (
                           <div key={i} className="bg-indigo-50 rounded-xl p-3 border border-indigo-100">
                             <div className="font-bold text-indigo-800 text-sm">{k.kelime}</div>
-                            <div className="text-xs text-gray-600 mt-0.5">{k.anlam}</div>
+                            <div className="text-xs text-subtle mt-0.5">{k.anlam}</div>
                             <div className="text-xs text-indigo-600 italic mt-1">"{k.cumle}"</div>
                           </div>
                         ))}
@@ -7683,15 +7683,15 @@ function OgrenciPaneli({ user, logout }) {
           {/* ═══ MATERYAL ÜRETİCİ ═══ */}
           {gelisimAltSekme === "materyal" && (
             <div className="space-y-4">
-              <div className="bg-white rounded-2xl border shadow-sm p-4">
+              <div className="bg-surface rounded-2xl border shadow-sm p-4">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 bg-gradient-to-br from-teal-400 to-cyan-500 rounded-xl flex items-center justify-center text-xl">📋</div>
-                  <div><div className="font-bold text-sm">AI Materyal Üretici</div><div className="text-xs text-gray-500">Kitabın için çalışma materyali üret</div></div>
+                  <div><div className="font-bold text-sm">AI Materyal Üretici</div><div className="text-xs text-subtle">Kitabın için çalışma materyali üret</div></div>
                 </div>
 
                 {/* Kitap seçimi — havuzdan + manuel */}
                 <div className="mb-4">
-                  <div className="text-xs font-medium text-gray-600 mb-1.5">📚 Kitap Seç</div>
+                  <div className="text-xs font-medium text-subtle mb-1.5">📚 Kitap Seç</div>
                   {(() => {
                     const havuzKitaplar = gelisimIcerikleri.filter(i => i.tur === "kitap");
                     return havuzKitaplar.length > 0 ? (
@@ -7699,7 +7699,7 @@ function OgrenciPaneli({ user, logout }) {
                         <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
                           {havuzKitaplar.map(k => (
                             <button key={k.id} onClick={() => setMateryalKitapAdi(k.baslik)}
-                              className={`text-[11px] px-2.5 py-1.5 rounded-xl border-2 transition-all flex items-center gap-1 ${materyalKitapAdi===k.baslik?"bg-teal-500 text-white border-teal-500":"bg-gray-50 text-gray-600 border-gray-200 hover:border-teal-400 hover:bg-teal-50"}`}>
+                              className={`text-[11px] px-2.5 py-1.5 rounded-xl border-2 transition-all flex items-center gap-1 ${materyalKitapAdi===k.baslik?"bg-teal-500 text-white border-teal-500":"bg-gray-50 text-subtle border-line hover:border-teal-400 hover:bg-teal-50"}`}>
                               📚 {k.baslik}
                             </button>
                           ))}
@@ -7707,19 +7707,19 @@ function OgrenciPaneli({ user, logout }) {
                         <div className="relative">
                           <input value={materyalKitapAdi} onChange={e => setMateryalKitapAdi(e.target.value)}
                             placeholder="veya farklı kitap adı yaz..."
-                            className="w-full border-2 border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-teal-400 transition-colors" />
-                          {materyalKitapAdi && <button onClick={() => setMateryalKitapAdi("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">✕</button>}
+                            className="w-full border-2 border-line rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-teal-400 transition-colors" />
+                          {materyalKitapAdi && <button onClick={() => setMateryalKitapAdi("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle text-sm">✕</button>}
                         </div>
                       </div>
                     ) : (
                       <div className="space-y-2">
                         <input value={materyalKitapAdi} onChange={e => setMateryalKitapAdi(e.target.value)}
                           placeholder="Kitap adını yaz..."
-                          className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-teal-400 transition-colors" />
+                          className="w-full border-2 border-line rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-teal-400 transition-colors" />
                         <div className="flex flex-wrap gap-1.5">
                           {["Küçük Prens","Pinokyo","Alice Harikalar Diyarında","Heidi","Pollyanna"].map(k => (
                             <button key={k} onClick={() => setMateryalKitapAdi(k)}
-                              className={`text-[11px] px-2.5 py-1 rounded-full border transition-all ${materyalKitapAdi===k?"bg-teal-500 text-white border-teal-500":"bg-gray-50 text-gray-600 border-gray-200 hover:border-teal-400"}`}>
+                              className={`text-[11px] px-2.5 py-1 rounded-full border transition-all ${materyalKitapAdi===k?"bg-teal-500 text-white border-teal-500":"bg-gray-50 text-subtle border-line hover:border-teal-400"}`}>
                               {k}
                             </button>
                           ))}
@@ -7730,7 +7730,7 @@ function OgrenciPaneli({ user, logout }) {
                 </div>
 
                 {/* Materyal tipi */}
-                <div className="text-xs font-medium text-gray-600 mb-2">Materyal Türü Seç</div>
+                <div className="text-xs font-medium text-subtle mb-2">Materyal Türü Seç</div>
                 <div className="grid grid-cols-2 gap-2 mb-4">
                   {[
                     {id:"soru_seti",e:"📝",l:"Soru Seti",a:"10 soruluk anlama testi"},
@@ -7758,15 +7758,15 @@ function OgrenciPaneli({ user, logout }) {
                       }} disabled={materyalYukleniyor}
                         className={`p-3 rounded-xl border-2 text-left transition-all ${secili?"border-teal-400 bg-teal-50":"border-gray-100 bg-gray-50 hover:border-teal-300"} disabled:opacity-50`}>
                         <div className="text-2xl mb-1">{t.e}</div>
-                        <div className="font-bold text-xs text-gray-800">{t.l}</div>
-                        <div className="text-[10px] text-gray-500 mt-0.5">{t.a}</div>
+                        <div className="font-bold text-xs text-content">{t.l}</div>
+                        <div className="text-[10px] text-subtle mt-0.5">{t.a}</div>
                       </button>
                     );
                   })}
                 </div>
 
                 {materyalYukleniyor && (
-                  <div className="text-center py-6"><div className="text-3xl animate-spin mb-2">⚙️</div><div className="text-sm text-gray-500">Materyal hazırlanıyor...</div></div>
+                  <div className="text-center py-6"><div className="text-3xl animate-spin mb-2">⚙️</div><div className="text-sm text-subtle">Materyal hazırlanıyor...</div></div>
                 )}
               </div>
 
@@ -7774,7 +7774,7 @@ function OgrenciPaneli({ user, logout }) {
               {materyalSonuc && !materyalYukleniyor && (() => {
                 const m = materyalSonuc;
                 return (
-                  <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+                  <div className="bg-surface rounded-2xl border shadow-sm overflow-hidden">
                     <div className="bg-gradient-to-r from-teal-500 to-cyan-600 p-4 text-white">
                       <div className="text-xs opacity-70 mb-0.5">📋 {m.kitap_adi}</div>
                       <div className="font-bold text-base">{m.baslik}</div>
@@ -7786,10 +7786,10 @@ function OgrenciPaneli({ user, logout }) {
                           <div className="flex items-start gap-2">
                             <span className="text-xs bg-teal-100 text-teal-700 font-bold px-1.5 py-0.5 rounded min-w-[20px] text-center">{i+1}</span>
                             <div className="flex-1">
-                              <p className="text-sm font-medium text-gray-800">{s.soru}</p>
+                              <p className="text-sm font-medium text-content">{s.soru}</p>
                               <div className="mt-2 grid grid-cols-2 gap-1">
                                 {(s.secenekler||[]).map((sec,j) => (
-                                  <div key={j} className={`text-xs px-2 py-1 rounded-lg border ${sec===s.dogru?"bg-green-100 border-green-300 text-green-700 font-medium":"bg-white border-gray-200 text-gray-600"}`}>{sec}</div>
+                                  <div key={j} className={`text-xs px-2 py-1 rounded-lg border ${sec===s.dogru?"bg-green-100 border-green-300 text-green-700 font-medium":"bg-surface border-line text-subtle"}`}>{sec}</div>
                                 ))}
                               </div>
                               {s.bloom_basamak && <div className="text-[10px] text-purple-500 mt-1">📊 {s.bloom_basamak}</div>}
@@ -7801,7 +7801,7 @@ function OgrenciPaneli({ user, logout }) {
                       {m.tur === "kelime_listesi" && m.kelimeler?.map((k,i) => (
                         <div key={i} className="bg-indigo-50 rounded-xl p-3 border border-indigo-100 flex items-start gap-3">
                           <span className="font-bold text-indigo-600 text-sm min-w-[80px]">{k.kelime}</span>
-                          <div className="flex-1 text-xs"><div className="text-gray-700">{k.anlam}</div><div className="text-indigo-500 italic mt-0.5">"{k.cumle}"</div></div>
+                          <div className="flex-1 text-xs"><div className="text-content">{k.anlam}</div><div className="text-indigo-500 italic mt-0.5">"{k.cumle}"</div></div>
                           <div className="flex gap-0.5">{[1,2,3,4,5].map(n => <div key={n} className={`w-1.5 h-1.5 rounded-full ${n<=k.zorluk?"bg-orange-400":"bg-gray-200"}`} />)}</div>
                         </div>
                       ))}
@@ -7812,11 +7812,11 @@ function OgrenciPaneli({ user, logout }) {
                           <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full">👥 {m.grup_sayisi} grup</span>
                         </div>
                         {m.adimlar?.map((a,i) => <div key={i} className="flex items-start gap-2 text-sm"><span className="text-teal-600 font-bold">{i+1}.</span><span>{a}</span></div>)}
-                        {m.kazanimlar?.length > 0 && <div className="mt-2"><div className="text-xs font-bold text-gray-600 mb-1">🎯 Kazanımlar</div>{m.kazanimlar.map((k,i) => <div key={i} className="text-xs text-gray-600">• {k}</div>)}</div>}
+                        {m.kazanimlar?.length > 0 && <div className="mt-2"><div className="text-xs font-bold text-subtle mb-1">🎯 Kazanımlar</div>{m.kazanimlar.map((k,i) => <div key={i} className="text-xs text-subtle">• {k}</div>)}</div>}
                       </>)}
                       {/* TAHMİN */}
                       {m.tur === "tahmin" && (<>
-                        <p className="text-sm text-gray-600 italic">{m.giris}</p>
+                        <p className="text-sm text-subtle italic">{m.giris}</p>
                         {m.sorular?.map((s,i) => (
                           <div key={i} className="bg-amber-50 rounded-xl p-3 border border-amber-100">
                             <p className="text-sm font-medium">{s.soru}</p>
@@ -7837,29 +7837,29 @@ function OgrenciPaneli({ user, logout }) {
         {aktifSekme === "siralama" && (<div className="space-y-4">
           <h2 className="text-lg font-bold">🏆 Lig Sıralaması</h2>
           {xpDurum && (<div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-2xl p-4 border border-yellow-100 flex items-center justify-between">
-            <div><div className="text-2xl font-bold">{xpDurum.lig_label}</div><div className="text-sm text-gray-600">{xpDurum.toplam_xp} XP</div></div>
-            {xpDurum.sonraki_lig && <div className="text-right"><div className="text-xs text-gray-500">Sonraki: {({"gumus":"🥈 Gümüş","altin":"🥇 Altın","elmas":"💎 Elmas"})[xpDurum.sonraki_lig]}</div><div className="text-sm font-bold text-orange-600">{xpDurum.kalan_xp} XP kaldı</div></div>}
+            <div><div className="text-2xl font-bold">{xpDurum.lig_label}</div><div className="text-sm text-subtle">{xpDurum.toplam_xp} XP</div></div>
+            {xpDurum.sonraki_lig && <div className="text-right"><div className="text-xs text-subtle">Sonraki: {({"gumus":"🥈 Gümüş","altin":"🥇 Altın","elmas":"💎 Elmas"})[xpDurum.sonraki_lig]}</div><div className="text-sm font-bold text-orange-600">{xpDurum.kalan_xp} XP kaldı</div></div>}
           </div>)}
-          {xpDurum?.son_xp?.length > 0 && (<div className="bg-white rounded-2xl p-3 shadow-sm border"><div className="text-xs font-medium text-gray-500 mb-2">Son Kazanımlar</div>
-            {xpDurum.son_xp.slice(0,5).map((x,i) => (<div key={i} className="flex items-center justify-between py-1 text-xs"><span className="text-gray-600">{({"okuma_gorevi":"📖 Okuma","anlama_testi":"📝 Test","egzersiz":"🎯 Egzersiz","gorev_tamamla":"✅ Görev","gelisim_tamamla":"🎓 Gelişim","kitap_bitirme":"📚 Kitap","gunluk_streak":"🔥 Streak"})[x.eylem] || x.eylem}</span><span className="font-bold text-green-600">+{x.xp} XP</span></div>))}
+          {xpDurum?.son_xp?.length > 0 && (<div className="bg-surface rounded-2xl p-3 shadow-sm border"><div className="text-xs font-medium text-subtle mb-2">Son Kazanımlar</div>
+            {xpDurum.son_xp.slice(0,5).map((x,i) => (<div key={i} className="flex items-center justify-between py-1 text-xs"><span className="text-subtle">{({"okuma_gorevi":"📖 Okuma","anlama_testi":"📝 Test","egzersiz":"🎯 Egzersiz","gorev_tamamla":"✅ Görev","gelisim_tamamla":"🎓 Gelişim","kitap_bitirme":"📚 Kitap","gunluk_streak":"🔥 Streak"})[x.eylem] || x.eylem}</span><span className="font-bold text-green-600">+{x.xp} XP</span></div>))}
           </div>)}
           <div className="flex items-center justify-between">
-            <p className="text-xs text-gray-500">Toplam XP'ye göre sıralama</p>
+            <p className="text-xs text-subtle">Toplam XP'ye göre sıralama</p>
             <span className="text-[10px] font-medium text-orange-600 bg-orange-50 border border-orange-100 rounded-full px-2 py-0.5">🎓 Sadece öğrenciler</span>
           </div>
-          {ligSiralama && ligSiralama.siralama.length > 0 ? (<div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
-            {ligSiralama.siralama.filter(s => !s.role || s.role === "student").map((s, i) => (<div key={i} className={`flex items-center justify-between px-4 py-3 ${s.ben ? 'bg-orange-50 border-l-4 border-l-orange-500 font-bold' : i%2===0 ? 'bg-white' : 'bg-gray-50'} ${i>0 ? 'border-t border-gray-100' : ''}`}>
-              <div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${s.sira<=3 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'}`}>{s.sira===1?"🥇":s.sira===2?"🥈":s.sira===3?"🥉":s.sira}</div><span className={`text-sm ${s.ben ? 'text-orange-700' : 'text-gray-700'}`}>{s.ad}</span><span className="text-xs">{s.lig_label}</span></div>
-              <span className={`text-sm font-medium ${s.ben ? 'text-orange-600' : 'text-gray-500'}`}>{s.xp} XP</span>
+          {ligSiralama && ligSiralama.siralama.length > 0 ? (<div className="bg-surface rounded-2xl shadow-sm border overflow-hidden">
+            {ligSiralama.siralama.filter(s => !s.role || s.role === "student").map((s, i) => (<div key={i} className={`flex items-center justify-between px-4 py-3 ${s.ben ? 'bg-orange-50 border-l-4 border-l-orange-500 font-bold' : i%2===0 ? 'bg-surface' : 'bg-gray-50'} ${i>0 ? 'border-t border-gray-100' : ''}`}>
+              <div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${s.sira<=3 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-subtle'}`}>{s.sira===1?"🥇":s.sira===2?"🥈":s.sira===3?"🥉":s.sira}</div><span className={`text-sm ${s.ben ? 'text-orange-700' : 'text-content'}`}>{s.ad}</span><span className="text-xs">{s.lig_label}</span></div>
+              <span className={`text-sm font-medium ${s.ben ? 'text-orange-600' : 'text-subtle'}`}>{s.xp} XP</span>
             </div>))}
-          </div>) : (<div className="text-center py-12"><div className="text-5xl mb-3">🏆</div><p className="text-gray-500">Henüz yeterli veri yok</p></div>)}
+          </div>) : (<div className="text-center py-12"><div className="text-5xl mb-3">🏆</div><p className="text-subtle">Henüz yeterli veri yok</p></div>)}
         </div>)}
 
         {/* ═══ MESAJLAR ═══ */}
         {aktifSekme === "mesajlar" && (<div className="space-y-4">
           <h2 className="text-lg font-bold">✉️ Mesajlar</h2>
           {profil?.ogretmen_bilgi && (
-            <Card className="border-0 shadow-sm border-l-4 border-l-blue-500"><CardHeader className="pb-2"><CardTitle className="text-sm">📝 Öğretmenime Mesaj</CardTitle><p className="text-xs text-gray-500">{profil.ogretmen_bilgi.ad} {profil.ogretmen_bilgi.soyad}</p></CardHeader>
+            <Card className="border border-line shadow-sm border-l-4 border-l-blue-500"><CardHeader className="pb-2"><CardTitle className="text-sm">📝 Öğretmenime Mesaj</CardTitle><p className="text-xs text-subtle">{profil.ogretmen_bilgi.ad} {profil.ogretmen_bilgi.soyad}</p></CardHeader>
               <CardContent><form onSubmit={mesajGonder} className="space-y-3">
                 <div><Label className="text-xs">Konu</Label><Input value={mesajForm.konu} onChange={e => setMesajForm({...mesajForm, konu: e.target.value})} placeholder="Konu..." className="text-sm" /></div>
                 <div><Label className="text-xs">Mesaj *</Label><textarea value={mesajForm.icerik} onChange={e => setMesajForm({...mesajForm, icerik: e.target.value})} required placeholder="Mesajınızı yazın..." className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px]" /></div>
@@ -7868,12 +7868,12 @@ function OgrenciPaneli({ user, logout }) {
             </Card>
           )}
           {!profil?.ogretmen_bilgi && (<div className="bg-yellow-50 rounded-xl p-4 border border-yellow-200 text-sm text-yellow-800">Henüz öğretmen atanmamış.</div>)}
-          {mesajlar.length > 0 && (<><h3 className="text-xs font-medium text-gray-500">Geçmiş</h3>
+          {mesajlar.length > 0 && (<><h3 className="text-xs font-medium text-subtle">Geçmiş</h3>
             {mesajlar.map(m => { const ben = m.gonderen_id === user.id; return (
-              <div key={m.id} className={`rounded-xl p-3 border ${ben ? 'bg-blue-50 border-blue-100 ml-8' : 'bg-white border-gray-100 mr-8'}`} onClick={() => !ben && !m.okundu && mesajOkundu(m.id)}>
-                <div className="flex items-center justify-between mb-1"><span className="text-xs text-gray-500">{ben ? `Sen → ${m.alici_ad}` : `${m.gonderen_ad}`}</span><div className="flex items-center gap-1"><span className="text-[10px] text-gray-400">{new Date(m.tarih).toLocaleDateString('tr-TR')}</span>{!ben && !m.okundu && <span className="w-2 h-2 bg-red-500 rounded-full" />}</div></div>
-                {m.konu && <div className="text-xs font-bold text-gray-700">{m.konu}</div>}
-                <p className="text-sm text-gray-800 mt-0.5">{m.icerik}</p>
+              <div key={m.id} className={`rounded-xl p-3 border ${ben ? 'bg-blue-50 border-blue-100 ml-8' : 'bg-surface border-gray-100 mr-8'}`} onClick={() => !ben && !m.okundu && mesajOkundu(m.id)}>
+                <div className="flex items-center justify-between mb-1"><span className="text-xs text-subtle">{ben ? `Sen → ${m.alici_ad}` : `${m.gonderen_ad}`}</span><div className="flex items-center gap-1"><span className="text-[10px] text-subtle">{new Date(m.tarih).toLocaleDateString('tr-TR')}</span>{!ben && !m.okundu && <span className="w-2 h-2 bg-red-500 rounded-full" />}</div></div>
+                {m.konu && <div className="text-xs font-bold text-content">{m.konu}</div>}
+                <p className="text-sm text-content mt-0.5">{m.icerik}</p>
               </div>);
             })}</>)}
         </div>)}
@@ -7882,7 +7882,7 @@ function OgrenciPaneli({ user, logout }) {
       {/* 🧠 Zekâ Haritası Modalı */}
       {zekaModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-4" onClick={() => setZekaModal(null)}>
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="bg-surface rounded-2xl w-full max-w-sm shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-t-2xl p-4 text-white">
               <div className="flex items-start justify-between">
                 <div><div className="text-xs opacity-70 mb-0.5">🧠 Zekâ Haritası</div><div className="font-bold text-base leading-tight">{zekaModal.kitap_adi}</div>{zekaModal.yazar && <div className="text-xs opacity-80 mt-0.5">{zekaModal.yazar}</div>}</div>
@@ -7890,7 +7890,7 @@ function OgrenciPaneli({ user, logout }) {
               </div>
             </div>
             {zekaModal.yukleniyor ? (
-              <div className="p-8 text-center"><div className="text-4xl mb-3 animate-spin">🧠</div><div className="text-sm text-gray-500">AI analiz ediyor...</div></div>
+              <div className="p-8 text-center"><div className="text-4xl mb-3 animate-spin">🧠</div><div className="text-sm text-subtle">AI analiz ediyor...</div></div>
             ) : zekaModal.profil ? (() => {
               const boyutlar = zekaModal.profil.boyutlar || {};
               const etiketler = {soyutluk:"Soyutluk",kelime_zorlugu:"Kelime Zorluğu",hayal_gucu:"Hayal Gücü",felsefi_derinlik:"Felsefi Derinlik",aksiyon:"Aksiyon",duygusal_yogunluk:"Duygusal Yoğunluk",hedef_kelime_yogunlugu:"Kelime Yoğunluğu"};
@@ -7900,7 +7900,7 @@ function OgrenciPaneli({ user, logout }) {
               return (
                 <div className="p-4 space-y-4">
                   <div className="flex items-center justify-between bg-gray-50 rounded-xl p-3">
-                    <div className="text-sm font-medium text-gray-700">Genel Zorluk</div>
+                    <div className="text-sm font-medium text-content">Genel Zorluk</div>
                     <div className="flex items-center gap-2">
                       <div className="flex gap-0.5">{[1,2,3,4,5,6,7,8,9,10].map(n => (<div key={n} className={`w-2.5 h-2.5 rounded-full ${n <= genelZorluk ? "bg-purple-500" : "bg-gray-200"}`} />))}</div>
                       <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${seviye.r}`}>{seviye.l}</span>
@@ -7908,15 +7908,15 @@ function OgrenciPaneli({ user, logout }) {
                   </div>
                   <div className="space-y-2">
                     {Object.entries(etiketler).map(([k,label]) => { const val = boyutlar[k] || 0; return (
-                      <div key={k}><div className="flex justify-between text-xs mb-1"><span className="text-gray-600">{label}</span><span className="font-bold">{val}/10</span></div><div className="h-2.5 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full rounded-full ${renkler[k]}`} style={{width:`${val*10}%`}} /></div></div>
+                      <div key={k}><div className="flex justify-between text-xs mb-1"><span className="text-subtle">{label}</span><span className="font-bold">{val}/10</span></div><div className="h-2.5 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full rounded-full ${renkler[k]}`} style={{width:`${val*10}%`}} /></div></div>
                     );})}
                   </div>
-                  {zekaModal.profil.aciklama && (<div className="bg-purple-50 rounded-xl p-3 border border-purple-100"><div className="text-xs text-purple-700 font-medium mb-1">🤖 AI Yorumu</div><p className="text-xs text-gray-700 leading-relaxed">{zekaModal.profil.aciklama}</p></div>)}
+                  {zekaModal.profil.aciklama && (<div className="bg-purple-50 rounded-xl p-3 border border-purple-100"><div className="text-xs text-purple-700 font-medium mb-1">🤖 AI Yorumu</div><p className="text-xs text-content leading-relaxed">{zekaModal.profil.aciklama}</p></div>)}
                   {zekaModal.profil.uyum_skoru !== undefined && (<div className="bg-green-50 rounded-xl p-3 border border-green-100 flex items-center justify-between"><div className="text-xs font-medium text-green-700">Sana Uyum</div><div className="text-2xl font-bold text-green-600">%{Math.round(zekaModal.profil.uyum_skoru)}</div></div>)}
                   <button onClick={() => setZekaModal(null)} className="w-full bg-purple-600 text-white rounded-xl py-3 text-sm font-bold">Kapat</button>
                 </div>
               );
-            })() : (<div className="p-6 text-center text-sm text-gray-400">Profil yüklenemedi.</div>)}
+            })() : (<div className="p-6 text-center text-sm text-subtle">Profil yüklenemedi.</div>)}
           </div>
         </div>
       )}
