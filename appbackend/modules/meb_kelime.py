@@ -29,8 +29,44 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, 
 from core.db import db
 from core.auth import get_current_user, require_role, UserRole
 from core.ai import call_claude
+from core.kelime_secici import kelime_sec
 
 router = APIRouter()
+
+
+async def _ogrenci_sinif(current_user: dict, varsayilan: int = 3) -> int:
+    """Öğrenci ise (linked_id → students) sınıfını döner; yoksa (öğretmen/admin
+    önizleme) varsayılan sınıfı döner. Oyun kelime havuzu için kullanılır."""
+    lid = current_user.get("linked_id")
+    if lid:
+        st = await db.students.find_one({"id": lid})
+        if st and st.get("sinif"):
+            try:
+                return int(str(st.get("sinif")).strip().split()[0])
+            except Exception:
+                pass
+    try:
+        return int(str(current_user.get("sinif", "") or varsayilan).strip().split()[0])
+    except Exception:
+        return varsayilan
+
+
+@router.get("/meb-kelime/oyun-havuzu")
+async def oyun_kelime_havuzu(adet: int = 80, current_user=Depends(get_current_user)):
+    """Kelime/anlam odaklı oyunlar (göz egzersizleri vb.) için MEB-öncelikli kelime
+    listesi. Öğrencinin sınıfına göre `meb_kelimeleri` + `meb_kelime_haritasi`
+    havuzundan seçilir; havuz yetersizse genel Türkçe havuzla tamamlanır (oyun
+    asla kelimesiz kalmaz). Sadece kelime string'leri döner (anlam gerekmez)."""
+    adet = max(10, min(300, int(adet)))
+    sinif = await _ogrenci_sinif(current_user)
+    try:
+        kayitlar = await kelime_sec(sinif, adet, meb_orani=1.0, istatistik=False)
+        kelimeler = [k["kelime"] for k in kayitlar if k.get("kelime")]
+        meb_sayisi = sum(1 for k in kayitlar if k.get("kaynak") == "meb")
+    except Exception as e:
+        logging.warning(f"[oyun-havuzu] {e}")
+        kelimeler, meb_sayisi = [], 0
+    return {"kelimeler": kelimeler, "sinif": sinif, "toplam": len(kelimeler), "meb_sayisi": meb_sayisi}
 
 MAX_DOSYA_BYTE = 5 * 1024 * 1024  # 5MB
 AI_BATCH = 20             # AI'a TEK promptta gönderilecek BENZERSİZ kelime sayısı
