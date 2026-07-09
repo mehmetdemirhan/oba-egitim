@@ -67,6 +67,29 @@ async def get_ozellik_ayarlari_public():
     return {"tanimlar": OZELLIK_TANIMLARI, "ayarlar": ayarlar}
 
 
+# ÖNEMLİ: /ayarlar/{tip} generic PUT'undan ÖNCE — aksi halde tip="ozellikler"
+# olarak generic handler'a düşer ve özellik kaydı yanlış doc'a yazılırdı.
+@router.put("/ayarlar/ozellikler")
+async def update_ozellik_ayarlari(
+    payload: dict = Body(...),
+    current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))
+):
+    ayarlar = payload.get("ayarlar", {})
+    gecerli_idler = {f["id"] for f in OZELLIK_TANIMLARI}
+    temiz = {k: v for k, v in ayarlar.items() if k in gecerli_idler}
+    await db.sistem_ayarlari.update_one(
+        {"tip": "ozellik_ayarlari"},
+        {"$set": {
+            "tip": "ozellik_ayarlari",
+            "degerler": temiz,
+            "guncelleme_tarihi": datetime.utcnow().isoformat(),
+            "guncelleyen": f"{current_user.get('ad', '')} {current_user.get('soyad', '')}".strip()
+        }},
+        upsert=True
+    )
+    return {"ok": True, "guncellenen": len(temiz)}
+
+
 @router.get("/ayarlar/{tip}")
 async def get_ayar(tip: str, current_user=Depends(get_current_user)):
     doc = await db.sistem_ayarlari.find_one({"tip": tip})
@@ -109,28 +132,5 @@ async def get_tum_ayarlar(current_user=Depends(get_current_user)):
     return ayarlar
 
 
-@router.get("/ayarlar/ozellikler")
-async def get_ozellik_ayarlari_endpoint():
-    ayarlar = await get_ozellik_ayarlari()
-    return {"tanimlar": OZELLIK_TANIMLARI, "ayarlar": ayarlar}
-
-
-@router.put("/ayarlar/ozellikler")
-async def update_ozellik_ayarlari(
-    payload: dict = Body(...),
-    current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))
-):
-    ayarlar = payload.get("ayarlar", {})
-    gecerli_idler = {f["id"] for f in OZELLIK_TANIMLARI}
-    temiz = {k: v for k, v in ayarlar.items() if k in gecerli_idler}
-    await db.sistem_ayarlari.update_one(
-        {"tip": "ozellik_ayarlari"},
-        {"$set": {
-            "tip": "ozellik_ayarlari",
-            "degerler": temiz,
-            "guncelleme_tarihi": datetime.utcnow().isoformat(),
-            "guncelleyen": f"{current_user.get('ad', '')} {current_user.get('soyad', '')}".strip()
-        }},
-        upsert=True
-    )
-    return {"ok": True, "guncellenen": len(temiz)}
+# NOT: /ayarlar/ozellikler'in GET (public, yukarıda) ve PUT (yukarıda, {tip}'ten
+# önce) tanımları tektir; eski buradaki duplike GET + gölgelenen PUT kaldırıldı.
