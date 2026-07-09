@@ -33,6 +33,7 @@ from core.sistem import (
     XP_TABLOSU_DEFAULT, LIG_ESIKLERI_DEFAULT, LIG_SIRA,
 )
 from core.ai import _gemini_call, call_claude, _mock_bilgi_tabani_response, get_ogrenci_ai_verileri
+from core.kelime_durum import leitner_ilerlet, durum_etiket, OGRENILDI_KUTU
 
 router = APIRouter()
 
@@ -62,49 +63,46 @@ async def kelime_evrimi_cevapla(payload: dict, current_user=Depends(get_current_
     """Kelime tekrarına doğru/yanlış cevap — Leitner Box algoritması."""
     kelime_id = payload.get("kelime_id", "")
     dogru = payload.get("dogru", False)
-    ogrenci_id = current_user["id"]
+    # kelime_tekrar öğrenci RECORD id (linked_id) ile tutulur; XP ise user'a yazılır.
+    ogrenci_id = current_user.get("linked_id") or current_user["id"]
 
     kayit = await db.kelime_tekrar.find_one({"id": kelime_id, "ogrenci_id": ogrenci_id})
     if not kayit:
         raise HTTPException(status_code=404, detail="Kelime kaydı bulunamadı")
 
     mevcut_kutu = kayit.get("kutu", 1)
+    onceki_kutu = kayit.get("kutu", 0)
     simdi = datetime.utcnow()
 
-    # Yaş bazlı aralıklar
+    # Leitner ilerlemesi — merkezî algoritma (core.kelime_durum, tek kaynak).
     sinif = kayit.get("sinif", 3)
-    if sinif <= 2:  # 6-8 yaş
-        araliklar = {1: 1, 2: 2, 3: 5, 4: 12, 5: 30}
-    elif sinif <= 5:  # 9-11 yaş
-        araliklar = {1: 1, 2: 3, 3: 7, 4: 21, 5: 45}
-    else:  # 12+ yaş
-        araliklar = {1: 1, 2: 3, 3: 7, 4: 30, 5: 60}
+    yeni_kutu, sonraki, xp = leitner_ilerlet(mevcut_kutu, dogru, sinif)
 
-    if dogru:
-        yeni_kutu = min(5, mevcut_kutu + 1)
-        xp = 2
-    else:
-        yeni_kutu = 1  # Yanlış → ilk kutuya geri
-        xp = 1
-
-    sonraki_gun = araliklar.get(yeni_kutu, 7)
-    sonraki = (simdi + timedelta(days=sonraki_gun)).isoformat()
-
-    await db.kelime_tekrar.update_one({"id": kelime_id}, {"$set": {
+    set_alan = {
         "kutu": yeni_kutu,
         "son_gosterim": simdi.isoformat(),
         "sonraki_gosterim": sonraki,
-        "tekrar_sayisi": kayit.get("tekrar_sayisi", 0) + 1,
-        "dogru_sayisi": kayit.get("dogru_sayisi", 0) + (1 if dogru else 0),
-    }})
+    }
+    # İlk kez öğrenildi eşiğine (kutu>=4) ulaştıysa tarihini damgala (bir kez).
+    if yeni_kutu >= OGRENILDI_KUTU and onceki_kutu < OGRENILDI_KUTU and not kayit.get("ogrenildi_tarihi"):
+        set_alan["ogrenildi_tarihi"] = simdi.isoformat()
 
-    # XP
+    await db.kelime_tekrar.update_one({"id": kelime_id}, {
+        "$set": set_alan,
+        "$inc": {
+            "tekrar_sayisi": 1,
+            "dogru_sayisi": 1 if dogru else 0,
+            "yanlis_sayisi": 0 if dogru else 1,
+        },
+    })
+
+    # XP → kullanıcı hesabına (user id; kelime_tekrar linked_id iken XP user'da).
     try:
-        await db.users.update_one({"id": ogrenci_id}, {"$inc": {"toplam_xp": xp}})
+        await db.users.update_one({"id": current_user["id"]}, {"$inc": {"toplam_xp": xp}})
     except:
         pass
 
-    return {"dogru": dogru, "yeni_kutu": yeni_kutu, "sonraki_gun": sonraki_gun, "xp": xp}
+    return {"dogru": dogru, "yeni_kutu": yeni_kutu, "durum": durum_etiket(yeni_kutu), "xp": xp}
 
 
 @router.post("/ai/kelime-evrimi/ekle")
@@ -115,15 +113,18 @@ async def kelime_evrimi_ekle(payload: dict, current_user=Depends(get_current_use
     `adet` verilirse, kelimeler MEB müfredatı ÖNCELİKLİ (core/kelime_secici) olarak
     otomatik seçilir — böylece Leitner havuzu MEB kelimelerini önceler.
     """
-    ogrenci_id = payload.get("ogrenci_id", current_user["id"])
+    # kelime_tekrar öğrenci RECORD id (linked_id) ile tutulur — engine ve öğretmen
+    # paneliyle tutarlı olsun diye varsayılan da linked_id (user id DEĞİL).
+    ogrenci_id = payload.get("ogrenci_id") or current_user.get("linked_id") or current_user["id"]
     kelimeler = payload.get("kelimeler", [])  # [{"kelime": "...", "anlam": "...", "sinif": 3}]
 
-    # Otomatik doldurma (MEB > genel havuz önceliğiyle)
+    # Otomatik doldurma: MEB öncelikli + öğrencinin ÖĞRENDİĞİ (kutu>=4) kelimeler
+    # hariç (rotasyona tekrar sokulmasın). core.kelime_durum.ogrenci_kelime_sec.
     if not kelimeler and payload.get("adet"):
         try:
-            from core.kelime_secici import kelime_sec
+            from core.kelime_durum import ogrenci_kelime_sec
             sinif = int(payload.get("sinif", 3))
-            secilenler = await kelime_sec(sinif, int(payload["adet"]))
+            secilenler = await ogrenci_kelime_sec(ogrenci_id, sinif, int(payload["adet"]))
             kelimeler = [{
                 "kelime": s["kelime"], "anlam": s.get("anlam", ""),
                 "ornek_cumle": s.get("ornek_cumle", ""), "sinif": sinif,

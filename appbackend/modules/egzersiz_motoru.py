@@ -31,6 +31,7 @@ from core.sistem import get_xp_tablosu
 from core.egzersiz_tipleri import tip_var_mi, tip_meta, tip_listesi
 from core.egzersiz_prompts import prompt_uret, mock_uret
 from core.bulmaca_olusturucu import bulmaca_uret, kelime_dogrula
+from core.kelime_durum import kelime_karsilasma
 
 router = APIRouter()
 
@@ -68,6 +69,39 @@ async def _meb_kelimeler(sinif: int, sadece_anlamli: bool = False, limit: int = 
         return []
 
 
+async def _ogrenci_meb_kelimeler(ogrenci_id: str, sinif: int, limit: int = 40) -> list[str]:
+    """Öğrencinin HENÜZ ÖĞRENMEDİĞİ (kutu<4) MEB kelimeleri — adaptif üretim için.
+    Öğrenilmiş kelimeler rotasyondan çıkarılır. Hata → genel MEB listesine düşer."""
+    try:
+        from core.kelime_durum import ogrenci_kelime_sec
+        kayitlar = await ogrenci_kelime_sec(ogrenci_id, sinif, limit)
+        return [k["kelime"] for k in kayitlar if k.get("kelime")]
+    except Exception as ex:
+        logging.warning(f"[egzersiz_motoru] öğrenci MEB kelime hatası: {ex}")
+        return await _meb_kelimeler(sinif, sadece_anlamli=True, limit=limit)
+
+
+def _icerik_hedef_kelimeler(icerik: dict) -> list[str]:
+    """Kelime-anlam içeriğinden test edilen hedef kelime listesini (sırayla) çıkarır.
+    Leitner güncellemesi için kullanılır."""
+    out: list[str] = []
+    if not isinstance(icerik, dict):
+        return out
+    if icerik.get("ciftler"):
+        for c in icerik["ciftler"]:
+            out.append(str(c.get("sol") or c.get("kelime") or "") if isinstance(c, dict) else str(c))
+    elif icerik.get("kelimeler"):
+        for k in icerik["kelimeler"]:
+            out.append(str(k.get("kelime") or k.get("cevap") or "") if isinstance(k, dict) else str(k))
+    elif icerik.get("kelime"):
+        out.append(str(icerik["kelime"]))
+    elif icerik.get("merkez"):
+        out.append(str(icerik["merkez"]))
+    elif icerik.get("hedef"):
+        out.append(str(icerik["hedef"]))
+    return [w for w in out if w and len(w.strip()) >= 2]
+
+
 def _toplam_soru(meta: dict, icerik: dict) -> int:
     p = meta.get("puanlama", "secmeli")
     if p == "secmeli":
@@ -78,7 +112,8 @@ def _toplam_soru(meta: dict, icerik: dict) -> int:
     return 1
 
 
-async def _icerik_uret(tip: str, sinif: int, konu: str | None, zorluk: str | None) -> tuple[dict, bool]:
+async def _icerik_uret(tip: str, sinif: int, konu: str | None, zorluk: str | None,
+                       ogrenci_id: str | None = None) -> tuple[dict, bool]:
     """AI ile içerik üretir. Başarısızsa 1 kez retry, yine olmazsa mock döner.
 
     Dönüş: (icerik_dict, mock_mu)
@@ -100,7 +135,12 @@ async def _icerik_uret(tip: str, sinif: int, konu: str | None, zorluk: str | Non
     # MEB/kitap önceliği: kelime-odaklı tiplerde AI'a bu kelimelerden üretmesini söyle.
     # (Liste, köprü sayesinde müfredat + AI Eğit ile yüklenen kitap kelimelerini içerir.)
     if tip in _MEB_KELIME_TIPLERI:
-        meb = await _meb_kelimeler(sinif, sadece_anlamli=True, limit=60)
+        # Öğrenci belliyse ÖĞRENMEDİĞİ (kutu<4) kelimelere öncelik ver (adaptif);
+        # yoksa (arka plan/öğretmen üretimi) genel MEB listesi.
+        if ogrenci_id:
+            meb = await _ogrenci_meb_kelimeler(ogrenci_id, sinif, limit=60)
+        else:
+            meb = await _meb_kelimeler(sinif, sadece_anlamli=True, limit=60)
         if meb:
             user_msg += ("\n\nZORUNLU KAYNAK: Bu egzersizi ÖNCELİKLE aşağıdaki kelimelerden üret "
                          "(öğrencinin okulda/kitaplarında öğrendiği kelimeler). Mümkün olduğunca "
@@ -188,7 +228,8 @@ def _aktif_sorgu(tip: str, sinif: int) -> dict:
     return {"tip": tip, "sinif": sinif, **_AKTIF}
 
 
-async def _icerik_sec_veya_uret(tip: str, sinif: int, ekleyen_id: str) -> dict:
+async def _icerik_sec_veya_uret(tip: str, sinif: int, ekleyen_id: str,
+                                ogrenci_id: str | None = None) -> dict:
     """Oturum için kalıcı kütüphaneden içerik seçer.
 
     1. (tip, sınıf) için durum="aktif" içerikleri kullanım sayısı artan, eşitlikte
@@ -211,7 +252,7 @@ async def _icerik_sec_veya_uret(tip: str, sinif: int, ekleyen_id: str) -> dict:
             asyncio.create_task(_arka_plan_uret(tip, sinif, ekleyen_id))
         return secilen
 
-    icerik, mock = await _icerik_uret(tip, sinif, None, None)
+    icerik, mock = await _icerik_uret(tip, sinif, None, None, ogrenci_id)
     return await _icerik_kaydet(tip, sinif, None, None, icerik, ekleyen_id, mock,
                                 kaynak="ai_uretim")
 
@@ -346,7 +387,8 @@ async def egzersiz_oturum_baslat(data: dict, current_user=Depends(get_current_us
         if not icerik_doc:
             raise HTTPException(status_code=404, detail="İçerik bulunamadı")
     else:
-        icerik_doc = await _icerik_sec_veya_uret(tip, sinif, current_user.get("id"))
+        icerik_doc = await _icerik_sec_veya_uret(tip, sinif, current_user.get("id"),
+                                                 ogrenci_id=_ogrenci_id(current_user))
 
     await db.egzersiz_icerikler.update_one(
         {"id": icerik_doc["id"]},
@@ -422,6 +464,24 @@ async def egzersiz_bitir(oturum_id: str, data: dict = None, current_user=Depends
     baz_xp = (await get_xp_tablosu()).get("egzersiz_motoru", 10)
     xp = round(baz_xp * oran)
     puan = dogru_sayisi * 2
+
+    # ── Kelime-anlam egzersizi tamamlandı → öğrenci kelime durumu (Leitner) güncelle.
+    #    Cevaba göre (soru_no eşleşirse) kelime-başı doğruluk; yoksa genel oran. Böylece
+    #    öğrenilen kelimeler (kutu>=4) sonraki üretim/seçimlerde rotasyondan çıkar. ──
+    if oturum.get("tip") in _MEB_KELIME_TIPLERI:
+        try:
+            icerik_doc = await db.egzersiz_icerikler.find_one({"id": oturum.get("icerik_id")})
+            hedefler = _icerik_hedef_kelimeler((icerik_doc or {}).get("icerik", {}))
+            if hedefler:
+                ogr = oturum.get("ogrenci_id") or _ogrenci_id(current_user)
+                s = int((icerik_doc or {}).get("sinif", 3) or 3)
+                cmap = {int(c.get("soru_no", -1)): bool(c.get("dogru"))
+                        for c in oturum.get("cevaplar", [])}
+                genel = oran >= 0.5
+                for i, w in enumerate(hedefler):
+                    await kelime_karsilasma(ogr, w, cmap.get(i, genel), s, xp_ver=False)
+        except Exception as ex:
+            logging.warning(f"[egzersiz_motoru] Leitner güncelleme hatası: {ex}")
 
     await db.egzersiz_oturumlari.update_one(
         {"id": oturum_id},
