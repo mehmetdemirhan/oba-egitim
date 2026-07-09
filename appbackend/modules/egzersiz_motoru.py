@@ -49,6 +49,9 @@ _MEB_KELIME_TIPLERI = {
     "anlam_haritasi", "sight_words", "hafiza_karti",
 }
 
+# Deyim/atasözü/tekerleme egzersizleri: AI içeriğine db.deyim_atasozu havuzunu enjekte et.
+_DEYIM_TIPLERI = {"deyim_eslestirme", "deyim_bosluk", "tekerleme_okuma"}
+
 
 # ─────────────────────────────────────────────
 # Yardımcılar
@@ -145,6 +148,26 @@ async def _icerik_uret(tip: str, sinif: int, konu: str | None, zorluk: str | Non
             user_msg += ("\n\nZORUNLU KAYNAK: Bu egzersizi ÖNCELİKLE aşağıdaki kelimelerden üret "
                          "(öğrencinin okulda/kitaplarında öğrendiği kelimeler). Mümkün olduğunca "
                          f"YALNIZCA bu listeden seç:\n{', '.join(meb[:40])}.")
+
+    if tip in _DEYIM_TIPLERI:
+        # db.deyim_atasozu havuzundan öğeleri prompt'a enjekte et (varsa AI onları kullanır).
+        try:
+            from modules.deyim_atasozu import deyim_ogeler
+            turler = ["tekerleme"] if tip == "tekerleme_okuma" else ["deyim", "atasozu"]
+            ogeler = await deyim_ogeler(sinif, turler, limit=20)
+        except Exception as ex:
+            logging.warning(f"[egzersiz_motoru] deyim havuzu hatası: {ex}")
+            ogeler = []
+        if ogeler:
+            if tip == "tekerleme_okuma":
+                secilen = random.choice(ogeler)
+                user_msg += ("\n\nZORUNLU: Aşağıdaki tekerlemeyi AYNEN kullan (metin alanına koy, "
+                             f"değiştirme):\n{secilen['icerik']}")
+            else:
+                liste = "; ".join(f"{o['icerik']} = {o.get('anlam','')}" for o in ogeler[:12] if o.get('anlam'))
+                if liste:
+                    user_msg += ("\n\nZORUNLU KAYNAK: Bu egzersizi ÖNCELİKLE aşağıdaki "
+                                 "öğretmenin girdiği deyim/atasözü havuzundan üret:\n" + liste)
 
     for deneme in range(2):
         try:

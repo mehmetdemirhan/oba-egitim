@@ -29,6 +29,8 @@ import DiyalogRender from "./DiyalogRender";
 import FonolojiRender from "./FonolojiRender";
 // Kelime Gezmece (çapraz bulmaca harf oyunu)
 import KelimeGezmece from "./KelimeGezmece";
+// Deyim/Atasözü/Tekerleme (FAZ 4)
+import TekerlemeOkumaRender from "./TekerlemeOkumaRender";
 
 const RENDER_MAP = {
   demo: DemoRender,
@@ -68,6 +70,10 @@ const RENDER_MAP = {
   ses_cikarma: FonolojiRender,
   // Kelime Gezmece — kendi akışını yöneten tam oyun bileşeni
   kelime_gezmece: KelimeGezmece,
+  // Deyim / Atasözü / Tekerleme (FAZ 4)
+  deyim_eslestirme: EslestirmeRender,   // ciftler (deyim/atasözü ↔ anlam)
+  deyim_bosluk: SecmeliRender,          // çoktan seçmeli boşluk doldurma
+  tekerleme_okuma: TekerlemeOkumaRender,
 };
 
 export function getRenderComponent(tip) {

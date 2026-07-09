@@ -671,6 +671,68 @@ def _kelime_gezmece_mock(sinif, konu, soru_sayisi):
     return bulmaca_uret(sinif)
 
 
+# ── Deyim / Atasözü / Tekerleme (FAZ 4) ──────────────────────────
+# Not: Gerçek deyim/atasözü/tekerleme öğeleri egzersiz_motoru tarafından
+# db.deyim_atasozu havuzundan prompt'a enjekte edilir (havuz varsa AI onları kullanır).
+
+def _deyim_eslestirme_user(sinif, konu, soru_sayisi, zorluk):
+    return (
+        f"Sınıf {sinif} seviyesine uygun {soru_sayisi} adet DEYİM veya ATASÖZÜ ve her birinin "
+        f"kısa, öğrenci-dostu anlamını üret. Zorluk: {zorluk or 'orta'}.\n"
+        'JSON şeması: {"ciftler": [{"sol": "deyim/atasözü", "sag": "kısa anlamı"}]}'
+        + _JSON_KURAL
+    )
+
+
+def _deyim_eslestirme_mock(sinif, konu, soru_sayisi):
+    havuz = [
+        {"sol": "göz atmak", "sag": "Kısaca bakmak"},
+        {"sol": "kulak vermek", "sag": "Dikkatle dinlemek"},
+        {"sol": "Damlaya damlaya göl olur", "sag": "Küçük birikimler zamanla büyür"},
+        {"sol": "ağzı kulaklarına varmak", "sag": "Çok sevinmek"},
+        {"sol": "Sakla samanı, gelir zamanı", "sag": "Bir şey ileride işe yarayabilir"},
+        {"sol": "el atmak", "sag": "Bir işe başlamak, yardım etmek"},
+    ]
+    return {"ciftler": havuz[: max(2, min(soru_sayisi, len(havuz)))]}
+
+
+def _deyim_bosluk_user(sinif, konu, soru_sayisi, zorluk):
+    return (
+        f"Sınıf {sinif} seviyesine uygun {soru_sayisi} adet cümle üret; her cümlede bir "
+        "DEYİM veya ATASÖZÜNÜN yerine '___' boşluk koy. 4 seçenek ver (biri doğru "
+        "deyim/atasözü, diğerleri yakın çeldiriciler) ve doğru seçeneğin indeksini (0-3) belirt.\n"
+        'JSON şeması: {"sorular": [{"soru": "Az kazandı ama biriktirdi; ___.", '
+        '"secenekler": ["Damlaya damlaya göl olur","Ateş olmayan yerden duman çıkmaz",'
+        '"Bir elin nesi var","Sütten ağzı yanan"], "dogru": 0}]}'
+        + _JSON_KURAL
+    )
+
+
+def _deyim_bosluk_mock(sinif, konu, soru_sayisi):
+    havuz = [
+        {"soru": "Az kazandı ama düzenli biriktirdi; ___.", "secenekler": ["Damlaya damlaya göl olur", "Ateş olmayan yerden duman çıkmaz", "Taşıma su ile değirmen dönmez", "Sütten ağzı yanan yoğurdu üfleyerek yer"], "dogru": 0},
+        {"soru": "Sınavı kazanınca çocuğun ___.", "secenekler": ["eli ayağı tutmadı", "ağzı kulaklarına vardı", "gözü açıldı", "kulağı çınladı"], "dogru": 1},
+        {"soru": "Bir kere aldandı, artık herkese ___.", "secenekler": ["kulak veriyor", "göz atıyor", "temkinli yaklaşıyor", "el atıyor"], "dogru": 2},
+    ]
+    return {"sorular": havuz[: max(1, min(soru_sayisi, len(havuz)))]}
+
+
+def _tekerleme_okuma_user(sinif, konu, soru_sayisi, zorluk):
+    return (
+        f"Sınıf {sinif} seviyesine uygun, akıcı okuma çalışması için KISA bir Türkçe "
+        "tekerleme üret (2-4 satır, ritmik, dili döndürücü).\n"
+        'JSON şeması: {"metin": "tekerleme metni", "baslik": "kısa başlık"}'
+        + _JSON_KURAL
+    )
+
+
+def _tekerleme_okuma_mock(sinif, konu, soru_sayisi):
+    return {
+        "metin": "Bir berber bir berbere gel beri bir berber gel diye bar bar bağırmış.",
+        "baslik": "Berber Tekerlemesi",
+    }
+
+
 # Tip -> {system, user, mock}
 PROMPTLAR = {
     "demo": {
@@ -846,6 +908,22 @@ PROMPTLAR = {
         "system": _SISTEM_TR,
         "user": _kelime_gezmece_user,
         "mock": _kelime_gezmece_mock,
+    },
+    # ── Deyim / Atasözü / Tekerleme (FAZ 4) ──────────────────────
+    "deyim_eslestirme": {
+        "system": _SISTEM_TR,
+        "user": _deyim_eslestirme_user,
+        "mock": _deyim_eslestirme_mock,
+    },
+    "deyim_bosluk": {
+        "system": _SISTEM_TR,
+        "user": _deyim_bosluk_user,
+        "mock": _deyim_bosluk_mock,
+    },
+    "tekerleme_okuma": {
+        "system": _SISTEM_TR,
+        "user": _tekerleme_okuma_user,
+        "mock": _tekerleme_okuma_mock,
     },
 }
 
