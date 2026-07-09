@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import { IkonCoz } from "../../lib/ikonlar";
+import { Medal, Star, Users, FileText, GraduationCap, Award, TrendingUp, Brain, Target, Flame, AlertTriangle, Zap, Calendar, MessageCircle, Trophy, Pin, Rocket, Sparkles, Lightbulb, CheckCircle } from "lucide-react";
 
 /**
  * OgretmenBasarilarim — öğretmene özel, tam genişlikte zengin başarı sayfası.
@@ -42,21 +43,21 @@ export default function OgretmenBasarilarim({ apiBase }) {
     }));
   }, [veri]);
 
-  if (yukleniyor) return <div className="text-center py-16 text-gray-400 text-sm">Yükleniyor…</div>;
-  if (hata || !veri) return <div className="text-center py-16 text-gray-400 text-sm">Başarılarım yüklenemedi.</div>;
+  if (yukleniyor) return <div className="text-center py-16 text-subtle text-sm">Yükleniyor…</div>;
+  if (hata || !veri) return <div className="text-center py-16 text-subtle text-sm">Başarılarım yüklenemedi.</div>;
 
   const pb = veri.puan_bilgisi || {};
   const fmt = (n) => (n || 0).toLocaleString("tr-TR");
   const eu = veri.kur_basarilari?.en_uzun_takip;
 
   const kpiKartlar = [
-    { emoji: "🎖️", buyuk: `${veri.rozetler?.kazanilan_sayisi ?? 0}/${veri.rozetler?.toplam_rozet ?? 0}`, alt: "Kazanılan rozet", renk: "border-l-amber-400" },
-    { emoji: "⭐", buyuk: `${veri.veli_degerlendirmesi?.ortalama ?? 0}/5`, alt: `Veli değerlendirmesi (${veri.veli_degerlendirmesi?.toplam_anket ?? 0} anket)`, renk: "border-l-pink-400" },
-    { emoji: "👥", buyuk: `${veri.ogrenci_ozet?.toplam_ogrenci_tum ?? veri.ogrenci_ozet?.toplam_ogrenci ?? 0}`, alt: `Şimdiye kadar aldığın öğrenci (${veri.ogrenci_ozet?.aktif_ogrenci ?? 0} aktif)`, renk: "border-l-blue-400" },
-    { emoji: "📝", buyuk: `${veri.icerik_ozet?.olusturulan_icerik ?? 0}`, alt: `Oluşturdum (${veri.icerik_ozet?.onaylanan_icerik ?? 0} onaylı)`, renk: "border-l-green-400" },
-    { emoji: "🎓", buyuk: `${veri.kur_basarilari?.toplam_kur_atlatma ?? 0}`, alt: `Toplam kur atlatma (${veri.kur_basarilari?.kur_atlatilan_ogrenci_sayisi ?? 0} öğrenci)`, renk: "border-l-violet-400" },
+    { Ikon: Medal, buyuk: `${veri.rozetler?.kazanilan_sayisi ?? 0}/${veri.rozetler?.toplam_rozet ?? 0}`, alt: "Kazanılan rozet", renk: "border-l-amber-400" },
+    { Ikon: Star, buyuk: `${veri.veli_degerlendirmesi?.ortalama ?? 0}/5`, alt: `Veli değerlendirmesi (${veri.veli_degerlendirmesi?.toplam_anket ?? 0} anket)`, renk: "border-l-pink-400" },
+    { Ikon: Users, buyuk: `${veri.ogrenci_ozet?.toplam_ogrenci_tum ?? veri.ogrenci_ozet?.toplam_ogrenci ?? 0}`, alt: `Şimdiye kadar aldığın öğrenci (${veri.ogrenci_ozet?.aktif_ogrenci ?? 0} aktif)`, renk: "border-l-blue-400" },
+    { Ikon: FileText, buyuk: `${veri.icerik_ozet?.olusturulan_icerik ?? 0}`, alt: `Oluşturdum (${veri.icerik_ozet?.onaylanan_icerik ?? 0} onaylı)`, renk: "border-l-green-400" },
+    { Ikon: GraduationCap, buyuk: `${veri.kur_basarilari?.toplam_kur_atlatma ?? 0}`, alt: `Toplam kur atlatma (${veri.kur_basarilari?.kur_atlatilan_ogrenci_sayisi ?? 0} öğrenci)`, renk: "border-l-violet-400" },
     {
-      emoji: "🏅",
+      Ikon: Award,
       buyuk: eu ? `${eu.kur_sayisi} kur` : "—",
       alt: eu ? `${eu.ogrenci_adi} · Kur ${eu.baslangic_kur}→${eu.mevcut_kur}` : "Henüz kur atlatan öğrencin yok",
       renk: "border-l-emerald-400",
@@ -68,17 +69,17 @@ export default function OgretmenBasarilarim({ apiBase }) {
   const em = veri.ek_metrikler || {};
   const og = em.okuma_gelisim || {}, an = em.anlama || {}, gr = em.gorev || {}, bg = em.baglilik || {}, ik = em.icerik_kalitesi || {}, vl = em.veli || {};
   const etkiKartlar = [
-    { emoji: "📈", buyuk: og.olculen_ogrenci ? `${og.wpm_artis > 0 ? "+" : ""}${og.wpm_artis} kel/dk` : "—",
+    { Ikon: TrendingUp, buyuk: og.olculen_ogrenci ? `${og.wpm_artis > 0 ? "+" : ""}${og.wpm_artis} kel/dk` : "—",
       alt: og.olculen_ogrenci ? `Okuma hızı gelişimi (${og.olculen_ogrenci} öğrenci)` : "Okuma hızı — yeterli ölçüm yok", renk: "border-l-indigo-400", soluk: !og.olculen_ogrenci },
-    { emoji: "🧠", buyuk: an.test_sayisi ? `%${an.ortalama_yuzde}` : "—",
+    { Ikon: Brain, buyuk: an.test_sayisi ? `%${an.ortalama_yuzde}` : "—",
       alt: an.test_sayisi ? `Anlama ortalaması (${an.test_sayisi} test)` : "Anlama — henüz test yok", renk: "border-l-sky-400", soluk: !an.test_sayisi },
-    { emoji: "🎯", buyuk: gr.atanan ? `%${gr.oran}` : "—",
+    { Ikon: Target, buyuk: gr.atanan ? `%${gr.oran}` : "—",
       alt: gr.atanan ? `Görev tamamlama (${gr.tamamlanan}/${gr.atanan})` : "Henüz görev atamadın", renk: "border-l-teal-400", soluk: !gr.atanan },
-    { emoji: "🔥", buyuk: `%${bg.aktif_oran ?? 0}`, alt: "Son 7 günde aktif öğrenci", renk: "border-l-orange-400" },
-    { emoji: "🚨", buyuk: `${bg.risk_ogrenci ?? 0}`, alt: "2 haftadır okumayan öğrenci", renk: "border-l-red-400", soluk: (bg.risk_ogrenci ?? 0) === 0 },
-    { emoji: "💥", buyuk: `${ik.etki_ogrenci_sayisi ?? 0}`, alt: "İçeriğini tamamlayan öğrenci", renk: "border-l-fuchsia-400", soluk: (ik.etki_ogrenci_sayisi ?? 0) === 0 },
-    { emoji: "📅", buyuk: `${bg.ortalama_streak ?? 0}`, alt: "Ort. okuma serisi (gün)", renk: "border-l-lime-500" },
-    { emoji: "🤝", buyuk: `%${vl.yanit_orani ?? 0}`, alt: "Veli anket yanıt oranı", renk: "border-l-rose-400", soluk: (vl.yanit_orani ?? 0) === 0 },
+    { Ikon: Flame, buyuk: `%${bg.aktif_oran ?? 0}`, alt: "Son 7 günde aktif öğrenci", renk: "border-l-orange-400" },
+    { Ikon: AlertTriangle, buyuk: `${bg.risk_ogrenci ?? 0}`, alt: "2 haftadır okumayan öğrenci", renk: "border-l-red-400", soluk: (bg.risk_ogrenci ?? 0) === 0 },
+    { Ikon: Zap, buyuk: `${ik.etki_ogrenci_sayisi ?? 0}`, alt: "İçeriğini tamamlayan öğrenci", renk: "border-l-fuchsia-400", soluk: (ik.etki_ogrenci_sayisi ?? 0) === 0 },
+    { Ikon: Calendar, buyuk: `${bg.ortalama_streak ?? 0}`, alt: "Ort. okuma serisi (gün)", renk: "border-l-lime-500" },
+    { Ikon: MessageCircle, buyuk: `%${vl.yanit_orani ?? 0}`, alt: "Veli anket yanıt oranı", renk: "border-l-rose-400", soluk: (vl.yanit_orani ?? 0) === 0 },
   ];
   const ipuclari = veri.ipuclari || [];
 
@@ -86,7 +87,7 @@ export default function OgretmenBasarilarim({ apiBase }) {
     <div className="space-y-5">
       {/* ── ÜST: Hero kart ── */}
       <div className="rounded-2xl p-6 bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-lg">
-        <div className="text-sm font-medium opacity-90 flex items-center gap-2">🏆 Sıralaman</div>
+        <div className="text-sm font-medium opacity-90 flex items-center gap-1.5"><Trophy className="h-4 w-4" />Sıralaman</div>
         <div className="flex items-center gap-6 mt-3 flex-wrap">
           <div className="w-24 h-24 rounded-full bg-white/15 border-4 border-white/30 flex flex-col items-center justify-center shrink-0">
             <span className="text-4xl font-extrabold leading-none">{pb.sira ?? "—"}</span>
@@ -100,7 +101,7 @@ export default function OgretmenBasarilarim({ apiBase }) {
               <span className="text-base font-bold">{fmt(pb.toplam_xp)} XP</span>
             </div>
             {pb.motivasyon_mesaji && (
-              <p className="text-sm font-medium mt-3 opacity-95">💡 {pb.motivasyon_mesaji}</p>
+              <p className="inline-flex items-start gap-1.5 text-sm font-medium mt-3 opacity-95"><Lightbulb className="h-4 w-4 mt-0.5 shrink-0" />{pb.motivasyon_mesaji}</p>
             )}
           </div>
         </div>
@@ -108,13 +109,13 @@ export default function OgretmenBasarilarim({ apiBase }) {
 
       {/* ── ORTA: Etkinliğin (6 KPI) ── */}
       <div>
-        <h4 className="text-sm font-bold text-gray-500 mb-2 px-1">📌 Etkinliğin</h4>
+        <h4 className="inline-flex items-center gap-1.5 text-sm font-bold text-subtle mb-2 px-1"><Pin className="h-4 w-4" />Etkinliğin</h4>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {kpiKartlar.map((k, i) => (
-            <div key={i} className={`bg-white rounded-2xl shadow-md p-5 border-l-4 ${k.renk} flex flex-col`}>
-              <div className="text-3xl mb-1">{k.emoji}</div>
-              <div className={`text-[28px] font-bold leading-tight ${k.soluk ? "text-gray-300" : "text-gray-800"}`}>{k.buyuk}</div>
-              <div className="text-xs text-gray-500 mt-1 leading-snug">{k.alt}</div>
+            <div key={i} className={`bg-surface rounded-2xl shadow-md p-5 border-l-4 ${k.renk} flex flex-col`}>
+              <div className="mb-1">{k.Ikon && <k.Ikon className="h-7 w-7 text-primary" />}</div>
+              <div className={`text-[28px] font-bold leading-tight ${k.soluk ? "text-subtle/50" : "text-content"}`}>{k.buyuk}</div>
+              <div className="text-xs text-subtle mt-1 leading-snug">{k.alt}</div>
             </div>
           ))}
         </div>
@@ -122,26 +123,26 @@ export default function OgretmenBasarilarim({ apiBase }) {
 
       {/* ── Öğrenci Etkisi & Bağlılık (çıktı odaklı metrikler) ── */}
       <div>
-        <h4 className="text-sm font-bold text-gray-500 mb-2 px-1">🚀 Öğrenci Etkisi & Bağlılık</h4>
+        <h4 className="inline-flex items-center gap-1.5 text-sm font-bold text-subtle mb-2 px-1"><Rocket className="h-4 w-4" />Öğrenci Etkisi & Bağlılık</h4>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {etkiKartlar.map((k, i) => (
-            <div key={i} className={`bg-white rounded-2xl shadow-md p-4 border-l-4 ${k.renk} flex flex-col`}>
-              <div className="text-2xl mb-1">{k.emoji}</div>
-              <div className={`text-[22px] font-bold leading-tight ${k.soluk ? "text-gray-300" : "text-gray-800"}`}>{k.buyuk}</div>
-              <div className="text-[11px] text-gray-500 mt-1 leading-snug">{k.alt}</div>
+            <div key={i} className={`bg-surface rounded-2xl shadow-md p-4 border-l-4 ${k.renk} flex flex-col`}>
+              <div className="mb-1">{k.Ikon && <k.Ikon className={`h-6 w-6 ${k.soluk ? "text-subtle/50" : "text-primary"}`} />}</div>
+              <div className={`text-[22px] font-bold leading-tight ${k.soluk ? "text-subtle/50" : "text-content"}`}>{k.buyuk}</div>
+              <div className="text-[11px] text-subtle mt-1 leading-snug">{k.alt}</div>
             </div>
           ))}
         </div>
       </div>
 
       {/* ── ORTA-ALT: Zaman grafiği ── */}
-      <div className="bg-white rounded-2xl shadow-md p-5">
+      <div className="bg-surface rounded-2xl shadow-md p-5">
         <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
-          <h4 className="text-sm font-bold text-gray-700">📈 Son 12 Hafta</h4>
+          <h4 className="inline-flex items-center gap-1.5 text-sm font-bold text-content"><TrendingUp className="h-4 w-4" />Son 12 Hafta</h4>
           <div className="flex gap-1.5">
             {[{ v: "xp", l: "XP Gelişimi" }, { v: "rozet", l: "Rozet Kazanımları" }].map((t) => (
               <button key={t.v} onClick={() => setGrafikSekme(t.v)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${grafikSekme === t.v ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
+                className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${grafikSekme === t.v ? "bg-primary text-white border-primary" : "bg-surface text-subtle border-line hover:bg-app"}`}>
                 {t.l}
               </button>
             ))}
@@ -171,14 +172,14 @@ export default function OgretmenBasarilarim({ apiBase }) {
 
       {/* ── ALT: Son Rozetler ── */}
       {veri.rozetler?.son_kazanilanlar?.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-md p-5">
-          <h4 className="text-sm font-bold text-gray-700 mb-3">✨ Son Kazandıklarım</h4>
+        <div className="bg-surface rounded-2xl shadow-md p-5">
+          <h4 className="inline-flex items-center gap-1.5 text-sm font-bold text-content mb-3"><Sparkles className="h-4 w-4" />Son Kazandıklarım</h4>
           <div className="flex flex-wrap gap-4">
             {veri.rozetler.son_kazanilanlar.map((r, i) => (
               <div key={i} className="flex flex-col items-center text-center w-24">
                 <div className="flex items-center justify-center h-9 text-amber-500"><IkonCoz deger={r.ikon} className="w-7 h-7" /></div>
-                <div className="text-[11px] font-semibold text-gray-700 mt-1 leading-tight line-clamp-2">{r.ad}</div>
-                <div className="text-[10px] text-gray-400 mt-0.5">
+                <div className="text-[11px] font-semibold text-content mt-1 leading-tight line-clamp-2">{r.ad}</div>
+                <div className="text-[10px] text-subtle mt-0.5">
                   {r.kazanma_tarihi ? new Date(r.kazanma_tarihi).toLocaleDateString("tr-TR") : ""}
                 </div>
               </div>
@@ -190,14 +191,14 @@ export default function OgretmenBasarilarim({ apiBase }) {
       {/* ── Başarını artıracak ipuçları (dinamik) ── */}
       {ipuclari.length > 0 && (
         <div className="rounded-2xl shadow-md bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 p-5">
-          <h4 className="font-semibold text-gray-800 mb-3">💡 Başarını Artıracak İpuçları</h4>
+          <h4 className="inline-flex items-center gap-1.5 font-semibold text-content mb-3"><Lightbulb className="h-4 w-4" />Başarını Artıracak İpuçları</h4>
           <div className="space-y-2.5">
             {ipuclari.map((t, i) => (
               <div key={i} className="flex items-start gap-3 bg-white/70 rounded-xl p-3">
-                <span className="text-xl leading-none mt-0.5">{t.ikon}</span>
+                <span className="mt-0.5 shrink-0 text-primary"><IkonCoz deger={t.ikon} className="w-5 h-5" /></span>
                 <div className="min-w-0">
-                  <div className="text-sm font-bold text-gray-800">{t.baslik}</div>
-                  <div className="text-xs text-gray-600 leading-snug mt-0.5">{t.mesaj}</div>
+                  <div className="text-sm font-bold text-content">{t.baslik}</div>
+                  <div className="text-xs text-subtle leading-snug mt-0.5">{t.mesaj}</div>
                 </div>
               </div>
             ))}
@@ -211,32 +212,32 @@ export default function OgretmenBasarilarim({ apiBase }) {
         const ag = pb.agirliklar || {};
         // XP bileşenleri (kullanıcının gerçek kırılımı + kural)
         const bilesenler = [
-          { ikon: "✅", ad: "Etkinlikler (içerik, test, oylama)", kural: "içerik +1 · test +10 · oylama +2 · yayın +5", puan: kir.etkinlik },
-          { ikon: "🎖️", ad: "Kazandığın rozetler", kural: "her rozet kendi puanı kadar", puan: kir.rozet },
-          { ikon: "👥", ad: "Aldığın öğrenciler", kural: `öğrenci başına +${ag.ogrenci_basi ?? 20}`, puan: kir.ogrenci },
-          { ikon: "🎓", ad: "Kur atlattığın öğrenciler", kural: `her kur atlatma +${ag.kur_basi ?? 50}`, puan: kir.kur },
-          { ikon: "⭐", ad: "Veli anket memnuniyeti", kural: `yıldız başına +${ag.veli_yildiz ?? 5} (5★ = +25/anket)`, puan: kir.veli },
+          { Ikon: CheckCircle, ad: "Etkinlikler (içerik, test, oylama)", kural: "içerik +1 · test +10 · oylama +2 · yayın +5", puan: kir.etkinlik },
+          { Ikon: Medal, ad: "Kazandığın rozetler", kural: "her rozet kendi puanı kadar", puan: kir.rozet },
+          { Ikon: Users, ad: "Aldığın öğrenciler", kural: `öğrenci başına +${ag.ogrenci_basi ?? 20}`, puan: kir.ogrenci },
+          { Ikon: GraduationCap, ad: "Kur atlattığın öğrenciler", kural: `her kur atlatma +${ag.kur_basi ?? 50}`, puan: kir.kur },
+          { Ikon: Star, ad: "Veli anket memnuniyeti", kural: `yıldız başına +${ag.veli_yildiz ?? 5} (5★ = +25/anket)`, puan: kir.veli },
         ];
         return (
           <div className="rounded-2xl shadow-md bg-gradient-to-br from-orange-50 to-yellow-50 p-5">
-            <h4 className="font-semibold text-gray-800 mb-1">🎯 Puanın (XP) Nasıl Hesaplanır?</h4>
-            <p className="text-xs text-gray-500 mb-3">
-              Toplam XP'n aşağıdaki 5 kaynağın toplamıdır. <span className="font-medium text-gray-700">Sadece içerik üretmek değil;
+            <h4 className="inline-flex items-center gap-1.5 font-semibold text-content mb-1"><Target className="h-4 w-4" />Puanın (XP) Nasıl Hesaplanır?</h4>
+            <p className="text-xs text-subtle mb-3">
+              Toplam XP'n aşağıdaki 5 kaynağın toplamıdır. <span className="font-medium text-content">Sadece içerik üretmek değil;
               öğrenci alman, kur atlatman ve veli memnuniyetin de puanına doğrudan yansır.</span> Öğretmenler arası sıralaman bu toplama göre belirlenir.
             </p>
             <div className="space-y-1.5">
               {bilesenler.map((b, i) => (
                 <div key={i} className="flex items-center justify-between gap-2 bg-white/60 rounded-lg px-3 py-2">
                   <div className="min-w-0">
-                    <div className="text-sm font-medium text-gray-700">{b.ikon} {b.ad}</div>
-                    <div className="text-[11px] text-gray-400">{b.kural}</div>
+                    <div className="inline-flex items-center gap-1.5 text-sm font-medium text-content">{b.Ikon && <b.Ikon className="h-4 w-4 text-primary" />}{b.ad}</div>
+                    <div className="text-[11px] text-subtle">{b.kural}</div>
                   </div>
                   {b.puan != null && <span className="text-sm font-bold text-orange-600 shrink-0">{fmt(b.puan)}</span>}
                 </div>
               ))}
             </div>
             <div className="flex items-center justify-between mt-3 pt-3 border-t border-orange-200">
-              <span className="text-sm font-bold text-gray-800">Toplam XP'n</span>
+              <span className="text-sm font-bold text-content">Toplam XP'n</span>
               <span className="text-lg font-extrabold text-orange-600">{fmt(pb.toplam_xp)}</span>
             </div>
           </div>
