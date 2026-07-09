@@ -1619,6 +1619,7 @@ async def ai_bilgi_tabani_tam_metin(yukleme_id: str, current_user=Depends(get_cu
     }
 
 
+@router.post("/ai/bilgi-tabani/yukle-url")
 async def ai_bilgi_tabani_yukle_url(payload: dict, current_user=Depends(get_current_user)):
     """URL'den PDF/Word dosyası indirip yükle."""
     url = (payload.get("url") or "").strip()

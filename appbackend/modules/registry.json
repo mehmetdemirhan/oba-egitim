@@ -162,5 +162,9 @@
   {
     "name": "instagram_beslemesi",
     "active": true
+  },
+  {
+    "name": "ek_paneller",
+    "active": true
   }
 ]
