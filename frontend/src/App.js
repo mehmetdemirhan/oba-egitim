@@ -13114,10 +13114,10 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
   const turLabel = (tur) => ({ hizmetici: "Hizmetiçi Eğitim", film: "Film", kitap: "Kitap", makale: "Makale", okuma_parcasi: "Okuma Parçası" }[tur] || tur);
   const turColor = (tur) => ({ hizmetici: "bg-blue-100 text-primary", film: "bg-purple-100 text-purple-600", kitap: "bg-green-100 text-green-600", makale: "bg-orange-100 text-orange-600", okuma_parcasi: "bg-amber-100 text-amber-600" }[tur] || "bg-gray-100 text-subtle");
   const durumBadge = (d) => ({
-    beklemede: <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full font-medium">⏳ Yönetici Onayı Bekliyor</span>,
-    oylama: <span className="px-2 py-1 bg-blue-100 text-primary text-xs rounded-full font-medium">🗳️ Öğretmen Oylamasında</span>,
-    yayinda: <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium">✅ Yayında</span>,
-    reddedildi: <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full font-medium">❌ Reddedildi</span>,
+    beklemede: <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-100 text-amber-700 text-xs rounded-full font-medium"><Clock className="h-3 w-3" />Yönetici Onayı Bekliyor</span>,
+    oylama: <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-primary text-xs rounded-full font-medium"><Users className="h-3 w-3" />Öğretmen Oylamasında</span>,
+    yayinda: <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium"><CheckCircle className="h-3 w-3" />Yayında</span>,
+    reddedildi: <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full font-medium"><XCircle className="h-3 w-3" />Reddedildi</span>,
   }[d] || null);
 
   const isTamamlandi = (id) => tamamlananlar.some(t => t.icerik_id === id);
@@ -13258,14 +13258,14 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => { setGorunum("liste"); setSoruYonetimiIcerik(null); }}>← Geri</Button>
-          <div><h2 className="text-lg font-bold">📝 {soruYonetimiIcerik.baslik}</h2>
-            <p className="text-xs text-subtle">{soruYonetimiIcerik.kitap_yazar} • {bolumSayisi} bölüm • {kitapSorulari.length} soru</p></div>
+          <Button variant="outline" size="sm" onClick={() => { setGorunum("liste"); setSoruYonetimiIcerik(null); }}><ArrowLeft className="h-4 w-4 mr-1" />Geri</Button>
+          <div><h2 className="inline-flex items-center gap-2 text-lg font-bold"><ClipboardList className="h-5 w-5" />{soruYonetimiIcerik.baslik}</h2>
+            <p className="text-xs text-subtle tabular-nums">{soruYonetimiIcerik.kitap_yazar} • {bolumSayisi} bölüm • {kitapSorulari.length} soru</p></div>
         </div>
 
         {/* Soru ekleme formu */}
-        <Card className="border-0 shadow-sm border-l-4 border-l-teal-500">
-          <CardHeader className="pb-2"><CardTitle className="text-sm">📝 Yeni Soru Ekle</CardTitle></CardHeader>
+        <Card className="border border-line shadow-sm border-l-4 border-l-primary">
+          <CardHeader className="pb-2"><CardTitle className="text-sm inline-flex items-center gap-1.5"><ClipboardList className="h-4 w-4" />Yeni Soru Ekle</CardTitle></CardHeader>
           <CardContent>
             <form onSubmit={soruEkle} className="space-y-3">
               <div className="grid grid-cols-3 gap-3">
@@ -13339,7 +13339,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                     toast({ title: `🤖 ${sorularAI.length} soru AI tarafından eklendi!` });
                     const rr = await axios.get(`${API}/kitaplar/${soruYonetimiIcerik.id}/sorular`); setKitapSorulari(Array.isArray(rr.data) ? rr.data : []);
                   } catch(e) { toast({ title: "AI soru üretilemedi", variant: "destructive" }); }
-                }}>🤖 AI ile Üret</Button>
+                }}><Sparkles className="h-4 w-4 mr-1" />AI ile Üret</Button>
               </div>
             </form>
           </CardContent>
@@ -13420,7 +13420,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
           </div>
         </div>
 
-        <Card className="border-0 shadow-sm">
+        <Card className="border border-line shadow-sm">
           <CardContent className="p-6">
             {/* Kitap türü için kapak + bilgiler */}
             {aktifIcerik.tur === "kitap" && (
@@ -13475,13 +13475,13 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
 
         <div className="flex gap-3">
           {aktifIcerik.sorular?.length > 0 && (
-            <Button onClick={() => { setGorunum("test"); setTestCevaplari([]); }} className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white">
-              📝 Anlama Testini Çöz (+10 puan)
+            <Button onClick={() => { setGorunum("test"); setTestCevaplari([]); }} className="flex-1 inline-flex items-center justify-center gap-1.5 bg-primary hover:bg-primary-hover text-white">
+              <ClipboardList className="h-4 w-4" />Anlama Testini Çöz (+10 puan)
             </Button>
           )}
           {!isTamamlandi && (
-            <Button variant="outline" onClick={() => handleTamamla(false, aktifIcerik)} className="flex-1">
-              ✓ Okudum, Tamamlandı (+1 puan)
+            <Button variant="outline" onClick={() => handleTamamla(false, aktifIcerik)} className="flex-1 inline-flex items-center justify-center gap-1.5">
+              <Check className="h-4 w-4" />Okudum, Tamamlandı (+1 puan)
             </Button>
           )}
           {isTamamlandi && (
@@ -13537,7 +13537,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
           <h2 className="text-xl font-bold">{aktifIcerik.baslik} — Test</h2>
         </div>
         {aktifIcerik.sorular.map((soru, i) => (
-          <Card key={i} className="border-0 shadow-sm">
+          <Card key={i} className="border border-line shadow-sm">
             <CardContent className="p-6">
               <p className="font-medium mb-4">{i + 1}. {soru.soru}</p>
               <div className="space-y-2">
@@ -13553,7 +13553,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
         ))}
         <Button onClick={() => handleTamamla(true)}
           disabled={testCevaplari.filter(c => c !== undefined).length < aktifIcerik.sorular.length}
-          className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-3">
+          className="w-full bg-primary hover:bg-primary-hover text-white py-3">
           Testi Tamamla ({testCevaplari.filter(c=>c!==undefined).length} / {aktifIcerik.sorular.length} cevaplandı)
         </Button>
       </div>
@@ -13574,7 +13574,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
           <Button variant="outline" size="sm" onClick={() => setGorunum("liste")}>← Geri</Button>
           <h2 className="text-xl font-bold">Yeni İçerik Ekle</h2>
         </div>
-        <Card className="border-0 shadow-sm">
+        <Card className="border border-line shadow-sm">
           <CardContent className="p-6">
             <form onSubmit={icerikKaydet} className="space-y-5">
               <div><Label>Başlık *</Label><Input value={adminForm.baslik} onChange={e => setAdminForm({...adminForm, baslik: e.target.value})} required /></div>
@@ -13882,7 +13882,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
               </div>
 
               <div className="flex gap-3">
-                <Button type="submit" className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white">
+                <Button type="submit" className="flex-1 bg-primary hover:bg-primary-hover text-white">
                   {(user.role === "admin" || user.role === "coordinator") ? "Oylama Başlat" : "Yöneticiye Gönder"}
                 </Button>
                 <Button type="button" variant="outline" onClick={() => setGorunum("liste")} className="flex-1">İptal</Button>
@@ -13906,16 +13906,16 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
       {!isFullscreen && (
       <div className="flex gap-2 mb-2 flex-wrap">
         {user.role === 'teacher' && (
-          <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'basarilarim' ? 'bg-purple-600 text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => setGelisimSekme('basarilarim')}>🏆 Başarılarım</button>
+          <button className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'basarilarim' ? 'bg-primary text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => setGelisimSekme('basarilarim')}><Trophy className="h-4 w-4" />Başarılarım</button>
         )}
-        <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'icerikler' ? 'bg-orange-500 text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => setGelisimSekme('icerikler')}>📚 İçerikler</button>
-        <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'egzersizler' ? 'bg-primary text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => setGelisimSekme('egzersizler')}>👁️ Egzersizler</button>
-        <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'gorevler' ? 'bg-green-500 text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => setGelisimSekme('gorevler')}>📌 Görevler</button>
-        <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'kurslar' ? 'bg-indigo-500 text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => { if (onTabChange) onTabChange('courses'); }}>📖 Kurslar</button>
-        <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'ai-bilgi' ? 'bg-cyan-500 text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => setGelisimSekme('ai-bilgi')}>🧠 AI Eğit</button>
-        <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'kitap-parcalari' ? 'bg-teal-500 text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => setGelisimSekme('kitap-parcalari')}>📖 Kitap Parçaları</button>
+        <button className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'icerikler' ? 'bg-primary text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => setGelisimSekme('icerikler')}><BookOpen className="h-4 w-4" />İçerikler</button>
+        <button className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'egzersizler' ? 'bg-primary text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => setGelisimSekme('egzersizler')}><Eye className="h-4 w-4" />Egzersizler</button>
+        <button className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'gorevler' ? 'bg-primary text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => setGelisimSekme('gorevler')}><Pin className="h-4 w-4" />Görevler</button>
+        <button className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'kurslar' ? 'bg-primary text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => { if (onTabChange) onTabChange('courses'); }}><GraduationCap className="h-4 w-4" />Kurslar</button>
+        <button className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'ai-bilgi' ? 'bg-primary text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => setGelisimSekme('ai-bilgi')}><Brain className="h-4 w-4" />AI Eğit</button>
+        <button className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'kitap-parcalari' ? 'bg-primary text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => setGelisimSekme('kitap-parcalari')}><BookMarked className="h-4 w-4" />Kitap Parçaları</button>
         {user.role === 'admin' && (
-          <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'puan-ayar' ? 'bg-purple-500 text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => setGelisimSekme('puan-ayar')}>⚙️ Egzersiz Puanları</button>
+          <button className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'puan-ayar' ? 'bg-primary text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => setGelisimSekme('puan-ayar')}><Settings className="h-4 w-4" />Egzersiz Puanları</button>
         )}
       </div>
       )}
@@ -14064,7 +14064,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
           )}
 
           {/* Yükleme formu */}
-          <Card className="border-0 shadow-sm border-l-4 border-l-cyan-500">
+          <Card className="border border-line shadow-sm border-l-4 border-l-cyan-500">
             <CardHeader className="pb-2"><CardTitle className="text-sm">📤 AI'a Kitap / Doküman Öğret</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               <div className="bg-cyan-50 rounded-lg p-3 border border-cyan-100">
@@ -14125,7 +14125,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
               {aiBilgiYukleniyor && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs"><span className="text-cyan-700 font-medium">{aiIslemDurum}</span><span className="text-subtle">{aiIlerleme}%</span></div>
-                  <div className="bg-gray-200 rounded-full h-3 overflow-hidden"><div className="h-3 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full transition-all duration-500" style={{width:`${aiIlerleme}%`}} /></div>
+                  <div className="bg-app rounded-full h-3 overflow-hidden"><div className="h-3 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full transition-all duration-500" style={{width:`${aiIlerleme}%`}} /></div>
                   <div className="flex justify-between text-[9px] text-subtle"><span>📤 Yükleme</span><span>📖 Parse</span><span>🧠 AI Analiz</span><span>💾 Kayıt</span><span>✅</span></div>
                 </div>
               )}
@@ -14428,7 +14428,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold">Gelişim Alanı</h2>
             {(user.role === "admin" || user.role === "teacher") && (
-              <Button onClick={() => setGorunum("icerikEkle")} className="bg-gradient-to-r from-orange-500 to-red-500 text-white">
+              <Button onClick={() => setGorunum("icerikEkle")} className="bg-primary hover:bg-primary-hover text-white">
                 <Plus className="h-4 w-4 mr-2"/>İçerik Ekle
               </Button>
             )}
@@ -14552,7 +14552,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
 
                         {/* Oy bar + butonlar */}
                         <div className="px-5 pb-5">
-                          {oran !== null && (<div className="mb-3"><div className="w-full bg-gray-200 rounded-full h-2"><div className={`h-2 rounded-full transition-all ${oran >= 60 ? 'bg-green-500' : 'bg-orange-500'}`} style={{width:`${oran}%`}}></div></div><p className="text-xs text-subtle mt-1">%60 onay gerekli • Şu an %{oran}</p></div>)}
+                          {oran !== null && (<div className="mb-3"><div className="w-full bg-app rounded-full h-2"><div className={`h-2 rounded-full transition-all ${oran >= 60 ? 'bg-green-500' : 'bg-orange-500'}`} style={{width:`${oran}%`}}></div></div><p className="text-xs text-subtle mt-1">%60 onay gerekli • Şu an %{oran}</p></div>)}
                           {kullandi ? (<div className="text-sm text-subtle bg-app p-3 rounded-lg">✓ Oyunuzu kullandınız: <strong>{kullandi.onay ? "Onay ✅" : "Red ❌"}</strong>{!kullandi.onay && kullandi.sebep && <span className="text-subtle"> — {kullandi.sebep}</span>}</div>
                           ) : (<div className="flex gap-2"><Button size="sm" onClick={() => oyVer(true, "", icerik)} className="bg-green-600 hover:bg-green-700 text-white flex-1">✅ Onayla (+2 puan)</Button><Button size="sm" variant="destructive" className="flex-1" onClick={() => { setRedDialogIcerik(icerik); }}>❌ Reddet</Button></div>)}
                           {icerik.tur === "kitap" && (user.role === "admin" || user.role === "coordinator") && (
@@ -14598,7 +14598,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                   const puan = getPuan(icerik.id);
                   const isAcik = acikDetayId === "yay-" + icerik.id;
                   return (
-                    <Card key={icerik.id} className={`border-0 shadow-sm ${tamamlandi ? 'opacity-90' : ''}`}>
+                    <Card key={icerik.id} className={`border border-line shadow-sm ${tamamlandi ? 'opacity-90' : ''}`}>
                       <CardContent className="p-0">
                         {/* Başlık - tıklanabilir */}
                         <div className="flex items-start justify-between p-5 cursor-pointer hover:bg-gray-50/80 transition-colors"
@@ -14663,7 +14663,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                             )}
                             {icerik.sorular?.length > 0 && (
                               <Button size="sm" onClick={() => { setAktifIcerik(icerik); setGorunum("test"); setTestCevaplari([]); }}
-                                className="bg-gradient-to-r from-orange-500 to-red-500 text-white">
+                                className="bg-primary hover:bg-primary-hover text-white">
                                 📝 {tamamlandi ? "Testi Tekrar Çöz" : "Testi Çöz (+10 puan)"}
                               </Button>
                             )}
@@ -14720,7 +14720,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
         {/* Puan Tablosu — öğretmende '🏆 Başarılarım' sekmesine taşındı; admin/coordinator'da kalır */}
         {user.role !== 'teacher' && (
         <div className="space-y-4">
-            <Card className="border-0 shadow-sm">
+            <Card className="border border-line shadow-sm">
               <CardHeader><CardTitle className="flex items-center gap-2"><Trophy className="h-5 w-5 text-yellow-500"/>Puan Tablosu</CardTitle></CardHeader>
               <CardContent>
                 <div className="space-y-2">
@@ -14745,7 +14745,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
             </Card>
 
           {/* Puan Rehberi */}
-          <Card className="border-0 shadow-sm bg-gradient-to-br from-orange-50 to-yellow-50">
+          <Card className="border border-line shadow-sm bg-gradient-to-br from-orange-50 to-yellow-50">
             <CardContent className="p-5">
               <h4 className="font-semibold text-content mb-3">🎯 Puan Rehberi</h4>
               <div className="space-y-2 text-sm text-subtle">
@@ -15097,7 +15097,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
           <div className="space-y-4">
             <textarea value={redSebep} onChange={e => setRedSebep(e.target.value)}
               placeholder="Lütfen reddetme sebebinizi açıklayın..." rows={4}
-              className="w-full border border-line rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none" />
+              className="w-full border border-line rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none" />
             <div className="flex gap-2">
               <Button variant="destructive" className="flex-1" disabled={!redSebep.trim()} onClick={() => oyVer(false, redSebep)}>Reddet</Button>
               <Button variant="outline" className="flex-1" onClick={() => { setRedDialogIcerik(null); setRedSebep(""); }}>İptal</Button>
