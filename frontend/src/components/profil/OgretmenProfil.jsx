@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
+import { GraduationCap, Phone, Calendar, Bell, Lock, X } from "lucide-react";
 
 /**
  * OgretmenProfil — öğretmenin kendi profilini görüntüleyip düzenlediği sayfa.
@@ -121,8 +122,8 @@ export default function OgretmenProfil({ apiBase }) {
     }
   };
 
-  if (yukleniyor) return <div className="text-center py-16 text-gray-400 text-sm">Yükleniyor…</div>;
-  if (!form) return <div className="text-center py-16 text-gray-400 text-sm">Profil yüklenemedi.</div>;
+  if (yukleniyor) return <div className="text-center py-16 text-subtle text-sm">Yükleniyor…</div>;
+  if (!form) return <div className="text-center py-16 text-subtle text-sm">Profil yüklenemedi.</div>;
 
   const fotoSrc = form.profil_fotografi ? `${backendUrl}${form.profil_fotografi}` : null;
   const bio = form.kisa_biyografi || "";
@@ -131,13 +132,13 @@ export default function OgretmenProfil({ apiBase }) {
   // remount edip input focus'unu kaybettirir.
   const girdi = (label, k, tip = "text", readonly = false) => (
     <div>
-      <label className="text-xs font-medium text-gray-500">{label}</label>
+      <label className="text-xs font-medium text-subtle">{label}</label>
       <input
         type={tip}
         value={form[k] ?? ""}
         onChange={(e) => alan(k, e.target.value)}
         readOnly={readonly}
-        className={`w-full mt-1 px-3 py-2 rounded-xl border text-sm ${readonly ? "bg-gray-100 text-gray-500 border-gray-200" : "border-gray-200 focus:border-indigo-400 outline-none"}`}
+        className={`w-full mt-1 px-3 py-2 rounded-xl border text-sm ${readonly ? "bg-app text-subtle border-line" : "border-line focus:border-primary outline-none"}`}
       />
     </div>
   );
@@ -145,26 +146,26 @@ export default function OgretmenProfil({ apiBase }) {
   return (
     <div className="space-y-4 pb-24">
       {/* ── Profil kartı ── */}
-      <div className="bg-white rounded-2xl shadow-sm border p-5 flex items-center gap-5 flex-wrap">
+      <div className="bg-surface rounded-2xl shadow-sm border p-5 flex items-center gap-5 flex-wrap">
         <div className="relative">
-          <div className="w-28 h-28 rounded-2xl overflow-hidden bg-indigo-50 border flex items-center justify-center">
+          <div className="w-28 h-28 rounded-2xl overflow-hidden bg-blue-50 border flex items-center justify-center">
             {fotoSrc ? (
               <img src={fotoSrc} alt="Profil" className="w-full h-full object-cover" />
             ) : (
-              <span className="text-4xl">👩‍🏫</span>
+              <GraduationCap className="h-9 w-9 text-subtle" />
             )}
           </div>
           <button onClick={fotoSec} disabled={fotoYukleniyor}
-            className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-indigo-600 text-white text-[11px] font-medium shadow hover:bg-indigo-700 disabled:opacity-50">
+            className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-primary hover:bg-primary-hover text-white text-[11px] font-medium shadow disabled:opacity-50">
             {fotoYukleniyor ? "…" : "Değiştir"}
           </button>
           <input ref={fotoInputRef} type="file" accept="image/jpeg,image/png" onChange={fotoYukle} className="hidden" />
         </div>
         <div className="min-w-0">
-          <div className="text-xl font-bold text-gray-800">{form.ad} {form.soyad}</div>
-          <div className="text-sm text-gray-500">{form.brans || "—"}{form.seviye ? ` • ${form.seviye}` : ""}</div>
-          <div className="text-sm text-gray-500 mt-1">📞 {form.telefon || "—"}</div>
-          <div className="text-xs text-gray-400 mt-1">📅 Katılım: {tarihKisa(form.katilim_tarihi)}</div>
+          <div className="text-xl font-bold text-content">{form.ad} {form.soyad}</div>
+          <div className="text-sm text-subtle">{form.brans || "—"}{form.seviye ? ` • ${form.seviye}` : ""}</div>
+          <div className="inline-flex items-center gap-1.5 text-sm text-subtle mt-1"><Phone className="h-3.5 w-3.5" />{form.telefon || "—"}</div>
+          <div className="inline-flex items-center gap-1.5 text-xs text-subtle mt-1"><Calendar className="h-3.5 w-3.5" />Katılım: {tarihKisa(form.katilim_tarihi)}</div>
         </div>
       </div>
 
@@ -172,7 +173,7 @@ export default function OgretmenProfil({ apiBase }) {
       <div className="flex gap-2 flex-wrap">
         {[{ v: "kisisel", l: "Kişisel Bilgiler" }, { v: "profesyonel", l: "Profesyonel" }, { v: "ayarlar", l: "Ayarlar" }].map((t) => (
           <button key={t.v} onClick={() => setTab(t.v)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${tab === t.v ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
+            className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${tab === t.v ? "bg-primary text-white border-primary" : "bg-surface text-subtle border-line hover:bg-app"}`}>
             {t.l}
           </button>
         ))}
@@ -180,7 +181,7 @@ export default function OgretmenProfil({ apiBase }) {
 
       {/* ── KİŞİSEL ── */}
       {tab === "kisisel" && (
-        <div className="bg-white rounded-2xl shadow-sm border p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-surface rounded-2xl shadow-sm border p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
           {girdi("Ad", "ad")}
           {girdi("Soyad", "soyad")}
           {girdi("E-posta (değiştirilemez)", "email", "text", true)}
@@ -188,25 +189,25 @@ export default function OgretmenProfil({ apiBase }) {
           {girdi("Doğum Tarihi", "dogum_tarihi", "date")}
           {girdi("Şehir", "sehir")}
           <div className="md:col-span-2">
-            <label className="text-xs font-medium text-gray-500">Adres</label>
+            <label className="text-xs font-medium text-subtle">Adres</label>
             <textarea value={form.adres || ""} onChange={(e) => alan("adres", e.target.value)} rows={2}
-              className="w-full mt-1 px-3 py-2 rounded-xl border border-gray-200 text-sm focus:border-indigo-400 outline-none" />
+              className="w-full mt-1 px-3 py-2 rounded-xl border border-line text-sm focus:border-primary outline-none" />
           </div>
         </div>
       )}
 
       {/* ── PROFESYONEL ── */}
       {tab === "profesyonel" && (
-        <div className="bg-white rounded-2xl shadow-sm border p-5 space-y-4">
+        <div className="bg-surface rounded-2xl shadow-sm border p-5 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {girdi("Branş", "brans")}
             {girdi("Deneyim Yılı", "deneyim_yili", "number")}
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-500">Kısa Biyografi <span className="text-gray-400">({bio.length}/500)</span></label>
+            <label className="text-xs font-medium text-subtle">Kısa Biyografi <span className="text-subtle">({bio.length}/500)</span></label>
             <textarea value={bio} maxLength={500} rows={3}
               onChange={(e) => alan("kisa_biyografi", e.target.value)}
-              className="w-full mt-1 px-3 py-2 rounded-xl border border-gray-200 text-sm focus:border-indigo-400 outline-none" />
+              className="w-full mt-1 px-3 py-2 rounded-xl border border-line text-sm focus:border-primary outline-none" />
           </div>
 
           <DinamikListe
@@ -227,33 +228,33 @@ export default function OgretmenProfil({ apiBase }) {
       {/* ── AYARLAR ── */}
       {tab === "ayarlar" && (
         <div className="space-y-4">
-          <div className="bg-white rounded-2xl shadow-sm border p-5">
-            <h4 className="text-sm font-bold text-gray-700 mb-3">🔔 Bildirim Tercihleri</h4>
+          <div className="bg-surface rounded-2xl shadow-sm border p-5">
+            <h4 className="inline-flex items-center gap-1.5 text-sm font-bold text-content mb-3"><Bell className="h-4 w-4" />Bildirim Tercihleri</h4>
             <div className="space-y-2">
               {Object.keys(BILDIRIM_ETIKET).map((k) => (
-                <label key={k} className="flex items-center gap-2 text-sm text-gray-700">
+                <label key={k} className="flex items-center gap-2 text-sm text-content">
                   <input type="checkbox"
                     checked={!!(form.bildirim_tercihleri || {})[k]}
                     onChange={(e) => alan("bildirim_tercihleri", { ...(form.bildirim_tercihleri || {}), [k]: e.target.checked })}
-                    className="w-4 h-4 accent-indigo-600" />
+                    className="w-4 h-4 accent-primary" />
                   {BILDIRIM_ETIKET[k]}
                 </label>
               ))}
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border p-5">
-            <h4 className="text-sm font-bold text-gray-700 mb-3">🔒 Şifre Değiştir</h4>
+          <div className="bg-surface rounded-2xl shadow-sm border p-5">
+            <h4 className="inline-flex items-center gap-1.5 text-sm font-bold text-content mb-3"><Lock className="h-4 w-4" />Şifre Değiştir</h4>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <input type="password" placeholder="Mevcut şifre" value={sifre.eski}
                 onChange={(e) => setSifre((s) => ({ ...s, eski: e.target.value }))}
-                className="px-3 py-2 rounded-xl border border-gray-200 text-sm outline-none focus:border-indigo-400" />
+                className="px-3 py-2 rounded-xl border border-line text-sm outline-none focus:border-primary" />
               <input type="password" placeholder="Yeni şifre" value={sifre.yeni}
                 onChange={(e) => setSifre((s) => ({ ...s, yeni: e.target.value }))}
-                className="px-3 py-2 rounded-xl border border-gray-200 text-sm outline-none focus:border-indigo-400" />
+                className="px-3 py-2 rounded-xl border border-line text-sm outline-none focus:border-primary" />
               <input type="password" placeholder="Yeni şifre (tekrar)" value={sifre.yeni2}
                 onChange={(e) => setSifre((s) => ({ ...s, yeni2: e.target.value }))}
-                className="px-3 py-2 rounded-xl border border-gray-200 text-sm outline-none focus:border-indigo-400" />
+                className="px-3 py-2 rounded-xl border border-line text-sm outline-none focus:border-primary" />
             </div>
             {sifreMesaj && (
               <div className={`text-xs mt-2 ${sifreMesaj.tip === "ok" ? "text-green-600" : "text-red-600"}`}>{sifreMesaj.m}</div>
@@ -269,8 +270,8 @@ export default function OgretmenProfil({ apiBase }) {
       {/* ── Sabit Kaydet ── */}
       <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40">
         <button onClick={kaydet} disabled={kaydediliyor}
-          className="px-6 py-3 rounded-2xl bg-indigo-600 text-white text-sm font-bold shadow-lg hover:bg-indigo-700 disabled:opacity-60">
-          {kaydediliyor ? "Kaydediliyor…" : "💾 Değişiklikleri Kaydet"}
+          className="px-6 py-3 rounded-2xl bg-primary text-white text-sm font-bold shadow-lg hover:bg-primary-hover disabled:opacity-60">
+          {kaydediliyor ? "Kaydediliyor…" : "Değişiklikleri Kaydet"}
         </button>
       </div>
 
@@ -293,19 +294,19 @@ function DinamikListe({ baslik, ogeler, alanlar, onDegis }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <label className="text-xs font-medium text-gray-500">{baslik}</label>
-        <button onClick={ekle} className="text-xs px-2 py-1 rounded-lg border border-indigo-200 text-indigo-600 hover:bg-indigo-50">+ Ekle</button>
+        <label className="text-xs font-medium text-subtle">{baslik}</label>
+        <button onClick={ekle} className="text-xs px-2 py-1 rounded-lg border border-line text-primary hover:bg-blue-50">+ Ekle</button>
       </div>
       <div className="space-y-2">
-        {(ogeler || []).length === 0 && <div className="text-xs text-gray-400">Henüz eklenmedi.</div>}
+        {(ogeler || []).length === 0 && <div className="text-xs text-subtle">Henüz eklenmedi.</div>}
         {(ogeler || []).map((o, i) => (
           <div key={i} className="flex gap-2 items-center">
             {alanlar.map((a) => (
               <input key={a.k} type={a.tip || "text"} placeholder={a.ph} value={o[a.k] ?? ""}
                 onChange={(e) => degis(i, a.k, a.tip === "number" ? e.target.value : e.target.value)}
-                className="flex-1 min-w-0 px-2 py-1.5 rounded-lg border border-gray-200 text-sm outline-none focus:border-indigo-400" />
+                className="flex-1 min-w-0 px-2 py-1.5 rounded-lg border border-line text-sm outline-none focus:border-primary" />
             ))}
-            <button onClick={() => sil(i)} className="text-red-400 hover:text-red-600 text-sm px-1">✕</button>
+            <button onClick={() => sil(i)} className="text-red-400 hover:text-red-600 px-1" aria-label="Sil"><X className="h-4 w-4" /></button>
           </div>
         ))}
       </div>
