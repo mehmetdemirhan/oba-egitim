@@ -7975,16 +7975,16 @@ function MesajlarPanel({ user }) {
 
   const mesajOkundu = async (id) => { try { await axios.put(`${API}/mesajlar/${id}/okundu`); fetchAll(); } catch(e) {} };
 
-  const rolRenk = (r) => ({ admin: "bg-red-100 text-red-700", coordinator: "bg-orange-100 text-orange-700", teacher: "bg-blue-100 text-blue-700", student: "bg-green-100 text-green-700", parent: "bg-purple-100 text-purple-700" })[r] || "bg-gray-100 text-gray-600";
+  const rolRenk = (r) => ({ admin: "bg-red-100 text-red-700", coordinator: "bg-orange-100 text-orange-700", teacher: "bg-blue-100 text-blue-700", student: "bg-green-100 text-green-700", parent: "bg-purple-100 text-purple-700" })[r] || "bg-gray-100 text-subtle";
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Mesajlar</h2>
-          <p className="text-gray-500 text-sm mt-1">{okunmamisSayisi > 0 ? `${okunmamisSayisi} okunmamış mesaj` : "Tüm mesajlar okundu"}</p>
+          <h2 className="text-2xl font-bold text-content">Mesajlar</h2>
+          <p className="text-subtle text-sm mt-1">{okunmamisSayisi > 0 ? `${okunmamisSayisi} okunmamış mesaj` : "Tüm mesajlar okundu"}</p>
         </div>
-        <Button onClick={() => setGorunum("yeni")} className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
+        <Button onClick={() => setGorunum("yeni")} className="bg-primary hover:bg-primary-hover text-white">
           <Send className="h-4 w-4 mr-2" /> Yeni Mesaj
         </Button>
       </div>
@@ -7997,16 +7997,16 @@ function MesajlarPanel({ user }) {
           { v: "yeni", l: "Yeni Mesaj" },
         ].map(t => (
           <button key={t.v} onClick={() => setGorunum(t.v)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all border flex items-center gap-2 ${gorunum === t.v ? 'bg-blue-500 text-white border-blue-500 shadow' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}>
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all border flex items-center gap-2 ${gorunum === t.v ? 'bg-primary text-white border-primary shadow' : 'bg-surface text-subtle border-line hover:border-primary'}`}>
             {t.l}
-            {t.badge > 0 && <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${gorunum === t.v ? 'bg-white/30' : 'bg-red-100 text-red-600'}`}>{t.badge}</span>}
+            {t.badge > 0 && <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold tabular-nums ${gorunum === t.v ? 'bg-white/30' : 'bg-red-100 text-red-600'}`}>{t.badge}</span>}
           </button>
         ))}
       </div>
 
       {/* Yeni Mesaj */}
       {gorunum === "yeni" && (
-        <Card className="border-0 shadow-sm">
+        <Card className="border border-line shadow-sm">
           <CardHeader><CardTitle className="text-base flex items-center gap-2"><Send className="h-4 w-4" /> Yeni Mesaj</CardTitle></CardHeader>
           <CardContent>
             <form onSubmit={mesajGonder} className="space-y-4">
@@ -8033,7 +8033,7 @@ function MesajlarPanel({ user }) {
               <div><Label>Konu</Label><Input value={form.konu} onChange={e => setForm({...form, konu: e.target.value})} placeholder="Mesaj konusu..." /></div>
               <div><Label>Mesaj *</Label><textarea value={form.icerik} onChange={e => setForm({...form, icerik: e.target.value})} required placeholder="Mesajınızı yazın..." className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[120px]" /></div>
               <div className="flex gap-3">
-                <Button type="submit" disabled={gonderiliyor || !form.icerik.trim()} className="flex-1 bg-blue-600 text-white">{gonderiliyor ? "Gönderiliyor..." : "✉️ Gönder"}</Button>
+                <Button type="submit" disabled={gonderiliyor || !form.icerik.trim()} className="flex-1 bg-primary hover:bg-primary-hover text-white">{gonderiliyor ? "Gönderiliyor..." : <><Send className="h-4 w-4 mr-1" />Gönder</>}</Button>
                 <Button type="button" variant="outline" onClick={() => setGorunum("gelen")} className="flex-1">İptal</Button>
               </div>
             </form>
@@ -8045,26 +8045,26 @@ function MesajlarPanel({ user }) {
       {gorunum === "gelen" && (
         <div className="space-y-3">
           <div className="flex gap-2 mb-2">
-            <button onClick={() => setFiltre("hepsi")} className={`text-xs px-3 py-1 rounded-full border ${filtre === "hepsi" ? 'bg-gray-800 text-white' : 'bg-white text-gray-600'}`}>Tümü ({gelenMesajlar.length})</button>
-            <button onClick={() => setFiltre("okunmamis")} className={`text-xs px-3 py-1 rounded-full border ${filtre === "okunmamis" ? 'bg-red-500 text-white' : 'bg-white text-gray-600'}`}>Okunmamış ({okunmamislar.length})</button>
+            <button onClick={() => setFiltre("hepsi")} className={`text-xs px-3 py-1 rounded-full border tabular-nums ${filtre === "hepsi" ? 'bg-primary text-white border-primary' : 'bg-surface text-subtle border-line'}`}>Tümü ({gelenMesajlar.length})</button>
+            <button onClick={() => setFiltre("okunmamis")} className={`text-xs px-3 py-1 rounded-full border tabular-nums ${filtre === "okunmamis" ? 'bg-primary text-white border-primary' : 'bg-surface text-subtle border-line'}`}>Okunmamış ({okunmamislar.length})</button>
           </div>
           {(filtre === "okunmamis" ? okunmamislar : gelenMesajlar).length === 0 ? (
-            <div className="text-center py-12"><Mail className="h-12 w-12 text-gray-300 mx-auto mb-3" /><p className="text-gray-500">{filtre === "okunmamis" ? "Okunmamış mesaj yok" : "Gelen mesaj yok"}</p></div>
+            <div className="text-center py-12"><Mail className="h-12 w-12 text-subtle mx-auto mb-3" /><p className="text-subtle">{filtre === "okunmamis" ? "Okunmamış mesaj yok" : "Gelen mesaj yok"}</p></div>
           ) : (
             (filtre === "okunmamis" ? okunmamislar : gelenMesajlar).map(m => (
-              <Card key={m.id} className={`border-0 shadow-sm cursor-pointer transition-all hover:shadow-md ${!m.okundu ? 'border-l-4 border-l-blue-500 bg-blue-50/30' : ''}`} onClick={() => !m.okundu && mesajOkundu(m.id)}>
+              <Card key={m.id} className={`border border-line shadow-sm cursor-pointer transition-all hover:shadow-md ${!m.okundu ? 'border-l-4 border-l-blue-500 bg-blue-50/30' : ''}`} onClick={() => !m.okundu && mesajOkundu(m.id)}>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${rolRenk(m.gonderen_rol)}`}>{({admin:"Yönetici",coordinator:"Koord.",teacher:"Öğretmen",student:"Öğrenci",parent:"Veli"})[m.gonderen_rol] || "—"}</span>
-                        <span className="font-medium text-sm text-gray-900">{m.gonderen_ad}</span>
+                        <span className="font-medium text-sm text-content">{m.gonderen_ad}</span>
                         {!m.okundu && <span className="w-2 h-2 bg-blue-500 rounded-full" />}
                       </div>
-                      {m.konu && <div className="font-bold text-sm text-gray-800 mt-1">{m.konu}</div>}
-                      <p className="text-sm text-gray-600 mt-1 line-clamp-2">{m.icerik}</p>
+                      {m.konu && <div className="font-bold text-sm text-content mt-1">{m.konu}</div>}
+                      <p className="text-sm text-subtle mt-1 line-clamp-2">{m.icerik}</p>
                     </div>
-                    <div className="text-xs text-gray-400 whitespace-nowrap">{new Date(m.tarih).toLocaleDateString('tr-TR')}</div>
+                    <div className="text-xs text-subtle whitespace-nowrap">{new Date(m.tarih).toLocaleDateString('tr-TR')}</div>
                   </div>
                 </CardContent>
               </Card>
@@ -8077,22 +8077,22 @@ function MesajlarPanel({ user }) {
       {gorunum === "giden" && (
         <div className="space-y-3">
           {gidenMesajlar.length === 0 ? (
-            <div className="text-center py-12"><Send className="h-12 w-12 text-gray-300 mx-auto mb-3" /><p className="text-gray-500">Gönderilen mesaj yok</p></div>
+            <div className="text-center py-12"><Send className="h-12 w-12 text-subtle mx-auto mb-3" /><p className="text-subtle">Gönderilen mesaj yok</p></div>
           ) : (
             gidenMesajlar.map(m => (
-              <Card key={m.id} className="border-0 shadow-sm"><CardContent className="p-4">
+              <Card key={m.id} className="border border-line shadow-sm"><CardContent className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs text-gray-500">→</span>
+                      <span className="text-xs text-subtle">→</span>
                       <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${rolRenk(m.alici_rol)}`}>{({admin:"Yönetici",coordinator:"Koord.",teacher:"Öğretmen",student:"Öğrenci",parent:"Veli"})[m.alici_rol] || "—"}</span>
-                      <span className="font-medium text-sm text-gray-900">{m.alici_ad}</span>
-                      {m.okundu ? <span className="text-xs text-green-600">✓ okundu</span> : <span className="text-xs text-gray-400">gönderildi</span>}
+                      <span className="font-medium text-sm text-content">{m.alici_ad}</span>
+                      {m.okundu ? <span className="inline-flex items-center gap-1 text-xs text-green-600"><Check className="h-3 w-3" />okundu</span> : <span className="text-xs text-subtle">gönderildi</span>}
                     </div>
-                    {m.konu && <div className="font-bold text-sm text-gray-800 mt-1">{m.konu}</div>}
-                    <p className="text-sm text-gray-600 mt-1 line-clamp-2">{m.icerik}</p>
+                    {m.konu && <div className="font-bold text-sm text-content mt-1">{m.konu}</div>}
+                    <p className="text-sm text-subtle mt-1 line-clamp-2">{m.icerik}</p>
                   </div>
-                  <div className="text-xs text-gray-400 whitespace-nowrap">{new Date(m.tarih).toLocaleDateString('tr-TR')}</div>
+                  <div className="text-xs text-subtle whitespace-nowrap">{new Date(m.tarih).toLocaleDateString('tr-TR')}</div>
                 </div>
               </CardContent></Card>
             ))
