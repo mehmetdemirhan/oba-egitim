@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./components/ui/dialog";
 import { Badge } from "./components/ui/badge";
-import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send, Bell, Database, RefreshCw, GitBranch, AlertTriangle, Package, ClipboardList, Flame, Target, Award, Heart, FlaskConical, Medal, Lock, Sparkles, Lightbulb, MessageCircle, TrendingUp, Palette, Brain, XCircle, Check, Clock, Save, Image as ImageIcon, ArrowLeft, ArrowRight, Play, Pause, Settings } from "lucide-react";
+import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send, Bell, Database, RefreshCw, GitBranch, AlertTriangle, Package, ClipboardList, Flame, Target, Award, Heart, FlaskConical, Medal, Lock, Sparkles, Lightbulb, MessageCircle, TrendingUp, Palette, Brain, XCircle, Check, Clock, Save, Image as ImageIcon, ArrowLeft, ArrowRight, Play, Pause, Settings, Music, Printer } from "lucide-react";
 import { useToast } from "./hooks/use-toast";
 import { IkonCoz } from "./lib/ikonlar";
 import { Toaster } from "./components/ui/toaster";
@@ -3034,7 +3034,7 @@ function RaporFormu({ oturum, sonuc, ogrenci, metin, onRaporTamamla }) {
         ))}
         {isEk && (
           <button onClick={() => setEkAnlamaOlcutleri(prev => prev.filter(o => o.id !== ekId))}
-            className="ml-2 text-red-400 hover:text-red-600 text-xs">✕</button>
+            className="ml-2 text-red-400 hover:text-red-600" aria-label="Kaldır"><XCircle className="h-3.5 w-3.5" /></button>
         )}
       </div>
     </div>
@@ -3047,7 +3047,7 @@ function RaporFormu({ oturum, sonuc, ogrenci, metin, onRaporTamamla }) {
         <div className="font-medium text-sm text-content mb-2">{etiket}</div>
         {isEk && (
           <button onClick={() => setEkProzodikOlcutleri(prev => prev.filter(o => o.id !== ekId))}
-            className="text-red-400 hover:text-red-600 text-xs mb-2">✕ Kaldır</button>
+            className="inline-flex items-center gap-1 text-red-400 hover:text-red-600 text-xs mb-2"><XCircle className="h-3.5 w-3.5" />Kaldır</button>
         )}
       </div>
       <div className="grid grid-cols-4 gap-1">
@@ -3061,7 +3061,7 @@ function RaporFormu({ oturum, sonuc, ogrenci, metin, onRaporTamamla }) {
           }}
             className={`p-2 rounded-lg text-xs border text-center transition-all leading-tight ${
               (isEk ? ekProzodikOlcutleri.find(o=>o.id===ekId)?.puan : prozodik[alan]) === p
-                ? 'border-orange-400 bg-orange-50 text-orange-700 font-medium'
+                ? 'border-primary bg-blue-50 text-primary font-medium'
                 : 'border-line bg-surface text-subtle hover:bg-app'
             }`}>
             <div className="font-bold text-sm mb-1">{p} puan</div>
@@ -3176,15 +3176,15 @@ JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
   };
 
   // ── Düzenlenebilir yorum bileşeni ──
-  const YorumAlani = ({ baslik, alan, placeholder }) => (
+  const YorumAlani = ({ baslik, alan, placeholder, ikon: Ikon }) => (
     <div className="mb-4">
-      <label className="text-sm font-semibold text-content mb-1 block">{baslik}</label>
+      <label className="inline-flex items-center gap-1.5 text-sm font-semibold text-content mb-1">{Ikon && <Ikon className="h-4 w-4" />}{baslik}</label>
       <textarea
         value={aiYorumlar[alan]}
         onChange={e => setAiYorumlar({ ...aiYorumlar, [alan]: e.target.value })}
         rows={4}
         placeholder={placeholder || "AI ile oluşturun veya el ile yazın..."}
-        className="w-full border border-line rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none leading-relaxed"
+        className="w-full border border-line rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none leading-relaxed"
       />
     </div>
   );
@@ -3251,22 +3251,22 @@ JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
 
       {/* Özet bilgiler */}
       <div className="grid grid-cols-3 gap-3">
-        <Card className="border-0 shadow-sm text-center"><CardContent className="p-4">
-          <div className="text-2xl font-bold text-primary">{sonuc.wpm}</div>
+        <Card className="border border-line shadow-sm text-center"><CardContent className="p-4">
+          <div className="text-2xl font-bold text-primary tabular-nums">{sonuc.wpm}</div>
           <div className="text-xs text-subtle">kelime/dk</div>
         </CardContent></Card>
-        <Card className="border-0 shadow-sm text-center"><CardContent className="p-4">
-          <div className="text-2xl font-bold text-green-600">%{sonuc.dogruluk_yuzde}</div>
+        <Card className="border border-line shadow-sm text-center"><CardContent className="p-4">
+          <div className="text-2xl font-bold text-green-600 tabular-nums">%{sonuc.dogruluk_yuzde}</div>
           <div className="text-xs text-subtle">doğruluk</div>
         </CardContent></Card>
-        <Card className="border-0 shadow-sm text-center"><CardContent className="p-4">
-          <div className="text-2xl font-bold text-orange-600">{sonuc.atanan_kur || sonuc.sistem_kur}</div>
+        <Card className="border border-line shadow-sm text-center"><CardContent className="p-4">
+          <div className="text-2xl font-bold text-primary tabular-nums">{sonuc.atanan_kur || sonuc.sistem_kur}</div>
           <div className="text-xs text-subtle">atanan kur</div>
         </CardContent></Card>
       </div>
 
       {/* ══ 4. Okuduğunu Anlama ══ */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader>
           <CardTitle className="text-base flex items-center justify-between">
             <span>4. Okuduğunu Anlama Becerileri</span>
@@ -3374,14 +3374,14 @@ JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
       </Card>
 
       {/* ══ 5. Prozodik Okuma ══ */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader>
           <CardTitle className="text-base flex items-center justify-between">
             <span>5. Prozodik Okuma Ölçeği</span>
             <div className="flex items-center gap-3">
-              <span className="text-lg font-bold text-orange-600">Toplam: {prozodikToplam}/{20 + ekProzodikOlcutleri.length * 4}</span>
+              <span className="text-lg font-bold text-primary tabular-nums">Toplam: {prozodikToplam}/{20 + ekProzodikOlcutleri.length * 4}</span>
               <button onClick={() => setProzodikEkleAcik(!prozodikEkleAcik)}
-                className="text-xs px-3 py-1 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 transition-all border border-orange-200">
+                className="text-xs px-3 py-1 bg-blue-50 text-primary rounded-lg hover:bg-blue-100 transition-all border border-line">
                 + Ölçüt Ekle
               </button>
             </div>
@@ -3390,16 +3390,16 @@ JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
         <CardContent>
           {/* Prozodik ölçüt ekleme */}
           {prozodikEkleAcik && (
-            <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 space-y-3 mb-4">
-              <div className="text-sm font-semibold text-orange-700">Yeni Prozodik Ölçüt Ekle</div>
+            <div className="bg-app border border-line rounded-xl p-4 space-y-3 mb-4">
+              <div className="text-sm font-semibold text-content">Yeni Prozodik Ölçüt Ekle</div>
               <input value={yeniProzodikAdi} onChange={e => setYeniProzodikAdi(e.target.value)}
                 placeholder="Ölçüt adı (ör: Diyalog ifadesi)"
-                className="w-full border border-orange-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                className="w-full border border-line rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
               <div className="flex gap-2">
                 <button onClick={prozodikOlcutEkle}
-                  className="px-4 py-2 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-700">Ekle</button>
+                  className="px-4 py-2 bg-primary hover:bg-primary-hover text-white text-sm rounded-lg">Ekle</button>
                 <button onClick={() => setProzodikEkleAcik(false)}
-                  className="px-4 py-2 bg-gray-200 text-content text-sm rounded-lg hover:bg-gray-300">İptal</button>
+                  className="px-4 py-2 bg-surface border border-line text-content text-sm rounded-lg hover:bg-app">İptal</button>
               </div>
             </div>
           )}
@@ -3425,28 +3425,26 @@ JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
       </Card>
 
       {/* ══ 6. AI Yorumları ══ */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader>
           <CardTitle className="text-base flex items-center justify-between">
             <span>6. Değerlendirme Yorumları</span>
             <button onClick={aiYorumlariOlustur} disabled={aiYukleniyor}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                 aiYukleniyor
-                  ? 'bg-gray-200 text-subtle cursor-not-allowed'
-                  : 'bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:from-purple-600 hover:to-blue-600 shadow-md'
+                  ? 'bg-app text-subtle cursor-not-allowed'
+                  : 'bg-primary hover:bg-primary-hover text-white shadow-sm'
               }`}>
               {aiYukleniyor ? (
-                <span className="flex items-center gap-2">
-                  <span className="animate-spin">⏳</span> AI Oluşturuyor...
-                </span>
-              ) : aiOlusturuldu ? "🔄 Yeniden Oluştur" : "🤖 AI ile Oluştur"}
+                <><RefreshCw className="h-4 w-4 animate-spin" />AI Oluşturuyor...</>
+              ) : aiOlusturuldu ? <><RefreshCw className="h-4 w-4" />Yeniden Oluştur</> : <><Sparkles className="h-4 w-4" />AI ile Oluştur</>}
             </button>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-1">
           {!aiOlusturuldu && !Object.values(aiYorumlar).some(v => v) && (
             <div className="text-center py-8 text-subtle">
-              <div className="text-4xl mb-3">🤖</div>
+              <Sparkles className="h-10 w-10 mx-auto mb-3 text-primary" />
               <p className="text-sm">Önce yukarıdaki ölçütleri doldurun, sonra<br/><strong>"AI ile Oluştur"</strong> butonuna tıklayın</p>
               <p className="text-xs mt-2 text-subtle">AI, sayısal verilere göre her bölüm için profesyonel yorum yazacak.</p>
               <p className="text-xs text-subtle">Oluşturulan yorumları istediğiniz gibi düzenleyebilirsiniz.</p>
@@ -3454,29 +3452,29 @@ JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
           )}
           {(aiOlusturuldu || Object.values(aiYorumlar).some(v => v)) && (
             <>
-              <YorumAlani baslik="📊 Okuma Hızı Değerlendirmesi" alan="hiz" placeholder="Okuma hızına ilişkin değerlendirme..." />
-              <YorumAlani baslik="✅ Doğru Okuma Oranı Değerlendirmesi" alan="dogruluk" placeholder="Doğruluk ve hata analizi..." />
-              <YorumAlani baslik="📖 Okuduğunu Anlama Değerlendirmesi" alan="anlama" placeholder="Anlama becerileri değerlendirmesi..." />
-              <YorumAlani baslik="🎵 Prozodik Okuma Değerlendirmesi" alan="prozodik" placeholder="Prozodik okuma değerlendirmesi..." />
-              <YorumAlani baslik="📝 Sonuç ve Genel Yorum" alan="sonuc" placeholder="Genel sonuç ve yorum..." />
-              <YorumAlani baslik="🎯 Eğitsel ve Ev Temelli Gelişim Önerileri" alan="oneriler" placeholder="Gelişim önerileri..." />
+              <YorumAlani ikon={BarChart3} baslik="Okuma Hızı Değerlendirmesi" alan="hiz" placeholder="Okuma hızına ilişkin değerlendirme..." />
+              <YorumAlani ikon={CheckCircle} baslik="Doğru Okuma Oranı Değerlendirmesi" alan="dogruluk" placeholder="Doğruluk ve hata analizi..." />
+              <YorumAlani ikon={BookOpen} baslik="Okuduğunu Anlama Değerlendirmesi" alan="anlama" placeholder="Anlama becerileri değerlendirmesi..." />
+              <YorumAlani ikon={Music} baslik="Prozodik Okuma Değerlendirmesi" alan="prozodik" placeholder="Prozodik okuma değerlendirmesi..." />
+              <YorumAlani ikon={FileText} baslik="Sonuç ve Genel Yorum" alan="sonuc" placeholder="Genel sonuç ve yorum..." />
+              <YorumAlani ikon={Lightbulb} baslik="Eğitsel ve Ev Temelli Gelişim Önerileri" alan="oneriler" placeholder="Gelişim önerileri..." />
             </>
           )}
         </CardContent>
       </Card>
 
       {/* ══ 7. Öğretmen Ek Notu ══ */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader><CardTitle className="text-base">7. Öğretmen Ek Notu</CardTitle></CardHeader>
         <CardContent>
           <textarea value={ogretmenNotu} onChange={e => setOgretmenNotu(e.target.value)} rows={4}
             placeholder="Öğrenciye ilişkin ek değerlendirme ve notlarınızı yazın..."
-            className="w-full border border-line rounded-xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none leading-relaxed" />
+            className="w-full border border-line rounded-xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none leading-relaxed" />
         </CardContent>
       </Card>
 
-      <Button onClick={kaydet} className="w-full py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold text-lg">
-        📄 Raporu Oluştur
+      <Button onClick={kaydet} className="w-full inline-flex items-center justify-center gap-2 py-4 bg-primary hover:bg-primary-hover text-white font-bold text-lg">
+        <FileText className="h-5 w-5" />Raporu Oluştur
       </Button>
     </div>
   );
@@ -3494,7 +3492,7 @@ function RaporGoruntule({ rapor, ogrenci, onGeri }) {
 
   const AnlamaTablosu = ({ baslik, satirlar }) => (
     <div className="mb-4">
-      <div className="bg-gray-100 px-3 py-2 rounded-t-lg font-semibold text-sm text-content">{baslik}</div>
+      <div className="bg-app px-3 py-2 rounded-t-lg font-semibold text-sm text-content">{baslik}</div>
       <table className="w-full border border-line rounded-b-lg overflow-hidden text-sm">
         <thead><tr className="bg-app">
           <th className="text-left p-2 border-b border-line font-medium">Ölçüt</th>
@@ -3509,7 +3507,7 @@ function RaporGoruntule({ rapor, ogrenci, onGeri }) {
               <tr key={alan} className="border-b border-line last:border-0">
                 <td className="p-2 text-content">{etiket}</td>
                 {["zayif","orta","iyi"].map(s => (
-                  <td key={s} className="p-2 text-center text-orange-500 font-bold">{deger === s ? "+" : ""}</td>
+                  <td key={s} className="p-2 text-center text-primary font-bold">{deger === s ? "+" : ""}</td>
                 ))}
               </tr>
             );
@@ -3527,7 +3525,7 @@ function RaporGoruntule({ rapor, ogrenci, onGeri }) {
       </div>
 
       {/* 1. Öğrenci Bilgileri */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader><CardTitle className="text-base bg-gray-800 text-white p-3 rounded-lg -m-1">1. ÖĞRENCİ BİLGİLERİ</CardTitle></CardHeader>
         <CardContent className="p-0">
           <table className="w-full text-sm">
@@ -3542,7 +3540,7 @@ function RaporGoruntule({ rapor, ogrenci, onGeri }) {
       </Card>
 
       {/* 2. Metin */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader><CardTitle className="text-base bg-gray-800 text-white p-3 rounded-lg -m-1">2. METİN</CardTitle></CardHeader>
         <CardContent className="p-0">
           <table className="w-full text-sm">
@@ -3559,7 +3557,7 @@ function RaporGoruntule({ rapor, ogrenci, onGeri }) {
       </Card>
 
       {/* 3. Okuma Hızı */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader><CardTitle className="text-base bg-gray-800 text-white p-3 rounded-lg -m-1">3. OKUMA HIZI</CardTitle></CardHeader>
         <CardContent className="pt-4">
           <div className="flex items-center gap-4 mb-4">
@@ -3578,7 +3576,7 @@ function RaporGoruntule({ rapor, ogrenci, onGeri }) {
       </Card>
 
       {/* 4. Okuduğunu Anlama */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader>
           <CardTitle className="text-base bg-gray-800 text-white p-3 rounded-lg -m-1">
             4. OKUDUĞUNU ANLAMA BECERİLERİ — %{rapor.anlama_yuzde}
@@ -3616,11 +3614,11 @@ function RaporGoruntule({ rapor, ogrenci, onGeri }) {
       </Card>
 
       {/* 5. Prozodik Okuma */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader><CardTitle className="text-base bg-gray-800 text-white p-3 rounded-lg -m-1">5. PROZODİK OKUMA ÖLÇEĞİ</CardTitle></CardHeader>
         <CardContent className="pt-4">
           <table className="w-full text-sm border border-line rounded-xl overflow-hidden mb-4">
-            <thead><tr className="bg-gray-100">
+            <thead><tr className="bg-app">
               <th className="text-left p-3 font-semibold">Ölçüt</th>
               <th className="text-center p-3 font-semibold w-24">1 puan</th>
               <th className="text-center p-3 font-semibold w-24">2 puan</th>
@@ -3639,18 +3637,18 @@ function RaporGoruntule({ rapor, ogrenci, onGeri }) {
                 <tr key={alan} className="border-t border-line">
                   <td className="p-3 font-medium">{etiket}</td>
                   {aciklamalar.map((a, i) => (
-                    <td key={i} className={`p-2 text-center text-xs ${rapor.prozodik?.[alan] === i+1 ? 'bg-orange-100 font-bold text-orange-700' : 'text-subtle'}`}>{a}</td>
+                    <td key={i} className={`p-2 text-center text-xs ${rapor.prozodik?.[alan] === i+1 ? 'bg-blue-100 font-bold text-primary' : 'text-subtle'}`}>{a}</td>
                   ))}
-                  <td className="p-3 text-center font-bold text-orange-600">{rapor.prozodik?.[alan]}</td>
+                  <td className="p-3 text-center font-bold text-primary tabular-nums">{rapor.prozodik?.[alan]}</td>
                 </tr>
               ))}
               <tr className="bg-app border-t-2 border-line">
                 <td colSpan="5" className="p-3 font-bold text-right">Toplam</td>
-                <td className="p-3 text-center font-bold text-xl text-orange-600">{rapor.prozodik_toplam}</td>
+                <td className="p-3 text-center font-bold text-xl text-primary tabular-nums">{rapor.prozodik_toplam}</td>
               </tr>
             </tbody>
           </table>
-          <div className="bg-orange-50 p-3 rounded-xl text-sm text-content">
+          <div className="bg-app border border-line p-3 rounded-xl text-sm text-content">
             Prozodik okuma performansı: <strong>{prozodikSeviye(rapor.prozodik_toplam)}</strong> (Toplam {rapor.prozodik_toplam}/20)
           </div>
         </CardContent>
@@ -3658,7 +3656,7 @@ function RaporGoruntule({ rapor, ogrenci, onGeri }) {
 
       {/* 6. Sonuç */}
       {rapor.ogretmen_notu && (
-        <Card className="border-0 shadow-sm">
+        <Card className="border border-line shadow-sm">
           <CardHeader><CardTitle className="text-base bg-gray-800 text-white p-3 rounded-lg -m-1">6. SONUÇ VE GENEL YORUM</CardTitle></CardHeader>
           <CardContent className="pt-4">
             <p className="text-sm text-content leading-relaxed whitespace-pre-wrap">{rapor.ogretmen_notu}</p>
@@ -3675,9 +3673,9 @@ function RaporGoruntule({ rapor, ogrenci, onGeri }) {
             a.download = `Rapor_${rapor.ogrenci_ad?.replace(/\s/g,'_')}_${rapor.olusturma_tarihi?.slice(0,10)}.pdf`;
             document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url);
           } catch(e) { toast({ title: "PDF indirilemedi", description: e.response?.data?.detail || "Rapor PDF'i oluşturulamadı.", variant: "destructive" }); }
-        }} className="flex-1 bg-red-600 hover:bg-red-700 text-white">📄 PDF İndir</Button>
-        <Button onClick={() => window.print()} variant="outline" className="flex-1">🖨️ Yazdır</Button>
-        <Button onClick={onGeri} variant="outline" className="flex-1">← Geri</Button>
+        }} className="flex-1 bg-primary hover:bg-primary-hover text-white"><FileText className="h-4 w-4 mr-1" />PDF İndir</Button>
+        <Button onClick={() => window.print()} variant="outline" className="flex-1"><Printer className="h-4 w-4 mr-1" />Yazdır</Button>
+        <Button onClick={onGeri} variant="outline" className="flex-1"><ArrowLeft className="h-4 w-4 mr-1" />Geri</Button>
       </div>
     </div>
   );
@@ -4253,11 +4251,11 @@ function GelisimRaporuButonu({ students }) {
 
   return (
     <>
-      <Button variant="outline" onClick={() => setAcik(true)}>🚀 Gelişim Raporu Oluştur</Button>
+      <Button variant="outline" onClick={() => setAcik(true)}><TrendingUp className="h-4 w-4 mr-1" />Gelişim Raporu Oluştur</Button>
       <Dialog open={acik} onOpenChange={setAcik}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>🚀 Gelişim Raporu (Ön Test / Son Test)</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><TrendingUp className="h-5 w-5" />Gelişim Raporu (Ön Test / Son Test)</DialogTitle>
             <DialogDescription>Bir öğrencinin iki tamamlanmış analizi karşılaştırılır. Her iki analizin de ölçüm raporu olmalıdır.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -4290,7 +4288,7 @@ function GelisimRaporuButonu({ students }) {
                 </Button>
               ) : (
                 <div className="border rounded-xl p-3 bg-green-50 space-y-2">
-                  <div className="font-semibold text-green-700">✓ Rapor hazır</div>
+                  <div className="inline-flex items-center gap-1.5 font-semibold text-green-700"><CheckCircle className="h-4 w-4" />Rapor hazır</div>
                   <div className="text-xs space-y-1">
                     {sonucRapor.ozet_tablo?.map(m => (
                       <div key={m.metrik} className="flex justify-between">
@@ -4299,7 +4297,7 @@ function GelisimRaporuButonu({ students }) {
                       </div>
                     ))}
                   </div>
-                  <Button onClick={pdfIndir} className="w-full bg-primary text-white">📄 PDF İndir</Button>
+                  <Button onClick={pdfIndir} className="w-full bg-primary hover:bg-primary-hover text-white"><FileText className="h-4 w-4 mr-1" />PDF İndir</Button>
                 </div>
               )}
             </>)}
@@ -8978,35 +8976,35 @@ function RaporOlcutleriPaneli() {
   if (!a) return <div className="p-6 text-subtle text-sm">Yükleniyor…</div>;
 
   const bolumler = [
-    { id: "normlar", l: "📏 Okuma Hızı Normları" },
-    { id: "dogruluk", l: "🎯 Doğruluk & Kur Eşikleri" },
-    { id: "anlama", l: "🧠 Anlama Rubriği" },
-    { id: "prozodik", l: "🎵 Prozodik Ölçütler" },
-    { id: "gelisim", l: "📈 Gelişim Eşikleri" },
+    { id: "normlar", l: "Okuma Hızı Normları", ik: Timer },
+    { id: "dogruluk", l: "Doğruluk & Kur Eşikleri", ik: Target },
+    { id: "anlama", l: "Anlama Rubriği", ik: Brain },
+    { id: "prozodik", l: "Prozodik Ölçütler", ik: Music },
+    { id: "gelisim", l: "Gelişim Eşikleri", ik: TrendingUp },
   ];
   const KaydetBtn = ({ tip }) => (
     <div className="flex gap-2 pt-2">
-      <Button onClick={() => kaydet(tip)} disabled={kayit === tip} className="bg-primary text-white">💾 Kaydet</Button>
-      <Button variant="outline" onClick={() => varsayilana(tip)}>↩️ Varsayılana Dön</Button>
+      <Button onClick={() => kaydet(tip)} disabled={kayit === tip} className="bg-primary hover:bg-primary-hover text-white"><Save className="h-4 w-4 mr-1" />Kaydet</Button>
+      <Button variant="outline" onClick={() => varsayilana(tip)}><RefreshCw className="h-4 w-4 mr-1" />Varsayılana Dön</Button>
     </div>
   );
 
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-2xl font-bold">📋 Rapor Ölçütleri</h2>
+        <h2 className="inline-flex items-center gap-2 text-2xl font-bold"><ClipboardList className="h-6 w-6" />Rapor Ölçütleri</h2>
         <p className="text-subtle text-sm">Giriş Analizi (Ölçüm & Gelişim) raporlarının norm, eşik ve rubrik ölçütleri. Değişiklikler yeni oluşturulan raporlara uygulanır.</p>
       </div>
       <div className="flex gap-2 flex-wrap">
-        {bolumler.map(b => (
+        {bolumler.map(b => { const Ik = b.ik; return (
           <button key={b.id} onClick={() => setBolum(b.id)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${bolum === b.id ? 'bg-primary text-white border-blue-600' : 'bg-surface text-subtle border-line'}`}>{b.l}</button>
-        ))}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${bolum === b.id ? 'bg-primary text-white border-primary' : 'bg-surface text-subtle border-line'}`}><Ik className="h-4 w-4" />{b.l}</button>
+        ); })}
       </div>
 
       {/* 📏 Okuma Hızı Normları */}
       {bolum === "normlar" && (
-        <Card className="border-0 shadow-sm"><CardHeader><CardTitle>Okuma Hızı Normları (kelime/dk)</CardTitle><p className="text-sm text-subtle">Sınıf bazlı Düşük/Orta/Yeterli eşikleri. WPM bu eşiklere göre düzeye çevrilir.</p></CardHeader><CardContent>
+        <Card className="border border-line shadow-sm"><CardHeader><CardTitle>Okuma Hızı Normları (kelime/dk)</CardTitle><p className="text-sm text-subtle">Sınıf bazlı Düşük/Orta/Yeterli eşikleri. WPM bu eşiklere göre düzeye çevrilir.</p></CardHeader><CardContent>
           <div className="overflow-x-auto"><table className="text-sm">
             <thead><tr className="text-subtle"><th className="p-1 text-left">Sınıf</th><th className="p-1">Düşük</th><th className="p-1">Orta</th><th className="p-1">Yeterli</th></tr></thead>
             <tbody>{Object.keys(a.okuma_hizi_normlari).sort().map(sn => (
@@ -9023,7 +9021,7 @@ function RaporOlcutleriPaneli() {
 
       {/* 🎯 Doğruluk & Kur Eşikleri */}
       {bolum === "dogruluk" && (
-        <Card className="border-0 shadow-sm"><CardHeader><CardTitle>Doğru Okuma Oranı Eşikleri (%)</CardTitle></CardHeader><CardContent className="space-y-4">
+        <Card className="border border-line shadow-sm"><CardHeader><CardTitle>Doğru Okuma Oranı Eşikleri (%)</CardTitle></CardHeader><CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-3 max-w-md">
             <div><Label className="text-sm">İyi (≥)</Label><Input type="number" value={a.dogruluk_esikleri.iyi} onChange={e => setTip("dogruluk_esikleri", { ...a.dogruluk_esikleri, iyi: parseInt(e.target.value) || 0 })} /></div>
             <div><Label className="text-sm">Geliştirilmeli (≥)</Label><Input type="number" value={a.dogruluk_esikleri.gelistirilmeli} onChange={e => setTip("dogruluk_esikleri", { ...a.dogruluk_esikleri, gelistirilmeli: parseInt(e.target.value) || 0 })} /></div>
@@ -9043,7 +9041,7 @@ function RaporOlcutleriPaneli() {
 
       {/* 🧠 Anlama Rubriği (4 boyut, madde ekle/düzenle/sil) */}
       {bolum === "anlama" && (
-        <Card className="border-0 shadow-sm"><CardHeader><CardTitle>Okuduğunu Anlama Rubriği</CardTitle><p className="text-sm text-subtle">4 alt boyut ve maddeleri. Eklediğiniz madde, yeni Ölçüm Raporu formunda otomatik satır olarak çıkar.</p></CardHeader><CardContent className="space-y-4">
+        <Card className="border border-line shadow-sm"><CardHeader><CardTitle>Okuduğunu Anlama Rubriği</CardTitle><p className="text-sm text-subtle">4 alt boyut ve maddeleri. Eklediğiniz madde, yeni Ölçüm Raporu formunda otomatik satır olarak çıkar.</p></CardHeader><CardContent className="space-y-4">
           {(a.anlama_rubrik_maddeleri || []).map((boyut, bi) => (
             <div key={boyut.id || bi} className="border rounded-xl p-3">
               <Input className="font-bold mb-2" value={boyut.baslik} onChange={e => { const c = [...a.anlama_rubrik_maddeleri]; c[bi] = { ...c[bi], baslik: e.target.value }; setTip("anlama_rubrik_maddeleri", c); }} />
@@ -9064,7 +9062,7 @@ function RaporOlcutleriPaneli() {
 
       {/* 🎵 Prozodik Ölçütler (ekle/düzenle/sil + 1-4 çapa) */}
       {bolum === "prozodik" && (
-        <Card className="border-0 shadow-sm"><CardHeader><CardTitle>Prozodik Okuma Ölçütleri</CardTitle><p className="text-sm text-subtle">Her ölçüt 1-4 puan; toplam puan ölçüt sayısına göre dinamik hesaplanır.</p></CardHeader><CardContent className="space-y-3">
+        <Card className="border border-line shadow-sm"><CardHeader><CardTitle>Prozodik Okuma Ölçütleri</CardTitle><p className="text-sm text-subtle">Her ölçüt 1-4 puan; toplam puan ölçüt sayısına göre dinamik hesaplanır.</p></CardHeader><CardContent className="space-y-3">
           {(a.prozodik_olcutler || []).map((olcut, oi) => (
             <div key={olcut.id || oi} className="border rounded-xl p-3 space-y-2">
               <div className="flex items-center gap-2">
@@ -9086,7 +9084,7 @@ function RaporOlcutleriPaneli() {
 
       {/* 📈 Gelişim Değişim Eşikleri */}
       {bolum === "gelisim" && (
-        <Card className="border-0 shadow-sm"><CardHeader><CardTitle>Gelişim Raporu Değişim Eşikleri</CardTitle><p className="text-sm text-subtle">Ön→son değişim bu eşiklere göre "Anlamlı Gelişim / Sabit-Sınırlı / Gerileme" olarak etiketlenir.</p></CardHeader><CardContent className="space-y-3">
+        <Card className="border border-line shadow-sm"><CardHeader><CardTitle>Gelişim Raporu Değişim Eşikleri</CardTitle><p className="text-sm text-subtle">Ön→son değişim bu eşiklere göre "Anlamlı Gelişim / Sabit-Sınırlı / Gerileme" olarak etiketlenir.</p></CardHeader><CardContent className="space-y-3">
           <div className="overflow-x-auto"><table className="text-sm">
             <thead><tr className="text-subtle"><th className="p-1 text-left">Metrik</th><th className="p-1">Anlamlı Gelişim (≥)</th><th className="p-1">Gerileme (≤)</th></tr></thead>
             <tbody>{[["wpm", "Okuma Hızı"], ["dogruluk", "Doğruluk %"], ["prozodik", "Prozodik Puan"], ["anlama", "Anlama %"]].map(([k, l]) => (
