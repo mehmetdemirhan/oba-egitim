@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./components/ui/dialog";
 import { Badge } from "./components/ui/badge";
-import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send, Bell, Database, RefreshCw, GitBranch, AlertTriangle, Package, ClipboardList, Flame, Target, Award, Heart, FlaskConical, Medal, Lock, Sparkles, Lightbulb, MessageCircle, TrendingUp, Palette, Brain, XCircle } from "lucide-react";
+import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send, Bell, Database, RefreshCw, GitBranch, AlertTriangle, Package, ClipboardList, Flame, Target, Award, Heart, FlaskConical, Medal, Lock, Sparkles, Lightbulb, MessageCircle, TrendingUp, Palette, Brain, XCircle, Check, Clock, Save, Image as ImageIcon, ArrowLeft } from "lucide-react";
 import { useToast } from "./hooks/use-toast";
 import { IkonCoz } from "./lib/ikonlar";
 import { Toaster } from "./components/ui/toaster";
@@ -1764,7 +1764,7 @@ function MetinSecimListesi({ onMetinSec }) {
     <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
       {metinler.map(m => (
         <div key={m.id} onClick={() => onMetinSec(m)}
-          className="border border-line rounded-xl p-4 cursor-pointer hover:border-orange-400 hover:bg-orange-50 transition-all">
+          className="border border-line rounded-xl p-4 cursor-pointer hover:border-primary hover:bg-app transition-all">
           <div className="font-semibold text-content">{m.baslik}</div>
           <div className="text-xs text-subtle mt-1">{m.sinif_seviyesi}. Sınıf • {turLabel[m.tur] || m.tur} • {m.kelime_sayisi} kelime</div>
           <p className="text-sm text-subtle mt-2 line-clamp-2">{m.icerik}</p>
@@ -1808,7 +1808,7 @@ function NormTablosu({ onClose }) {
       <div className="overflow-x-auto">
         <table className="w-full text-sm border-collapse">
           <thead>
-            <tr className="bg-gray-100">
+            <tr className="bg-app">
               <th className="p-3 text-left font-semibold border border-line">Sınıf</th>
               <th className="p-3 text-center font-semibold border border-line text-red-600">Düşük (≤)</th>
               <th className="p-3 text-center font-semibold border border-line text-yellow-600">Orta (≤)</th>
@@ -1826,7 +1826,7 @@ function NormTablosu({ onClose }) {
                     <td key={alan} className="p-2 border border-line">
                       <input type="number" value={n[alan] || ""} min={0} max={500}
                         onChange={e => setNormlar({...normlar, [s]: {...n, [alan]: parseInt(e.target.value)||0}})}
-                        className="w-full text-center border border-line rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-orange-500" />
+                        className="w-full text-center border border-line rounded-lg p-2 tabular-nums focus:outline-none focus:ring-2 focus:ring-primary" />
                     </td>
                   ))}
                   <td className="p-3 border border-line text-center text-green-600 font-medium">{(n.yeterli||0)+1}+</td>
@@ -1837,7 +1837,7 @@ function NormTablosu({ onClose }) {
         </table>
       </div>
       <div className="flex gap-3 pt-2">
-        <Button onClick={kaydet} className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white">Kaydet</Button>
+        <Button onClick={kaydet} className="flex-1 bg-primary hover:bg-primary-hover text-white"><Save className="h-4 w-4 mr-1" />Kaydet</Button>
         <Button variant="outline" onClick={onClose} className="flex-1">İptal</Button>
       </div>
     </div>
@@ -1902,10 +1902,10 @@ function MetinKatkiPaneli({ metin, user, onDegisti, acik: acikProp, onToggle }) 
     <div className="mt-2 border-t border-line pt-2" onClick={(e) => e.stopPropagation()}>
       <button type="button" onClick={toggle}
         className="text-xs font-medium text-primary flex items-center gap-1.5 hover:underline">
-        {acik ? "▼" : "▶"} 📝 Cevap Anahtarı & Görsel
+        {acik ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}<ClipboardList className="h-3.5 w-3.5" />Cevap Anahtarı & Görsel
         {soruSayisi > 0 && <span className="text-subtle">({soruSayisi} soru)</span>}
-        {kontrolSayisi > 0 && <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full">⚠ {kontrolSayisi} kontrol edilmeli</span>}
-        {gorselVar && <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded-full">🖼️ görsel</span>}
+        {kontrolSayisi > 0 && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full"><AlertTriangle className="h-3 w-3" />{kontrolSayisi} kontrol edilmeli</span>}
+        {gorselVar && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded-full"><ImageIcon className="h-3 w-3" />görsel</span>}
       </button>
 
       {acik && (
@@ -1918,7 +1918,7 @@ function MetinKatkiPaneli({ metin, user, onDegisti, acik: acikProp, onToggle }) 
                 <input ref={fileRef} type="file" accept="image/jpeg,image/png" className="hidden" onChange={gorselYukle} />
                 <Button type="button" size="sm" disabled={yukleniyor} onClick={() => fileRef.current?.click()}
                   className="bg-purple-600 hover:bg-purple-700 text-white h-7 text-xs">
-                  {yukleniyor ? "Yükleniyor…" : gorselVar ? "🖼️ Görseli Değiştir" : "🖼️ Görsel Ekle"}
+                  <ImageIcon className="h-3.5 w-3.5 mr-1" />{yukleniyor ? "Yükleniyor…" : gorselVar ? "Görseli Değiştir" : "Görsel Ekle"}
                 </Button>
               </div>
             </div>
@@ -1937,7 +1937,7 @@ function MetinKatkiPaneli({ metin, user, onDegisti, acik: acikProp, onToggle }) 
               <div key={s.id || i} className="bg-app rounded-lg p-3 text-sm">
                 <div className="flex items-start justify-between gap-2">
                   <div className="font-medium text-content">{i + 1}. {s.soru}</div>
-                  {s.kontrol_gerekli && <span className="shrink-0 px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[11px] rounded-full">⚠ kontrol edilmeli</span>}
+                  {s.kontrol_gerekli && <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[11px] rounded-full"><AlertTriangle className="h-3 w-3" />kontrol edilmeli</span>}
                 </div>
                 <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                   {sikHarfleri.filter(h => secenekler[h] !== undefined).map(h => {
@@ -1947,7 +1947,7 @@ function MetinKatkiPaneli({ metin, user, onDegisti, acik: acikProp, onToggle }) 
                         className={`text-left px-2 py-1.5 rounded-lg border text-xs transition flex items-start gap-1.5
                           ${dogru ? "border-green-500 bg-green-50 text-green-800 font-semibold" : "border-line bg-surface text-subtle hover:border-primary"}`}>
                         <span className="font-bold">{h}</span><span>{secenekler[h]}</span>
-                        {dogru && <span className="ml-auto">✓</span>}
+                        {dogru && <Check className="h-3.5 w-3.5 ml-auto shrink-0" />}
                       </button>
                     );
                   })}
@@ -1979,9 +1979,9 @@ function MetinKatkiPaneli({ metin, user, onDegisti, acik: acikProp, onToggle }) 
                       <span className="text-content text-xs">{nesne && q.no ? `${q.no}. ` : ""}{soruMetni}</span>
                     </div>
                     {subjektif ? (
-                      <div className="text-[11px] text-amber-700 mt-1 ml-1">
-                        ✎ Açık uçlu — otomatik değerlendirilmez.
-                        {modelCevap && <span className="text-subtle"> Örnek/yönlendirme: {modelCevap}</span>}
+                      <div className="inline-flex items-start gap-1 text-[11px] text-amber-700 mt-1 ml-1">
+                        <Edit2 className="h-3 w-3 mt-0.5 shrink-0" /><span>Açık uçlu — otomatik değerlendirilmez.
+                        {modelCevap && <span className="text-subtle"> Örnek/yönlendirme: {modelCevap}</span>}</span>
                       </div>
                     ) : (
                       modelCevap && <div className="text-[11px] text-green-700 mt-1 ml-1">Model cevap: {modelCevap}</div>
@@ -2075,10 +2075,10 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
 
   const turLabel = { hikaye: "Hikaye", bilgilendirici: "Bilgilendirici", siir: "Şiir" };
   const durumBadge = (d) => ({
-    beklemede: <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded-full">⏳ Onay Bekliyor</span>,
-    oylama: <span className="px-2 py-0.5 bg-blue-100 text-primary text-xs rounded-full">🗳️ Oylamada</span>,
-    havuzda: <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">✅ Havuzda</span>,
-    reddedildi: <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">❌ Reddedildi</span>,
+    beklemede: <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full"><Clock className="h-3 w-3" />Onay Bekliyor</span>,
+    oylama: <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-primary text-xs rounded-full"><Users className="h-3 w-3" />Oylamada</span>,
+    havuzda: <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full"><CheckCircle className="h-3 w-3" />Havuzda</span>,
+    reddedildi: <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full"><XCircle className="h-3 w-3" />Reddedildi</span>,
   }[d] || null);
 
   const oyKullandi = (m) => m.oylar && m.oylar[user?.id];
@@ -2099,14 +2099,14 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
       {/* Üst bar */}
       <div className="flex items-center justify-between">
         <h3 className="font-semibold text-content">{secimModu ? "Analiz Metinleri" : "Analiz Metinleri"}</h3>
-        <Button onClick={() => setFormAcik(!formAcik)} className="bg-gradient-to-r from-orange-500 to-red-500 text-white" size="sm">
+        <Button onClick={() => setFormAcik(!formAcik)} className="bg-primary hover:bg-primary-hover text-white" size="sm">
           <Plus className="h-4 w-4 mr-1"/>{formAcik ? "İptal" : "Metin Ekle (+5 puan)"}
         </Button>
       </div>
 
       {/* Metin Ekleme Formu */}
       {formAcik && (
-        <Card className="border-2 border-orange-200">
+        <Card className="border border-line shadow-sm">
           <CardContent className="p-5">
             <form onSubmit={kaydet} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -2131,7 +2131,7 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
               <div>
                 <Label>Metin İçeriği</Label>
                 <textarea value={form.icerik} onChange={e => setForm({...form, icerik: e.target.value})} required rows={8}
-                  className="w-full border border-line rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-y font-serif leading-relaxed" />
+                  className="w-full border border-line rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-y font-serif leading-relaxed" />
                 <p className="text-xs text-subtle mt-1">Kelime sayısı: {kelimeSay(form.icerik)}</p>
               </div>
               <div className="flex gap-3">
@@ -2146,9 +2146,9 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
       {/* Admin: Onay Bekleyenler */}
       {(user?.role === "admin" || user?.role === "coordinator") && bekleyenler.length > 0 && (
         <div>
-          <h4 className="text-sm font-semibold text-yellow-700 mb-2">⏳ Onay Bekleyenler ({bekleyenler.length})</h4>
+          <h4 className="inline-flex items-center gap-1.5 text-sm font-semibold text-amber-700 mb-2"><Clock className="h-4 w-4" />Onay Bekleyenler ({bekleyenler.length})</h4>
           {bekleyenler.map(m => (
-            <div key={m.id} className="border-2 border-yellow-200 rounded-xl p-4 mb-2 bg-yellow-50">
+            <div key={m.id} className="border border-line border-l-4 border-l-amber-400 rounded-xl p-4 mb-2 bg-amber-50">
               <div className="flex items-start justify-between">
                 <div>
                   <div className="font-semibold">{m.baslik}</div>
@@ -2157,9 +2157,9 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
                 </div>
               </div>
               <div className="flex gap-2 mt-3 flex-wrap">
-                <Button size="sm" onClick={() => adminKarar(m.id, true, false)} className="bg-primary hover:bg-primary-hover text-white">🗳️ Oylama Başlat</Button>
-                <Button size="sm" onClick={() => adminKarar(m.id, true, true)} className="bg-green-600 hover:bg-green-700 text-white">✅ Direkt Havuza Al</Button>
-                <Button size="sm" variant="destructive" onClick={() => adminKarar(m.id, false)}>❌ Reddet</Button>
+                <Button size="sm" onClick={() => adminKarar(m.id, true, false)} className="bg-primary hover:bg-primary-hover text-white"><Users className="h-4 w-4 mr-1" />Oylama Başlat</Button>
+                <Button size="sm" onClick={() => adminKarar(m.id, true, true)} className="bg-green-600 hover:bg-green-700 text-white"><CheckCircle className="h-4 w-4 mr-1" />Direkt Havuza Al</Button>
+                <Button size="sm" variant="destructive" onClick={() => adminKarar(m.id, false)}><XCircle className="h-4 w-4 mr-1" />Reddet</Button>
                 <Button size="sm" variant="destructive" onClick={() => sil(m.id)}><Trash2 className="h-4 w-4"/></Button>
               </div>
             </div>
@@ -2170,7 +2170,7 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
       {/* Oylamadakiler */}
       {oylamadakiler.length > 0 && (user?.role === "admin" || user?.role === "teacher") && (
         <div>
-          <h4 className="text-sm font-semibold text-primary mb-2">🗳️ Oylamada ({oylamadakiler.length})</h4>
+          <h4 className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary mb-2"><Users className="h-4 w-4" />Oylamada ({oylamadakiler.length})</h4>
           {oylamadakiler.map(m => {
             const kullandi = oyKullandi(m);
             const oran = onayOrani(m);
@@ -2182,26 +2182,26 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
                     <div className="font-semibold">{m.baslik}</div>
                     <div className="text-xs text-subtle">{m.sinif_seviyesi}. Sınıf • {turLabel[m.tur]} • {m.kelime_sayisi} kelime • Ekleyen: {m.ekleyen_ad}</div>
                   </div>
-                  {oran !== null && <div className="text-right"><div className="text-lg font-bold text-primary">%{oran}</div><div className="text-xs text-subtle">{oyCount} oy</div></div>}
+                  {oran !== null && <div className="text-right"><div className="text-lg font-bold text-primary tabular-nums">%{oran}</div><div className="text-xs text-subtle tabular-nums">{oyCount} oy</div></div>}
                 </div>
                 {oran !== null && (
                   <div className="mb-3">
-                    <div className="w-full bg-gray-200 rounded-full h-1.5">
-                      <div className={`h-1.5 rounded-full ${oran >= 60 ? 'bg-green-500' : 'bg-orange-500'}`} style={{width:`${oran}%`}}></div>
+                    <div className="w-full bg-app rounded-full h-1.5">
+                      <div className={`h-1.5 rounded-full ${oran >= 60 ? 'bg-green-500' : 'bg-amber-500'}`} style={{width:`${oran}%`}}></div>
                     </div>
                     <p className="text-xs text-subtle mt-1">%60 onay gerekli</p>
                   </div>
                 )}
                 <p className="text-sm text-subtle mb-3 line-clamp-2">{m.icerik}</p>
                 {kullandi ? (
-                  <div className="text-sm bg-app p-2 rounded-lg text-subtle">
-                    ✓ Oyunuzu kullandınız: <strong>{kullandi.onay ? "Onay" : "Red"}</strong>
-                    {!kullandi.onay && kullandi.sebep && <span> — {kullandi.sebep}</span>}
+                  <div className="inline-flex items-center gap-1.5 text-sm bg-app p-2 rounded-lg text-subtle">
+                    <Check className="h-4 w-4 shrink-0" /><span>Oyunuzu kullandınız: <strong>{kullandi.onay ? "Onay" : "Red"}</strong>
+                    {!kullandi.onay && kullandi.sebep && <span> — {kullandi.sebep}</span>}</span>
                   </div>
                 ) : (
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={() => oyVer(m.id, true)} className="bg-green-600 hover:bg-green-700 text-white">✅ Onayla (+2 puan)</Button>
-                    <Button size="sm" variant="destructive" onClick={() => { setRedDialog(m.id); }}>❌ Reddet</Button>
+                    <Button size="sm" onClick={() => oyVer(m.id, true)} className="bg-green-600 hover:bg-green-700 text-white"><CheckCircle className="h-4 w-4 mr-1" />Onayla (+2 puan)</Button>
+                    <Button size="sm" variant="destructive" onClick={() => { setRedDialog(m.id); }}><XCircle className="h-4 w-4 mr-1" />Reddet</Button>
                   </div>
                 )}
               </div>
@@ -2217,16 +2217,16 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
         return (
       <div className={`space-y-2 ${tamEkran ? "" : "max-h-96 overflow-y-auto"}`}>
         <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
-          <h4 className="text-sm font-semibold text-green-700">✅ Havuzdaki Metinler ({havuzdakiler.length}{kelimeAralik ? ` / ${havuzTumu.length}` : ""})</h4>
+          <h4 className="inline-flex items-center gap-1.5 text-sm font-semibold text-green-700"><CheckCircle className="h-4 w-4" />Havuzdaki Metinler ({havuzdakiler.length}{kelimeAralik ? ` / ${havuzTumu.length}` : ""})</h4>
         </div>
         {/* Seviye (kelime sayısı) aralık filtresi */}
         <div className="flex items-center gap-1.5 flex-wrap mb-1">
           <span className="text-xs text-subtle">Seviye:</span>
           <button type="button" onClick={() => setKelimeAralik(null)}
-            className={`px-2 py-1 rounded-full text-xs border transition ${!kelimeAralik ? 'bg-primary text-white border-blue-600' : 'bg-surface text-subtle border-line hover:bg-app'}`}>Tümü</button>
+            className={`px-2 py-1 rounded-full text-xs border transition ${!kelimeAralik ? 'bg-primary text-white border-primary' : 'bg-surface text-subtle border-line hover:bg-app'}`}>Tümü</button>
           {KELIME_ARALIKLARI.map(a => (
             <button key={a.l} type="button" onClick={() => setKelimeAralik(kelimeAralik?.l === a.l ? null : a)}
-              className={`px-2 py-1 rounded-full text-xs border transition ${kelimeAralik?.l === a.l ? 'bg-primary text-white border-blue-600' : 'bg-surface text-subtle border-line hover:bg-app'}`}>{a.l}</button>
+              className={`px-2 py-1 rounded-full text-xs border transition ${kelimeAralik?.l === a.l ? 'bg-primary text-white border-primary' : 'bg-surface text-subtle border-line hover:bg-app'}`}>{a.l}</button>
           ))}
         </div>
         {havuzdakiler.length === 0 && <p className="text-subtle text-sm text-center py-6">{havuzTumu.length === 0 ? "Henüz havuzda metin yok. Metin ekleyip onaylayın." : "Bu seviye aralığında metin yok."}</p>}
@@ -2242,7 +2242,7 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
               title="Cevap anahtarı & görsel için tıklayın">
               <div className="flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-subtle text-xs">{secili ? "▼" : "▶"}</span>
+                  <span className="text-subtle shrink-0">{secili ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</span>
                   <span className="font-semibold">{m.baslik}</span>
                   {durumBadge(m.durum)}
                 </div>
@@ -2251,10 +2251,10 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
               </div>
               <div className="flex items-center gap-2 ml-2 shrink-0">
                 {secimModu && m.durum === "havuzda" && onMetinSec && (
-                  <Button size="sm" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={(e) => { e.stopPropagation(); onMetinSec(m); }}>Seç</Button>
+                  <Button size="sm" className="bg-primary hover:bg-primary-hover text-white" onClick={(e) => { e.stopPropagation(); onMetinSec(m); }}>Seç</Button>
                 )}
                 {onDuzenle && ["admin", "coordinator", "teacher"].includes(user?.role) && (
-                  <Button size="sm" variant="outline" className="border-primary text-primary" onClick={(e) => { e.stopPropagation(); onDuzenle(m); }}>✏️ Düzenle</Button>
+                  <Button size="sm" variant="outline" className="border-primary text-primary" onClick={(e) => { e.stopPropagation(); onDuzenle(m); }}><Edit2 className="h-4 w-4 mr-1" />Düzenle</Button>
                 )}
                 {(user?.role === "admin" || user?.role === "coordinator") && (
                   <Button variant="destructive" size="sm" onClick={(e) => { e.stopPropagation(); sil(m.id); }}><Trash2 className="h-4 w-4"/></Button>
@@ -2270,43 +2270,43 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
       })()}
 
       {/* Puan Rehberi */}
-      <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-sm">
+      <div className="bg-app border border-line rounded-xl p-4 text-sm">
           <div className="flex items-center justify-between mb-2">
-            <div className="font-semibold text-orange-800">🎯 Metin Katkı Puanları</div>
+            <div className="inline-flex items-center gap-1.5 font-semibold text-content"><Target className="h-4 w-4 text-primary" />Metin Katkı Puanları</div>
             {(user?.role === "admin" || user?.role === "coordinator") && (
               <button onClick={() => setPuanDuzenle(!puanDuzenle)}
-                className="text-xs px-2 py-1 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 border border-orange-300">
-                {puanDuzenle ? '✕ Kapat' : '⚙️ Düzenle'}
+                className="inline-flex items-center gap-1 text-xs px-2 py-1 bg-surface text-subtle rounded-lg hover:bg-app border border-line">
+                {puanDuzenle ? <><XCircle className="h-3.5 w-3.5" />Kapat</> : <><Edit2 className="h-3.5 w-3.5" />Düzenle</>}
               </button>
             )}
           </div>
           {!puanDuzenle ? (
-            <div className="space-y-1 text-orange-700">
-              <div className="flex justify-between"><span>📝 Metin ekle</span><span className="font-bold">+{puanAyarlari.metin_ekleme} puan</span></div>
-              <div className="flex justify-between"><span>🗳️ Oylama katıl</span><span className="font-bold">+{puanAyarlari.oylama_katilim} puan</span></div>
-              <div className="flex justify-between"><span>🌟 Metin havuza girince</span><span className="font-bold">+{puanAyarlari.metin_havuza_girme} puan</span></div>
+            <div className="space-y-1 text-subtle">
+              <div className="flex justify-between"><span className="inline-flex items-center gap-1.5"><FileText className="h-3.5 w-3.5" />Metin ekle</span><span className="font-bold text-content tabular-nums">+{puanAyarlari.metin_ekleme} puan</span></div>
+              <div className="flex justify-between"><span className="inline-flex items-center gap-1.5"><Users className="h-3.5 w-3.5" />Oylama katıl</span><span className="font-bold text-content tabular-nums">+{puanAyarlari.oylama_katilim} puan</span></div>
+              <div className="flex justify-between"><span className="inline-flex items-center gap-1.5"><Star className="h-3.5 w-3.5" />Metin havuza girince</span><span className="font-bold text-content tabular-nums">+{puanAyarlari.metin_havuza_girme} puan</span></div>
             </div>
           ) : (
             <div className="space-y-3 mt-2">
               <div className="flex items-center justify-between gap-3">
-                <span className="text-orange-700">📝 Metin ekle</span>
+                <span className="inline-flex items-center gap-1.5 text-subtle"><FileText className="h-3.5 w-3.5" />Metin ekle</span>
                 <input type="number" min="0" value={puanAyarlari.metin_ekleme}
                   onChange={e => setPuanAyarlari({...puanAyarlari, metin_ekleme: parseInt(e.target.value) || 0})}
-                  className="w-20 border border-orange-300 rounded-lg p-1 text-center text-sm font-bold focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                  className="w-20 border border-line rounded-lg p-1 text-center text-sm font-bold tabular-nums focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
               <div className="flex items-center justify-between gap-3">
-                <span className="text-orange-700">🗳️ Oylama katıl</span>
+                <span className="inline-flex items-center gap-1.5 text-subtle"><Users className="h-3.5 w-3.5" />Oylama katıl</span>
                 <input type="number" min="0" value={puanAyarlari.oylama_katilim}
                   onChange={e => setPuanAyarlari({...puanAyarlari, oylama_katilim: parseInt(e.target.value) || 0})}
-                  className="w-20 border border-orange-300 rounded-lg p-1 text-center text-sm font-bold focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                  className="w-20 border border-line rounded-lg p-1 text-center text-sm font-bold tabular-nums focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
               <div className="flex items-center justify-between gap-3">
-                <span className="text-orange-700">🌟 Metin havuza girince</span>
+                <span className="inline-flex items-center gap-1.5 text-subtle"><Star className="h-3.5 w-3.5" />Metin havuza girince</span>
                 <input type="number" min="0" value={puanAyarlari.metin_havuza_girme}
                   onChange={e => setPuanAyarlari({...puanAyarlari, metin_havuza_girme: parseInt(e.target.value) || 0})}
-                  className="w-20 border border-orange-300 rounded-lg p-1 text-center text-sm font-bold focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                  className="w-20 border border-line rounded-lg p-1 text-center text-sm font-bold tabular-nums focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
-              <Button size="sm" className="w-full bg-orange-600 hover:bg-orange-700 text-white mt-2"
+              <Button size="sm" className="w-full bg-primary hover:bg-primary-hover text-white mt-2"
                 onClick={async () => {
                   try {
                     await axios.put(`${API}/ayarlar/puanlar`, puanAyarlari);
@@ -2314,7 +2314,7 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
                     setPuanDuzenle(false);
                   } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
                 }}>
-                💾 Kaydet
+                <Save className="h-4 w-4 mr-1" />Kaydet
               </Button>
             </div>
           )}
@@ -2324,12 +2324,12 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
       <Dialog open={!!redDialog} onOpenChange={() => { setRedDialog(null); setRedSebep(""); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>❌ Reddetme Sebebi</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><XCircle className="h-5 w-5 text-red-600" />Reddetme Sebebi</DialogTitle>
             <DialogDescription>Bu metni neden reddediyorsunuz?</DialogDescription>
           </DialogHeader>
           <textarea value={redSebep} onChange={e => setRedSebep(e.target.value)} rows={4}
             placeholder="Lütfen sebebinizi açıklayın..."
-            className="w-full border border-line rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none" />
+            className="w-full border border-line rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none" />
           <div className="flex gap-2">
             <Button variant="destructive" className="flex-1" disabled={!redSebep.trim()} onClick={() => oyVer(redDialog, false, redSebep)}>Reddet</Button>
             <Button variant="outline" className="flex-1" onClick={() => { setRedDialog(null); setRedSebep(""); }}>İptal</Button>
@@ -2408,16 +2408,16 @@ function MetinDuzenleEkrani({ metin, user, onGeri }) {
       {/* Üst bar */}
       <div className="flex items-center justify-between gap-3 sticky top-0 bg-app z-10 py-2">
         <div className="flex items-center gap-3 min-w-0">
-          <Button variant="outline" size="sm" onClick={onGeri}>← Geri</Button>
-          <h2 className="text-xl font-bold truncate">✏️ Metni Düzenle</h2>
+          <Button variant="outline" size="sm" onClick={onGeri}><ArrowLeft className="h-4 w-4 mr-1" />Geri</Button>
+          <h2 className="inline-flex items-center gap-2 text-xl font-bold truncate"><Edit2 className="h-5 w-5" />Metni Düzenle</h2>
         </div>
         <Button onClick={kaydet} disabled={kaydediyor} className="bg-green-600 hover:bg-green-700 text-white shrink-0">
-          {kaydediyor ? "Kaydediliyor…" : "💾 Kaydet"}
+          <Save className="h-4 w-4 mr-1" />{kaydediyor ? "Kaydediliyor…" : "Kaydet"}
         </Button>
       </div>
 
       {/* Temel bilgiler */}
-      <Card className="border-0 shadow-sm"><CardContent className="p-5 space-y-4">
+      <Card className="border border-line shadow-sm"><CardContent className="p-5 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2"><Label>Başlık</Label><Input value={baslik} onChange={e => setBaslik(e.target.value)} /></div>
           <div><Label>Tür</Label>
@@ -2453,9 +2453,9 @@ function MetinDuzenleEkrani({ metin, user, onGeri }) {
       </CardContent></Card>
 
       {/* Görsel */}
-      <Card className="border-0 shadow-sm"><CardContent className="p-5">
+      <Card className="border border-line shadow-sm"><CardContent className="p-5">
         <div className="flex items-center justify-between gap-2">
-          <div className="font-semibold text-content">🖼️ Metin Görseli</div>
+          <div className="inline-flex items-center gap-2 font-semibold text-content"><ImageIcon className="h-4 w-4" />Metin Görseli</div>
           <div>
             <input ref={fileRef} type="file" accept="image/jpeg,image/png" className="hidden" onChange={gorselYukle} />
             <Button type="button" size="sm" disabled={gorselYukleniyor} onClick={() => fileRef.current?.click()} className="bg-purple-600 hover:bg-purple-700 text-white">
@@ -2469,7 +2469,7 @@ function MetinDuzenleEkrani({ metin, user, onGeri }) {
       </CardContent></Card>
 
       {/* MCQ soruları */}
-      <Card className="border-0 shadow-sm"><CardContent className="p-5 space-y-3">
+      <Card className="border border-line shadow-sm"><CardContent className="p-5 space-y-3">
         <div className="flex items-center justify-between">
           <div className="font-semibold text-content">Çoktan Seçmeli Sorular ({sorular.length})</div>
           <Button size="sm" variant="outline" onClick={soruEkle}><Plus className="h-4 w-4 mr-1" />Soru Ekle</Button>
@@ -2498,7 +2498,7 @@ function MetinDuzenleEkrani({ metin, user, onGeri }) {
       </CardContent></Card>
 
       {/* Açık uçlu sorular */}
-      <Card className="border-0 shadow-sm"><CardContent className="p-5 space-y-3">
+      <Card className="border border-line shadow-sm"><CardContent className="p-5 space-y-3">
         <div className="flex items-center justify-between">
           <div className="font-semibold text-content">Açık Uçlu Sorular ({acikSorular.length})</div>
           <Button size="sm" variant="outline" onClick={acikEkle}><Plus className="h-4 w-4 mr-1" />Soru Ekle</Button>
@@ -2534,7 +2534,7 @@ function MetinDuzenleEkrani({ metin, user, onGeri }) {
 
       <div className="flex justify-end">
         <Button onClick={kaydet} disabled={kaydediyor} className="bg-green-600 hover:bg-green-700 text-white">
-          {kaydediyor ? "Kaydediliyor…" : "💾 Kaydet"}
+          <Save className="h-4 w-4 mr-1" />{kaydediyor ? "Kaydediliyor…" : "Kaydet"}
         </Button>
       </div>
     </div>
