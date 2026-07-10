@@ -157,6 +157,12 @@ async def faz3_ogrenci():
     say = await db.sinav_cevaplari.count_documents({"odevId": odev_id, "ogrenciId": "stud-1", "soruId": ilk["id"]})
     kontrol(say == 1, f"tekrar cevap tek kayıt (upsert) — bulunan {say}")
 
+    # öğretmen sonuç görünümü (konu bazlı kırılım)
+    sonuc = await sinav.sinav_odev_sonuc(odev_id=odev_id, current_user=MOCK_ADMIN)
+    kontrol(sonuc["genel"]["toplam"] >= 1, f"sonuç: genel toplam {sonuc['genel']['toplam']}")
+    kontrol(len(sonuc["ogrenciler"]) == 1, f"sonuç: 1 öğrenci ({len(sonuc['ogrenciler'])})")
+    kontrol(len(sonuc["konuBazli"]) >= 1, "sonuç: konu kırılımı var")
+
     await db.client.drop_database("oba_test_sinav_smoke")
 
 

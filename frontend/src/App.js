@@ -9823,6 +9823,7 @@ function GorevYonetimi({ user, students, teachers }) {
   const [sinavKriter, setSinavKriter] = useState({ ders: "", zorluk: "", soruSayisi: 10 });
   const [sinavSetHazir, setSinavSetHazir] = useState(null);
   const [sinavSetYukleniyor, setSinavSetYukleniyor] = useState(false);
+  const [sinavSonuc, setSinavSonuc] = useState(null); // öğretmen sonuç modalı
 
   const fetchAll = useCallback(async () => {
     try { const r = await axios.get(`${API}/gorevler`); setGorevler(r.data); } catch(e) {}
@@ -9915,6 +9916,11 @@ function GorevYonetimi({ user, students, teachers }) {
     } catch (e) {
       toast({ title: "Set oluşturulamadı", description: e?.response?.data?.detail || "", variant: "destructive" });
     } finally { setSinavSetYukleniyor(false); }
+  };
+  const sinavSonucGetir = async (odevId) => {
+    if (!odevId) { toast({ title: "Bu görevde sınav bulunamadı", variant: "destructive" }); return; }
+    try { const r = await axios.get(`${API}/sinav/odev/${odevId}/sonuc`); setSinavSonuc(r.data); }
+    catch (e) { toast({ title: "Sonuç alınamadı", description: e?.response?.data?.detail || "", variant: "destructive" }); }
   };
 
   const [ogretmenUsers, setOgretmenUsers] = useState([]);
@@ -10119,6 +10125,7 @@ function GorevYonetimi({ user, students, teachers }) {
             </div></div>
             <div className="flex items-center gap-2 shrink-0">
               {durumBadgeGorev(g.durum)}
+              {g.tur === "sinav_odevi" && (g.atayan_id === user.id || user.role === "admin") && (<Button size="sm" variant="outline" className="text-xs" onClick={() => sinavSonucGetir(g.icerik_id)}>📊 Sonuç</Button>)}
               {g.durum === "bekliyor" && g.hedef_id === user.id && (<Button size="sm" variant="outline" className="text-xs" onClick={() => durumGuncelle(g.id, "devam_ediyor")}>Başla</Button>)}
               {(g.durum === "bekliyor" || g.durum === "devam_ediyor") && g.hedef_id === user.id && (
                 <Button size="sm" className="bg-green-600 text-white text-xs" onClick={() => { setTamamlamaDialogu(g); setTamamlamaNotu(""); }}>Tamamla</Button>)}
@@ -10126,6 +10133,51 @@ function GorevYonetimi({ user, students, teachers }) {
             </div>
           </div></CardContent></Card>))}
       </div>)}
+
+      {sinavSonuc && (
+        <div className="fixed inset-0 z-[80] bg-black/40 flex items-center justify-center p-4" onClick={() => setSinavSonuc(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[88vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-3 border-b flex items-center justify-between sticky top-0 bg-white rounded-t-2xl">
+              <div className="font-bold text-gray-800">📊 {sinavSonuc.ad || "Sınav"} — Sonuçlar</div>
+              <button onClick={() => setSinavSonuc(null)} className="text-gray-400 hover:text-gray-700 text-xl leading-none">✕</button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-indigo-50 rounded-xl p-3"><div className="text-2xl font-bold text-indigo-600">{sinavSonuc.cozenSayisi}</div><div className="text-[11px] text-indigo-500">çözen öğrenci</div></div>
+                <div className="bg-green-50 rounded-xl p-3"><div className="text-2xl font-bold text-green-600">{sinavSonuc.genel?.dogru ?? 0}/{sinavSonuc.genel?.toplam ?? 0}</div><div className="text-[11px] text-green-600">doğru / cevap</div></div>
+                <div className="bg-gray-50 rounded-xl p-3"><div className="text-2xl font-bold text-gray-700">{sinavSonuc.soruSayisi}</div><div className="text-[11px] text-gray-500">soru</div></div>
+              </div>
+              {sinavSonuc.ogrenciler?.length > 0 && (
+                <div>
+                  <div className="text-xs font-semibold text-gray-500 mb-2">Öğrenci Bazlı</div>
+                  <div className="space-y-1">
+                    {sinavSonuc.ogrenciler.map((o) => (
+                      <div key={o.ogrenciId} className="flex items-center justify-between text-sm px-3 py-1.5 rounded-lg bg-gray-50"><span className="text-gray-700">{o.ad}</span><span className="font-semibold text-gray-800">{o.dogru}/{o.toplam}</span></div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {sinavSonuc.konuBazli?.length > 0 && (
+                <div>
+                  <div className="text-xs font-semibold text-gray-500 mb-2">Konu Bazlı Kırılım <span className="text-gray-400">(zayıf alan üstte)</span></div>
+                  <div className="space-y-1.5">
+                    {sinavSonuc.konuBazli.map((k) => {
+                      const yuzde = k.toplam ? Math.round((k.dogru / k.toplam) * 100) : 0;
+                      return (
+                        <div key={k.konu}>
+                          <div className="flex justify-between text-xs text-gray-600"><span>{k.konu}</span><span>{k.dogru}/{k.toplam} (%{yuzde})</span></div>
+                          <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden"><div className={`h-full ${yuzde < 50 ? "bg-red-400" : yuzde < 75 ? "bg-amber-400" : "bg-green-500"}`} style={{ width: `${yuzde}%` }} /></div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {(!sinavSonuc.ogrenciler || sinavSonuc.ogrenciler.length === 0) && <div className="text-sm text-gray-400 text-center py-4">Henüz çözen öğrenci yok.</div>}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

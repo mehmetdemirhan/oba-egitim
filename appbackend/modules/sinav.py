@@ -540,3 +540,56 @@ async def sinav_cevap_ver(data: dict, current_user=Depends(get_current_user)):
     )
     await db.sinav_sorulari.update_one({"id": soru_id}, {"$inc": {"kullanim_sayisi": 1}})
     return {"dogruMu": dogru_mu, "dogruCevap": dogru, "cozumTaktigi": soru.get("cozumTaktigi") or ""}
+
+
+# ── 8) ÖĞRETMEN: SONUÇ + KONU BAZLI KIRILIM ───────────────────────────────
+@router.get("/sinav/odev/{odev_id}/sonuc")
+async def sinav_odev_sonuc(odev_id: str, current_user=Depends(_OKUMA)):
+    """Ödev sonucu: öğrenci bazlı skor + konu bazlı kırılım (zayıf-alan tespiti)."""
+    odev = await db.sinav_odevleri.find_one({"id": odev_id}, {"_id": 0, "soruIds": 1, "ad": 1})
+    if not odev:
+        raise HTTPException(status_code=404, detail="Sınav ödevi bulunamadı.")
+    soru_ids = odev.get("soruIds") or []
+    sorular = await db.sinav_sorulari.find(
+        {"id": {"$in": soru_ids}}, {"_id": 0, "id": 1, "konu": 1, "ders": 1}
+    ).to_list(length=None)
+    konu_map = {s["id"]: (s.get("konu") or "Genel") for s in sorular}
+
+    cevaplar = await db.sinav_cevaplari.find({"odevId": odev_id}, {"_id": 0}).to_list(length=None)
+    ogr, konu = {}, {}
+    genel_d = genel_t = 0
+    for c in cevaplar:
+        oid = c.get("ogrenciId")
+        d = 1 if c.get("dogruMu") else 0
+        ogr.setdefault(oid, {"dogru": 0, "toplam": 0})
+        ogr[oid]["dogru"] += d
+        ogr[oid]["toplam"] += 1
+        k = konu_map.get(c.get("soruId"), "Genel")
+        konu.setdefault(k, {"dogru": 0, "toplam": 0})
+        konu[k]["dogru"] += d
+        konu[k]["toplam"] += 1
+        genel_d += d
+        genel_t += 1
+
+    oids = list(ogr.keys())
+    students = await db.students.find(
+        {"id": {"$in": oids}}, {"_id": 0, "id": 1, "ad": 1, "soyad": 1}
+    ).to_list(length=None)
+    ad_map = {s["id"]: f"{s.get('ad', '')} {s.get('soyad', '')}".strip() or "Öğrenci" for s in students}
+
+    ogrenciler = [
+        {"ogrenciId": oid, "ad": ad_map.get(oid, "Öğrenci"), "dogru": v["dogru"], "toplam": v["toplam"]}
+        for oid, v in sorted(ogr.items(), key=lambda kv: -kv[1]["dogru"])
+    ]
+    konu_bazli = [
+        {"konu": k, "dogru": v["dogru"], "toplam": v["toplam"]}
+        for k, v in sorted(konu.items(), key=lambda kv: (kv[1]["dogru"] / kv[1]["toplam"]) if kv[1]["toplam"] else 0)
+    ]
+    return {
+        "ad": odev.get("ad"),
+        "soruSayisi": len(soru_ids),
+        "cozenSayisi": len(oids),
+        "genel": {"dogru": genel_d, "toplam": genel_t},
+        "ogrenciler": ogrenciler,
+        "konuBazli": konu_bazli,
+    }
