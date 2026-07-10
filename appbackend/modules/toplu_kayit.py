@@ -194,8 +194,10 @@ async def toplu_kayit_yukle(dosya: UploadFile = File(...), sayfa: str = Form(Non
     # Boş olmayan satırları sakla (yeniden kolon-eşleme için ham liste de tutulur).
     ham_satirlar = [s for s in veri if any(str(c).strip() for c in s)]
     # Öğretmen varyant-birleştirme (tüm dosya üzerinden, bir kez).
+    from collections import Counter
     ham_ogr_adlar = [_hucre(s, kolon.get("ogretmen_ad")) for s in ham_satirlar]
-    kumele = KN.ogretmen_kumele(ham_ogr_adlar, ogretmenler)
+    agirlik = dict(Counter(a.strip() for a in ham_ogr_adlar if a and a.strip()))
+    kumele = KN.ogretmen_kumele(ham_ogr_adlar, ogretmenler, agirlik)
     satirlar = [_satir_isle(satir, kolon, kumele["harita"], i + 1) for i, satir in enumerate(ham_satirlar)]
 
     taslak = {
@@ -260,8 +262,10 @@ async def toplu_kayit_taslak_guncelle(taslak_id: str, data: dict, current_user=D
         kolon = {**t.get("kolon_esleme", {}), **{k: int(v) for k, v in data["kolon_esleme"].items() if v is not None}}
         ogretmenler = await _ogretmen_listesi()
         ham_satirlar = t.get("ham_satirlar", [])
+        from collections import Counter
         ham_ogr = [_hucre(s, kolon.get("ogretmen_ad")) for s in ham_satirlar]
-        kumele = KN.ogretmen_kumele(ham_ogr, ogretmenler)
+        agirlik = dict(Counter(a.strip() for a in ham_ogr if a and a.strip()))
+        kumele = KN.ogretmen_kumele(ham_ogr, ogretmenler, agirlik)
         guncelle["satirlar"] = [_satir_isle(satir, kolon, kumele["harita"], i + 1) for i, satir in enumerate(ham_satirlar)]
         guncelle["ogretmen_kumeleri"] = kumele["kumeler"]
         guncelle["ozet"] = _ozet(guncelle["satirlar"])

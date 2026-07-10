@@ -97,18 +97,25 @@ def _fold_tokenset(ad: str) -> frozenset:
 
 
 def _lev(a: str, b: str) -> int:
-    """Basit Levenshtein (küçük stringler için); >1 gerekmediğinden 2 ile kısa devre."""
+    """Damerau-Levenshtein (bitişik harf yer değiştirmesi = 1). Küçük stringler için.
+    'yildiirm'↔'yildirim' gibi transpozisyonlar 1 sayılır."""
     if a == b:
         return 0
     if abs(len(a) - len(b)) > 1:
         return 2
-    onceki = list(range(len(b) + 1))
-    for i, ca in enumerate(a, 1):
-        simdi = [i]
-        for j, cb in enumerate(b, 1):
-            simdi.append(min(onceki[j] + 1, simdi[j - 1] + 1, onceki[j - 1] + (ca != cb)))
-        onceki = simdi
-    return onceki[-1]
+    la, lb = len(a), len(b)
+    d = [[0] * (lb + 1) for _ in range(la + 1)]
+    for i in range(la + 1):
+        d[i][0] = i
+    for j in range(lb + 1):
+        d[0][j] = j
+    for i in range(1, la + 1):
+        for j in range(1, lb + 1):
+            maliyet = 0 if a[i - 1] == b[j - 1] else 1
+            d[i][j] = min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + maliyet)
+            if i > 1 and j > 1 and a[i - 1] == b[j - 2] and a[i - 2] == b[j - 1]:
+                d[i][j] = min(d[i][j], d[i - 2][j - 2] + 1)
+    return d[la][lb]
 
 
 def _tokens_yakin(ta: frozenset, tb: frozenset) -> bool:
@@ -124,21 +131,27 @@ def _tokens_yakin(ta: frozenset, tb: frozenset) -> bool:
     return True
 
 
-def _kanonik_sec(uyeler: list[str]) -> str:
-    """Birleşen gruptan en eksiksiz (en çok kelime, sonra en uzun) yazımı kanonik yapar."""
-    en = max(uyeler, key=lambda a: (len(_fold_tokenset(a)), len(_unvan_sil(a))))
+def _kanonik_sec(uyeler: list[str], agirlik: dict | None = None) -> str:
+    """Kanonik yazım: en eksiksiz (en çok kelime), sonra en sık yazılan (baskın/doğru
+    yazım), sonra en uzun. agirlik verilmezse hepsi 1 sayılır."""
+    ag = agirlik or {}
+    en = max(uyeler, key=lambda a: (len(_fold_tokenset(a)), ag.get(a.strip(), 1), len(_unvan_sil(a))))
     return normalize_ad(_unvan_sil(en))
 
 
-def ogretmen_kumele(ham_adlar: list[str], mevcut_ogretmenler: list[dict] | None = None) -> dict:
+def ogretmen_kumele(ham_adlar: list[str], mevcut_ogretmenler: list[dict] | None = None,
+                    agirlik: dict | None = None) -> dict:
     """Ham öğretmen adı varyantlarını otomatik birleştirir (bariz aynı olanlar), gerçekten
     belirsiz olanları işaretler. Kurallar: (1) normalize aynı → birleş; (2) alt-küme tek
     süperkümeyle → birleş, çok süperküme → belirsiz; (3) diakritik eşitleme + kelime-başı
-    Levenshtein≤1 → ÖNERİ (otomatik değil). Mevcut öğretmenlerle de aynı kural.
+    Damerau≤1 komşu → ÖNERİ; ANCAK komşu TEK ise ve baskınsa (o yazım ≥3× daha sık, `agirlik`)
+    yazım-hatası olarak OTOMATİK birleşir (nadir typo → yaygın doğru yazım). Yakın-sayımlı
+    gerçek farklı kişiler birleşmez. Mevcut öğretmenlerle de aynı kural.
 
-    Dönüş: {harita: {ham_ad → {kanonik, mevcut_id, belirsiz, oneriler, kume_id}},
-            kumeler: [{kume_id, kanonik, uyeler, mevcut_id, belirsiz, oneriler}]}"""
+    agirlik: {kırpılmış_ham_ad → satır sayısı} (baskınlık + kanonik seçimi için).
+    Dönüş: {harita: {ham_ad → {...}}, kumeler: [{...}]}"""
     mevcut_ogretmenler = mevcut_ogretmenler or []
+    agirlik = agirlik or {}
     # Orijinal (kırpılmamış) adları koru → harita hem orijinal hem kırpılmış anahtarla erişilir.
     strip_map: dict = {}
     for a in dict.fromkeys(ham_adlar):
@@ -175,7 +188,27 @@ def ogretmen_kumele(ham_adlar: list[str], mevcut_ogretmenler: list[dict] | None 
         if len(maksimal) == 1:
             birlestir(i, maksimal[0])
         else:
-            belirsiz_secenek[i] = [_kanonik_sec(dugum_uye[j]) for j in maksimal]
+            belirsiz_secenek[i] = [_kanonik_sec(dugum_uye[j], agirlik) for j in maksimal]
+
+    # (3b) Baskınlık-tabanlı yazım-hatası birleştirme: nadir bir kümenin TEK Damerau≤1
+    # komşusu varsa ve o komşu ≥3× daha sık yazılıyorsa (baskın doğru yazım) → birleş.
+    # Yakın-sayımlı gerçek farklı kişiler (dominance sağlanmaz) birleşmez.
+    def _kok_uyeleri(r):
+        return [u for i in range(n) if bul(i) == r for u in dugum_uye[i]]
+    def _kok_tok(r):
+        return max((dugum_tok[i] for i in range(n) if bul(i) == r), key=len)
+    def _kok_agir(r):
+        return sum(agirlik.get(u, 1) for u in _kok_uyeleri(r))
+    for r0 in sorted({bul(i) for i in range(n)}, key=lambda r: _kok_agir(r)):
+        r = bul(r0)
+        if r != r0:
+            continue
+        tr = _kok_tok(r)
+        komsu = {bul(o) for o in {bul(i) for i in range(n)} if bul(o) != r and _tokens_yakin(tr, _kok_tok(bul(o)))}
+        if len(komsu) == 1:
+            b = next(iter(komsu))
+            if _kok_agir(b) >= 3 * _kok_agir(r):
+                birlestir(r, b)
 
     # Kümeleri topla
     kok_uyeler: dict = {}
@@ -193,7 +226,7 @@ def ogretmen_kumele(ham_adlar: list[str], mevcut_ogretmenler: list[dict] | None 
     kumeler = []
     harita: dict = {}
     for ki, (r, uyeler) in enumerate(kok_uyeler.items()):
-        kanonik = _kanonik_sec(uyeler)
+        kanonik = _kanonik_sec(uyeler, agirlik)
         ktok = _fold_tokenset(kanonik)
         # Mevcut öğretmenle eşleşme (aynı / alt-küme / üst-küme)
         esles = [m for m in mev if m["tok"] and (m["tok"] == ktok or ktok <= m["tok"] or m["tok"] <= ktok)]
