@@ -27,6 +27,7 @@ export default function TopluKayit({ apiBase }) {
   const [ucret, setUcret] = useState("");
   const [rapor, setRapor] = useState(null);
   const [mesgul, setMesgul] = useState(false);
+  const [dosya, setDosya] = useState(null);
 
   const taslakYukle = useCallback(async (id) => {
     const r = await axios.get(`${apiBase}/toplu-kayit/taslak/${id}`);
@@ -35,13 +36,12 @@ export default function TopluKayit({ apiBase }) {
     setUcret(r.data.varsayilan_ucret ?? "");
   }, [apiBase]);
 
-  const dosyaSec = async (e) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
+  const yukle = useCallback(async (f, sayfa) => {
     setMesgul(true);
     try {
       const fd = new FormData();
       fd.append("dosya", f);
+      if (sayfa) fd.append("sayfa", sayfa);
       const r = await axios.post(`${apiBase}/toplu-kayit/yukle`, fd, { headers: { "Content-Type": "multipart/form-data" } });
       setTaslakId(r.data.taslak_id);
       await taslakYukle(r.data.taslak_id);
@@ -51,8 +51,15 @@ export default function TopluKayit({ apiBase }) {
       toast({ title: "Yüklenemedi", description: err?.response?.data?.detail || "", variant: "destructive" });
     } finally {
       setMesgul(false);
-      e.target.value = "";
     }
+  }, [apiBase, taslakYukle, toast]);
+
+  const dosyaSec = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setDosya(f);
+    yukle(f, null);
+    e.target.value = "";
   };
 
   // Tek satır güncelle (öğretmen seçimi / elle düzeltme) → PUT
@@ -152,7 +159,17 @@ export default function TopluKayit({ apiBase }) {
             return <span key={k} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium ${m.renk}`}><m.Ikon className="h-3.5 w-3.5" />{m.ad}: {ozet[k] ?? 0}</span>;
           })}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {(taslak?.sayfalar?.length > 1) && (
+            <>
+              <label className="text-xs text-subtle">Sayfa</label>
+              <select value={taslak.secili_sayfa || ""} disabled={mesgul}
+                onChange={(e) => dosya && yukle(dosya, e.target.value)}
+                className="border border-line rounded-lg px-2 py-1 text-sm max-w-[160px]">
+                {taslak.sayfalar.map((sn) => <option key={sn} value={sn}>{sn.trim() || sn}</option>)}
+              </select>
+            </>
+          )}
           <label className="text-xs text-subtle">Varsayılan kur ücreti (₺)</label>
           <input type="number" min="0" value={ucret} onChange={(e) => setUcret(e.target.value)} onBlur={ucretKaydet}
             className="w-28 border border-line rounded-lg px-2 py-1 text-sm tabular-nums" placeholder="örn. 2500" />
