@@ -47,21 +47,37 @@ _VARSAYILAN_KOLON = {
 _BASLIK_IPUCU = ["telefon", "öğretmen", "ogretmen", "öğrenci", "ogrenci", "sınıf", "sinif", "kur", "veli", "tarih", "not"]
 
 
-def _parse_dosya(icerik: bytes, dosya_adi: str) -> list[list]:
-    """xlsx/csv → satır listesi (her satır hücre listesi). İlk sayfa kullanılır."""
+def _hucre_str(c) -> str:
+    """Hücre → temiz string. Excel tam-sayı float'ı ('5052627395.0'→'5052627395',
+    '2.0'→'2') ve datetime ('2024-09-16 17:02:10') düzgün işlenir."""
+    if c is None:
+        return ""
+    if isinstance(c, bool):
+        return str(c)
+    if isinstance(c, float) and c.is_integer():
+        return str(int(c))
+    if isinstance(c, datetime):
+        return c.isoformat(sep=" ")
+    return str(c).strip()
+
+
+def _parse_dosya(icerik: bytes, dosya_adi: str, sayfa: str | None = None) -> tuple[list[list], list[str]]:
+    """xlsx/csv → (satırlar, sayfa_adlari). xlsx'te `sayfa` verilirse o sayfa, yoksa ilk."""
     ad = (dosya_adi or "").lower()
     if ad.endswith(".xlsx") or ad.endswith(".xlsm"):
         import openpyxl
         wb = openpyxl.load_workbook(io.BytesIO(icerik), read_only=True, data_only=True)
-        ws = wb[wb.sheetnames[0]]
-        satirlar = [[("" if c is None else str(c).strip()) for c in row] for row in ws.iter_rows(values_only=True)]
+        sayfalar = list(wb.sheetnames)
+        sn = sayfa if (sayfa and sayfa in sayfalar) else sayfalar[0]
+        ws = wb[sn]
+        satirlar = [[_hucre_str(c) for c in row] for row in ws.iter_rows(values_only=True)]
         wb.close()
-        return satirlar
+        return satirlar, sayfalar
     if ad.endswith(".csv"):
         metin = icerik.decode("utf-8-sig", errors="replace")
         ornek = metin[:2000]
         ayirici = ";" if ornek.count(";") > ornek.count(",") else ","
-        return [[str(c).strip() for c in row] for row in csv.reader(io.StringIO(metin), delimiter=ayirici)]
+        return [[str(c).strip() for c in row] for row in csv.reader(io.StringIO(metin), delimiter=ayirici)], []
     raise HTTPException(status_code=400, detail="Yalnızca .xlsx veya .csv dosyaları desteklenir")
 
 
@@ -142,12 +158,14 @@ def _ozet(satirlar: list[dict]) -> dict:
 
 
 @router.post("/toplu-kayit/yukle")
-async def toplu_kayit_yukle(dosya: UploadFile = File(...), current_user=Depends(_YAZMA)):
-    """xlsx/csv yükler → parse + normalize → TASLAK oluşturur. DB'ye kullanıcı YAZMAZ."""
+async def toplu_kayit_yukle(dosya: UploadFile = File(...), sayfa: str = Form(None),
+                            current_user=Depends(_YAZMA)):
+    """xlsx/csv yükler → parse + normalize → TASLAK oluşturur. DB'ye kullanıcı YAZMAZ.
+    Çok sayfalı xlsx'te `sayfa` verilebilir (yoksa ilk sayfa)."""
     icerik = await dosya.read()
     if len(icerik) > MAX_DOSYA_BYTE:
         raise HTTPException(status_code=400, detail="Dosya en fazla 8 MB olabilir")
-    satirlar_ham = _parse_dosya(icerik, dosya.filename or "")
+    satirlar_ham, sayfalar = _parse_dosya(icerik, dosya.filename or "", sayfa)
     if not satirlar_ham:
         raise HTTPException(status_code=400, detail="Dosya boş veya okunamadı")
 
@@ -166,6 +184,8 @@ async def toplu_kayit_yukle(dosya: UploadFile = File(...), current_user=Depends(
         "dosya_adi": dosya.filename or "",
         "kolon_esleme": kolon,
         "baslik_atlandi": baslik_atla,
+        "sayfalar": sayfalar,
+        "secili_sayfa": (sayfa if (sayfa and sayfa in sayfalar) else (sayfalar[0] if sayfalar else None)),
         "ham_satirlar": ham_satirlar,
         "varsayilan_ucret": None,
         "sinif_ucret": {},       # {"3": 2500, ...} opsiyonel
@@ -179,6 +199,7 @@ async def toplu_kayit_yukle(dosya: UploadFile = File(...), current_user=Depends(
     taslak.pop("_id", None)
     return {"taslak_id": taslak["id"], "ozet": taslak["ozet"], "kolon_esleme": kolon,
             "baslik_atlandi": baslik_atla, "satir_sayisi": len(satirlar),
+            "sayfalar": sayfalar, "secili_sayfa": taslak["secili_sayfa"],
             "ogretmenler": [{"id": t["id"], "ad": f"{t.get('ad','')} {t.get('soyad','')}".strip()} for t in ogretmenler]}
 
 

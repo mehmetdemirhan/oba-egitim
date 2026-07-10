@@ -140,8 +140,10 @@ def normalize_telefon(s: str) -> dict:
     ham = str(s or "").strip()
     if not ham:
         return {"e164": None, "gecerli": False, "ham": ham}
-    uluslararasi = ham.lstrip().startswith("+")
-    rakam = re.sub(r"\D", "", ham)
+    # Excel sayısal telefon hücresi "5052627395.0" gibi gelebilir → sondaki .0 kaldır.
+    ham_tmp = re.sub(r"\.0+$", "", ham)
+    uluslararasi = ham_tmp.lstrip().startswith("+")
+    rakam = re.sub(r"\D", "", ham_tmp)
     if not rakam:
         return {"e164": None, "gecerli": False, "ham": ham}
     if uluslararasi:
@@ -166,6 +168,14 @@ def normalize_tarih(s: str) -> str | None:
     if not s:
         return None
     metin = str(s).strip()
+    # ISO / datetime biçimi (Excel tarih hücresi "2024-09-16 17:02:10") — önce onu dene.
+    iso = re.match(r"(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})", metin)
+    if iso:
+        try:
+            return datetime(int(iso.group(1)), int(iso.group(2)), int(iso.group(3)),
+                            int(iso.group(4)), int(iso.group(5))).isoformat()
+        except ValueError:
+            return None
     m = re.search(r"(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{2,4})", metin)
     if not m:
         return None
