@@ -26,6 +26,7 @@ import BildirimIzni from "./components/BildirimIzni";
 import { BildirimTercihleri } from "./components/BildirimTercihleri";
 import MebKelimeYonetimi from "./components/admin/MebKelimeYonetimi";
 import MuhasebePaneli from "./components/MuhasebePaneli";
+import OdemeTablosu from "./components/OdemeTablosu";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
 import InstagramAyarlari from "./components/admin/InstagramAyarlari";
 import ExerciseStarter from "./components/ExerciseStarter";
@@ -287,6 +288,7 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [teachers, setTeachers] = useState([]);
   const [students, setStudents] = useState([]);
+  const [muhasebeKisiler, setMuhasebeKisiler] = useState({ ogrenciler: [], ogretmenler: [] });
   const [courses, setCourses] = useState([]);
   const [payments, setPayments] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
@@ -326,6 +328,7 @@ function AppContent() {
     try { const r = await axios.get(`${API}/students`); setStudents(Array.isArray(r.data) ? r.data : []); } catch(e) {}
     try { const r = await axios.get(`${API}/courses`); setCourses(Array.isArray(r.data) ? r.data : []); } catch(e) {}
     try { const r = await axios.get(`${API}/payments`); setPayments(Array.isArray(r.data) ? r.data : []); } catch(e) {}
+    try { const r = await axios.get(`${API}/muhasebe/kisiler`); setMuhasebeKisiler(r.data || { ogrenciler: [], ogretmenler: [] }); } catch(e) {}
     try { const r = await axios.get(`${API}/risk-skor/toplu`); setOgrenciRiskler(Array.isArray(r.data) ? r.data : []); } catch(e) { setOgrenciRiskler([]); }
   }, []);
 
@@ -398,7 +401,10 @@ function AppContent() {
   const fetchCourses = async () => { try { const r = await axios.get(`${API}/courses`); setCourses(r.data); } catch(e) {} };
   const fetchKursDersleri = async (kursId) => { try { const r = await axios.get(`${API}/courses/${kursId}/dersler`); setKursDersleri(prev => ({...prev, [kursId]: r.data})); } catch(e) {} };
   const fetchPayments = async () => { try { const r = await axios.get(`${API}/payments`); setPayments(r.data); } catch(e) {} };
+  const fetchMuhasebeKisiler = async () => { try { const r = await axios.get(`${API}/muhasebe/kisiler`); setMuhasebeKisiler(r.data || { ogrenciler: [], ogretmenler: [] }); } catch(e) {} };
   const fetchDashboard = async () => { try { const r = await axios.get(`${API}/dashboard`); setDashboardStats(r.data); } catch(e) {} };
+  // OdemeTablosu satır içi düzenlemesi sonrası muhasebe verilerini + KPI kaynaklarını tazele.
+  const muhasebeYenile = () => { fetchMuhasebeKisiler(); fetchPayments(); fetchStudents(); fetchTeachers(); fetchDashboard(); };
   const fetchTeacherStudents = async (id) => { try { const r = await axios.get(`${API}/teachers/${id}/students`); setTeacherStudents(p => ({...p, [id]: r.data})); } catch(e) {} };
 
   const toggleTeacherExpansion = (id) => {
@@ -1157,169 +1163,17 @@ function AppContent() {
               </Card>
             </div>
 
-            {/* İki Sütunlu Tablo */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* SOL: Alacaklar (Öğrenci Tahsilatları) */}
-              <Card className="border border-line shadow-sm border-t-4" style={{borderTopColor: '#27ae60'}}>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center justify-between">
-                    <span className="text-green-700">📥 Alacaklar (Öğrenci Ödemeleri)</span>
-                    <button onClick={() => setPaymentForm({...paymentForm, _alacakFormAcik: !paymentForm._alacakFormAcik})}
-                      className="text-xs px-3 py-1 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 border border-green-200">
-                      {paymentForm._alacakFormAcik ? '✕ Kapat' : '+ Tahsilat Ekle'}
-                    </button>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {/* Tahsilat Ekleme Formu */}
-                  {paymentForm._alacakFormAcik && (
-                    <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4 space-y-3">
-                      <div className="text-sm font-semibold text-green-800">Öğrenci Tahsilatı Kaydet</div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <Label className="text-xs">Öğrenci</Label>
-                          <Select value={paymentForm.kisi_id} onValueChange={v => setPaymentForm({...paymentForm, kisi_id:v, tip:'ogrenci'})}>
-                            <SelectTrigger className="h-9"><SelectValue placeholder="Seçin" /></SelectTrigger>
-                            <SelectContent position="popper">{students.map(s => <SelectItem key={s.id} value={s.id}>{s.ad} {s.soyad}</SelectItem>)}</SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label className="text-xs">Miktar (₺)</Label>
-                          <Input type="number" step="0.01" className="h-9" value={paymentForm.miktar} onChange={e => setPaymentForm({...paymentForm, miktar:parseFloat(e.target.value)||0})} />
-                        </div>
-                      </div>
-                      <div>
-                        <Label className="text-xs">Açıklama</Label>
-                        <Input className="h-9" value={paymentForm.aciklama} onChange={e => setPaymentForm({...paymentForm, aciklama:e.target.value})} placeholder="Ör: Mart ayı ödemesi" />
-                      </div>
-                      <Button size="sm" className="w-full bg-green-600 hover:bg-green-700 text-white" disabled={!paymentForm.kisi_id || !paymentForm.miktar}
-                        onClick={async () => {
-                          try {
-                            await axios.post(`${API}/payments`, {tip:'ogrenci', kisi_id:paymentForm.kisi_id, miktar:paymentForm.miktar, aciklama:paymentForm.aciklama});
-                            setPaymentForm({tip:'ogrenci',kisi_id:'',miktar:0,aciklama:'',_alacakFormAcik:false,_odemeFormAcik:false});
-                            fetchPayments(); fetchStudents(); fetchDashboard();
-                            toast({title:"✅ Tahsilat kaydedildi"});
-                          } catch(e) { toast({title:"Hata", variant:"destructive"}); }
-                        }}>
-                        💰 Tahsilatı Kaydet
-                      </Button>
-                    </div>
-                  )}
-                  <div className="max-h-96 overflow-y-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-xs">Tarih</TableHead>
-                          <TableHead className="text-xs">Öğrenci</TableHead>
-                          <TableHead className="text-xs text-right">Miktar</TableHead>
-                          <TableHead className="text-xs">Açıklama</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {payments.filter(p => p.tip === 'ogrenci').length === 0 && (
-                          <TableRow><TableCell colSpan={4} className="text-center text-subtle py-8">Henüz alacak kaydı yok</TableCell></TableRow>
-                        )}
-                        {payments.filter(p => p.tip === 'ogrenci').map(p => {
-                          const person = students.find(s => s.id === p.kisi_id);
-                          return (
-                            <TableRow key={p.id}>
-                              <TableCell className="text-xs text-subtle">{formatDate(p.tarih)}</TableCell>
-                              <TableCell className="text-sm font-medium">{person ? `${person.ad} ${person.soyad}` : '-'}</TableCell>
-                              <TableCell className="text-sm font-bold text-green-600 text-right">{formatCurrency(p.miktar)}</TableCell>
-                              <TableCell className="text-xs text-subtle">{p.aciklama || '-'}</TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                  <div className="border-t-2 border-green-200 mt-3 pt-3 flex justify-between items-center">
-                    <span className="text-sm font-semibold text-green-700">Toplam Alacak:</span>
-                    <span className="text-lg font-bold text-green-700">{formatCurrency(payments.filter(p => p.tip === 'ogrenci').reduce((s, p) => s + (p.miktar || 0), 0))}</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* SAĞ: Ödenecekler (Öğretmen Ödemeleri) */}
-              <Card className="border border-line shadow-sm border-t-4" style={{borderTopColor: '#e74c3c'}}>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center justify-between">
-                    <span className="text-red-700">📤 Ödemeler (Öğretmen Ücretleri)</span>
-                    <button onClick={() => setPaymentForm({...paymentForm, _odemeFormAcik: !paymentForm._odemeFormAcik})}
-                      className="text-xs px-3 py-1 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 border border-red-200">
-                      {paymentForm._odemeFormAcik ? '✕ Kapat' : '+ Ödeme Ekle'}
-                    </button>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {/* Ödeme Ekleme Formu */}
-                  {paymentForm._odemeFormAcik && (
-                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4 space-y-3">
-                      <div className="text-sm font-semibold text-red-800">Öğretmen Ödemesi Kaydet</div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <Label className="text-xs">Öğretmen</Label>
-                          <Select value={paymentForm.kisi_id} onValueChange={v => setPaymentForm({...paymentForm, kisi_id:v, tip:'ogretmen'})}>
-                            <SelectTrigger className="h-9"><SelectValue placeholder="Seçin" /></SelectTrigger>
-                            <SelectContent position="popper">{teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.ad} {t.soyad}</SelectItem>)}</SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label className="text-xs">Miktar (₺)</Label>
-                          <Input type="number" step="0.01" className="h-9" value={paymentForm.miktar} onChange={e => setPaymentForm({...paymentForm, miktar:parseFloat(e.target.value)||0})} />
-                        </div>
-                      </div>
-                      <div>
-                        <Label className="text-xs">Açıklama</Label>
-                        <Input className="h-9" value={paymentForm.aciklama} onChange={e => setPaymentForm({...paymentForm, aciklama:e.target.value})} placeholder="Ör: Mart ayı öğretmen ücreti" />
-                      </div>
-                      <Button size="sm" className="w-full bg-red-600 hover:bg-red-700 text-white" disabled={!paymentForm.kisi_id || !paymentForm.miktar}
-                        onClick={async () => {
-                          try {
-                            await axios.post(`${API}/payments`, {tip:'ogretmen', kisi_id:paymentForm.kisi_id, miktar:paymentForm.miktar, aciklama:paymentForm.aciklama});
-                            setPaymentForm({tip:'ogrenci',kisi_id:'',miktar:0,aciklama:'',_alacakFormAcik:false,_odemeFormAcik:false});
-                            fetchPayments(); fetchTeachers(); fetchDashboard();
-                            toast({title:"✅ Ödeme kaydedildi"});
-                          } catch(e) { toast({title:"Hata", variant:"destructive"}); }
-                        }}>
-                        💳 Ödemeyi Kaydet
-                      </Button>
-                    </div>
-                  )}
-                  <div className="max-h-96 overflow-y-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-xs">Tarih</TableHead>
-                          <TableHead className="text-xs">Öğretmen</TableHead>
-                          <TableHead className="text-xs text-right">Miktar</TableHead>
-                          <TableHead className="text-xs">Açıklama</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {payments.filter(p => p.tip === 'ogretmen').length === 0 && (
-                          <TableRow><TableCell colSpan={4} className="text-center text-subtle py-8">Henüz ödeme kaydı yok</TableCell></TableRow>
-                        )}
-                        {payments.filter(p => p.tip === 'ogretmen').map(p => {
-                          const person = teachers.find(t => t.id === p.kisi_id);
-                          return (
-                            <TableRow key={p.id}>
-                              <TableCell className="text-xs text-subtle">{formatDate(p.tarih)}</TableCell>
-                              <TableCell className="text-sm font-medium">{person ? `${person.ad} ${person.soyad}` : '-'}</TableCell>
-                              <TableCell className="text-sm font-bold text-red-600 text-right">{formatCurrency(p.miktar)}</TableCell>
-                              <TableCell className="text-xs text-subtle">{p.aciklama || '-'}</TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                  <div className="border-t-2 border-red-200 mt-3 pt-3 flex justify-between items-center">
-                    <span className="text-sm font-semibold text-red-700">Toplam Ödenen:</span>
-                    <span className="text-lg font-bold text-red-700">{formatCurrency(payments.filter(p => p.tip === 'ogretmen').reduce((s, p) => s + (p.miktar || 0), 0))}</span>
-                  </div>
-                </CardContent>
-              </Card>
+            {/* Öğrenci & Öğretmen ödeme tabloları — MuhasebePaneli ile PAYLAŞILAN
+                Excel-benzeri satır içi düzenlenebilir bileşen (OdemeTablosu). */}
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-base font-semibold text-content mb-2">Öğrenci Ödemeleri</h3>
+                <OdemeTablosu tip="ogrenci" kisiler={muhasebeKisiler.ogrenciler} payments={payments} apiBase={API} onDegisim={muhasebeYenile} />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-content mb-2">Öğretmen Ödemeleri</h3>
+                <OdemeTablosu tip="ogretmen" kisiler={muhasebeKisiler.ogretmenler} payments={payments} apiBase={API} onDegisim={muhasebeYenile} />
+              </div>
             </div>
 
             {/* Aylık Özet Tablosu */}
