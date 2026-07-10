@@ -17,6 +17,7 @@ Koleksiyonlar:
 + icerik_id ile bağlanır (task 4).
 """
 import base64
+import random
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -356,3 +357,116 @@ async def sinav_istatistik(current_user=Depends(_OKUMA)):
     toplam_taslak = sum(v.get("taslak", 0) for v in ozet.values())
     toplam_yayinda = sum(v.get("yayinda", 0) for v in ozet.values())
     return {"ders_bazli": ozet, "toplam_taslak": toplam_taslak, "toplam_yayinda": toplam_yayinda}
+
+
+# ── 6) ÖĞRETMEN: YAYINDAKİ SORULAR + OTOMATİK SEÇİM + ÖDEV TANIMI ──────────
+@router.get("/sinav/yayinda")
+async def sinav_yayinda(
+    ders: Optional[str] = Query(None),
+    konu: Optional[str] = Query(None),
+    zorluk: Optional[str] = Query(None),
+    sinavTuru: Optional[str] = Query(None),
+    sayfa: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=200),
+    current_user=Depends(_OKUMA),
+):
+    """Öğretmen: yayındaki soruları filtreli listeler (elle ödev seçimi için)."""
+    q = {"durum": "yayinda"}
+    if ders:
+        q["ders"] = ders
+    if konu:
+        q["konu"] = konu
+    if zorluk:
+        q["zorluk"] = zorluk
+    if sinavTuru:
+        q["sinavTuru"] = sinavTuru
+    toplam = await db.sinav_sorulari.count_documents(q)
+    docs = await (
+        db.sinav_sorulari.find(q, _HAFIF_PROJ)
+        .sort([("ders", 1), ("soruNo", 1)])
+        .skip((sayfa - 1) * limit)
+        .limit(limit)
+        .to_list(length=limit)
+    )
+    for d in docs:
+        d["gorselVar"] = True
+    return {"sorular": docs, "toplam": toplam, "sayfa": sayfa, "limit": limit,
+            "sayfa_sayisi": -(-toplam // limit)}
+
+
+async def _otomatik_soru_sec(ders: str, soruSayisi: int, konu: Optional[str] = None,
+                             zorluk: Optional[str] = None) -> list:
+    """Kritere uyan yayındaki sorulardan rastgele soruSayisi kadar id seçer."""
+    q = {"durum": "yayinda", "ders": ders}
+    if konu:
+        q["konu"] = konu
+    if zorluk:
+        q["zorluk"] = zorluk
+    havuz = await db.sinav_sorulari.find(q, {"id": 1, "_id": 0}).to_list(length=None)
+    idler = [d["id"] for d in havuz]
+    random.shuffle(idler)
+    return idler[:max(0, soruSayisi)]
+
+
+@router.post("/sinav/otomatik-sec")
+async def sinav_otomatik_sec(data: dict, current_user=Depends(_OKUMA)):
+    """Kriter → dengeli/rastgele soru id listesi (önizleme; ödev oluşturmaz)."""
+    ders = data.get("ders")
+    if ders not in AKTIF_DERSLER:
+        raise HTTPException(status_code=400, detail="Geçerli bir ders seçin.")
+    sayi = int(data.get("soruSayisi", 10))
+    idler = await _otomatik_soru_sec(ders, sayi, data.get("konu"), data.get("zorluk"))
+    return {"soruIds": idler, "bulunan": len(idler), "istenen": sayi}
+
+
+@router.post("/sinav/odev")
+async def sinav_odev_olustur(data: dict, current_user=Depends(_OKUMA)):
+    """Sınav ödevi tanımı oluşturur (soru seti). Görevler'e icerik_id ile bağlanır.
+
+    Body: {ad?, soruIds?[], otomatikKriter?{ders,konu?,zorluk?,soruSayisi}}
+    Dönüş: {odev_id, ad, soruSayisi}
+    """
+    soru_ids = data.get("soruIds") or []
+    kriter = data.get("otomatikKriter") or None
+
+    if not soru_ids and kriter:
+        ders = kriter.get("ders")
+        if ders not in AKTIF_DERSLER:
+            raise HTTPException(status_code=400, detail="Otomatik kriterde geçerli ders yok.")
+        soru_ids = await _otomatik_soru_sec(
+            ders, int(kriter.get("soruSayisi", 10)), kriter.get("konu"), kriter.get("zorluk")
+        )
+
+    if not soru_ids:
+        raise HTTPException(status_code=400, detail="Soru seçilmedi.")
+    # yalnızca yayındaki soruları kabul et (sıra korunur)
+    gecerli = await db.sinav_sorulari.find(
+        {"id": {"$in": soru_ids}, "durum": "yayinda"}, {"id": 1, "_id": 0}
+    ).to_list(length=None)
+    gecerli_set = {d["id"] for d in gecerli}
+    temiz = [sid for sid in soru_ids if sid in gecerli_set]
+    if not temiz:
+        raise HTTPException(status_code=400, detail="Seçilen sorular yayında değil.")
+
+    odev_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+    await db.sinav_odevleri.insert_one({
+        "id": odev_id,
+        "ad": (data.get("ad") or "Sınav Ödevi").strip(),
+        "soruIds": temiz,
+        "otomatikKriter": kriter,
+        "soruSayisi": len(temiz),
+        "olusturan_id": current_user.get("id"),
+        "olusturan_ad": _ad(current_user),
+        "olusturma_tarihi": now,
+    })
+    return {"odev_id": odev_id, "ad": data.get("ad") or "Sınav Ödevi", "soruSayisi": len(temiz)}
+
+
+@router.get("/sinav/odev/{odev_id}/ozet")
+async def sinav_odev_ozet(odev_id: str, current_user=Depends(get_current_user)):
+    """Ödev meta bilgisi (görev kartında gösterim için)."""
+    o = await db.sinav_odevleri.find_one({"id": odev_id}, {"_id": 0})
+    if not o:
+        raise HTTPException(status_code=404, detail="Sınav ödevi bulunamadı.")
+    return o

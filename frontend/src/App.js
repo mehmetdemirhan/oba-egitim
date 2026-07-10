@@ -9814,6 +9814,11 @@ function GorevYonetimi({ user, students, teachers }) {
   const [kitapYukleniyor, setKitapYukleniyor] = useState(false);
   const [gelisimIcerikleri, setGelisimIcerikleri] = useState([]);
   const [icerikSecDialogu, setIcerikSecDialogu] = useState(false);
+  // Sınav ödevi seti (otomatik kriter)
+  const [sinavDersler, setSinavDersler] = useState([]);
+  const [sinavKriter, setSinavKriter] = useState({ ders: "", zorluk: "", soruSayisi: 10 });
+  const [sinavSetHazir, setSinavSetHazir] = useState(null);
+  const [sinavSetYukleniyor, setSinavSetYukleniyor] = useState(false);
 
   const fetchAll = useCallback(async () => {
     try { const r = await axios.get(`${API}/gorevler`); setGorevler(r.data); } catch(e) {}
@@ -9826,9 +9831,9 @@ function GorevYonetimi({ user, students, teachers }) {
     try { const r = await axios.get(`${API}/gelisim/icerik`); const gd = Array.isArray(r.data) ? r.data : []; setGelisimIcerikleri(gd.filter(i => i.durum === "yayinda")); } catch(e) {}
   };
 
-  const turIcon = (tur) => ({ ozel: <FileText className="h-4 w-4"/>, film: <Film className="h-4 w-4"/>, kitap: <BookMarked className="h-4 w-4"/>, makale: <FileText className="h-4 w-4"/>, hizmetici: <GraduationCap className="h-4 w-4"/>, egzersiz: <Target className="h-4 w-4"/> }[tur] || <ClipboardList className="h-4 w-4"/>);
-  const turLabelGorev = (tur) => ({ ozel: "Özel Görev", film: "Film", kitap: "Kitap", makale: "Makale", hizmetici: "Hizmetiçi Eğitim", egzersiz: "Egzersiz" }[tur] || tur);
-  const turColorGorev = (tur) => ({ ozel: "bg-app text-subtle", film: "bg-purple-100 text-purple-600", kitap: "bg-green-100 text-green-600", makale: "bg-orange-100 text-orange-600", hizmetici: "bg-blue-100 text-primary", egzersiz: "bg-pink-100 text-pink-600" }[tur] || "bg-app text-subtle");
+  const turIcon = (tur) => ({ ozel: <FileText className="h-4 w-4"/>, film: <Film className="h-4 w-4"/>, kitap: <BookMarked className="h-4 w-4"/>, makale: <FileText className="h-4 w-4"/>, hizmetici: <GraduationCap className="h-4 w-4"/>, egzersiz: <Target className="h-4 w-4"/>, sinav_odevi: <ClipboardList className="h-4 w-4"/> }[tur] || <ClipboardList className="h-4 w-4"/>);
+  const turLabelGorev = (tur) => ({ ozel: "Özel Görev", film: "Film", kitap: "Kitap", makale: "Makale", hizmetici: "Hizmetiçi Eğitim", egzersiz: "Egzersiz", sinav_odevi: "Sınav" }[tur] || tur);
+  const turColorGorev = (tur) => ({ ozel: "bg-app text-subtle", film: "bg-purple-100 text-purple-600", kitap: "bg-green-100 text-green-600", makale: "bg-orange-100 text-orange-600", hizmetici: "bg-blue-100 text-primary", egzersiz: "bg-pink-100 text-pink-600", sinav_odevi: "bg-indigo-100 text-indigo-600" }[tur] || "bg-app text-subtle");
   const durumBadgeGorev = (d) => ({
     bekliyor: <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-100 text-amber-700 text-xs rounded-full font-medium"><Clock className="h-3 w-3" />Bekliyor</span>,
     devam_ediyor: <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-100 text-primary text-xs rounded-full font-medium"><RefreshCw className="h-3 w-3" />Devam Ediyor</span>,
@@ -9845,6 +9850,7 @@ function GorevYonetimi({ user, students, teachers }) {
   const gorevOlustur = async (e) => {
     e.preventDefault();
     if (seciliHedefler.length === 0) { toast({ title: "Uyarı", description: "En az bir kişi seçmelisiniz", variant: "destructive" }); return; }
+    if (form.tur === "sinav_odevi" && !form.icerik_id) { toast({ title: "Uyarı", description: "Önce sınav seti oluşturun", variant: "destructive" }); return; }
     try {
       if (seciliHedefler.length === 1) {
         await axios.post(`${API}/gorevler`, { ...form, hedef_id: seciliHedefler[0], hedef_tip: form.hedef_tip });
@@ -9852,7 +9858,7 @@ function GorevYonetimi({ user, students, teachers }) {
         await axios.post(`${API}/gorevler/toplu`, { hedef_idler: seciliHedefler, hedef_tip: form.hedef_tip, gorev: form });
       }
       toast({ title: "✅ Görev atandı", description: `${seciliHedefler.length} kişiye görev oluşturuldu` });
-      resetForm(); setSeciliHedefler([]); setGorunum("liste"); fetchAll();
+      resetForm(); setSeciliHedefler([]); setSinavSetHazir(null); setGorunum("liste"); fetchAll();
     } catch(e) { toast({ title: "Hata", description: e.response?.data?.detail || "Görev oluşturulamadı", variant: "destructive" }); }
   };
 
@@ -9885,6 +9891,26 @@ function GorevYonetimi({ user, students, teachers }) {
     setForm({ ...form, baslik: icerik.baslik, aciklama: icerik.aciklama, tur: icerik.tur, icerik_id: icerik.id, makale_link: icerik.makale_link || "", kitap_yazar: icerik.kitap_yazar || "", kitap_isbn: icerik.kitap_isbn || "", kitap_link: icerik.kitap_link || "", kitap_kapak: icerik.kitap_kapak || "" });
     setIcerikSecDialogu(false);
     toast({ title: `"${icerik.baslik}" içeriği görev olarak seçildi` });
+  };
+
+  // ── Sınav ödevi seti ──
+  useEffect(() => {
+    axios.get(`${API}/sinav/dersler`).then(r => setSinavDersler(r.data?.dersler || [])).catch(() => {});
+  }, []);
+  const sinavSetiOlustur = async () => {
+    if (!sinavKriter.ders) { toast({ title: "Ders seçin", variant: "destructive" }); return; }
+    setSinavSetYukleniyor(true);
+    try {
+      const r = await axios.post(`${API}/sinav/odev`, {
+        ad: form.baslik || "Sınav Ödevi",
+        otomatikKriter: { ders: sinavKriter.ders, zorluk: sinavKriter.zorluk || undefined, soruSayisi: Number(sinavKriter.soruSayisi) || 10 },
+      });
+      setSinavSetHazir({ odev_id: r.data.odev_id, soruSayisi: r.data.soruSayisi });
+      setForm(prev => ({ ...prev, tur: "sinav_odevi", icerik_id: r.data.odev_id, baslik: prev.baslik || r.data.ad }));
+      toast({ title: `✅ ${r.data.soruSayisi} soruluk set hazır` });
+    } catch (e) {
+      toast({ title: "Set oluşturulamadı", description: e?.response?.data?.detail || "", variant: "destructive" });
+    } finally { setSinavSetYukleniyor(false); }
   };
 
   const [ogretmenUsers, setOgretmenUsers] = useState([]);
@@ -9967,7 +9993,7 @@ function GorevYonetimi({ user, students, teachers }) {
             <button type="button" onClick={() => { fetchGelisimIcerikleri(); setIcerikSecDialogu(true); }} className="text-xs text-primary hover:underline flex items-center gap-1"><BookOpen className="h-3 w-3" /> Mevcut içerikten seç</button></div></CardHeader>
             <CardContent className="space-y-4">
               <div><Label className="mb-2 block">Görev Türü</Label><div className="flex flex-wrap gap-2">
-                {[{v:"ozel",l:"Özel Görev"},{v:"hizmetici",l:"Hizmetiçi"},{v:"film",l:"Film"},{v:"kitap",l:"Kitap"},{v:"makale",l:"Makale"},{v:"egzersiz",l:"Egzersiz"}].map(t => (
+                {[{v:"ozel",l:"Özel Görev"},{v:"hizmetici",l:"Hizmetiçi"},{v:"film",l:"Film"},{v:"kitap",l:"Kitap"},{v:"makale",l:"Makale"},{v:"egzersiz",l:"Egzersiz"},{v:"sinav_odevi",l:"Sınav"}].map(t => (
                   <button key={t.v} type="button" onClick={() => setForm({...form, tur: t.v})}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${form.tur === t.v ? 'bg-primary text-white border-primary shadow' : 'bg-surface text-subtle border-line hover:border-primary'}`}>{t.l}</button>))}
               </div></div>
@@ -9986,6 +10012,32 @@ function GorevYonetimi({ user, students, teachers }) {
                 <div><Label>Yazar</Label><Input value={form.kitap_yazar} onChange={e => setForm({...form, kitap_yazar: e.target.value})} /></div></div>)}
 
               {form.tur === "makale" && (<div className="p-4 bg-app border border-line rounded-xl space-y-3"><div className="inline-flex items-center gap-1.5 font-semibold text-sm text-content"><FileText className="h-4 w-4" />Makale Linki</div><Input value={form.makale_link} onChange={e => setForm({...form, makale_link: e.target.value})} placeholder="https://..." /></div>)}
+              {form.tur === "sinav_odevi" && (
+                <div className="p-4 bg-app border border-line rounded-xl space-y-3">
+                  <div className="inline-flex items-center gap-1.5 font-semibold text-sm text-content"><ClipboardList className="h-4 w-4" />Sınav Seti (otomatik seçim)</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div><Label>Ders</Label>
+                      <select value={sinavKriter.ders} onChange={e => { setSinavKriter({ ...sinavKriter, ders: e.target.value }); setSinavSetHazir(null); }} className="w-full px-3 py-2 rounded-lg border border-line text-sm bg-surface">
+                        <option value="">Seçin…</option>
+                        {sinavDersler.map(d => <option key={d.key} value={d.key}>{d.ad}</option>)}
+                      </select>
+                    </div>
+                    <div><Label>Zorluk</Label>
+                      <select value={sinavKriter.zorluk} onChange={e => { setSinavKriter({ ...sinavKriter, zorluk: e.target.value }); setSinavSetHazir(null); }} className="w-full px-3 py-2 rounded-lg border border-line text-sm bg-surface">
+                        <option value="">Tümü</option><option value="kolay">kolay</option><option value="orta">orta</option><option value="zor">zor</option>
+                      </select>
+                    </div>
+                    <div><Label>Soru Sayısı</Label>
+                      <Input type="number" value={sinavKriter.soruSayisi} onChange={e => { setSinavKriter({ ...sinavKriter, soruSayisi: e.target.value }); setSinavSetHazir(null); }} />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={sinavSetiOlustur} disabled={sinavSetYukleniyor}>{sinavSetYukleniyor ? "Hazırlanıyor…" : "Seti Oluştur"}</Button>
+                    {sinavSetHazir && <span className="text-xs text-green-600 font-medium">✅ {sinavSetHazir.soruSayisi} soruluk set hazır</span>}
+                  </div>
+                  <div className="text-[11px] text-subtle">Yayındaki sorulardan rastgele seçilir. Seti oluşturduktan sonra aşağıdan öğrencileri seçip atayın.</div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
