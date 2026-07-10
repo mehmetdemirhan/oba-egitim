@@ -178,5 +178,9 @@
   {
     "name": "muhasebe",
     "active": true
+  },
+  {
+    "name": "toplu_kayit",
+    "active": true
   }
 ]
