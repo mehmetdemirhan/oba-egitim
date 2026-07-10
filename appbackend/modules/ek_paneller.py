@@ -1,16 +1,17 @@
-"""PASİF (kayıt-DIŞI) route arşivi — uygulamaya DAHİL EDİLMEZ.
+"""Ek panel endpoint'leri — registry.json üzerinden aktif olarak yüklenir.
 
-Bu fonksiyonlar orijinal server.py'de app.include_router(api_router)'dan SONRA
-tanımlandıkları için HİÇBİR ZAMAN kaydedilmemiş (üretimde 404 dönen) ölü
-route'lardı. Refactoring sırasında davranışı birebir korumak için aktif
-edilmediler; kod kaybolmasın diye burada saklanıyor.
+Bu route'lar eski server.py'de mount SONRASI tanımlandıkları için üretimde
+404 dönüyordu (frontend panelleri sessizce boş kalıyordu). registry migrasyonu
+sonrası kayıt altına alındı.
 
-AKTİVASYON: Etkinleştirmek istenirse server.py'ye
-    from modules._pasif_route_arsiv import router as pasif_router
-    api_router.include_router(pasif_router)
-eklen: yollar /gelisim/peer-rozet, /gelisim/peer-review-ozet, /sezon/bilgi,
-/sezon/reset, /kullanici/veri-indir, /kullanici/hesap-sil,
-/istatistik/global-kelime-haritasi olarak canlanır (route tablosu +7).
+İçerik:
+- /istatistik/global-kelime-haritasi  (Global Kelime Haritası paneli)
+- /kullanici/veri-indir, /kullanici/hesap-sil  (KVKK veri paneli)
+- /gelisim/peer-review-ozet  (admin peer review özeti)
+- /sezon/bilgi, /sezon/reset  (sezonluk reset paneli)
+
+Not: /gelisim/peer-rozet burada TANIMLI DEĞİL — aktif karşılığı ilerleme.py'de
+(çift kayıt olmaması için).
 """
 import os
 import io
@@ -180,45 +181,6 @@ async def hesap_sil(current_user=Depends(get_current_user)):
     except Exception as e:
         logging.error(f"[HESAP-SİL] {e}")
         raise HTTPException(status_code=500, detail="Hesap silinemedi")
-
-
-# ── Ölü route'lar: app.include_router'dan SONRA tanımlı (baseline'da kayıtsız).
-#    Davranış birebir korunsun diye taşınmadı; orijinaldeki gibi kayıt-dışıdır.
-@router.get("/gelisim/peer-rozet")
-async def get_peer_rozet(current_user=Depends(get_current_user)):
-    """Kullanıcının haftalık oy sayısı ve toplam peer review rozeti."""
-    try:
-        from datetime import datetime, timedelta
-        haftanin_basi = datetime.utcnow() - timedelta(days=datetime.utcnow().weekday())
-        haftanin_basi = haftanin_basi.replace(hour=0, minute=0, second=0, microsecond=0)
-
-        # Haftalık oy sayısı - gelisim_oylar collection'ından
-        haftalik = await db.gelisim_oylar.count_documents({
-            "kullanici_id": current_user["id"],
-            "tarih": {"$gte": haftanin_basi}
-        })
-
-        # Toplam oy sayısı (tüm zamanlar)
-        toplam = await db.gelisim_oylar.count_documents({
-            "kullanici_id": current_user["id"]
-        })
-
-        # Rozet hesapla
-        rozet = "Bronz Onaycı"
-        if toplam >= 50: rozet = "Platin Uzman"
-        elif toplam >= 20: rozet = "Altın Moderatör"
-        elif toplam >= 5:  rozet = "Gümüş Değerlendirici"
-
-        return {
-            "haftalik_oy": haftalik,
-            "haftalik_limit": 5,
-            "toplam_oy": toplam,
-            "rozet": rozet,
-            "kalan": max(0, 5 - haftalik),
-        }
-    except Exception as e:
-        logging.error(f"[PEER-ROZET] {e}")
-        return {"haftalik_oy": 0, "haftalik_limit": 5, "toplam_oy": 0, "rozet": "Bronz Onaycı", "kalan": 5}
 
 
 @router.get("/gelisim/peer-review-ozet")

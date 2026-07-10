@@ -3,6 +3,7 @@ import "./App.css";
 import axios from "axios";
 import { useAuth } from "./context/AuthContext";
 import LoginPage from "./pages/LoginPage";
+import SifreSifirla from "./pages/SifreSifirla";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
@@ -12,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./components/ui/dialog";
 import { Badge } from "./components/ui/badge";
-import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send, Bell, Database, RefreshCw, GitBranch, AlertTriangle, Package, ClipboardList, Flame, Target, Award, Heart, FlaskConical, Medal, Lock, Sparkles, Lightbulb, MessageCircle, TrendingUp, Palette, Brain, XCircle } from "lucide-react";
+import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send, Bell, Database, RefreshCw, GitBranch, AlertTriangle, Package, ClipboardList, Flame, Target, Award, Heart, FlaskConical, Medal, Lock, Sparkles, Lightbulb, MessageCircle, TrendingUp, Palette, Brain, XCircle, Check, Clock, Save, Image as ImageIcon, ArrowLeft, ArrowRight, Play, Pause, Settings, Music, Printer, Search, Link2, Pin, Upload } from "lucide-react";
 import { useToast } from "./hooks/use-toast";
 import { IkonCoz } from "./lib/ikonlar";
 import { Toaster } from "./components/ui/toaster";
@@ -25,6 +26,11 @@ import { ZorunluSifreDegistir, SifreDegistirButton } from "./components/SifreDeg
 import BildirimIzni from "./components/BildirimIzni";
 import { BildirimTercihleri } from "./components/BildirimTercihleri";
 import MebKelimeYonetimi from "./components/admin/MebKelimeYonetimi";
+import MuhasebePaneli from "./components/MuhasebePaneli";
+import OdemeTablosu from "./components/OdemeTablosu";
+import TopluKayit from "./components/admin/TopluKayit";
+import SinavYonetimi from "./components/admin/SinavYonetimi";
+import SinavCozum from "./components/SinavCozum";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
 import InstagramAyarlari from "./components/admin/InstagramAyarlari";
 import ExerciseStarter from "./components/ExerciseStarter";
@@ -50,7 +56,7 @@ const hataBildir = (toast, mesaj = "İşlem başarısız oldu. Lütfen tekrar de
 const LIG_ESIKLERI_FE = { bronz: 0, gumus: 200, altin: 500, elmas: 1000 };
 
 function roleLabel(role) {
-  const labels = { admin: "Yönetici", coordinator: "Koordinatör", teacher: "Öğretmen", student: "Öğrenci", parent: "Veli" };
+  const labels = { admin: "Yönetici", coordinator: "Koordinatör", teacher: "Öğretmen", student: "Öğrenci", parent: "Veli", accountant: "Muhasebe" };
   return labels[role] || role;
 }
 
@@ -110,11 +116,11 @@ function UserManagement({ teachers }) {
     catch (error) { toast({ title: "Hata", description: error.response?.data?.detail || "Hata oluştu", variant: "destructive" }); }
   };
 
-  const roleBadgeColor = { admin: "bg-red-100 text-red-700", coordinator: "bg-orange-100 text-orange-700", teacher: "bg-blue-100 text-primary", student: "bg-green-100 text-green-700", parent: "bg-purple-100 text-purple-700" };
+  const roleBadgeColor = { admin: "bg-red-100 text-red-700", coordinator: "bg-orange-100 text-orange-700", teacher: "bg-blue-100 text-primary", student: "bg-green-100 text-green-700", parent: "bg-purple-100 text-purple-700", accountant: "bg-amber-100 text-amber-700" };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <Card className="lg:col-span-1 border-0 shadow-sm">
+      <Card className="lg:col-span-1 border border-line shadow-sm">
         <CardHeader><CardTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />Yeni Kullanıcı</CardTitle></CardHeader>
         <CardContent>
           <form onSubmit={createUser} className="space-y-4">
@@ -136,6 +142,7 @@ function UserManagement({ teachers }) {
                   <SelectItem value="teacher">Öğretmen</SelectItem>
                   <SelectItem value="student">Öğrenci</SelectItem>
                   <SelectItem value="parent">Veli</SelectItem>
+                  <SelectItem value="accountant">Muhasebe</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -143,7 +150,7 @@ function UserManagement({ teachers }) {
           </form>
         </CardContent>
       </Card>
-      <Card className="lg:col-span-2 border-0 shadow-sm">
+      <Card className="lg:col-span-2 border border-line shadow-sm">
         <CardHeader><CardTitle>Kullanıcılar</CardTitle></CardHeader>
         <CardContent>
           <Table>
@@ -206,6 +213,7 @@ function UserManagement({ teachers }) {
                     <SelectItem value="teacher">Öğretmen</SelectItem>
                     <SelectItem value="student">Öğrenci</SelectItem>
                     <SelectItem value="parent">Veli</SelectItem>
+                    <SelectItem value="accountant">Muhasebe</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -284,6 +292,7 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [teachers, setTeachers] = useState([]);
   const [students, setStudents] = useState([]);
+  const [muhasebeKisiler, setMuhasebeKisiler] = useState({ ogrenciler: [], ogretmenler: [] });
   const [courses, setCourses] = useState([]);
   const [payments, setPayments] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
@@ -323,6 +332,7 @@ function AppContent() {
     try { const r = await axios.get(`${API}/students`); setStudents(Array.isArray(r.data) ? r.data : []); } catch(e) {}
     try { const r = await axios.get(`${API}/courses`); setCourses(Array.isArray(r.data) ? r.data : []); } catch(e) {}
     try { const r = await axios.get(`${API}/payments`); setPayments(Array.isArray(r.data) ? r.data : []); } catch(e) {}
+    try { const r = await axios.get(`${API}/muhasebe/kisiler`); setMuhasebeKisiler(r.data || { ogrenciler: [], ogretmenler: [] }); } catch(e) {}
     try { const r = await axios.get(`${API}/risk-skor/toplu`); setOgrenciRiskler(Array.isArray(r.data) ? r.data : []); } catch(e) { setOgrenciRiskler([]); }
   }, []);
 
@@ -356,7 +366,9 @@ function AppContent() {
   }, [user]);
 
   useEffect(() => {
-    if (user) fetchAll();
+    // Yalnızca admin/koordinatör yönetim verisini çeker (fetchAll admin-only uçlara
+    // vurur; diğer roller kendi panel bileşenlerini kullanır → gereksiz 403'ler önlenir)
+    if (user && (user.role === "admin" || user.role === "coordinator")) fetchAll();
   }, [user, fetchAll]);
 
   // ── KOŞULLU RETURN'LER HOOK'LARDAN SONRA ──
@@ -370,7 +382,12 @@ function AppContent() {
     );
   }
 
-  if (!user) return <LoginPage />;
+  if (!user) {
+    // E-postadaki reset linki: /sifre-sifirla?token=... → login olmadan yeni şifre ekranı
+    const _tok = new URLSearchParams(window.location.search).get("token");
+    if (window.location.pathname === "/sifre-sifirla" && _tok) return <SifreSifirla token={_tok} />;
+    return <LoginPage />;
+  }
 
   // İlk giriş: geçici şifreyle oluşturulan hesap, şifre değiştirmeden hiçbir modüle erişemez
   if (user.sifre_degistirme_zorunlu) return <ZorunluSifreDegistir />;
@@ -384,6 +401,9 @@ function AppContent() {
   // Öğretmen rolü → ayrı panel
   if (user.role === "teacher") return <OgretmenPaneli user={user} logout={logout} />;
 
+  // Muhasebe rolü → sade ödeme paneli (yönetim sekme çubuğunu HİÇ görmez)
+  if (user.role === "accountant") return <MuhasebePaneli user={user} logout={logout} />;
+
   // Admin + Koordinatör aynı yönetim arayüzünü görür (koordinatör muhasebe hariç)
   const adminVeyaKoord = user.role === "admin" || user.role === "coordinator";
 
@@ -392,7 +412,10 @@ function AppContent() {
   const fetchCourses = async () => { try { const r = await axios.get(`${API}/courses`); setCourses(r.data); } catch(e) {} };
   const fetchKursDersleri = async (kursId) => { try { const r = await axios.get(`${API}/courses/${kursId}/dersler`); setKursDersleri(prev => ({...prev, [kursId]: r.data})); } catch(e) {} };
   const fetchPayments = async () => { try { const r = await axios.get(`${API}/payments`); setPayments(r.data); } catch(e) {} };
+  const fetchMuhasebeKisiler = async () => { try { const r = await axios.get(`${API}/muhasebe/kisiler`); setMuhasebeKisiler(r.data || { ogrenciler: [], ogretmenler: [] }); } catch(e) {} };
   const fetchDashboard = async () => { try { const r = await axios.get(`${API}/dashboard`); setDashboardStats(r.data); } catch(e) {} };
+  // OdemeTablosu satır içi düzenlemesi sonrası muhasebe verilerini + KPI kaynaklarını tazele.
+  const muhasebeYenile = () => { fetchMuhasebeKisiler(); fetchPayments(); fetchStudents(); fetchTeachers(); fetchDashboard(); };
   const fetchTeacherStudents = async (id) => { try { const r = await axios.get(`${API}/teachers/${id}/students`); setTeacherStudents(p => ({...p, [id]: r.data})); } catch(e) {} };
 
   const toggleTeacherExpansion = (id) => {
@@ -502,6 +525,7 @@ function AppContent() {
             <TabsTrigger value="students" className={tabClass}><Users className="h-4 w-4 mr-2" />Öğrenciler</TabsTrigger>
             {user.role !== "coordinator" && <TabsTrigger value="payments" className={tabClass}><CreditCard className="h-4 w-4 mr-2" />Muhasebe</TabsTrigger>}
             {adminVeyaKoord && <TabsTrigger value="users" className={tabClass}><Shield className="h-4 w-4 mr-2" />Kullanıcılar</TabsTrigger>}
+            {adminVeyaKoord && <TabsTrigger value="toplu-kayit" className={tabClass}><Upload className="h-4 w-4 mr-2" />Toplu Kayıt</TabsTrigger>}
             <TabsTrigger value="gelisim" className={tabClass}><Trophy className="h-4 w-4 mr-2" />Gelişim</TabsTrigger>
             <TabsTrigger value="ders-programi" className={tabClass}><Calendar className="h-4 w-4 mr-2" />Ders Programı</TabsTrigger>
             <TabsTrigger value="giris-analizi" className={tabClass}><Stethoscope className="h-4 w-4 mr-2" />Analiz</TabsTrigger>
@@ -513,6 +537,7 @@ function AppContent() {
             {adminVeyaKoord && <TabsTrigger value="tema-yonetimi" className={tabClass}><Palette className="h-4 w-4 mr-2" />Tema</TabsTrigger>}
             {adminVeyaKoord && <TabsTrigger value="rozet-yonetimi" className={tabClass}><Medal className="h-4 w-4 mr-2" />Rozetler</TabsTrigger>}
             {adminVeyaKoord && <TabsTrigger value="meb-kelime" className={tabClass}><BookMarked className="h-4 w-4 mr-2" />MEB Kelimeleri</TabsTrigger>}
+            {adminVeyaKoord && <TabsTrigger value="sinav" className={tabClass}><ClipboardList className="h-4 w-4 mr-2" />Sınavlar</TabsTrigger>}
             <TabsTrigger value="ai-merkezi" className={tabClass}><Brain className="h-4 w-4 mr-2" />AI Merkezi</TabsTrigger>
           </TabsList>
           )}
@@ -542,6 +567,13 @@ function AppContent() {
           {adminVeyaKoord && (
             <TabsContent value="meb-kelime">
               <MebKelimeYonetimi apiBase={API} />
+            </TabsContent>
+          )}
+
+          {/* Sınav Soru Bankası */}
+          {adminVeyaKoord && (
+            <TabsContent value="sinav">
+              <SinavYonetimi apiBase={API} />
             </TabsContent>
           )}
 
@@ -685,7 +717,7 @@ function AppContent() {
           {/* Teachers */}
           <TabsContent value="teachers">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="lg:col-span-1 border-0 shadow-sm">
+              <Card className="lg:col-span-1 border border-line shadow-sm">
                 <CardHeader><CardTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />Yeni Öğretmen</CardTitle></CardHeader>
                 <CardContent>
                   <form onSubmit={createTeacher} className="space-y-4">
@@ -743,7 +775,7 @@ function AppContent() {
                   </div>
                 </DialogContent>
               </Dialog>
-              <Card className="lg:col-span-2 border-0 shadow-sm">
+              <Card className="lg:col-span-2 border border-line shadow-sm">
                 <CardHeader><CardTitle className="flex items-center justify-between">Öğretmenler <label className="flex items-center gap-2 text-sm font-normal cursor-pointer"><input type="checkbox" checked={showArchived.teachers} onChange={e => setShowArchived(p => ({...p, teachers: e.target.checked}))} className="rounded" /> Arşivi göster</label></CardTitle></CardHeader>
                 <CardContent>
                   <div className="space-y-3">
@@ -826,7 +858,7 @@ function AppContent() {
           {/* Students */}
           <TabsContent value="students">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="lg:col-span-1 border-0 shadow-sm">
+              <Card className="lg:col-span-1 border border-line shadow-sm">
                 <CardHeader><CardTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />Yeni Öğrenci</CardTitle></CardHeader>
                 <CardContent>
                   <form onSubmit={createStudent} className="space-y-4">
@@ -864,7 +896,7 @@ function AppContent() {
                   </form>
                 </CardContent>
               </Card>
-              <Card className="lg:col-span-2 border-0 shadow-sm">
+              <Card className="lg:col-span-2 border border-line shadow-sm">
                 <CardHeader><CardTitle className="flex items-center justify-between">Öğrenciler <label className="flex items-center gap-2 text-sm font-normal cursor-pointer"><input type="checkbox" checked={showArchived.students} onChange={e => setShowArchived(p => ({...p, students: e.target.checked}))} className="rounded" /> Arşivi göster</label></CardTitle></CardHeader>
                 <CardContent>
                   <Table>
@@ -899,7 +931,7 @@ function AppContent() {
           {/* Courses */}
           <TabsContent value="courses">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="lg:col-span-1 border-0 shadow-sm">
+              <Card className="lg:col-span-1 border border-line shadow-sm">
                 <CardHeader><CardTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />Yeni Kurs</CardTitle></CardHeader>
                 <CardContent>
                   <form onSubmit={createCourse} className="space-y-4">
@@ -910,7 +942,7 @@ function AppContent() {
                   </form>
                 </CardContent>
               </Card>
-              <Card className="lg:col-span-2 border-0 shadow-sm">
+              <Card className="lg:col-span-2 border border-line shadow-sm">
                 <CardHeader><CardTitle className="flex items-center justify-between">Kurslar <label className="flex items-center gap-2 text-sm font-normal cursor-pointer"><input type="checkbox" checked={showArchived.courses} onChange={e => setShowArchived(p => ({...p, courses: e.target.checked}))} className="rounded" /> Arşivi göster</label></CardTitle></CardHeader>
                 <CardContent className="space-y-3">
                   {courses.filter(c => showArchived.courses || !c.arsivli).map(c => {
@@ -934,7 +966,7 @@ function AppContent() {
                         {isExpanded && (
                           <div className="border-t border-line bg-app p-4 space-y-4">
                             <div className="flex items-center justify-between">
-                              <h4 className="font-semibold text-sm">📚 Dersler</h4>
+                              <h4 className="font-semibold text-sm">Dersler</h4>
                               <Button size="sm" className="bg-primary hover:bg-primary-hover text-white" onClick={() => setYeniDersForm({kurs_id: c.id, baslik: '', ozet: '', _acik: true})}>+ Ders Ekle</Button>
                             </div>
                             {yeniDersForm?._acik && yeniDersForm?.kurs_id === c.id && (
@@ -1116,7 +1148,7 @@ function AppContent() {
           <TabsContent value="payments">
             {/* Özet Kartları */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <Card className="border-0 shadow-sm bg-gradient-to-br from-green-50 to-emerald-100">
+              <Card className="border border-line shadow-sm bg-gradient-to-br from-green-50 to-emerald-100">
                 <CardContent className="p-5 text-center">
                   <div className="text-sm text-green-700 font-medium mb-2">📥 Öğrenci Ödemeleri</div>
                   <div className="text-xs text-subtle mb-1">Alınması Gereken</div>
@@ -1127,7 +1159,7 @@ function AppContent() {
                   <div className="text-xs text-green-600 mt-1">{payments.filter(p => p.tip === 'ogrenci').length} tahsilat</div>
                 </CardContent>
               </Card>
-              <Card className="border-0 shadow-sm bg-gradient-to-br from-red-50 to-orange-100">
+              <Card className="border border-line shadow-sm bg-gradient-to-br from-red-50 to-orange-100">
                 <CardContent className="p-5 text-center">
                   <div className="text-sm text-red-700 font-medium mb-2">📤 Öğretmen Ücretleri</div>
                   <div className="text-xs text-subtle mb-1">Ödenecek</div>
@@ -1138,7 +1170,7 @@ function AppContent() {
                   <div className="text-xs text-red-600 mt-1">{payments.filter(p => p.tip === 'ogretmen').length} ödeme</div>
                 </CardContent>
               </Card>
-              <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-indigo-100">
+              <Card className="border border-line shadow-sm bg-gradient-to-br from-blue-50 to-indigo-100">
                 <CardContent className="p-5 text-center">
                   <div className="text-sm text-primary font-medium mb-2">🏦 Kasa Bakiyesi</div>
                   <div className="text-xs text-subtle mb-1">Alınan − Ödenen</div>
@@ -1151,175 +1183,23 @@ function AppContent() {
               </Card>
             </div>
 
-            {/* İki Sütunlu Tablo */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* SOL: Alacaklar (Öğrenci Tahsilatları) */}
-              <Card className="border-0 shadow-sm border-t-4" style={{borderTopColor: '#27ae60'}}>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center justify-between">
-                    <span className="text-green-700">📥 Alacaklar (Öğrenci Ödemeleri)</span>
-                    <button onClick={() => setPaymentForm({...paymentForm, _alacakFormAcik: !paymentForm._alacakFormAcik})}
-                      className="text-xs px-3 py-1 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 border border-green-200">
-                      {paymentForm._alacakFormAcik ? '✕ Kapat' : '+ Tahsilat Ekle'}
-                    </button>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {/* Tahsilat Ekleme Formu */}
-                  {paymentForm._alacakFormAcik && (
-                    <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4 space-y-3">
-                      <div className="text-sm font-semibold text-green-800">Öğrenci Tahsilatı Kaydet</div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <Label className="text-xs">Öğrenci</Label>
-                          <Select value={paymentForm.kisi_id} onValueChange={v => setPaymentForm({...paymentForm, kisi_id:v, tip:'ogrenci'})}>
-                            <SelectTrigger className="h-9"><SelectValue placeholder="Seçin" /></SelectTrigger>
-                            <SelectContent position="popper">{students.map(s => <SelectItem key={s.id} value={s.id}>{s.ad} {s.soyad}</SelectItem>)}</SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label className="text-xs">Miktar (₺)</Label>
-                          <Input type="number" step="0.01" className="h-9" value={paymentForm.miktar} onChange={e => setPaymentForm({...paymentForm, miktar:parseFloat(e.target.value)||0})} />
-                        </div>
-                      </div>
-                      <div>
-                        <Label className="text-xs">Açıklama</Label>
-                        <Input className="h-9" value={paymentForm.aciklama} onChange={e => setPaymentForm({...paymentForm, aciklama:e.target.value})} placeholder="Ör: Mart ayı ödemesi" />
-                      </div>
-                      <Button size="sm" className="w-full bg-green-600 hover:bg-green-700 text-white" disabled={!paymentForm.kisi_id || !paymentForm.miktar}
-                        onClick={async () => {
-                          try {
-                            await axios.post(`${API}/payments`, {tip:'ogrenci', kisi_id:paymentForm.kisi_id, miktar:paymentForm.miktar, aciklama:paymentForm.aciklama});
-                            setPaymentForm({tip:'ogrenci',kisi_id:'',miktar:0,aciklama:'',_alacakFormAcik:false,_odemeFormAcik:false});
-                            fetchPayments(); fetchStudents(); fetchDashboard();
-                            toast({title:"✅ Tahsilat kaydedildi"});
-                          } catch(e) { toast({title:"Hata", variant:"destructive"}); }
-                        }}>
-                        💰 Tahsilatı Kaydet
-                      </Button>
-                    </div>
-                  )}
-                  <div className="max-h-96 overflow-y-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-xs">Tarih</TableHead>
-                          <TableHead className="text-xs">Öğrenci</TableHead>
-                          <TableHead className="text-xs text-right">Miktar</TableHead>
-                          <TableHead className="text-xs">Açıklama</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {payments.filter(p => p.tip === 'ogrenci').length === 0 && (
-                          <TableRow><TableCell colSpan={4} className="text-center text-subtle py-8">Henüz alacak kaydı yok</TableCell></TableRow>
-                        )}
-                        {payments.filter(p => p.tip === 'ogrenci').map(p => {
-                          const person = students.find(s => s.id === p.kisi_id);
-                          return (
-                            <TableRow key={p.id}>
-                              <TableCell className="text-xs text-subtle">{formatDate(p.tarih)}</TableCell>
-                              <TableCell className="text-sm font-medium">{person ? `${person.ad} ${person.soyad}` : '-'}</TableCell>
-                              <TableCell className="text-sm font-bold text-green-600 text-right">{formatCurrency(p.miktar)}</TableCell>
-                              <TableCell className="text-xs text-subtle">{p.aciklama || '-'}</TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                  <div className="border-t-2 border-green-200 mt-3 pt-3 flex justify-between items-center">
-                    <span className="text-sm font-semibold text-green-700">Toplam Alacak:</span>
-                    <span className="text-lg font-bold text-green-700">{formatCurrency(payments.filter(p => p.tip === 'ogrenci').reduce((s, p) => s + (p.miktar || 0), 0))}</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* SAĞ: Ödenecekler (Öğretmen Ödemeleri) */}
-              <Card className="border-0 shadow-sm border-t-4" style={{borderTopColor: '#e74c3c'}}>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center justify-between">
-                    <span className="text-red-700">📤 Ödemeler (Öğretmen Ücretleri)</span>
-                    <button onClick={() => setPaymentForm({...paymentForm, _odemeFormAcik: !paymentForm._odemeFormAcik})}
-                      className="text-xs px-3 py-1 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 border border-red-200">
-                      {paymentForm._odemeFormAcik ? '✕ Kapat' : '+ Ödeme Ekle'}
-                    </button>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {/* Ödeme Ekleme Formu */}
-                  {paymentForm._odemeFormAcik && (
-                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4 space-y-3">
-                      <div className="text-sm font-semibold text-red-800">Öğretmen Ödemesi Kaydet</div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <Label className="text-xs">Öğretmen</Label>
-                          <Select value={paymentForm.kisi_id} onValueChange={v => setPaymentForm({...paymentForm, kisi_id:v, tip:'ogretmen'})}>
-                            <SelectTrigger className="h-9"><SelectValue placeholder="Seçin" /></SelectTrigger>
-                            <SelectContent position="popper">{teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.ad} {t.soyad}</SelectItem>)}</SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label className="text-xs">Miktar (₺)</Label>
-                          <Input type="number" step="0.01" className="h-9" value={paymentForm.miktar} onChange={e => setPaymentForm({...paymentForm, miktar:parseFloat(e.target.value)||0})} />
-                        </div>
-                      </div>
-                      <div>
-                        <Label className="text-xs">Açıklama</Label>
-                        <Input className="h-9" value={paymentForm.aciklama} onChange={e => setPaymentForm({...paymentForm, aciklama:e.target.value})} placeholder="Ör: Mart ayı öğretmen ücreti" />
-                      </div>
-                      <Button size="sm" className="w-full bg-red-600 hover:bg-red-700 text-white" disabled={!paymentForm.kisi_id || !paymentForm.miktar}
-                        onClick={async () => {
-                          try {
-                            await axios.post(`${API}/payments`, {tip:'ogretmen', kisi_id:paymentForm.kisi_id, miktar:paymentForm.miktar, aciklama:paymentForm.aciklama});
-                            setPaymentForm({tip:'ogrenci',kisi_id:'',miktar:0,aciklama:'',_alacakFormAcik:false,_odemeFormAcik:false});
-                            fetchPayments(); fetchTeachers(); fetchDashboard();
-                            toast({title:"✅ Ödeme kaydedildi"});
-                          } catch(e) { toast({title:"Hata", variant:"destructive"}); }
-                        }}>
-                        💳 Ödemeyi Kaydet
-                      </Button>
-                    </div>
-                  )}
-                  <div className="max-h-96 overflow-y-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-xs">Tarih</TableHead>
-                          <TableHead className="text-xs">Öğretmen</TableHead>
-                          <TableHead className="text-xs text-right">Miktar</TableHead>
-                          <TableHead className="text-xs">Açıklama</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {payments.filter(p => p.tip === 'ogretmen').length === 0 && (
-                          <TableRow><TableCell colSpan={4} className="text-center text-subtle py-8">Henüz ödeme kaydı yok</TableCell></TableRow>
-                        )}
-                        {payments.filter(p => p.tip === 'ogretmen').map(p => {
-                          const person = teachers.find(t => t.id === p.kisi_id);
-                          return (
-                            <TableRow key={p.id}>
-                              <TableCell className="text-xs text-subtle">{formatDate(p.tarih)}</TableCell>
-                              <TableCell className="text-sm font-medium">{person ? `${person.ad} ${person.soyad}` : '-'}</TableCell>
-                              <TableCell className="text-sm font-bold text-red-600 text-right">{formatCurrency(p.miktar)}</TableCell>
-                              <TableCell className="text-xs text-subtle">{p.aciklama || '-'}</TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                  <div className="border-t-2 border-red-200 mt-3 pt-3 flex justify-between items-center">
-                    <span className="text-sm font-semibold text-red-700">Toplam Ödenen:</span>
-                    <span className="text-lg font-bold text-red-700">{formatCurrency(payments.filter(p => p.tip === 'ogretmen').reduce((s, p) => s + (p.miktar || 0), 0))}</span>
-                  </div>
-                </CardContent>
-              </Card>
+            {/* Öğrenci & Öğretmen ödeme tabloları — MuhasebePaneli ile PAYLAŞILAN
+                Excel-benzeri satır içi düzenlenebilir bileşen (OdemeTablosu). */}
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-base font-semibold text-content mb-2">Öğrenci Ödemeleri</h3>
+                <OdemeTablosu tip="ogrenci" kisiler={muhasebeKisiler.ogrenciler} payments={payments} apiBase={API} onDegisim={muhasebeYenile} />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-content mb-2">Öğretmen Ödemeleri</h3>
+                <OdemeTablosu tip="ogretmen" kisiler={muhasebeKisiler.ogretmenler} payments={payments} apiBase={API} onDegisim={muhasebeYenile} />
+              </div>
             </div>
 
             {/* Aylık Özet Tablosu */}
-            <Card className="border-0 shadow-sm mt-6">
+            <Card className="border border-line shadow-sm mt-6">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">📅 Aylık Özet</CardTitle>
+                <CardTitle className="text-base flex items-center gap-2">Aylık Özet</CardTitle>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -1373,6 +1253,12 @@ function AppContent() {
           {adminVeyaKoord && (
             <TabsContent value="users">
               <UserManagement teachers={teachers} />
+            </TabsContent>
+          )}
+
+          {adminVeyaKoord && (
+            <TabsContent value="toplu-kayit">
+              <TopluKayit apiBase={API} />
             </TabsContent>
           )}
 
@@ -1739,40 +1625,8 @@ function BekleyenlerKarti({ bekleyenler, onRefresh, onTabChange }) {
   );
 }
 
-// ── Sadece havuzdaki metinleri listele (analiz için) ──
-function MetinSecimListesi({ onMetinSec }) {
-  const [metinler, setMetinler] = useState([]);
-  const [yukleniyor, setYukleniyor] = useState(true);
-  const turLabel = { hikaye: "Hikaye", bilgilendirici: "Bilgilendirici", siir: "Şiir" };
-
-  useEffect(() => {
-    axios.get(`${API}/diagnostic/texts`)
-      .then(r => { const d = Array.isArray(r.data) ? r.data : []; setMetinler(d.filter(m => m.durum === "havuzda")); })
-      .catch(() => {})
-      .finally(() => setYukleniyor(false));
-  }, []);
-
-  if (yukleniyor) return <div className="text-center py-8 text-subtle">Yükleniyor...</div>;
-  if (metinler.length === 0) return (
-    <div className="text-center py-8 text-subtle">
-      <p>Henüz onaylı metin yok.</p>
-      <p className="text-sm mt-1">Metinler sekmesinden metin ekleyip onaylayın.</p>
-    </div>
-  );
-
-  return (
-    <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
-      {metinler.map(m => (
-        <div key={m.id} onClick={() => onMetinSec(m)}
-          className="border border-line rounded-xl p-4 cursor-pointer hover:border-orange-400 hover:bg-orange-50 transition-all">
-          <div className="font-semibold text-content">{m.baslik}</div>
-          <div className="text-xs text-subtle mt-1">{m.sinif_seviyesi}. Sınıf • {turLabel[m.tur] || m.tur} • {m.kelime_sayisi} kelime</div>
-          <p className="text-sm text-subtle mt-2 line-clamp-2">{m.icerik}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
+// (Yetim bileşen MetinSecimListesi kaldırıldı — hiç render edilmiyordu; metin
+//  seçimi MetinYonetimi'nin secimModu prop'uyla yapılıyor.)
 
 // ── NORM TABLOSU YÖNETİMİ (Admin) ──
 function NormTablosu({ onClose }) {
@@ -1808,7 +1662,7 @@ function NormTablosu({ onClose }) {
       <div className="overflow-x-auto">
         <table className="w-full text-sm border-collapse">
           <thead>
-            <tr className="bg-gray-100">
+            <tr className="bg-app">
               <th className="p-3 text-left font-semibold border border-line">Sınıf</th>
               <th className="p-3 text-center font-semibold border border-line text-red-600">Düşük (≤)</th>
               <th className="p-3 text-center font-semibold border border-line text-yellow-600">Orta (≤)</th>
@@ -1826,7 +1680,7 @@ function NormTablosu({ onClose }) {
                     <td key={alan} className="p-2 border border-line">
                       <input type="number" value={n[alan] || ""} min={0} max={500}
                         onChange={e => setNormlar({...normlar, [s]: {...n, [alan]: parseInt(e.target.value)||0}})}
-                        className="w-full text-center border border-line rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-orange-500" />
+                        className="w-full text-center border border-line rounded-lg p-2 tabular-nums focus:outline-none focus:ring-2 focus:ring-primary" />
                     </td>
                   ))}
                   <td className="p-3 border border-line text-center text-green-600 font-medium">{(n.yeterli||0)+1}+</td>
@@ -1837,7 +1691,7 @@ function NormTablosu({ onClose }) {
         </table>
       </div>
       <div className="flex gap-3 pt-2">
-        <Button onClick={kaydet} className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white">Kaydet</Button>
+        <Button onClick={kaydet} className="flex-1 bg-primary hover:bg-primary-hover text-white"><Save className="h-4 w-4 mr-1" />Kaydet</Button>
         <Button variant="outline" onClick={onClose} className="flex-1">İptal</Button>
       </div>
     </div>
@@ -1902,10 +1756,10 @@ function MetinKatkiPaneli({ metin, user, onDegisti, acik: acikProp, onToggle }) 
     <div className="mt-2 border-t border-line pt-2" onClick={(e) => e.stopPropagation()}>
       <button type="button" onClick={toggle}
         className="text-xs font-medium text-primary flex items-center gap-1.5 hover:underline">
-        {acik ? "▼" : "▶"} 📝 Cevap Anahtarı & Görsel
+        {acik ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}<ClipboardList className="h-3.5 w-3.5" />Cevap Anahtarı & Görsel
         {soruSayisi > 0 && <span className="text-subtle">({soruSayisi} soru)</span>}
-        {kontrolSayisi > 0 && <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full">⚠ {kontrolSayisi} kontrol edilmeli</span>}
-        {gorselVar && <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded-full">🖼️ görsel</span>}
+        {kontrolSayisi > 0 && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full"><AlertTriangle className="h-3 w-3" />{kontrolSayisi} kontrol edilmeli</span>}
+        {gorselVar && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded-full"><ImageIcon className="h-3 w-3" />görsel</span>}
       </button>
 
       {acik && (
@@ -1918,7 +1772,7 @@ function MetinKatkiPaneli({ metin, user, onDegisti, acik: acikProp, onToggle }) 
                 <input ref={fileRef} type="file" accept="image/jpeg,image/png" className="hidden" onChange={gorselYukle} />
                 <Button type="button" size="sm" disabled={yukleniyor} onClick={() => fileRef.current?.click()}
                   className="bg-purple-600 hover:bg-purple-700 text-white h-7 text-xs">
-                  {yukleniyor ? "Yükleniyor…" : gorselVar ? "🖼️ Görseli Değiştir" : "🖼️ Görsel Ekle"}
+                  <ImageIcon className="h-3.5 w-3.5 mr-1" />{yukleniyor ? "Yükleniyor…" : gorselVar ? "Görseli Değiştir" : "Görsel Ekle"}
                 </Button>
               </div>
             </div>
@@ -1937,7 +1791,7 @@ function MetinKatkiPaneli({ metin, user, onDegisti, acik: acikProp, onToggle }) 
               <div key={s.id || i} className="bg-app rounded-lg p-3 text-sm">
                 <div className="flex items-start justify-between gap-2">
                   <div className="font-medium text-content">{i + 1}. {s.soru}</div>
-                  {s.kontrol_gerekli && <span className="shrink-0 px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[11px] rounded-full">⚠ kontrol edilmeli</span>}
+                  {s.kontrol_gerekli && <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[11px] rounded-full"><AlertTriangle className="h-3 w-3" />kontrol edilmeli</span>}
                 </div>
                 <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                   {sikHarfleri.filter(h => secenekler[h] !== undefined).map(h => {
@@ -1947,7 +1801,7 @@ function MetinKatkiPaneli({ metin, user, onDegisti, acik: acikProp, onToggle }) 
                         className={`text-left px-2 py-1.5 rounded-lg border text-xs transition flex items-start gap-1.5
                           ${dogru ? "border-green-500 bg-green-50 text-green-800 font-semibold" : "border-line bg-surface text-subtle hover:border-primary"}`}>
                         <span className="font-bold">{h}</span><span>{secenekler[h]}</span>
-                        {dogru && <span className="ml-auto">✓</span>}
+                        {dogru && <Check className="h-3.5 w-3.5 ml-auto shrink-0" />}
                       </button>
                     );
                   })}
@@ -1979,9 +1833,9 @@ function MetinKatkiPaneli({ metin, user, onDegisti, acik: acikProp, onToggle }) 
                       <span className="text-content text-xs">{nesne && q.no ? `${q.no}. ` : ""}{soruMetni}</span>
                     </div>
                     {subjektif ? (
-                      <div className="text-[11px] text-amber-700 mt-1 ml-1">
-                        ✎ Açık uçlu — otomatik değerlendirilmez.
-                        {modelCevap && <span className="text-subtle"> Örnek/yönlendirme: {modelCevap}</span>}
+                      <div className="inline-flex items-start gap-1 text-[11px] text-amber-700 mt-1 ml-1">
+                        <Edit2 className="h-3 w-3 mt-0.5 shrink-0" /><span>Açık uçlu — otomatik değerlendirilmez.
+                        {modelCevap && <span className="text-subtle"> Örnek/yönlendirme: {modelCevap}</span>}</span>
                       </div>
                     ) : (
                       modelCevap && <div className="text-[11px] text-green-700 mt-1 ml-1">Model cevap: {modelCevap}</div>
@@ -2075,10 +1929,10 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
 
   const turLabel = { hikaye: "Hikaye", bilgilendirici: "Bilgilendirici", siir: "Şiir" };
   const durumBadge = (d) => ({
-    beklemede: <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded-full">⏳ Onay Bekliyor</span>,
-    oylama: <span className="px-2 py-0.5 bg-blue-100 text-primary text-xs rounded-full">🗳️ Oylamada</span>,
-    havuzda: <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">✅ Havuzda</span>,
-    reddedildi: <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">❌ Reddedildi</span>,
+    beklemede: <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full"><Clock className="h-3 w-3" />Onay Bekliyor</span>,
+    oylama: <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-primary text-xs rounded-full"><Users className="h-3 w-3" />Oylamada</span>,
+    havuzda: <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full"><CheckCircle className="h-3 w-3" />Havuzda</span>,
+    reddedildi: <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full"><XCircle className="h-3 w-3" />Reddedildi</span>,
   }[d] || null);
 
   const oyKullandi = (m) => m.oylar && m.oylar[user?.id];
@@ -2099,14 +1953,14 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
       {/* Üst bar */}
       <div className="flex items-center justify-between">
         <h3 className="font-semibold text-content">{secimModu ? "Analiz Metinleri" : "Analiz Metinleri"}</h3>
-        <Button onClick={() => setFormAcik(!formAcik)} className="bg-gradient-to-r from-orange-500 to-red-500 text-white" size="sm">
+        <Button onClick={() => setFormAcik(!formAcik)} className="bg-primary hover:bg-primary-hover text-white" size="sm">
           <Plus className="h-4 w-4 mr-1"/>{formAcik ? "İptal" : "Metin Ekle (+5 puan)"}
         </Button>
       </div>
 
       {/* Metin Ekleme Formu */}
       {formAcik && (
-        <Card className="border-2 border-orange-200">
+        <Card className="border border-line shadow-sm">
           <CardContent className="p-5">
             <form onSubmit={kaydet} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -2131,7 +1985,7 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
               <div>
                 <Label>Metin İçeriği</Label>
                 <textarea value={form.icerik} onChange={e => setForm({...form, icerik: e.target.value})} required rows={8}
-                  className="w-full border border-line rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-y font-serif leading-relaxed" />
+                  className="w-full border border-line rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-y font-serif leading-relaxed" />
                 <p className="text-xs text-subtle mt-1">Kelime sayısı: {kelimeSay(form.icerik)}</p>
               </div>
               <div className="flex gap-3">
@@ -2146,9 +2000,9 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
       {/* Admin: Onay Bekleyenler */}
       {(user?.role === "admin" || user?.role === "coordinator") && bekleyenler.length > 0 && (
         <div>
-          <h4 className="text-sm font-semibold text-yellow-700 mb-2">⏳ Onay Bekleyenler ({bekleyenler.length})</h4>
+          <h4 className="inline-flex items-center gap-1.5 text-sm font-semibold text-amber-700 mb-2"><Clock className="h-4 w-4" />Onay Bekleyenler ({bekleyenler.length})</h4>
           {bekleyenler.map(m => (
-            <div key={m.id} className="border-2 border-yellow-200 rounded-xl p-4 mb-2 bg-yellow-50">
+            <div key={m.id} className="border border-line border-l-4 border-l-amber-400 rounded-xl p-4 mb-2 bg-amber-50">
               <div className="flex items-start justify-between">
                 <div>
                   <div className="font-semibold">{m.baslik}</div>
@@ -2157,9 +2011,9 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
                 </div>
               </div>
               <div className="flex gap-2 mt-3 flex-wrap">
-                <Button size="sm" onClick={() => adminKarar(m.id, true, false)} className="bg-primary hover:bg-primary-hover text-white">🗳️ Oylama Başlat</Button>
-                <Button size="sm" onClick={() => adminKarar(m.id, true, true)} className="bg-green-600 hover:bg-green-700 text-white">✅ Direkt Havuza Al</Button>
-                <Button size="sm" variant="destructive" onClick={() => adminKarar(m.id, false)}>❌ Reddet</Button>
+                <Button size="sm" onClick={() => adminKarar(m.id, true, false)} className="bg-primary hover:bg-primary-hover text-white"><Users className="h-4 w-4 mr-1" />Oylama Başlat</Button>
+                <Button size="sm" onClick={() => adminKarar(m.id, true, true)} className="bg-green-600 hover:bg-green-700 text-white"><CheckCircle className="h-4 w-4 mr-1" />Direkt Havuza Al</Button>
+                <Button size="sm" variant="destructive" onClick={() => adminKarar(m.id, false)}><XCircle className="h-4 w-4 mr-1" />Reddet</Button>
                 <Button size="sm" variant="destructive" onClick={() => sil(m.id)}><Trash2 className="h-4 w-4"/></Button>
               </div>
             </div>
@@ -2170,7 +2024,7 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
       {/* Oylamadakiler */}
       {oylamadakiler.length > 0 && (user?.role === "admin" || user?.role === "teacher") && (
         <div>
-          <h4 className="text-sm font-semibold text-primary mb-2">🗳️ Oylamada ({oylamadakiler.length})</h4>
+          <h4 className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary mb-2"><Users className="h-4 w-4" />Oylamada ({oylamadakiler.length})</h4>
           {oylamadakiler.map(m => {
             const kullandi = oyKullandi(m);
             const oran = onayOrani(m);
@@ -2182,26 +2036,26 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
                     <div className="font-semibold">{m.baslik}</div>
                     <div className="text-xs text-subtle">{m.sinif_seviyesi}. Sınıf • {turLabel[m.tur]} • {m.kelime_sayisi} kelime • Ekleyen: {m.ekleyen_ad}</div>
                   </div>
-                  {oran !== null && <div className="text-right"><div className="text-lg font-bold text-primary">%{oran}</div><div className="text-xs text-subtle">{oyCount} oy</div></div>}
+                  {oran !== null && <div className="text-right"><div className="text-lg font-bold text-primary tabular-nums">%{oran}</div><div className="text-xs text-subtle tabular-nums">{oyCount} oy</div></div>}
                 </div>
                 {oran !== null && (
                   <div className="mb-3">
-                    <div className="w-full bg-gray-200 rounded-full h-1.5">
-                      <div className={`h-1.5 rounded-full ${oran >= 60 ? 'bg-green-500' : 'bg-orange-500'}`} style={{width:`${oran}%`}}></div>
+                    <div className="w-full bg-app rounded-full h-1.5">
+                      <div className={`h-1.5 rounded-full ${oran >= 60 ? 'bg-green-500' : 'bg-amber-500'}`} style={{width:`${oran}%`}}></div>
                     </div>
                     <p className="text-xs text-subtle mt-1">%60 onay gerekli</p>
                   </div>
                 )}
                 <p className="text-sm text-subtle mb-3 line-clamp-2">{m.icerik}</p>
                 {kullandi ? (
-                  <div className="text-sm bg-app p-2 rounded-lg text-subtle">
-                    ✓ Oyunuzu kullandınız: <strong>{kullandi.onay ? "Onay" : "Red"}</strong>
-                    {!kullandi.onay && kullandi.sebep && <span> — {kullandi.sebep}</span>}
+                  <div className="inline-flex items-center gap-1.5 text-sm bg-app p-2 rounded-lg text-subtle">
+                    <Check className="h-4 w-4 shrink-0" /><span>Oyunuzu kullandınız: <strong>{kullandi.onay ? "Onay" : "Red"}</strong>
+                    {!kullandi.onay && kullandi.sebep && <span> — {kullandi.sebep}</span>}</span>
                   </div>
                 ) : (
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={() => oyVer(m.id, true)} className="bg-green-600 hover:bg-green-700 text-white">✅ Onayla (+2 puan)</Button>
-                    <Button size="sm" variant="destructive" onClick={() => { setRedDialog(m.id); }}>❌ Reddet</Button>
+                    <Button size="sm" onClick={() => oyVer(m.id, true)} className="bg-green-600 hover:bg-green-700 text-white"><CheckCircle className="h-4 w-4 mr-1" />Onayla (+2 puan)</Button>
+                    <Button size="sm" variant="destructive" onClick={() => { setRedDialog(m.id); }}><XCircle className="h-4 w-4 mr-1" />Reddet</Button>
                   </div>
                 )}
               </div>
@@ -2217,16 +2071,16 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
         return (
       <div className={`space-y-2 ${tamEkran ? "" : "max-h-96 overflow-y-auto"}`}>
         <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
-          <h4 className="text-sm font-semibold text-green-700">✅ Havuzdaki Metinler ({havuzdakiler.length}{kelimeAralik ? ` / ${havuzTumu.length}` : ""})</h4>
+          <h4 className="inline-flex items-center gap-1.5 text-sm font-semibold text-green-700"><CheckCircle className="h-4 w-4" />Havuzdaki Metinler ({havuzdakiler.length}{kelimeAralik ? ` / ${havuzTumu.length}` : ""})</h4>
         </div>
         {/* Seviye (kelime sayısı) aralık filtresi */}
         <div className="flex items-center gap-1.5 flex-wrap mb-1">
           <span className="text-xs text-subtle">Seviye:</span>
           <button type="button" onClick={() => setKelimeAralik(null)}
-            className={`px-2 py-1 rounded-full text-xs border transition ${!kelimeAralik ? 'bg-primary text-white border-blue-600' : 'bg-surface text-subtle border-line hover:bg-app'}`}>Tümü</button>
+            className={`px-2 py-1 rounded-full text-xs border transition ${!kelimeAralik ? 'bg-primary text-white border-primary' : 'bg-surface text-subtle border-line hover:bg-app'}`}>Tümü</button>
           {KELIME_ARALIKLARI.map(a => (
             <button key={a.l} type="button" onClick={() => setKelimeAralik(kelimeAralik?.l === a.l ? null : a)}
-              className={`px-2 py-1 rounded-full text-xs border transition ${kelimeAralik?.l === a.l ? 'bg-primary text-white border-blue-600' : 'bg-surface text-subtle border-line hover:bg-app'}`}>{a.l}</button>
+              className={`px-2 py-1 rounded-full text-xs border transition ${kelimeAralik?.l === a.l ? 'bg-primary text-white border-primary' : 'bg-surface text-subtle border-line hover:bg-app'}`}>{a.l}</button>
           ))}
         </div>
         {havuzdakiler.length === 0 && <p className="text-subtle text-sm text-center py-6">{havuzTumu.length === 0 ? "Henüz havuzda metin yok. Metin ekleyip onaylayın." : "Bu seviye aralığında metin yok."}</p>}
@@ -2242,7 +2096,7 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
               title="Cevap anahtarı & görsel için tıklayın">
               <div className="flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-subtle text-xs">{secili ? "▼" : "▶"}</span>
+                  <span className="text-subtle shrink-0">{secili ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</span>
                   <span className="font-semibold">{m.baslik}</span>
                   {durumBadge(m.durum)}
                 </div>
@@ -2251,10 +2105,10 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
               </div>
               <div className="flex items-center gap-2 ml-2 shrink-0">
                 {secimModu && m.durum === "havuzda" && onMetinSec && (
-                  <Button size="sm" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={(e) => { e.stopPropagation(); onMetinSec(m); }}>Seç</Button>
+                  <Button size="sm" className="bg-primary hover:bg-primary-hover text-white" onClick={(e) => { e.stopPropagation(); onMetinSec(m); }}>Seç</Button>
                 )}
                 {onDuzenle && ["admin", "coordinator", "teacher"].includes(user?.role) && (
-                  <Button size="sm" variant="outline" className="border-primary text-primary" onClick={(e) => { e.stopPropagation(); onDuzenle(m); }}>✏️ Düzenle</Button>
+                  <Button size="sm" variant="outline" className="border-primary text-primary" onClick={(e) => { e.stopPropagation(); onDuzenle(m); }}><Edit2 className="h-4 w-4 mr-1" />Düzenle</Button>
                 )}
                 {(user?.role === "admin" || user?.role === "coordinator") && (
                   <Button variant="destructive" size="sm" onClick={(e) => { e.stopPropagation(); sil(m.id); }}><Trash2 className="h-4 w-4"/></Button>
@@ -2270,43 +2124,43 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
       })()}
 
       {/* Puan Rehberi */}
-      <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-sm">
+      <div className="bg-app border border-line rounded-xl p-4 text-sm">
           <div className="flex items-center justify-between mb-2">
-            <div className="font-semibold text-orange-800">🎯 Metin Katkı Puanları</div>
+            <div className="inline-flex items-center gap-1.5 font-semibold text-content"><Target className="h-4 w-4 text-primary" />Metin Katkı Puanları</div>
             {(user?.role === "admin" || user?.role === "coordinator") && (
               <button onClick={() => setPuanDuzenle(!puanDuzenle)}
-                className="text-xs px-2 py-1 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 border border-orange-300">
-                {puanDuzenle ? '✕ Kapat' : '⚙️ Düzenle'}
+                className="inline-flex items-center gap-1 text-xs px-2 py-1 bg-surface text-subtle rounded-lg hover:bg-app border border-line">
+                {puanDuzenle ? <><XCircle className="h-3.5 w-3.5" />Kapat</> : <><Edit2 className="h-3.5 w-3.5" />Düzenle</>}
               </button>
             )}
           </div>
           {!puanDuzenle ? (
-            <div className="space-y-1 text-orange-700">
-              <div className="flex justify-between"><span>📝 Metin ekle</span><span className="font-bold">+{puanAyarlari.metin_ekleme} puan</span></div>
-              <div className="flex justify-between"><span>🗳️ Oylama katıl</span><span className="font-bold">+{puanAyarlari.oylama_katilim} puan</span></div>
-              <div className="flex justify-between"><span>🌟 Metin havuza girince</span><span className="font-bold">+{puanAyarlari.metin_havuza_girme} puan</span></div>
+            <div className="space-y-1 text-subtle">
+              <div className="flex justify-between"><span className="inline-flex items-center gap-1.5"><FileText className="h-3.5 w-3.5" />Metin ekle</span><span className="font-bold text-content tabular-nums">+{puanAyarlari.metin_ekleme} puan</span></div>
+              <div className="flex justify-between"><span className="inline-flex items-center gap-1.5"><Users className="h-3.5 w-3.5" />Oylama katıl</span><span className="font-bold text-content tabular-nums">+{puanAyarlari.oylama_katilim} puan</span></div>
+              <div className="flex justify-between"><span className="inline-flex items-center gap-1.5"><Star className="h-3.5 w-3.5" />Metin havuza girince</span><span className="font-bold text-content tabular-nums">+{puanAyarlari.metin_havuza_girme} puan</span></div>
             </div>
           ) : (
             <div className="space-y-3 mt-2">
               <div className="flex items-center justify-between gap-3">
-                <span className="text-orange-700">📝 Metin ekle</span>
+                <span className="inline-flex items-center gap-1.5 text-subtle"><FileText className="h-3.5 w-3.5" />Metin ekle</span>
                 <input type="number" min="0" value={puanAyarlari.metin_ekleme}
                   onChange={e => setPuanAyarlari({...puanAyarlari, metin_ekleme: parseInt(e.target.value) || 0})}
-                  className="w-20 border border-orange-300 rounded-lg p-1 text-center text-sm font-bold focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                  className="w-20 border border-line rounded-lg p-1 text-center text-sm font-bold tabular-nums focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
               <div className="flex items-center justify-between gap-3">
-                <span className="text-orange-700">🗳️ Oylama katıl</span>
+                <span className="inline-flex items-center gap-1.5 text-subtle"><Users className="h-3.5 w-3.5" />Oylama katıl</span>
                 <input type="number" min="0" value={puanAyarlari.oylama_katilim}
                   onChange={e => setPuanAyarlari({...puanAyarlari, oylama_katilim: parseInt(e.target.value) || 0})}
-                  className="w-20 border border-orange-300 rounded-lg p-1 text-center text-sm font-bold focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                  className="w-20 border border-line rounded-lg p-1 text-center text-sm font-bold tabular-nums focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
               <div className="flex items-center justify-between gap-3">
-                <span className="text-orange-700">🌟 Metin havuza girince</span>
+                <span className="inline-flex items-center gap-1.5 text-subtle"><Star className="h-3.5 w-3.5" />Metin havuza girince</span>
                 <input type="number" min="0" value={puanAyarlari.metin_havuza_girme}
                   onChange={e => setPuanAyarlari({...puanAyarlari, metin_havuza_girme: parseInt(e.target.value) || 0})}
-                  className="w-20 border border-orange-300 rounded-lg p-1 text-center text-sm font-bold focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                  className="w-20 border border-line rounded-lg p-1 text-center text-sm font-bold tabular-nums focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
-              <Button size="sm" className="w-full bg-orange-600 hover:bg-orange-700 text-white mt-2"
+              <Button size="sm" className="w-full bg-primary hover:bg-primary-hover text-white mt-2"
                 onClick={async () => {
                   try {
                     await axios.put(`${API}/ayarlar/puanlar`, puanAyarlari);
@@ -2314,7 +2168,7 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
                     setPuanDuzenle(false);
                   } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
                 }}>
-                💾 Kaydet
+                <Save className="h-4 w-4 mr-1" />Kaydet
               </Button>
             </div>
           )}
@@ -2324,12 +2178,12 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
       <Dialog open={!!redDialog} onOpenChange={() => { setRedDialog(null); setRedSebep(""); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>❌ Reddetme Sebebi</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><XCircle className="h-5 w-5 text-red-600" />Reddetme Sebebi</DialogTitle>
             <DialogDescription>Bu metni neden reddediyorsunuz?</DialogDescription>
           </DialogHeader>
           <textarea value={redSebep} onChange={e => setRedSebep(e.target.value)} rows={4}
             placeholder="Lütfen sebebinizi açıklayın..."
-            className="w-full border border-line rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none" />
+            className="w-full border border-line rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none" />
           <div className="flex gap-2">
             <Button variant="destructive" className="flex-1" disabled={!redSebep.trim()} onClick={() => oyVer(redDialog, false, redSebep)}>Reddet</Button>
             <Button variant="outline" className="flex-1" onClick={() => { setRedDialog(null); setRedSebep(""); }}>İptal</Button>
@@ -2408,16 +2262,16 @@ function MetinDuzenleEkrani({ metin, user, onGeri }) {
       {/* Üst bar */}
       <div className="flex items-center justify-between gap-3 sticky top-0 bg-app z-10 py-2">
         <div className="flex items-center gap-3 min-w-0">
-          <Button variant="outline" size="sm" onClick={onGeri}>← Geri</Button>
-          <h2 className="text-xl font-bold truncate">✏️ Metni Düzenle</h2>
+          <Button variant="outline" size="sm" onClick={onGeri}><ArrowLeft className="h-4 w-4 mr-1" />Geri</Button>
+          <h2 className="inline-flex items-center gap-2 text-xl font-bold truncate"><Edit2 className="h-5 w-5" />Metni Düzenle</h2>
         </div>
         <Button onClick={kaydet} disabled={kaydediyor} className="bg-green-600 hover:bg-green-700 text-white shrink-0">
-          {kaydediyor ? "Kaydediliyor…" : "💾 Kaydet"}
+          <Save className="h-4 w-4 mr-1" />{kaydediyor ? "Kaydediliyor…" : "Kaydet"}
         </Button>
       </div>
 
       {/* Temel bilgiler */}
-      <Card className="border-0 shadow-sm"><CardContent className="p-5 space-y-4">
+      <Card className="border border-line shadow-sm"><CardContent className="p-5 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2"><Label>Başlık</Label><Input value={baslik} onChange={e => setBaslik(e.target.value)} /></div>
           <div><Label>Tür</Label>
@@ -2453,9 +2307,9 @@ function MetinDuzenleEkrani({ metin, user, onGeri }) {
       </CardContent></Card>
 
       {/* Görsel */}
-      <Card className="border-0 shadow-sm"><CardContent className="p-5">
+      <Card className="border border-line shadow-sm"><CardContent className="p-5">
         <div className="flex items-center justify-between gap-2">
-          <div className="font-semibold text-content">🖼️ Metin Görseli</div>
+          <div className="inline-flex items-center gap-2 font-semibold text-content"><ImageIcon className="h-4 w-4" />Metin Görseli</div>
           <div>
             <input ref={fileRef} type="file" accept="image/jpeg,image/png" className="hidden" onChange={gorselYukle} />
             <Button type="button" size="sm" disabled={gorselYukleniyor} onClick={() => fileRef.current?.click()} className="bg-purple-600 hover:bg-purple-700 text-white">
@@ -2469,7 +2323,7 @@ function MetinDuzenleEkrani({ metin, user, onGeri }) {
       </CardContent></Card>
 
       {/* MCQ soruları */}
-      <Card className="border-0 shadow-sm"><CardContent className="p-5 space-y-3">
+      <Card className="border border-line shadow-sm"><CardContent className="p-5 space-y-3">
         <div className="flex items-center justify-between">
           <div className="font-semibold text-content">Çoktan Seçmeli Sorular ({sorular.length})</div>
           <Button size="sm" variant="outline" onClick={soruEkle}><Plus className="h-4 w-4 mr-1" />Soru Ekle</Button>
@@ -2498,7 +2352,7 @@ function MetinDuzenleEkrani({ metin, user, onGeri }) {
       </CardContent></Card>
 
       {/* Açık uçlu sorular */}
-      <Card className="border-0 shadow-sm"><CardContent className="p-5 space-y-3">
+      <Card className="border border-line shadow-sm"><CardContent className="p-5 space-y-3">
         <div className="flex items-center justify-between">
           <div className="font-semibold text-content">Açık Uçlu Sorular ({acikSorular.length})</div>
           <Button size="sm" variant="outline" onClick={acikEkle}><Plus className="h-4 w-4 mr-1" />Soru Ekle</Button>
@@ -2534,7 +2388,7 @@ function MetinDuzenleEkrani({ metin, user, onGeri }) {
 
       <div className="flex justify-end">
         <Button onClick={kaydet} disabled={kaydediyor} className="bg-green-600 hover:bg-green-700 text-white">
-          {kaydediyor ? "Kaydediliyor…" : "💾 Kaydet"}
+          <Save className="h-4 w-4 mr-1" />{kaydediyor ? "Kaydediliyor…" : "Kaydet"}
         </Button>
       </div>
     </div>
@@ -2585,10 +2439,10 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
   const FontKontrol = ({ light = false }) => (
     <div className="flex items-center gap-1">
       <button onClick={fontKucult} aria-label="Yazıyı küçült"
-        className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${light ? 'bg-white/70 hover:bg-surface text-content border border-line' : 'bg-gray-100 hover:bg-gray-200 text-content'}`}
+        className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${light ? 'bg-white/70 hover:bg-surface text-content border border-line' : 'bg-app hover:bg-line text-content'}`}
         disabled={fontSize <= 14}>A−</button>
       <button onClick={fontBuyut} aria-label="Yazıyı büyüt"
-        className={`w-8 h-8 rounded-lg text-sm font-bold transition-all ${light ? 'bg-white/70 hover:bg-surface text-content border border-line' : 'bg-gray-100 hover:bg-gray-200 text-content'}`}
+        className={`w-8 h-8 rounded-lg text-sm font-bold transition-all ${light ? 'bg-white/70 hover:bg-surface text-content border border-line' : 'bg-app hover:bg-line text-content'}`}
         disabled={fontSize >= 24}>A+</button>
     </div>
   );
@@ -2600,7 +2454,7 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
           {cumleler.map((c, ci) => (
             <React.Fragment key={ci}>
               <span>{c.cumle}</span>
-              <sup className="ml-1 mr-1.5 text-gray-300 hover:text-orange-500 transition-all inline-block cursor-default align-super select-none"
+              <sup className="ml-1 mr-1.5 text-gray-300 hover:text-primary transition-all inline-block cursor-default align-super select-none tabular-nums"
                 style={{ fontSize: '0.55em' }}
                 onMouseEnter={e => { e.currentTarget.style.fontSize = '0.85em'; }}
                 onMouseLeave={e => { e.currentTarget.style.fontSize = '0.55em'; }}
@@ -2699,7 +2553,7 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
 
   // ── ÖĞRETMEN/ADMİN: Bölünmüş ekran ──
   return (
-    <div className="fixed inset-0 bg-gray-100 z-50 flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-app z-50 flex flex-col overflow-hidden">
       {/* Üst bar */}
       <div className="bg-surface border-b px-4 py-2 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
@@ -2710,8 +2564,8 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
           <FontKontrol />
           <div className="text-3xl font-mono font-bold text-content tabular-nums">{formatSure(sure)}</div>
           <button onClick={toggleSayac}
-            className={`px-4 py-2 rounded-xl text-white font-medium transition-all ${calisıyor ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}>
-            {calisıyor ? "⏸ Durdur" : "▶ Başlat"}
+            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-white font-medium transition-all ${calisıyor ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}>
+            {calisıyor ? <><Pause className="h-4 w-4" />Durdur</> : <><Play className="h-4 w-4" />Başlat</>}
           </button>
         </div>
       </div>
@@ -2731,7 +2585,7 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
           <div className="flex border-b shrink-0">
             {["Hata Takibi","Anlama","Prozodik","Kur & Bitir"].map((label, i) => (
               <button key={i} onClick={() => setRaporAdim(i)}
-                className={`flex-1 py-2 text-xs font-medium transition-all ${raporAdim===i ? 'border-b-2 border-orange-500 text-orange-600' : 'text-subtle hover:text-subtle'}`}>
+                className={`flex-1 py-2 text-xs font-medium transition-all ${raporAdim===i ? 'border-b-2 border-primary text-primary' : 'text-subtle hover:text-subtle'}`}>
                 {label}
               </button>
             ))}
@@ -2755,7 +2609,7 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
                 <div>
                   <label className="text-xs font-medium text-subtle">Gözlem Notu</label>
                   <textarea value={gozlemNotu} onChange={e => setGozlemNotu(e.target.value)} rows={3}
-                    className="w-full mt-1 border border-line rounded-xl p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                    className="w-full mt-1 border border-line rounded-xl p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary" />
                 </div>
               </div>
             )}
@@ -2801,7 +2655,7 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
                     <div className="grid grid-cols-4 gap-1">
                       {[1,2,3,4].map(p => (
                         <button key={p} onClick={() => setProzodik({...prozodik, [alan]: p})}
-                          className={`p-1.5 rounded-lg text-xs border text-center transition-all ${prozodik[alan]===p ? 'border-orange-400 bg-orange-50 text-orange-700 font-bold' : 'border-line text-subtle hover:bg-app'}`}>
+                          className={`p-1.5 rounded-lg text-xs border text-center transition-all ${prozodik[alan]===p ? 'border-primary bg-blue-50 text-primary font-bold' : 'border-line text-subtle hover:bg-app'}`}>
                           <div className="font-bold">{p}</div>
                           <div className="text-[10px] leading-tight">{aciklamalar[p-1]}</div>
                         </button>
@@ -2809,8 +2663,8 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
                     </div>
                   </div>
                 ))}
-                <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-center">
-                  <div className="text-sm text-orange-700 font-medium">Toplam: <span className="text-2xl font-bold">{prozodikToplam}</span>/20</div>
+                <div className="bg-app border border-line rounded-xl p-3 text-center">
+                  <div className="text-sm text-subtle font-medium">Toplam: <span className="text-2xl font-bold text-content tabular-nums">{prozodikToplam}</span>/20</div>
                 </div>
               </div>
             )}
@@ -2822,27 +2676,27 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
                   <label className="text-xs font-medium text-subtle">Öğretmen Notu</label>
                   <textarea value={ogretmenNotu} onChange={e => setOgretmenNotu(e.target.value)} rows={4}
                     placeholder="Genel değerlendirme ve öneriler..."
-                    className="w-full mt-1 border border-line rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                    className="w-full mt-1 border border-line rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary" />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-subtle">Kur Kararı</label>
                   <div className="grid grid-cols-3 gap-2 mt-2">
                     {["Kur 1","Kur 2","Kur 3"].map(k => (
                       <button key={k} onClick={() => setKurKarari(k)}
-                        className={`py-3 rounded-xl border-2 font-bold text-sm transition-all ${kurKarari===k ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-line text-subtle hover:border-orange-300'}`}>
+                        className={`py-3 rounded-xl border-2 font-bold text-sm transition-all ${kurKarari===k ? 'border-primary bg-blue-50 text-primary' : 'border-line text-subtle hover:border-primary'}`}>
                         {k}
                       </button>
                     ))}
                   </div>
                 </div>
                 <div className="text-xs text-subtle bg-app rounded-xl p-3 space-y-1">
-                  <div>⏱ Süre: <strong>{formatSure(sure)}</strong></div>
-                  <div>❌ Toplam hata: <strong>{hatalar.length}</strong></div>
-                  <div>📊 Prozodik: <strong>{prozodikToplam}/20</strong></div>
+                  <div className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" />Süre: <strong className="tabular-nums">{formatSure(sure)}</strong></div>
+                  <div className="flex items-center gap-1.5"><XCircle className="h-3.5 w-3.5" />Toplam hata: <strong className="tabular-nums">{hatalar.length}</strong></div>
+                  <div className="flex items-center gap-1.5"><BarChart3 className="h-3.5 w-3.5" />Prozodik: <strong className="tabular-nums">{prozodikToplam}/20</strong></div>
                 </div>
                 <button onClick={tamamla} disabled={sure===0 || !kurKarari}
-                  className="w-full py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-all">
-                  {sure===0 ? "Önce süre sayacını başlatın" : !kurKarari ? "Kur kararı seçin" : "✅ Analizi Tamamla ve Raporu Oluştur"}
+                  className="w-full inline-flex items-center justify-center gap-1.5 py-4 bg-primary hover:bg-primary-hover text-white font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+                  {sure===0 ? "Önce süre sayacını başlatın" : !kurKarari ? "Kur kararı seçin" : <><CheckCircle className="h-5 w-5" />Analizi Tamamla ve Raporu Oluştur</>}
                 </button>
               </div>
             )}
@@ -2851,9 +2705,9 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
           {/* Alt navigasyon */}
           <div className="flex border-t p-3 gap-2 shrink-0">
             <button onClick={() => setRaporAdim(a => Math.max(0, a-1))} disabled={raporAdim===0}
-              className="flex-1 py-2 text-sm border border-line rounded-xl disabled:opacity-30 hover:bg-app">← Geri</button>
+              className="flex-1 inline-flex items-center justify-center gap-1 py-2 text-sm border border-line rounded-xl disabled:opacity-30 hover:bg-app"><ArrowLeft className="h-4 w-4" />Geri</button>
             <button onClick={() => setRaporAdim(a => Math.min(3, a+1))} disabled={raporAdim===3}
-              className="flex-1 py-2 text-sm bg-orange-500 text-white rounded-xl disabled:opacity-30 hover:bg-orange-600">İleri →</button>
+              className="flex-1 inline-flex items-center justify-center gap-1 py-2 text-sm bg-primary hover:bg-primary-hover text-white rounded-xl disabled:opacity-30">İleri<ArrowRight className="h-4 w-4" /></button>
           </div>
         </div>
       </div>
@@ -2879,23 +2733,23 @@ function AnalizSonucEkrani({ sonuc, ogrenci, onKaydet, onYeniAnaliz }) {
 
       {/* Temel İstatistikler */}
       <div className="grid grid-cols-3 gap-4">
-        <Card className="border-0 shadow-sm text-center">
+        <Card className="border border-line shadow-sm text-center">
           <CardContent className="p-5">
-            <div className="text-3xl font-bold text-primary">{sonuc.wpm}</div>
+            <div className="text-3xl font-bold text-primary tabular-nums">{sonuc.wpm}</div>
             <div className="text-xs text-subtle mt-1">kelime/dakika</div>
             <div className={`text-sm font-medium mt-1 ${hizRenk[sonuc.hiz_deger]}`}>{hizLabel[sonuc.hiz_deger]}</div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm text-center">
+        <Card className="border border-line shadow-sm text-center">
           <CardContent className="p-5">
-            <div className="text-3xl font-bold text-green-600">%{sonuc.dogruluk_yuzde}</div>
+            <div className="text-3xl font-bold text-green-600 tabular-nums">%{sonuc.dogruluk_yuzde}</div>
             <div className="text-xs text-subtle mt-1">doğruluk oranı</div>
-            <div className="text-sm font-medium mt-1 text-subtle">{sonuc.hata_sayilari ? Object.values(sonuc.hata_sayilari).reduce((a,b)=>a+b,0) : 0} hata</div>
+            <div className="text-sm font-medium mt-1 text-subtle tabular-nums">{sonuc.hata_sayilari ? Object.values(sonuc.hata_sayilari).reduce((a,b)=>a+b,0) : 0} hata</div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm text-center">
+        <Card className="border border-line shadow-sm text-center">
           <CardContent className="p-5">
-            <div className="text-3xl font-bold text-orange-600">{formatSure(sonuc.sure_saniye)}</div>
+            <div className="text-3xl font-bold text-content tabular-nums">{formatSure(sonuc.sure_saniye)}</div>
             <div className="text-xs text-subtle mt-1">okuma süresi</div>
           </CardContent>
         </Card>
@@ -2903,14 +2757,14 @@ function AnalizSonucEkrani({ sonuc, ogrenci, onKaydet, onYeniAnaliz }) {
 
       {/* Hata Dağılımı */}
       {sonuc.hata_sayilari && (
-        <Card className="border-0 shadow-sm">
+        <Card className="border border-line shadow-sm">
           <CardHeader><CardTitle className="text-base">Hata Dağılımı</CardTitle></CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-3">
-              {[["atlama","Atlama","red"],["yanlis_okuma","Yanlış Okuma","orange"],["takilma","Takılma","yellow"],["tekrar","Tekrar","purple"]].map(([key,label,color]) => (
-                <div key={key} className={`flex items-center justify-between p-3 bg-${color}-50 rounded-xl border border-${color}-200`}>
+              {[["atlama","Atlama","bg-red-50 border-red-200","text-red-600"],["yanlis_okuma","Yanlış Okuma","bg-orange-50 border-orange-200","text-orange-600"],["takilma","Takılma","bg-yellow-50 border-yellow-200","text-yellow-600"],["tekrar","Tekrar","bg-purple-50 border-purple-200","text-purple-600"]].map(([key,label,kutu,yazi]) => (
+                <div key={key} className={`flex items-center justify-between p-3 rounded-xl border ${kutu}`}>
                   <span className="text-sm font-medium">{label}</span>
-                  <span className={`text-lg font-bold text-${color}-600`}>{sonuc.hata_sayilari[key] || 0}</span>
+                  <span className={`text-lg font-bold tabular-nums ${yazi}`}>{sonuc.hata_sayilari[key] || 0}</span>
                 </div>
               ))}
             </div>
@@ -2919,14 +2773,14 @@ function AnalizSonucEkrani({ sonuc, ogrenci, onKaydet, onYeniAnaliz }) {
       )}
 
       {/* Kur Kararı */}
-      <Card className="border-2 border-orange-200 shadow-sm">
+      <Card className="border border-line shadow-sm border-l-4 border-l-primary">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="text-sm text-subtle">Sistem Önerisi</div>
-              <div className="text-2xl font-bold text-orange-600">{sonuc.sistem_kur}</div>
+              <div className="text-2xl font-bold text-primary">{sonuc.sistem_kur}</div>
             </div>
-            <div className="text-4xl">🎯</div>
+            <Target className="h-9 w-9 text-primary" />
           </div>
           <div>
             <Label>Öğretmen Kararı</Label>
@@ -2940,8 +2794,8 @@ function AnalizSonucEkrani({ sonuc, ogrenci, onKaydet, onYeniAnaliz }) {
             </Select>
           </div>
           <Button onClick={() => onKaydet(ogretmenKur)}
-            className="w-full mt-4 bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold py-3">
-            ✅ Onayla ve Kaydet
+            className="w-full mt-4 bg-primary hover:bg-primary-hover text-white font-bold py-3">
+            <CheckCircle className="h-4 w-4 mr-1" />Onayla ve Kaydet
           </Button>
         </CardContent>
       </Card>
@@ -2955,6 +2809,23 @@ function AnalizSonucEkrani({ sonuc, ogrenci, onKaydet, onYeniAnaliz }) {
 // RaporFormu — AI Destekli, Ölçüt Eklenebilir, Yorum Düzenlenebilir
 // Bu fonksiyonu App.js'deki eski RaporFormu ile değiştirin
 // ══════════════════════════════════════════════
+
+// Modül seviyesinde — RaporFormu render'ı içinde tanımlanınca her tuş vuruşunda
+// remount olup textarea focus'u kaybediyordu. State prop olarak geçiriliyor.
+function YorumAlani({ baslik, alan, placeholder, ikon: Ikon, yorumlar, setYorumlar }) {
+  return (
+    <div className="mb-4">
+      <label className="inline-flex items-center gap-1.5 text-sm font-semibold text-content mb-1">{Ikon && <Ikon className="h-4 w-4" />}{baslik}</label>
+      <textarea
+        value={yorumlar[alan]}
+        onChange={e => setYorumlar({ ...yorumlar, [alan]: e.target.value })}
+        rows={4}
+        placeholder={placeholder || "AI ile oluşturun veya el ile yazın..."}
+        className="w-full border border-line rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none leading-relaxed"
+      />
+    </div>
+  );
+}
 
 function RaporFormu({ oturum, sonuc, ogrenci, metin, onRaporTamamla }) {
   const { toast } = useToast();
@@ -3034,7 +2905,7 @@ function RaporFormu({ oturum, sonuc, ogrenci, metin, onRaporTamamla }) {
         ))}
         {isEk && (
           <button onClick={() => setEkAnlamaOlcutleri(prev => prev.filter(o => o.id !== ekId))}
-            className="ml-2 text-red-400 hover:text-red-600 text-xs">✕</button>
+            className="ml-2 text-red-400 hover:text-red-600" aria-label="Kaldır"><XCircle className="h-3.5 w-3.5" /></button>
         )}
       </div>
     </div>
@@ -3047,7 +2918,7 @@ function RaporFormu({ oturum, sonuc, ogrenci, metin, onRaporTamamla }) {
         <div className="font-medium text-sm text-content mb-2">{etiket}</div>
         {isEk && (
           <button onClick={() => setEkProzodikOlcutleri(prev => prev.filter(o => o.id !== ekId))}
-            className="text-red-400 hover:text-red-600 text-xs mb-2">✕ Kaldır</button>
+            className="inline-flex items-center gap-1 text-red-400 hover:text-red-600 text-xs mb-2"><XCircle className="h-3.5 w-3.5" />Kaldır</button>
         )}
       </div>
       <div className="grid grid-cols-4 gap-1">
@@ -3061,7 +2932,7 @@ function RaporFormu({ oturum, sonuc, ogrenci, metin, onRaporTamamla }) {
           }}
             className={`p-2 rounded-lg text-xs border text-center transition-all leading-tight ${
               (isEk ? ekProzodikOlcutleri.find(o=>o.id===ekId)?.puan : prozodik[alan]) === p
-                ? 'border-orange-400 bg-orange-50 text-orange-700 font-medium'
+                ? 'border-primary bg-blue-50 text-primary font-medium'
                 : 'border-line bg-surface text-subtle hover:bg-app'
             }`}>
             <div className="font-bold text-sm mb-1">{p} puan</div>
@@ -3176,18 +3047,8 @@ JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
   };
 
   // ── Düzenlenebilir yorum bileşeni ──
-  const YorumAlani = ({ baslik, alan, placeholder }) => (
-    <div className="mb-4">
-      <label className="text-sm font-semibold text-content mb-1 block">{baslik}</label>
-      <textarea
-        value={aiYorumlar[alan]}
-        onChange={e => setAiYorumlar({ ...aiYorumlar, [alan]: e.target.value })}
-        rows={4}
-        placeholder={placeholder || "AI ile oluşturun veya el ile yazın..."}
-        className="w-full border border-line rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none leading-relaxed"
-      />
-    </div>
-  );
+  // YorumAlani modül seviyesinde tanımlı (aşağıda); render içinde tanımlanınca
+  // her tuş vuruşunda remount olup textarea focus'unu kaybediyordu.
 
   // ── Kaydet ──
   const kaydet = async () => {
@@ -3251,22 +3112,22 @@ JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
 
       {/* Özet bilgiler */}
       <div className="grid grid-cols-3 gap-3">
-        <Card className="border-0 shadow-sm text-center"><CardContent className="p-4">
-          <div className="text-2xl font-bold text-primary">{sonuc.wpm}</div>
+        <Card className="border border-line shadow-sm text-center"><CardContent className="p-4">
+          <div className="text-2xl font-bold text-primary tabular-nums">{sonuc.wpm}</div>
           <div className="text-xs text-subtle">kelime/dk</div>
         </CardContent></Card>
-        <Card className="border-0 shadow-sm text-center"><CardContent className="p-4">
-          <div className="text-2xl font-bold text-green-600">%{sonuc.dogruluk_yuzde}</div>
+        <Card className="border border-line shadow-sm text-center"><CardContent className="p-4">
+          <div className="text-2xl font-bold text-green-600 tabular-nums">%{sonuc.dogruluk_yuzde}</div>
           <div className="text-xs text-subtle">doğruluk</div>
         </CardContent></Card>
-        <Card className="border-0 shadow-sm text-center"><CardContent className="p-4">
-          <div className="text-2xl font-bold text-orange-600">{sonuc.atanan_kur || sonuc.sistem_kur}</div>
+        <Card className="border border-line shadow-sm text-center"><CardContent className="p-4">
+          <div className="text-2xl font-bold text-primary tabular-nums">{sonuc.atanan_kur || sonuc.sistem_kur}</div>
           <div className="text-xs text-subtle">atanan kur</div>
         </CardContent></Card>
       </div>
 
       {/* ══ 4. Okuduğunu Anlama ══ */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader>
           <CardTitle className="text-base flex items-center justify-between">
             <span>4. Okuduğunu Anlama Becerileri</span>
@@ -3374,14 +3235,14 @@ JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
       </Card>
 
       {/* ══ 5. Prozodik Okuma ══ */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader>
           <CardTitle className="text-base flex items-center justify-between">
             <span>5. Prozodik Okuma Ölçeği</span>
             <div className="flex items-center gap-3">
-              <span className="text-lg font-bold text-orange-600">Toplam: {prozodikToplam}/{20 + ekProzodikOlcutleri.length * 4}</span>
+              <span className="text-lg font-bold text-primary tabular-nums">Toplam: {prozodikToplam}/{20 + ekProzodikOlcutleri.length * 4}</span>
               <button onClick={() => setProzodikEkleAcik(!prozodikEkleAcik)}
-                className="text-xs px-3 py-1 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 transition-all border border-orange-200">
+                className="text-xs px-3 py-1 bg-blue-50 text-primary rounded-lg hover:bg-blue-100 transition-all border border-line">
                 + Ölçüt Ekle
               </button>
             </div>
@@ -3390,16 +3251,16 @@ JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
         <CardContent>
           {/* Prozodik ölçüt ekleme */}
           {prozodikEkleAcik && (
-            <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 space-y-3 mb-4">
-              <div className="text-sm font-semibold text-orange-700">Yeni Prozodik Ölçüt Ekle</div>
+            <div className="bg-app border border-line rounded-xl p-4 space-y-3 mb-4">
+              <div className="text-sm font-semibold text-content">Yeni Prozodik Ölçüt Ekle</div>
               <input value={yeniProzodikAdi} onChange={e => setYeniProzodikAdi(e.target.value)}
                 placeholder="Ölçüt adı (ör: Diyalog ifadesi)"
-                className="w-full border border-orange-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                className="w-full border border-line rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
               <div className="flex gap-2">
                 <button onClick={prozodikOlcutEkle}
-                  className="px-4 py-2 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-700">Ekle</button>
+                  className="px-4 py-2 bg-primary hover:bg-primary-hover text-white text-sm rounded-lg">Ekle</button>
                 <button onClick={() => setProzodikEkleAcik(false)}
-                  className="px-4 py-2 bg-gray-200 text-content text-sm rounded-lg hover:bg-gray-300">İptal</button>
+                  className="px-4 py-2 bg-surface border border-line text-content text-sm rounded-lg hover:bg-app">İptal</button>
               </div>
             </div>
           )}
@@ -3425,28 +3286,26 @@ JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
       </Card>
 
       {/* ══ 6. AI Yorumları ══ */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader>
           <CardTitle className="text-base flex items-center justify-between">
             <span>6. Değerlendirme Yorumları</span>
             <button onClick={aiYorumlariOlustur} disabled={aiYukleniyor}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                 aiYukleniyor
-                  ? 'bg-gray-200 text-subtle cursor-not-allowed'
-                  : 'bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:from-purple-600 hover:to-blue-600 shadow-md'
+                  ? 'bg-app text-subtle cursor-not-allowed'
+                  : 'bg-primary hover:bg-primary-hover text-white shadow-sm'
               }`}>
               {aiYukleniyor ? (
-                <span className="flex items-center gap-2">
-                  <span className="animate-spin">⏳</span> AI Oluşturuyor...
-                </span>
-              ) : aiOlusturuldu ? "🔄 Yeniden Oluştur" : "🤖 AI ile Oluştur"}
+                <><RefreshCw className="h-4 w-4 animate-spin" />AI Oluşturuyor...</>
+              ) : aiOlusturuldu ? <><RefreshCw className="h-4 w-4" />Yeniden Oluştur</> : <><Sparkles className="h-4 w-4" />AI ile Oluştur</>}
             </button>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-1">
           {!aiOlusturuldu && !Object.values(aiYorumlar).some(v => v) && (
             <div className="text-center py-8 text-subtle">
-              <div className="text-4xl mb-3">🤖</div>
+              <Sparkles className="h-10 w-10 mx-auto mb-3 text-primary" />
               <p className="text-sm">Önce yukarıdaki ölçütleri doldurun, sonra<br/><strong>"AI ile Oluştur"</strong> butonuna tıklayın</p>
               <p className="text-xs mt-2 text-subtle">AI, sayısal verilere göre her bölüm için profesyonel yorum yazacak.</p>
               <p className="text-xs text-subtle">Oluşturulan yorumları istediğiniz gibi düzenleyebilirsiniz.</p>
@@ -3454,29 +3313,29 @@ JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
           )}
           {(aiOlusturuldu || Object.values(aiYorumlar).some(v => v)) && (
             <>
-              <YorumAlani baslik="📊 Okuma Hızı Değerlendirmesi" alan="hiz" placeholder="Okuma hızına ilişkin değerlendirme..." />
-              <YorumAlani baslik="✅ Doğru Okuma Oranı Değerlendirmesi" alan="dogruluk" placeholder="Doğruluk ve hata analizi..." />
-              <YorumAlani baslik="📖 Okuduğunu Anlama Değerlendirmesi" alan="anlama" placeholder="Anlama becerileri değerlendirmesi..." />
-              <YorumAlani baslik="🎵 Prozodik Okuma Değerlendirmesi" alan="prozodik" placeholder="Prozodik okuma değerlendirmesi..." />
-              <YorumAlani baslik="📝 Sonuç ve Genel Yorum" alan="sonuc" placeholder="Genel sonuç ve yorum..." />
-              <YorumAlani baslik="🎯 Eğitsel ve Ev Temelli Gelişim Önerileri" alan="oneriler" placeholder="Gelişim önerileri..." />
+              <YorumAlani ikon={BarChart3} baslik="Okuma Hızı Değerlendirmesi" alan="hiz" placeholder="Okuma hızına ilişkin değerlendirme..." yorumlar={aiYorumlar} setYorumlar={setAiYorumlar} />
+              <YorumAlani ikon={CheckCircle} baslik="Doğru Okuma Oranı Değerlendirmesi" alan="dogruluk" placeholder="Doğruluk ve hata analizi..." yorumlar={aiYorumlar} setYorumlar={setAiYorumlar} />
+              <YorumAlani ikon={BookOpen} baslik="Okuduğunu Anlama Değerlendirmesi" alan="anlama" placeholder="Anlama becerileri değerlendirmesi..." yorumlar={aiYorumlar} setYorumlar={setAiYorumlar} />
+              <YorumAlani ikon={Music} baslik="Prozodik Okuma Değerlendirmesi" alan="prozodik" placeholder="Prozodik okuma değerlendirmesi..." yorumlar={aiYorumlar} setYorumlar={setAiYorumlar} />
+              <YorumAlani ikon={FileText} baslik="Sonuç ve Genel Yorum" alan="sonuc" placeholder="Genel sonuç ve yorum..." yorumlar={aiYorumlar} setYorumlar={setAiYorumlar} />
+              <YorumAlani ikon={Lightbulb} baslik="Eğitsel ve Ev Temelli Gelişim Önerileri" alan="oneriler" placeholder="Gelişim önerileri..." yorumlar={aiYorumlar} setYorumlar={setAiYorumlar} />
             </>
           )}
         </CardContent>
       </Card>
 
       {/* ══ 7. Öğretmen Ek Notu ══ */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader><CardTitle className="text-base">7. Öğretmen Ek Notu</CardTitle></CardHeader>
         <CardContent>
           <textarea value={ogretmenNotu} onChange={e => setOgretmenNotu(e.target.value)} rows={4}
             placeholder="Öğrenciye ilişkin ek değerlendirme ve notlarınızı yazın..."
-            className="w-full border border-line rounded-xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none leading-relaxed" />
+            className="w-full border border-line rounded-xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none leading-relaxed" />
         </CardContent>
       </Card>
 
-      <Button onClick={kaydet} className="w-full py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold text-lg">
-        📄 Raporu Oluştur
+      <Button onClick={kaydet} className="w-full inline-flex items-center justify-center gap-2 py-4 bg-primary hover:bg-primary-hover text-white font-bold text-lg">
+        <FileText className="h-5 w-5" />Raporu Oluştur
       </Button>
     </div>
   );
@@ -3494,7 +3353,7 @@ function RaporGoruntule({ rapor, ogrenci, onGeri }) {
 
   const AnlamaTablosu = ({ baslik, satirlar }) => (
     <div className="mb-4">
-      <div className="bg-gray-100 px-3 py-2 rounded-t-lg font-semibold text-sm text-content">{baslik}</div>
+      <div className="bg-app px-3 py-2 rounded-t-lg font-semibold text-sm text-content">{baslik}</div>
       <table className="w-full border border-line rounded-b-lg overflow-hidden text-sm">
         <thead><tr className="bg-app">
           <th className="text-left p-2 border-b border-line font-medium">Ölçüt</th>
@@ -3509,7 +3368,7 @@ function RaporGoruntule({ rapor, ogrenci, onGeri }) {
               <tr key={alan} className="border-b border-line last:border-0">
                 <td className="p-2 text-content">{etiket}</td>
                 {["zayif","orta","iyi"].map(s => (
-                  <td key={s} className="p-2 text-center text-orange-500 font-bold">{deger === s ? "+" : ""}</td>
+                  <td key={s} className="p-2 text-center text-primary font-bold">{deger === s ? "+" : ""}</td>
                 ))}
               </tr>
             );
@@ -3527,7 +3386,7 @@ function RaporGoruntule({ rapor, ogrenci, onGeri }) {
       </div>
 
       {/* 1. Öğrenci Bilgileri */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader><CardTitle className="text-base bg-gray-800 text-white p-3 rounded-lg -m-1">1. ÖĞRENCİ BİLGİLERİ</CardTitle></CardHeader>
         <CardContent className="p-0">
           <table className="w-full text-sm">
@@ -3542,7 +3401,7 @@ function RaporGoruntule({ rapor, ogrenci, onGeri }) {
       </Card>
 
       {/* 2. Metin */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader><CardTitle className="text-base bg-gray-800 text-white p-3 rounded-lg -m-1">2. METİN</CardTitle></CardHeader>
         <CardContent className="p-0">
           <table className="w-full text-sm">
@@ -3559,7 +3418,7 @@ function RaporGoruntule({ rapor, ogrenci, onGeri }) {
       </Card>
 
       {/* 3. Okuma Hızı */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader><CardTitle className="text-base bg-gray-800 text-white p-3 rounded-lg -m-1">3. OKUMA HIZI</CardTitle></CardHeader>
         <CardContent className="pt-4">
           <div className="flex items-center gap-4 mb-4">
@@ -3578,7 +3437,7 @@ function RaporGoruntule({ rapor, ogrenci, onGeri }) {
       </Card>
 
       {/* 4. Okuduğunu Anlama */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader>
           <CardTitle className="text-base bg-gray-800 text-white p-3 rounded-lg -m-1">
             4. OKUDUĞUNU ANLAMA BECERİLERİ — %{rapor.anlama_yuzde}
@@ -3616,11 +3475,11 @@ function RaporGoruntule({ rapor, ogrenci, onGeri }) {
       </Card>
 
       {/* 5. Prozodik Okuma */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader><CardTitle className="text-base bg-gray-800 text-white p-3 rounded-lg -m-1">5. PROZODİK OKUMA ÖLÇEĞİ</CardTitle></CardHeader>
         <CardContent className="pt-4">
           <table className="w-full text-sm border border-line rounded-xl overflow-hidden mb-4">
-            <thead><tr className="bg-gray-100">
+            <thead><tr className="bg-app">
               <th className="text-left p-3 font-semibold">Ölçüt</th>
               <th className="text-center p-3 font-semibold w-24">1 puan</th>
               <th className="text-center p-3 font-semibold w-24">2 puan</th>
@@ -3639,18 +3498,18 @@ function RaporGoruntule({ rapor, ogrenci, onGeri }) {
                 <tr key={alan} className="border-t border-line">
                   <td className="p-3 font-medium">{etiket}</td>
                   {aciklamalar.map((a, i) => (
-                    <td key={i} className={`p-2 text-center text-xs ${rapor.prozodik?.[alan] === i+1 ? 'bg-orange-100 font-bold text-orange-700' : 'text-subtle'}`}>{a}</td>
+                    <td key={i} className={`p-2 text-center text-xs ${rapor.prozodik?.[alan] === i+1 ? 'bg-blue-100 font-bold text-primary' : 'text-subtle'}`}>{a}</td>
                   ))}
-                  <td className="p-3 text-center font-bold text-orange-600">{rapor.prozodik?.[alan]}</td>
+                  <td className="p-3 text-center font-bold text-primary tabular-nums">{rapor.prozodik?.[alan]}</td>
                 </tr>
               ))}
               <tr className="bg-app border-t-2 border-line">
                 <td colSpan="5" className="p-3 font-bold text-right">Toplam</td>
-                <td className="p-3 text-center font-bold text-xl text-orange-600">{rapor.prozodik_toplam}</td>
+                <td className="p-3 text-center font-bold text-xl text-primary tabular-nums">{rapor.prozodik_toplam}</td>
               </tr>
             </tbody>
           </table>
-          <div className="bg-orange-50 p-3 rounded-xl text-sm text-content">
+          <div className="bg-app border border-line p-3 rounded-xl text-sm text-content">
             Prozodik okuma performansı: <strong>{prozodikSeviye(rapor.prozodik_toplam)}</strong> (Toplam {rapor.prozodik_toplam}/20)
           </div>
         </CardContent>
@@ -3658,7 +3517,7 @@ function RaporGoruntule({ rapor, ogrenci, onGeri }) {
 
       {/* 6. Sonuç */}
       {rapor.ogretmen_notu && (
-        <Card className="border-0 shadow-sm">
+        <Card className="border border-line shadow-sm">
           <CardHeader><CardTitle className="text-base bg-gray-800 text-white p-3 rounded-lg -m-1">6. SONUÇ VE GENEL YORUM</CardTitle></CardHeader>
           <CardContent className="pt-4">
             <p className="text-sm text-content leading-relaxed whitespace-pre-wrap">{rapor.ogretmen_notu}</p>
@@ -3675,9 +3534,9 @@ function RaporGoruntule({ rapor, ogrenci, onGeri }) {
             a.download = `Rapor_${rapor.ogrenci_ad?.replace(/\s/g,'_')}_${rapor.olusturma_tarihi?.slice(0,10)}.pdf`;
             document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url);
           } catch(e) { toast({ title: "PDF indirilemedi", description: e.response?.data?.detail || "Rapor PDF'i oluşturulamadı.", variant: "destructive" }); }
-        }} className="flex-1 bg-red-600 hover:bg-red-700 text-white">📄 PDF İndir</Button>
-        <Button onClick={() => window.print()} variant="outline" className="flex-1">🖨️ Yazdır</Button>
-        <Button onClick={onGeri} variant="outline" className="flex-1">← Geri</Button>
+        }} className="flex-1 bg-primary hover:bg-primary-hover text-white"><FileText className="h-4 w-4 mr-1" />PDF İndir</Button>
+        <Button onClick={() => window.print()} variant="outline" className="flex-1"><Printer className="h-4 w-4 mr-1" />Yazdır</Button>
+        <Button onClick={onGeri} variant="outline" className="flex-1"><ArrowLeft className="h-4 w-4 mr-1" />Geri</Button>
       </div>
     </div>
   );
@@ -4253,11 +4112,11 @@ function GelisimRaporuButonu({ students }) {
 
   return (
     <>
-      <Button variant="outline" onClick={() => setAcik(true)}>🚀 Gelişim Raporu Oluştur</Button>
+      <Button variant="outline" onClick={() => setAcik(true)}><TrendingUp className="h-4 w-4 mr-1" />Gelişim Raporu Oluştur</Button>
       <Dialog open={acik} onOpenChange={setAcik}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>🚀 Gelişim Raporu (Ön Test / Son Test)</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><TrendingUp className="h-5 w-5" />Gelişim Raporu (Ön Test / Son Test)</DialogTitle>
             <DialogDescription>Bir öğrencinin iki tamamlanmış analizi karşılaştırılır. Her iki analizin de ölçüm raporu olmalıdır.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -4290,7 +4149,7 @@ function GelisimRaporuButonu({ students }) {
                 </Button>
               ) : (
                 <div className="border rounded-xl p-3 bg-green-50 space-y-2">
-                  <div className="font-semibold text-green-700">✓ Rapor hazır</div>
+                  <div className="inline-flex items-center gap-1.5 font-semibold text-green-700"><CheckCircle className="h-4 w-4" />Rapor hazır</div>
                   <div className="text-xs space-y-1">
                     {sonucRapor.ozet_tablo?.map(m => (
                       <div key={m.metrik} className="flex justify-between">
@@ -4299,7 +4158,7 @@ function GelisimRaporuButonu({ students }) {
                       </div>
                     ))}
                   </div>
-                  <Button onClick={pdfIndir} className="w-full bg-primary text-white">📄 PDF İndir</Button>
+                  <Button onClick={pdfIndir} className="w-full bg-primary hover:bg-primary-hover text-white"><FileText className="h-4 w-4 mr-1" />PDF İndir</Button>
                 </div>
               )}
             </>)}
@@ -4381,7 +4240,7 @@ function TimiRapor({ sonuc, ogrenci }) {
         </div>
         <div className="flex flex-wrap gap-2">
           {baskin.map(k => (
-            <span key={k} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-sm font-semibold shadow-sm">
+            <span key={k} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-primary text-white text-sm font-semibold shadow-sm tabular-nums">
               {TIMI_IKON[k]} {TIMI_TR[k]} ({puanlar[k] || 0}/8)
             </span>
           ))}
@@ -4390,9 +4249,9 @@ function TimiRapor({ sonuc, ogrenci }) {
 
       {/* Baskın alan vurgusu */}
       {baskin.length > 0 && (
-        <Card className="border-2 border-purple-200 bg-purple-50/40">
+        <Card className="border border-line shadow-sm border-l-4 border-l-primary">
           <CardContent className="py-4">
-            <div className="text-sm font-semibold text-purple-800 mb-1">🧠 Baskın Zeka Alanı{baskin.length > 1 ? "ları" : ""}</div>
+            <div className="inline-flex items-center gap-1.5 text-sm font-semibold text-content mb-1"><Brain className="h-4 w-4 text-primary" />Baskın Zeka Alanı{baskin.length > 1 ? "ları" : ""}</div>
             <div className="text-sm text-content">{baskin.map(k => TIMI_TR[k]).join(", ")}</div>
           </CardContent>
         </Card>
@@ -4400,7 +4259,7 @@ function TimiRapor({ sonuc, ogrenci }) {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Radar grafik */}
-        <Card className="border-0 shadow-sm">
+        <Card className="border border-line shadow-sm">
           <CardHeader><CardTitle className="text-base">Çoklu Zeka Profili</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -4416,7 +4275,7 @@ function TimiRapor({ sonuc, ogrenci }) {
         </Card>
 
         {/* Kategori tablosu */}
-        <Card className="border-0 shadow-sm">
+        <Card className="border border-line shadow-sm">
           <CardHeader><CardTitle className="text-base">Zeka Alanı Puanları</CardTitle></CardHeader>
           <CardContent className="space-y-2.5">
             {TIMI_SIRA.map(k => {
@@ -4425,11 +4284,11 @@ function TimiRapor({ sonuc, ogrenci }) {
               return (
                 <div key={k}>
                   <div className="flex items-center justify-between text-sm mb-1">
-                    <span className={`flex items-center gap-1.5 ${bask ? "font-bold text-purple-700" : "text-content"}`}>{TIMI_IKON[k]} {TIMI_TR[k]}</span>
-                    <span className={`font-semibold tabular-nums ${bask ? "text-purple-700" : "text-subtle"}`}>{p}/8</span>
+                    <span className={`flex items-center gap-1.5 ${bask ? "font-bold text-primary" : "text-content"}`}>{TIMI_IKON[k]} {TIMI_TR[k]}</span>
+                    <span className={`font-semibold tabular-nums ${bask ? "text-primary" : "text-subtle"}`}>{p}/8</span>
                   </div>
-                  <div className="h-2.5 rounded-full bg-gray-100 overflow-hidden">
-                    <div className={`h-full rounded-full ${bask ? "bg-gradient-to-r from-purple-500 to-indigo-500" : "bg-indigo-300"}`} style={{ width: `${(p / 8) * 100}%` }} />
+                  <div className="h-2.5 rounded-full bg-app overflow-hidden">
+                    <div className={`h-full rounded-full ${bask ? "bg-primary" : "bg-blue-200"}`} style={{ width: `${(p / 8) * 100}%` }} />
                   </div>
                 </div>
               );
@@ -4439,7 +4298,7 @@ function TimiRapor({ sonuc, ogrenci }) {
       </div>
 
       {/* Yorumlayıcı metin */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader><CardTitle className="text-base">Zeka Alanları — Kısa Açıklama</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           {[...baskin, ...TIMI_SIRA.filter(k => !baskin.includes(k))].map(k => (
@@ -4453,7 +4312,7 @@ function TimiRapor({ sonuc, ogrenci }) {
 
       {/* Öğretmen notu */}
       {sonuc?.notlar && (
-        <Card className="border-0 shadow-sm">
+        <Card className="border border-line shadow-sm">
           <CardHeader><CardTitle className="text-base">Öğretmen Gözlem Notu</CardTitle></CardHeader>
           <CardContent><p className="text-sm text-content whitespace-pre-wrap">{sonuc.notlar}</p></CardContent>
         </Card>
@@ -4461,8 +4320,8 @@ function TimiRapor({ sonuc, ogrenci }) {
 
       {/* Cevap detay tablosu (opsiyonel) */}
       <div>
-        <Button variant="outline" size="sm" onClick={() => setDetayAcik(a => !a)}>
-          {detayAcik ? "▼" : "▶"} Cevap Detayları ({(sonuc?.yanitlar || []).length} kart)
+        <Button variant="outline" size="sm" onClick={() => setDetayAcik(a => !a)} className="inline-flex items-center gap-1">
+          {detayAcik ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}Cevap Detayları ({(sonuc?.yanitlar || []).length} kart)
         </Button>
         {detayAcik && (
           <div className="mt-3 overflow-x-auto">
@@ -4478,7 +4337,7 @@ function TimiRapor({ sonuc, ogrenci }) {
                   return (
                     <TableRow key={y.kart_no}>
                       <TableCell className="font-medium">Kart {y.kart_no}</TableCell>
-                      <TableCell><span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">{y.secim}</span></TableCell>
+                      <TableCell><span className="px-2 py-0.5 rounded-full bg-blue-100 text-primary text-xs font-bold">{y.secim}</span></TableCell>
                       <TableCell className="text-sm">{catKey ? `${TIMI_IKON[catKey]} ${TIMI_TR[catKey]}` : "-"}</TableCell>
                     </TableRow>
                   );
@@ -4491,7 +4350,7 @@ function TimiRapor({ sonuc, ogrenci }) {
 
       {/* Psikometrik uyarı */}
       <div className="text-xs text-subtle bg-amber-50 border border-amber-200 rounded-lg p-3">
-        ⚠️ {TIMI_UYARI}
+        <AlertTriangle className="h-3.5 w-3.5 inline mr-1" />{TIMI_UYARI}
       </div>
     </div>
   );
@@ -4512,8 +4371,8 @@ function TimiOzetKart({ ogrenciId }) {
   if (!yuklendi) return null;
   const baskin = son?.baskin_zeka_alanlari || [];
   return (
-    <Card className="border-0 shadow-sm">
-      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5">🧠 TIMI — Çoklu Zeka</CardTitle></CardHeader>
+    <Card className="border border-line shadow-sm">
+      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><Brain className="h-4 w-4" />TIMI — Çoklu Zeka</CardTitle></CardHeader>
       <CardContent>
         {son ? (
           <div className="space-y-1.5">
@@ -4589,12 +4448,12 @@ function TimiModul({ user, students }) {
     const KartPanel = ({ ab }) => (
       <button
         onClick={() => secYap(ab)}
-        className={`group relative flex-1 min-h-0 flex items-center justify-center rounded-2xl border-2 overflow-hidden transition-all bg-surface p-1.5 md:p-2 ${secili === ab ? "border-purple-600 ring-4 ring-purple-200" : "border-line hover:border-purple-400"}`}
+        className={`group relative flex-1 min-h-0 flex items-center justify-center rounded-2xl border-2 overflow-hidden transition-all bg-surface p-1.5 md:p-2 ${secili === ab ? "border-primary ring-4 ring-blue-200" : "border-line hover:border-primary"}`}
       >
         {/* max-h/max-w + object-contain: görsel kalan alana sığar, taşmaz, oran korunur */}
         <img src={timiKartGorsel(kartNo, ab)} alt={`Kart ${kartNo} — ${ab}`} className="max-h-full max-w-full object-contain select-none pointer-events-none" draggable="false" />
-        <div className={`absolute top-2 left-2 w-9 h-9 flex items-center justify-center rounded-full text-lg font-black shadow ${secili === ab ? "bg-purple-600 text-white" : "bg-white/90 text-purple-700"}`}>{ab}</div>
-        {secili === ab && <div className="absolute top-2 right-2 w-9 h-9 flex items-center justify-center rounded-full bg-purple-600 text-white text-lg shadow">✓</div>}
+        <div className={`absolute top-2 left-2 w-9 h-9 flex items-center justify-center rounded-full text-lg font-black shadow ${secili === ab ? "bg-primary text-white" : "bg-white/90 text-primary"}`}>{ab}</div>
+        {secili === ab && <div className="absolute top-2 right-2 w-9 h-9 flex items-center justify-center rounded-full bg-primary text-white shadow"><Check className="h-5 w-5" /></div>}
       </button>
     );
     // Sabit fullscreen layout: header + footer daima görünür, görsel alanı ortada
@@ -4604,12 +4463,12 @@ function TimiModul({ user, students }) {
         {/* ── HEADER (sabit) ── */}
         <div className="shrink-0 space-y-2">
           <div className="flex items-center justify-between gap-3">
-            <Button variant="outline" size="sm" onClick={() => { if (window.confirm("Envanterden çıkılsın mı? İşaretlenen cevaplar kaydedildi.")) listeyeDon(); }}>← Çık</Button>
+            <Button variant="outline" size="sm" onClick={() => { if (window.confirm("Envanterden çıkılsın mı? İşaretlenen cevaplar kaydedildi.")) listeyeDon(); }}><ArrowLeft className="h-4 w-4 mr-1" />Çık</Button>
             <div className="text-sm font-semibold text-content truncate">{seciliOgrenci ? `${seciliOgrenci.ad} ${seciliOgrenci.soyad}` : ""}</div>
-            <div className="text-sm font-bold text-purple-700 whitespace-nowrap">Kart {kartNo} / {TIMI_KART_SAYISI}</div>
+            <div className="text-sm font-bold text-primary whitespace-nowrap tabular-nums">Kart {kartNo} / {TIMI_KART_SAYISI}</div>
           </div>
-          <div className="h-2.5 rounded-full bg-gray-100 overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full transition-all" style={{ width: `${(cevaplanan / TIMI_KART_SAYISI) * 100}%` }} />
+          <div className="h-2.5 rounded-full bg-app overflow-hidden">
+            <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${(cevaplanan / TIMI_KART_SAYISI) * 100}%` }} />
           </div>
           <p className="text-center text-xs md:text-sm text-subtle">Öğrencinin kendini daha çok özdeşleştirdiği pandayı seçin</p>
         </div>
@@ -4629,21 +4488,21 @@ function TimiModul({ user, students }) {
               onChange={e => setNotlar(e.target.value)}
               rows={2}
               placeholder="Öğretmen gözlem notu (opsiyonel)…"
-              className="w-full border border-line rounded-lg p-2 text-sm bg-surface focus:outline-none focus:border-purple-400"
+              className="w-full border border-line rounded-lg p-2 text-sm bg-surface focus:outline-none focus:border-primary"
             />
           )}
           <div className="flex items-center justify-between gap-3">
-            <Button variant="outline" onClick={() => setKartIndex(i => Math.max(0, i - 1))} disabled={kartIndex === 0}>← Önceki Kart</Button>
+            <Button variant="outline" onClick={() => setKartIndex(i => Math.max(0, i - 1))} disabled={kartIndex === 0}><ArrowLeft className="h-4 w-4 mr-1" />Önceki Kart</Button>
             {!sonKart ? (
-              <Button variant="outline" onClick={() => setKartIndex(i => Math.min(TIMI_KART_SAYISI - 1, i + 1))} disabled={!secili}>Sonraki Kart →</Button>
+              <Button variant="outline" onClick={() => setKartIndex(i => Math.min(TIMI_KART_SAYISI - 1, i + 1))} disabled={!secili}>Sonraki Kart<ArrowRight className="h-4 w-4 ml-1" /></Button>
             ) : (
-              <Button onClick={tamamla} disabled={cevaplanan !== TIMI_KART_SAYISI || kaydediliyor} className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold">
-                {kaydediliyor ? "Kaydediliyor..." : "✅ Envanteri Tamamla"}
+              <Button onClick={tamamla} disabled={cevaplanan !== TIMI_KART_SAYISI || kaydediliyor} className="bg-primary hover:bg-primary-hover text-white font-bold">
+                {kaydediliyor ? "Kaydediliyor..." : <><CheckCircle className="h-4 w-4 mr-1" />Envanteri Tamamla</>}
               </Button>
             )}
           </div>
           {sonKart && cevaplanan !== TIMI_KART_SAYISI && (
-            <p className="text-center text-xs text-amber-600">Eksik kart var ({cevaplanan}/28). Tamamlamak için tüm kartları işaretleyin.</p>
+            <p className="text-center text-xs text-amber-600 tabular-nums">Eksik kart var ({cevaplanan}/28). Tamamlamak için tüm kartları işaretleyin.</p>
           )}
         </div>
       </div>
@@ -4656,7 +4515,7 @@ function TimiModul({ user, students }) {
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={listeyeDon}>← Listeye Dön</Button>
+          <Button variant="outline" size="sm" onClick={listeyeDon}><ArrowLeft className="h-4 w-4 mr-1" />Listeye Dön</Button>
           <h2 className="text-lg font-bold">TIMI Sonuç Raporu</h2>
         </div>
         <TimiRapor sonuc={sonuc} ogrenci={ogr} />
@@ -4670,14 +4529,14 @@ function TimiModul({ user, students }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold">🧠 TIMI — Çoklu Zeka Envanteri</h2>
+          <h2 className="inline-flex items-center gap-2 text-lg font-bold"><Brain className="h-5 w-5" />TIMI — Çoklu Zeka Envanteri</h2>
           <p className="text-xs text-subtle">Teele Çoklu Zeka Envanteri (28 kart, zorlamalı seçim)</p>
         </div>
       </div>
 
       {/* Yeni Uygulama */}
-      <Card className="border-2 border-purple-200 shadow-sm">
-        <CardHeader><CardTitle className="text-base flex items-center gap-2">🎯 Yeni Uygulama Başlat</CardTitle></CardHeader>
+      <Card className="border border-line shadow-sm border-l-4 border-l-primary">
+        <CardHeader><CardTitle className="text-base flex items-center gap-2"><Target className="h-4 w-4 text-primary" />Yeni Uygulama Başlat</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div>
             <Label>Öğrenci Seç</Label>
@@ -4688,14 +4547,14 @@ function TimiModul({ user, students }) {
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={baslat} disabled={!seciliOgrenci} className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 font-bold">
-            ▶ Envanteri Başlat
+          <Button onClick={baslat} disabled={!seciliOgrenci} className="w-full bg-primary hover:bg-primary-hover text-white py-3 font-bold">
+            <Play className="h-4 w-4 mr-1" />Envanteri Başlat
           </Button>
         </CardContent>
       </Card>
 
       {/* Geçmiş Uygulamalar */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader><CardTitle className="text-base">Geçmiş Uygulamalar</CardTitle></CardHeader>
         <CardContent>
           {tamamlananlar.length === 0 && <p className="text-subtle text-sm text-center py-8">Henüz envanter uygulanmadı</p>}
@@ -4738,12 +4597,12 @@ function TimiModul({ user, students }) {
 // ── ANALİZ SEKMESİ — Giriş Analizi + TIMI kardeş modülleri ──
 function AnalizSekmesi({ user, students, teachers }) {
   const [altModul, setAltModul] = useState("giris"); // giris | timi
-  const sekmeClass = (aktif) => `px-4 py-2 rounded-xl text-sm font-medium border transition-all ${aktif ? "bg-primary text-white border-blue-600" : "bg-surface text-subtle border-line hover:bg-app"}`;
+  const sekmeClass = (aktif) => `inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${aktif ? "bg-primary text-white border-primary" : "bg-surface text-subtle border-line hover:bg-app"}`;
   return (
     <div className="space-y-4">
       <div className="flex gap-2 flex-wrap">
-        <button onClick={() => setAltModul("giris")} className={sekmeClass(altModul === "giris")}>🩺 Giriş Analizi</button>
-        <button onClick={() => setAltModul("timi")} className={sekmeClass(altModul === "timi")}>🧠 TIMI - Çoklu Zeka Envanteri</button>
+        <button onClick={() => setAltModul("giris")} className={sekmeClass(altModul === "giris")}><Stethoscope className="h-4 w-4" />Giriş Analizi</button>
+        <button onClick={() => setAltModul("timi")} className={sekmeClass(altModul === "timi")}><Brain className="h-4 w-4" />TIMI - Çoklu Zeka Envanteri</button>
       </div>
       {altModul === "giris" && <GirisAnaliziModul user={user} students={students} teachers={teachers} />}
       {altModul === "timi" && <TimiModul user={user} students={students} />}
@@ -4841,7 +4700,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => { setAdim("liste"); setAktifOturumId(null); }}>← Geri</Button>
+          <Button variant="outline" size="sm" onClick={() => { setAdim("liste"); setAktifOturumId(null); }}><ArrowLeft className="h-4 w-4 mr-1" />Geri</Button>
           <h2 className="text-xl font-bold">Canlı Analiz</h2>
         </div>
         <CanlıAnalizEkrani ogrenci={seciliOgrenci} metin={seciliMetin} oturumId={aktifOturumId} onTamamla={analiziTamamla} user={user} />
@@ -4854,7 +4713,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => { setAdim("liste"); setSonuc(null); setSeciliOgrenci(null); setSeciliMetin(null); setAktifOturumId(null); }}>← Listeye Dön</Button>
+          <Button variant="outline" size="sm" onClick={() => { setAdim("liste"); setSonuc(null); setSeciliOgrenci(null); setSeciliMetin(null); setAktifOturumId(null); }}><ArrowLeft className="h-4 w-4 mr-1" />Listeye Dön</Button>
           <span className="text-sm text-subtle">Raporu doldurup kaydedin veya atlayın</span>
         </div>
         <RaporFormu
@@ -4894,8 +4753,8 @@ function GirisAnaliziModul({ user, students, teachers }) {
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => setAdim("liste")}>← Geri</Button>
-          <h2 className="text-xl font-bold">📄 Metin Havuzu Yönetimi</h2>
+          <Button variant="outline" size="sm" onClick={() => setAdim("liste")}><ArrowLeft className="h-4 w-4 mr-1" />Geri</Button>
+          <h2 className="inline-flex items-center gap-2 text-xl font-bold"><FileText className="h-5 w-5" />Metin Havuzu Yönetimi</h2>
         </div>
         <MetinYonetimi tamEkran user={user} onDuzenle={acMetinDuzenle} />
       </div>
@@ -4921,11 +4780,11 @@ function GirisAnaliziModul({ user, students, teachers }) {
         <div className="flex gap-2">
           {(user.role === "admin" || user.role === "coordinator") && (
             <Button variant="outline" size="sm" onClick={() => setNormDialogAcik(true)}>
-              ⚙️ Norm Tablosu
+              <Settings className="h-4 w-4 mr-1" />Norm Tablosu
             </Button>
           )}
           <Button variant="outline" size="sm" onClick={() => setAdim("metin-yonetimi")}>
-            📄 Metinler
+            <FileText className="h-4 w-4 mr-1" />Metinler
           </Button>
         </div>
       </div>
@@ -4933,21 +4792,21 @@ function GirisAnaliziModul({ user, students, teachers }) {
       {/* Analiz Modu Seçimi: Ölçüm mü, Gelişim mi? */}
       <div className="grid grid-cols-2 gap-3">
         <button onClick={() => setAnalizModu("olcum")}
-          className={`p-4 rounded-2xl border-2 text-left transition-all ${analizModu === "olcum" ? "border-orange-400 bg-orange-50" : "border-line bg-surface hover:bg-app"}`}>
-          <div className="font-bold flex items-center gap-2">📊 Ölçüm Analizi{analizModu === "olcum" && " ✓"}</div>
+          className={`p-4 rounded-2xl border-2 text-left transition-all ${analizModu === "olcum" ? "border-primary bg-blue-50" : "border-line bg-surface hover:bg-app"}`}>
+          <div className="font-bold flex items-center gap-2"><BarChart3 className="h-4 w-4" />Ölçüm Analizi{analizModu === "olcum" && <Check className="h-4 w-4 text-primary" />}</div>
           <div className="text-xs text-subtle mt-1">Öğrenciyle canlı okuma; hız/doğruluk/anlama/prozodi ölçülür, ölçüm raporu üretilir.</div>
         </button>
         <button onClick={() => setAnalizModu("gelisim")}
-          className={`p-4 rounded-2xl border-2 text-left transition-all ${analizModu === "gelisim" ? "border-indigo-400 bg-indigo-50" : "border-line bg-surface hover:bg-app"}`}>
-          <div className="font-bold flex items-center gap-2">📈 Gelişim Analizi{analizModu === "gelisim" && " ✓"}</div>
+          className={`p-4 rounded-2xl border-2 text-left transition-all ${analizModu === "gelisim" ? "border-amber-400 bg-amber-50" : "border-line bg-surface hover:bg-app"}`}>
+          <div className="font-bold flex items-center gap-2"><TrendingUp className="h-4 w-4" />Gelişim Analizi{analizModu === "gelisim" && <Check className="h-4 w-4 text-amber-600" />}</div>
           <div className="text-xs text-subtle mt-1">İki ölçümü (ön test / son test) karşılaştırır, kur sonu gelişim raporu üretir.</div>
         </button>
       </div>
 
       {/* ÖLÇÜM: Yeni Analiz Başlat */}
       {analizModu === "olcum" && (
-      <Card className="border-2 border-orange-200 shadow-sm">
-        <CardHeader><CardTitle className="text-base flex items-center gap-2">🎯 Yeni Ölçüm Analizi Başlat</CardTitle></CardHeader>
+      <Card className="border border-line shadow-sm border-l-4 border-l-primary">
+        <CardHeader><CardTitle className="text-base flex items-center gap-2"><Target className="h-4 w-4 text-primary" />Yeni Ölçüm Analizi Başlat</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -4963,7 +4822,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
               <Label>Analiz Metni Seç</Label>
               <button onClick={() => setMetinDialogAcik(true)}
                 disabled={!seciliOgrenci}
-                className="w-full border border-line rounded-lg p-2 text-left text-sm hover:border-orange-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-line">
+                className="w-full border border-line rounded-lg p-2 text-left text-sm hover:border-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-line">
                 {seciliMetin ? <span className="font-medium">{seciliMetin.baslik} <span className="text-subtle font-normal">({seciliMetin.kelime_sayisi} kelime)</span></span> : <span className="text-subtle">{seciliOgrenci ? "Metin seçmek için tıklayın..." : "Önce öğrenci seçin..."}</span>}
               </button>
             </div>
@@ -4981,8 +4840,8 @@ function GirisAnaliziModul({ user, students, teachers }) {
             <p className="text-[11px] text-subtle mt-1">Gelişim raporu için "İlk Analiz" ve "Kur Sonu Analizi" karşılaştırılır.</p>
           </div>
           <Button onClick={analiziBaslat} disabled={!seciliOgrenci || !seciliMetin}
-            className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 font-bold">
-            ▶ Analizi Başlat
+            className="w-full bg-primary hover:bg-primary-hover text-white py-3 font-bold">
+            <Play className="h-4 w-4 mr-1" />Analizi Başlat
           </Button>
         </CardContent>
       </Card>
@@ -4990,8 +4849,8 @@ function GirisAnaliziModul({ user, students, teachers }) {
 
       {/* GELİŞİM: iki ölçümü karşılaştır */}
       {analizModu === "gelisim" && (
-      <Card className="border-2 border-indigo-200 shadow-sm">
-        <CardHeader><CardTitle className="text-base flex items-center gap-2">📈 Gelişim Analizi (Ön Test / Son Test)</CardTitle></CardHeader>
+      <Card className="border border-line shadow-sm border-l-4 border-l-amber-400">
+        <CardHeader><CardTitle className="text-base flex items-center gap-2"><TrendingUp className="h-4 w-4 text-amber-600" />Gelişim Analizi (Ön Test / Son Test)</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-subtle">Bir öğrencinin <b>İlk Analiz</b> ve <b>Kur Sonu Analizi</b> ölçümlerini karşılaştırarak gelişim raporu üretin. Her iki ölçümün de tamamlanmış ve ölçüm raporu oluşturulmuş olması gerekir.</p>
           <GelisimRaporuButonu students={students} />
@@ -5000,7 +4859,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
       )}
 
       {/* Geçmiş Analizler */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader><CardTitle className="text-base">Geçmiş Analizler</CardTitle></CardHeader>
         <CardContent>
           {gecmisOturumlar.length === 0 && <p className="text-subtle text-sm text-center py-8">Henüz analiz yapılmadı</p>}
@@ -5023,10 +4882,10 @@ function GirisAnaliziModul({ user, students, teachers }) {
                   <TableRow key={o.id}>
                     <TableCell className="font-medium">{ogr ? `${ogr.ad} ${ogr.soyad}` : "-"}</TableCell>
                     <TableCell className="text-sm text-subtle">{new Date(o.olusturma_tarihi).toLocaleDateString("tr-TR")}</TableCell>
-                    <TableCell className="font-bold text-primary">{o.wpm}</TableCell>
-                    <TableCell>%{o.dogruluk_yuzde}</TableCell>
-                    <TableCell><span className={`px-2 py-1 rounded-full text-xs font-medium ${hizRenk[o.hiz_deger] || "bg-gray-100 text-subtle"}`}>{hizLabel[o.hiz_deger] || "-"}</span></TableCell>
-                    <TableCell className="font-semibold text-orange-600">{o.ogretmen_kur || "-"}</TableCell>
+                    <TableCell className="font-bold text-primary tabular-nums">{o.wpm}</TableCell>
+                    <TableCell className="tabular-nums">%{o.dogruluk_yuzde}</TableCell>
+                    <TableCell><span className={`px-2 py-1 rounded-full text-xs font-medium ${hizRenk[o.hiz_deger] || "bg-app text-subtle"}`}>{hizLabel[o.hiz_deger] || "-"}</span></TableCell>
+                    <TableCell className="font-semibold text-primary">{o.ogretmen_kur || "-"}</TableCell>
                     <TableCell>
                       <Button size="sm" variant="outline" onClick={async () => {
                         try { const r = await axios.get(`${API}/diagnostic/rapor/ogrenci/${o.ogrenci_id}`);
@@ -5034,7 +4893,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
                           if (ogrRapor) { setAktifRapor(ogrRapor); setSeciliOgrenci(students.find(s => s.id === o.ogrenci_id) || {}); setAdim("rapor-goruntule"); }
                           else { toast({ title: "Bu analiz için rapor bulunamadı" }); }
                         } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
-                      }}>📄 Rapor</Button>
+                      }}><FileText className="h-4 w-4 mr-1" />Rapor</Button>
                     </TableCell>
                   </TableRow>
                 );
@@ -5048,7 +4907,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
       <Dialog open={normDialogAcik} onOpenChange={setNormDialogAcik}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>⚙️ Okuma Hızı Norm Tablosu</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><Settings className="h-5 w-5" />Okuma Hızı Norm Tablosu</DialogTitle>
             <DialogDescription>Sınıf bazlı okuma hızı sınır değerlerini düzenleyin (kelime/dakika)</DialogDescription>
           </DialogHeader>
           <NormTablosu onClose={() => setNormDialogAcik(false)} />
@@ -5059,7 +4918,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
       <Dialog open={metinDialogAcik} onOpenChange={setMetinDialogAcik}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>📄 Analiz Metinleri</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><FileText className="h-5 w-5" />Analiz Metinleri</DialogTitle>
             <DialogDescription>{seciliMetin ? "Farklı bir metin seçin veya yeni metin ekleyin" : "Analiz için metin seçin"}</DialogDescription>
           </DialogHeader>
           <MetinYonetimi secimModu={true} user={user} filtreSinif={seciliOgrenci?.sinif} onDuzenle={acMetinDuzenle} onMetinSec={m => { setSeciliMetin(m); setMetinDialogAcik(false); }} />
@@ -5188,14 +5047,15 @@ function OgretmenPaneli({ user, logout }) {
     setSeciliOgrenci(ogrenci);
     setAiRapor(null); setAiDna(null); setAiAcikKart(null); setSpeechOgrData(null); setSpeechOgrYukleniyor(false); // AI state reset
     try {
-      const [logR, statR, riskR, xpR, gorevR] = await Promise.all([
+      const [logR, statR, riskR, xpR, gorevR, kelimeR] = await Promise.all([
         axios.get(`${API}/reading-logs/${ogrenci.id}`),
         axios.get(`${API}/reading-logs/${ogrenci.id}/istatistik`),
         axios.get(`${API}/risk-skor/${ogrenci.id}`),
         axios.get(`${API}/xp/durum/${ogrenci.id}`).catch(() => ({ data: null })),
         axios.get(`${API}/gorevler?hedef_id=${ogrenci.id}&hedef_tip=ogrenci`),
+        axios.get(`${API}/ogrenci-kelime-ozet/${ogrenci.id}`).catch(() => ({ data: null })),
       ]);
-      setOgrenciDetay({ logs: logR.data, stat: statR.data, risk: riskR.data, xp: xpR.data, gorevler: gorevR.data });
+      setOgrenciDetay({ logs: logR.data, stat: statR.data, risk: riskR.data, xp: xpR.data, gorevler: gorevR.data, kelime: kelimeR.data });
     } catch(e) { setOgrenciDetay(null); hataBildir(toast, "Öğrenci verisi yüklenemedi"); }
     setAktifSekme("ogrenci-detay");
   };
@@ -5258,12 +5118,13 @@ function OgretmenPaneli({ user, logout }) {
         <div className="max-w-4xl mx-auto p-4 space-y-4">
           {d ? (<>
             {/* Risk + İstatistik */}
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-              <div className={`rounded-2xl p-3 text-center border ${riskRenk(d.risk?.seviye)}`}><div className="text-2xl font-bold">{d.risk?.risk_skoru || 0}</div><div className="text-xs">{riskIcon(d.risk?.seviye)} Risk</div></div>
-              <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-orange-600">{d.stat?.streak || 0}</div><div className="text-xs text-subtle">🔥 Streak</div></div>
-              <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-green-600">{d.stat?.bugun_dakika || 0}</div><div className="text-xs text-subtle">⏱ Bugün</div></div>
-              <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-primary">{d.stat?.toplam_kitap || 0}</div><div className="text-xs text-subtle">📚 Kitap</div></div>
-              <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-purple-600">{d.xp?.toplam_xp || 0}</div><div className="text-xs text-subtle">{d.xp?.lig_label || "XP"}</div></div>
+            <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+              <div className={`rounded-2xl p-3 text-center border ${riskRenk(d.risk?.seviye)}`}><div className="text-2xl font-bold tabular-nums">{d.risk?.risk_skoru || 0}</div><div className="text-xs">{riskIcon(d.risk?.seviye)} Risk</div></div>
+              <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-orange-600 tabular-nums">{d.stat?.streak || 0}</div><div className="text-xs text-subtle">🔥 Streak</div></div>
+              <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-green-600 tabular-nums">{d.stat?.bugun_dakika || 0}</div><div className="text-xs text-subtle">⏱ Bugün</div></div>
+              <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-primary tabular-nums">{d.stat?.toplam_kitap || 0}</div><div className="text-xs text-subtle">📚 Kitap</div></div>
+              <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-purple-600 tabular-nums">{d.xp?.toplam_xp || 0}</div><div className="text-xs text-subtle">{d.xp?.lig_label || "XP"}</div></div>
+              <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border border-l-4 border-l-teal-400"><div className="inline-flex items-center justify-center gap-1 text-2xl font-bold text-teal-600 tabular-nums"><BookMarked className="h-4 w-4" />{d.kelime?.ogrenilen ?? 0}</div><div className="text-xs text-subtle tabular-nums">Öğrenilen{d.kelime?.toplam_havuz ? ` / ${d.kelime.toplam_havuz}` : ""} kelime</div></div>
             </div>
             {/* Risk faktörleri */}
             {d.risk?.faktorler?.length > 0 && (<div className="bg-red-50 rounded-xl p-3 border border-red-100"><div className="text-xs font-medium text-red-700 mb-1">⚠️ Risk Faktörleri:</div>{d.risk.faktorler.map((f,i) => <div key={i} className="text-xs text-red-600">• {f}</div>)}</div>)}
@@ -5418,9 +5279,9 @@ function OgretmenPaneli({ user, logout }) {
             {/* Haftalık */}
             <div className="bg-surface rounded-2xl p-4 shadow-sm border"><div className="flex items-center justify-between mb-2"><span className="text-sm font-medium">Haftalık Aktivite</span><span className="font-bold">{d.stat?.aktif_gunler_7 || 0}/4 gün</span></div><div className="flex gap-1">{[0,1,2,3].map(i => (<div key={i} className={`flex-1 h-3 rounded-full ${i < (d.stat?.aktif_gunler_7 || 0) ? 'bg-gradient-to-r from-orange-400 to-red-500' : 'bg-gray-100'}`} />))}</div></div>
             {/* Görevler */}
-            {d.gorevler?.length > 0 && (<div><h3 className="font-bold text-sm mb-2">📌 Görevler ({d.gorevler.length})</h3>{d.gorevler.slice(0,5).map(g => (<div key={g.id} className="bg-surface rounded-xl p-3 shadow-sm border mb-2 flex items-center justify-between"><div className="text-sm">{g.baslik}</div><span className={`text-xs px-2 py-0.5 rounded-full ${g.durum === "tamamlandi" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>{g.durum === "tamamlandi" ? "✅" : "⏳"} {g.durum}</span></div>))}</div>)}
+            {d.gorevler?.length >0 && (<div><h3 className="font-bold text-sm mb-2">Görevler ({d.gorevler.length})</h3>{d.gorevler.slice(0,5).map(g =>(<div key={g.id} className="bg-surface rounded-xl p-3 shadow-sm border mb-2 flex items-center justify-between"><div className="text-sm">{g.baslik}</div><span className={`text-xs px-2 py-0.5 rounded-full ${g.durum === "tamamlandi" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>{g.durum === "tamamlandi" ? "" : ""} {g.durum}</span></div>))}</div>)}
             {/* Son okumalar */}
-            {d.logs?.length > 0 && (<div><h3 className="font-bold text-sm mb-2">📖 Son Okumalar</h3>{d.logs.slice(0,8).map(l => (<div key={l.id} className="bg-surface rounded-xl p-3 shadow-sm border mb-2 flex items-center justify-between"><div><div className="text-sm font-medium">{l.kitap_adi || "—"}</div><div className="text-xs text-subtle">{l.bolum} • {l.sure_dakika} dk</div></div><div className="text-xs text-subtle">{new Date(l.tarih).toLocaleDateString('tr-TR')}</div></div>))}</div>)}
+            {d.logs?.length >0 && (<div><h3 className="font-bold text-sm mb-2">Son Okumalar</h3>{d.logs.slice(0,8).map(l =>(<div key={l.id} className="bg-surface rounded-xl p-3 shadow-sm border mb-2 flex items-center justify-between"><div><div className="text-sm font-medium">{l.kitap_adi || "—"}</div><div className="text-xs text-subtle">{l.bolum} • {l.sure_dakika} dk</div></div><div className="text-xs text-subtle">{new Date(l.tarih).toLocaleDateString('tr-TR')}</div></div>))}</div>)}
           </>) : (<div className="text-center py-12 text-subtle">Yükleniyor...</div>)}
         </div>
         <Toaster />
@@ -5979,14 +5840,14 @@ function OgretmenPaneli({ user, logout }) {
             <div className="bg-red-50 rounded-xl p-3 text-center border border-red-100"><div className="text-xl font-bold text-red-700">{riskler.filter(r => r.risk_seviye === "yuksek").length}</div><div className="text-[10px] text-red-600">🔴 Yüksek Risk</div></div>
           </div>)}
 
-          <div className="flex items-center justify-between"><h2 className="text-lg font-bold">👥 Öğrencilerim</h2>
+          <div className="flex items-center justify-between"><h2 className="text-lg font-bold">Öğrencilerim</h2>
             <div className="flex gap-2">
               <Button size="sm" onClick={() => setYeniOgrenciAcik(true)} className="bg-primary text-white text-xs"><Plus className="h-3 w-3 mr-1" />Yeni Öğrenci</Button>
               <Button size="sm" onClick={() => setGorevAtaGoster(!gorevAtaGoster)} className="bg-orange-500 text-white text-xs"><Plus className="h-3 w-3 mr-1" />Görev Ata</Button>
             </div></div>
 
           {/* Hızlı görev atama */}
-          {gorevAtaGoster && (<Card className="border-0 shadow-sm border-l-4 border-l-orange-500"><CardContent className="p-4"><form onSubmit={gorevAta} className="space-y-3">
+          {gorevAtaGoster && (<Card className="border border-line shadow-sm border-l-4 border-l-orange-500"><CardContent className="p-4"><form onSubmit={gorevAta} className="space-y-3">
             <div className="text-sm font-medium text-content">Hızlı Görev Ata</div>
             <div className="flex flex-wrap gap-1">{ogrenciler.map(s => (<button key={s.id} type="button" onClick={() => setGorevHedefler(prev => prev.includes(s.id) ? prev.filter(x => x !== s.id) : [...prev, s.id])} className={`px-2 py-1 rounded-lg text-xs border ${gorevHedefler.includes(s.id) ? 'bg-orange-500 text-white border-orange-500' : 'bg-surface text-subtle border-line'}`}>{s.ad} {s.soyad}</button>))}<button type="button" onClick={() => setGorevHedefler(gorevHedefler.length === ogrenciler.length ? [] : ogrenciler.map(s => s.id))} className="text-xs text-primary px-2">{gorevHedefler.length === ogrenciler.length ? "Kaldır" : "Tümü"}</button></div>
             <div className="grid grid-cols-2 gap-2"><div><Label className="text-xs">Başlık *</Label><Input value={gorevForm.baslik} onChange={e => setGorevForm({...gorevForm, baslik: e.target.value})} required className="text-sm" /></div><div><Label className="text-xs">Son Tarih</Label><Input type="date" value={gorevForm.son_tarih} onChange={e => setGorevForm({...gorevForm, son_tarih: e.target.value})} className="text-sm" /></div></div>
@@ -5997,7 +5858,7 @@ function OgretmenPaneli({ user, logout }) {
           {/* Öğrenci listesi */}
           {(riskler.length > 0 ? riskler : ogrenciler).map(s => {
             const risk = riskler.find(r => r.id === s.id);
-            return (<Card key={s.id} className="border-0 shadow-sm cursor-pointer hover:shadow-md transition-all" onClick={() => ogrenciDetayCek(s)}>
+            return (<Card key={s.id} className="border border-line shadow-sm cursor-pointer hover:shadow-md transition-all" onClick={() => ogrenciDetayCek(s)}>
               <CardContent className="p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${risk ? riskRenk(risk.risk_seviye) : 'bg-gray-100 text-subtle'}`}>{risk ? riskIcon(risk.risk_seviye) : "👤"}</div>
@@ -6054,7 +5915,7 @@ function OgretmenPaneli({ user, logout }) {
         {/* ═══ GÖREVLER ═══ */}
         {aktifSekme === "gorevler" && (<div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold">📌 Görev Yönetimi</h2>
+            <h2 className="text-lg font-bold">Görev Yönetimi</h2>
             <Button size="sm" onClick={() => { setAktifSekme("ogrencilerim"); setGorevAtaGoster(true); }} className="bg-orange-500 text-white text-xs"><Plus className="h-3 w-3 mr-1" />Yeni Görev Ata</Button>
           </div>
           {benimGorevlerim.filter(g => g.durum !== "tamamlandi").length > 0 && (<div className="bg-indigo-50 rounded-xl p-3 border border-indigo-100"><div className="text-sm font-medium text-indigo-700 mb-2">📌 Bana Atanan Görevler</div>{benimGorevlerim.filter(g => g.durum !== "tamamlandi").map(g => (<div key={g.id} className="flex items-center justify-between py-1"><span className="text-sm">{g.baslik}</span><Button size="sm" className="bg-green-600 text-white text-xs h-7" onClick={async () => { try { await axios.put(`${API}/gorevler/${g.id}/durum`, { durum: "tamamlandi" }); toast({ title: "✅ Tamamlandı" }); fetchAll(); } catch(e) { hataBildir(toast, "Görev güncellenemedi"); } }}>Tamamla</Button></div>))}</div>)}
@@ -6090,7 +5951,7 @@ function OgretmenPaneli({ user, logout }) {
         {/* ═══ DERS PROGRAMI ═══ */}
         {aktifSekme === "program" && (
           <div className="space-y-3">
-            <h2 className="text-lg font-bold">📅 Ders Programı</h2>
+            <h2 className="text-lg font-bold">Ders Programı</h2>
             <HaftalikTakvim apiBase={API} user={user} ogrenciler={ogrenciler} />
           </div>
         )}
@@ -6100,13 +5961,13 @@ function OgretmenPaneli({ user, logout }) {
 
         {/* ═══ MESAJLAR ═══ */}
         {aktifSekme === "mesajlar" && (<div className="space-y-4">
-          <h2 className="text-lg font-bold">✉️ Mesajlar</h2>
+          <h2 className="text-lg font-bold">Mesajlar</h2>
           <div className="flex gap-2">
             {[{v:"gelen",l:`Gelen (${gelenMesajlar.length})`},{v:"giden",l:"Gönderilen"},{v:"yeni",l:"Yeni Mesaj"}].map(t => (
               <button key={t.v} onClick={() => setMesajGorunum(t.v)} className={`px-3 py-1.5 rounded-xl text-xs font-medium border ${mesajGorunum === t.v ? 'bg-primary text-white border-blue-600' : 'bg-surface text-subtle border-line'}`}>{t.l}</button>
             ))}
           </div>
-          {mesajGorunum === "yeni" && (<Card className="border-0 shadow-sm"><CardContent className="p-4"><form onSubmit={mesajGonder} className="space-y-3">
+          {mesajGorunum === "yeni" && (<Card className="border border-line shadow-sm"><CardContent className="p-4"><form onSubmit={mesajGonder} className="space-y-3">
             <div><Label className="text-xs">Alıcı *</Label><Select value={mesajAlici} onValueChange={setMesajAlici}><SelectTrigger className="text-sm"><SelectValue placeholder="Kişi seçin..." /></SelectTrigger><SelectContent>{kullanicilar.filter(u => u.id !== user.id).map(u => (<SelectItem key={u.id} value={u.id}>{u.ad} {u.soyad} ({({admin:"Yönetici",coordinator:"Koord.",teacher:"Öğretmen",student:"Öğrenci",parent:"Veli"})[u.role]})</SelectItem>))}</SelectContent></Select></div>
             <div><Label className="text-xs">Konu</Label><Input value={mesajForm.konu} onChange={e => setMesajForm({...mesajForm, konu: e.target.value})} className="text-sm" /></div>
             <div><Label className="text-xs">Mesaj *</Label><textarea value={mesajForm.icerik} onChange={e => setMesajForm({...mesajForm, icerik: e.target.value})} required className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px]" /></div>
@@ -6132,6 +5993,8 @@ function OgretmenPaneli({ user, logout }) {
 // ═══════════════════════════════════════════════
 
 function OgrenciPaneli({ user, logout }) {
+  const [sinavCozum, setSinavCozum] = useState(null);
+  const sinavBaslat = (odevId, gorevId) => setSinavCozum({ odevId, gorevId });
   const { toast } = useToast();
   const { isFullscreen } = useFullscreenExercise();
   const [profil, setProfil] = useState(null);
@@ -6394,8 +6257,8 @@ function OgrenciPaneli({ user, logout }) {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center p-8 max-w-sm">
           <div className="text-5xl mb-4">🔒</div>
-          <h3 className="font-bold text-gray-900 text-lg">Bu özellik devre dışı</h3>
-          <p className="text-gray-500 text-sm mt-2">Sistem yöneticisi sesli okuma analizini kapatmıştır.</p>
+          <h3 className="font-bold text-content text-lg">Bu özellik devre dışı</h3>
+          <p className="text-subtle text-sm mt-2">Sistem yöneticisi sesli okuma analizini kapatmıştır.</p>
           <button onClick={() => setAktifEkran(null)} className="mt-4 px-4 py-2 bg-gray-200 rounded-xl text-sm font-medium">← Geri Dön</button>
         </div>
       </div>
@@ -6409,7 +6272,7 @@ function OgrenciPaneli({ user, logout }) {
           {/* Header */}
           <div className="flex items-center gap-3">
             <button onClick={() => { setAktifEkran(null); setSpeechSonuc(null); setSpeechKayit(false); clearInterval(speechSureRef.current); if(mediaRecorderRef.current?.state === "recording") { mediaRecorderRef.current.stop(); mediaRecorderRef.current.stream?.getTracks().forEach(t=>t.stop()); } }} className="text-purple-600 text-sm">← Geri</button>
-            <h2 className="text-lg font-bold text-purple-900">🎤 Sesli Okuma Analizi</h2>
+            <h2 className="text-lg font-bold text-purple-900">Sesli Okuma Analizi</h2>
           </div>
 
           {/* Sonuç ekranı */}
@@ -6417,7 +6280,7 @@ function OgrenciPaneli({ user, logout }) {
             <div className="space-y-3">
               <div className={`rounded-2xl border p-4 text-center ${skorBg(speechSonuc.genel_skor)}`}>
                 <div className="text-5xl font-bold mb-1 text-purple-700">{speechSonuc.genel_skor}<span className="text-lg">/100</span></div>
-                <div className="text-sm font-medium text-gray-600 capitalize">{speechSonuc.seviye}</div>
+                <div className="text-sm font-medium text-subtle capitalize">{speechSonuc.seviye}</div>
                 <div className="text-xs text-green-600 font-bold mt-1">+{speechSonuc.xp_kazanildi} XP kazandın! 🎉</div>
               </div>
 
@@ -6429,10 +6292,10 @@ function OgrenciPaneli({ user, logout }) {
                   { label: "Tonlama", val: speechSonuc.tonlama_skoru, icon: "🎵" },
                   { label: "Vurgu", val: speechSonuc.vurgu_skoru, icon: "💥" },
                 ].map(m => (
-                  <div key={m.label} className="bg-white rounded-xl p-3 border text-center">
+                  <div key={m.label} className="bg-surface rounded-xl p-3 border text-center">
                     <div className="text-xl">{m.icon}</div>
                     <div className={`text-xl font-bold ${skorRenk(m.val)}`}>{m.val}</div>
-                    <div className="text-xs text-gray-500">{m.label}</div>
+                    <div className="text-xs text-subtle">{m.label}</div>
                     <div className="mt-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                       <div className={`h-1.5 rounded-full ${m.val>=80?"bg-green-500":m.val>=60?"bg-yellow-400":"bg-red-400"}`} style={{width:`${m.val}%`}} />
                     </div>
@@ -6441,14 +6304,14 @@ function OgrenciPaneli({ user, logout }) {
               </div>
 
               {/* WPM */}
-              <div className="bg-white rounded-xl border p-3 flex justify-between items-center">
+              <div className="bg-surface rounded-xl border p-3 flex justify-between items-center">
                 <div>
-                  <div className="text-xs text-gray-500">Okuma Hızın</div>
-                  <div className={`text-2xl font-bold ${skorRenk(speechSonuc.akicilik_skoru)}`}>{speechSonuc.wpm} <span className="text-sm font-normal text-gray-400">kelime/dk</span></div>
+                  <div className="text-xs text-subtle">Okuma Hızın</div>
+                  <div className={`text-2xl font-bold ${skorRenk(speechSonuc.akicilik_skoru)}`}>{speechSonuc.wpm} <span className="text-sm font-normal text-subtle">kelime/dk</span></div>
                 </div>
                 <div className="text-right">
-                  <div className="text-xs text-gray-500">Sınıf Normu</div>
-                  <div className="text-lg font-bold text-gray-400">{speechSonuc.norm_wpm} <span className="text-xs font-normal">kelime/dk</span></div>
+                  <div className="text-xs text-subtle">Sınıf Normu</div>
+                  <div className="text-lg font-bold text-subtle">{speechSonuc.norm_wpm} <span className="text-xs font-normal">kelime/dk</span></div>
                 </div>
               </div>
 
@@ -6456,7 +6319,7 @@ function OgrenciPaneli({ user, logout }) {
               {speechSonuc.ogrenci_mesaj && (
                 <div className="bg-gradient-to-r from-purple-100 to-indigo-100 rounded-xl p-3 border border-purple-200">
                   <div className="text-xs font-medium text-purple-700 mb-1">🤖 AI Koçun Diyor:</div>
-                  <p className="text-sm text-gray-700">{speechSonuc.ogrenci_mesaj}</p>
+                  <p className="text-sm text-content">{speechSonuc.ogrenci_mesaj}</p>
                 </div>
               )}
 
@@ -6495,24 +6358,24 @@ function OgrenciPaneli({ user, logout }) {
                 </div>
               </div>
 
-              <div className="bg-white rounded-2xl border-2 border-purple-200 p-4">
+              <div className="bg-surface rounded-2xl border-2 border-purple-200 p-4">
                 <div className="text-xs font-bold text-purple-700 mb-2">📖 Okunan Metin:</div>
-                <p className="text-sm text-gray-800 leading-relaxed font-medium">{seciliSpeechMetin.metin}</p>
+                <p className="text-sm text-content leading-relaxed font-medium">{seciliSpeechMetin.metin}</p>
               </div>
 
               <button onClick={speechBitir} disabled={speechYukleniyor || speechSure < 3}
                 className="w-full py-4 rounded-2xl bg-gradient-to-r from-red-500 to-pink-600 text-white font-bold text-lg disabled:opacity-50">
                 {speechYukleniyor ? "⏳ Analiz ediliyor..." : "⏹️ Bitir & Analiz Et"}
               </button>
-              {speechSure < 3 && <p className="text-xs text-center text-gray-400">En az 3 saniye kayıt gerekiyor</p>}
+              {speechSure < 3 && <p className="text-xs text-center text-subtle">En az 3 saniye kayıt gerekiyor</p>}
             </div>
           )}
 
           {/* Yükleniyor */}
           {speechYukleniyor && !speechKayit && (
-            <div className="bg-white rounded-2xl border p-8 text-center">
+            <div className="bg-surface rounded-2xl border p-8 text-center">
               <div className="text-4xl mb-3 animate-bounce">🤖</div>
-              <div className="text-sm font-medium text-gray-600">AI sesin analiz ediyor...</div>
+              <div className="text-sm font-medium text-subtle">AI sesin analiz ediyor...</div>
               <div className="mt-3 flex justify-center gap-1">
                 {[0,1,2].map(i => <div key={i} className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{animationDelay:`${i*0.15}s`}} />)}
               </div>
@@ -6522,17 +6385,17 @@ function OgrenciPaneli({ user, logout }) {
           {/* Metin seçimi */}
           {!speechSonuc && !speechKayit && !speechYukleniyor && (
             <div className="space-y-3">
-              <p className="text-sm text-gray-600 text-center">Bir metin seç ve yüksek sesle oku 📖</p>
+              <p className="text-sm text-subtle text-center">Bir metin seç ve yüksek sesle oku 📖</p>
               {speechMetinler.length === 0 && (
-                <div className="text-center text-gray-400 text-sm py-4">Metin yükleniyor...</div>
+                <div className="text-center text-subtle text-sm py-4">Metin yükleniyor...</div>
               )}
               {speechMetinler.map(m => (
-                <div key={m.id} className="bg-white rounded-2xl border-2 border-purple-100 hover:border-purple-300 p-4 cursor-pointer transition-all" onClick={() => speechBaslat(m)}>
+                <div key={m.id} className="bg-surface rounded-2xl border-2 border-purple-100 hover:border-purple-300 p-4 cursor-pointer transition-all" onClick={() => speechBaslat(m)}>
                   <div className="flex justify-between items-start mb-2">
-                    <div className="font-semibold text-gray-800 text-sm">{m.baslik}</div>
+                    <div className="font-semibold text-content text-sm">{m.baslik}</div>
                     <div className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">{m.kelime_sayisi} kelime</div>
                   </div>
-                  <p className="text-xs text-gray-500 line-clamp-2">{m.metin}</p>
+                  <p className="text-xs text-subtle line-clamp-2">{m.metin}</p>
                   <button className="mt-3 w-full py-2 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-600 text-white text-sm font-medium">🎤 Bu Metni Oku</button>
                 </div>
               ))}
@@ -6540,17 +6403,17 @@ function OgrenciPaneli({ user, logout }) {
               {/* Geçmiş */}
               {speechGecmis.length > 0 && (
                 <div className="mt-4">
-                  <div className="text-xs font-bold text-gray-500 mb-2">📊 Son Okumalar</div>
+                  <div className="text-xs font-bold text-subtle mb-2">📊 Son Okumalar</div>
                   <div className="space-y-2">
                     {speechGecmis.slice(0,3).map((k,i) => (
-                      <div key={i} className="bg-white rounded-xl border p-3 flex justify-between items-center">
+                      <div key={i} className="bg-surface rounded-xl border p-3 flex justify-between items-center">
                         <div>
-                          <div className="text-xs font-medium text-gray-700">{k.metin_baslik}</div>
-                          <div className="text-xs text-gray-400">{k.tarih?.slice(0,10)}</div>
+                          <div className="text-xs font-medium text-content">{k.metin_baslik}</div>
+                          <div className="text-xs text-subtle">{k.tarih?.slice(0,10)}</div>
                         </div>
                         <div className="text-right">
                           <div className={`text-lg font-bold ${skorRenk(k.analiz?.genel_skor||0)}`}>{k.analiz?.genel_skor||0}</div>
-                          <div className="text-xs text-gray-400">{k.analiz?.wpm||0} k/dk</div>
+                          <div className="text-xs text-subtle">{k.analiz?.wpm||0} k/dk</div>
                         </div>
                       </div>
                     ))}
@@ -6579,7 +6442,7 @@ function OgrenciPaneli({ user, logout }) {
             <Button onClick={() => setOkumaDuraklatildi(!okumaDuraklatildi)} variant="outline" className="rounded-full px-8 py-3 text-lg border-green-300 text-green-700">{okumaDuraklatildi ? "▶ Devam Et" : "⏸ Duraklat"}</Button>
             <Button onClick={okumaBitir} className="rounded-full px-8 py-3 text-lg bg-gradient-to-r from-green-500 to-emerald-600 text-white" disabled={okumaSuresi < 30}>✅ Bitirdim</Button>
           </div>
-          {okumaSuresi < 30 && <p className="text-xs text-gray-400">En az 30 saniye okuman gerekiyor</p>}
+          {okumaSuresi < 30 && <p className="text-xs text-subtle">En az 30 saniye okuman gerekiyor</p>}
         </div>
       </div>
     );
@@ -6591,8 +6454,8 @@ function OgrenciPaneli({ user, logout }) {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center p-8 max-w-sm">
           <div className="text-5xl mb-4">🔒</div>
-          <h3 className="font-bold text-gray-900 text-lg">Bu özellik devre dışı</h3>
-          <p className="text-gray-500 text-sm mt-2">Sistem yöneticisi seviyeli okumayı kapatmıştır.</p>
+          <h3 className="font-bold text-content text-lg">Bu özellik devre dışı</h3>
+          <p className="text-subtle text-sm mt-2">Sistem yöneticisi seviyeli okumayı kapatmıştır.</p>
           <button onClick={() => setAktifEkran(null)} className="mt-4 px-4 py-2 bg-gray-200 rounded-xl text-sm font-medium">← Geri Dön</button>
         </div>
       </div>
@@ -6603,14 +6466,14 @@ function OgrenciPaneli({ user, logout }) {
         <div className="max-w-md mx-auto p-4 space-y-4">
           <div className="flex items-center gap-3">
             <button onClick={() => setAktifEkran(null)} className="text-indigo-600 text-sm">← Geri</button>
-            <h2 className="text-base font-bold text-indigo-900">📖 Seviyeli Okuma</h2>
+            <h2 className="text-base font-bold text-indigo-900">Seviyeli Okuma</h2>
           </div>
-          <div className="bg-white rounded-2xl p-4 border shadow-sm">
-            <div className="text-sm font-bold text-gray-800 mb-1">Hangi kitabı okumak istiyorsun?</div>
-            <div className="text-xs text-gray-500 mb-4">AI kitabı Kolay → Orta → Orijinal olarak hazırlar</div>
+          <div className="bg-surface rounded-2xl p-4 border shadow-sm">
+            <div className="text-sm font-bold text-content mb-1">Hangi kitabı okumak istiyorsun?</div>
+            <div className="text-xs text-subtle mb-4">AI kitabı Kolay → Orta → Orijinal olarak hazırlar</div>
             {havuzKitaplar.length > 0 && (
               <div className="mb-4">
-                <div className="text-xs font-medium text-gray-500 mb-2">📚 Kitap Havuzundan Seç</div>
+                <div className="text-xs font-medium text-subtle mb-2">📚 Kitap Havuzundan Seç</div>
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                   {havuzKitaplar.map(k => (
                     <button key={k.id} disabled={scaffoldYukleniyor}
@@ -6628,15 +6491,15 @@ function OgrenciPaneli({ user, logout }) {
                       className="w-full text-left bg-indigo-50 border-2 border-indigo-100 hover:border-indigo-400 rounded-xl p-3 transition-all disabled:opacity-50 flex items-center gap-3 active:scale-[0.98]">
                       <span className="text-2xl flex-shrink-0">📚</span>
                       <div className="min-w-0">
-                        <div className="font-semibold text-sm text-gray-800 truncate">{k.baslik}</div>
-                        {k.kitap_yazar && <div className="text-xs text-gray-500">{k.kitap_yazar}</div>}
+                        <div className="font-semibold text-sm text-content truncate">{k.baslik}</div>
+                        {k.kitap_yazar && <div className="text-xs text-subtle">{k.kitap_yazar}</div>}
                       </div>
                       {scaffoldYukleniyor && <span className="ml-auto text-indigo-400 text-lg">⏳</span>}
                     </button>
                   ))}
                 </div>
                 <div className="flex items-center gap-2 my-4">
-                  <div className="flex-1 h-px bg-gray-200"/><span className="text-xs text-gray-400">veya farklı kitap</span><div className="flex-1 h-px bg-gray-200"/>
+                  <div className="flex-1 h-px bg-gray-200"/><span className="text-xs text-subtle">veya farklı kitap</span><div className="flex-1 h-px bg-gray-200"/>
                 </div>
               </div>
             )}
@@ -6646,7 +6509,7 @@ function OgrenciPaneli({ user, logout }) {
                 <div className="flex gap-2">
                   <input value={manuelAd} onChange={e => setManuelAd(e.target.value)}
                     placeholder="Kitap adını yaz..."
-                    className="flex-1 border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-400" />
+                    className="flex-1 border-2 border-line rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-400" />
                   <button disabled={!manuelAd.trim() || scaffoldYukleniyor}
                     onClick={async () => {
                       setScaffoldYukleniyor(true);
@@ -6681,11 +6544,11 @@ function OgrenciPaneli({ user, logout }) {
           {/* Header */}
           <div className="flex items-center gap-3">
             <button onClick={() => setAktifEkran(null)} className="text-indigo-600 text-sm">← Geri</button>
-            <h2 className="text-base font-bold text-indigo-900">📖 Seviyeli Okuma</h2>
+            <h2 className="text-base font-bold text-indigo-900">Seviyeli Okuma</h2>
           </div>
-          <div className="text-center bg-white rounded-2xl p-3 border shadow-sm">
-            <div className="text-sm font-bold text-gray-800">{scaffoldData.kitap_adi}</div>
-            <div className="text-xs text-gray-500 mt-0.5">{scaffoldData.zpd_aciklama}</div>
+          <div className="text-center bg-surface rounded-2xl p-3 border shadow-sm">
+            <div className="text-sm font-bold text-content">{scaffoldData.kitap_adi}</div>
+            <div className="text-xs text-subtle mt-0.5">{scaffoldData.zpd_aciklama}</div>
           </div>
 
           {/* Seviye seçici */}
@@ -6695,7 +6558,7 @@ function OgrenciPaneli({ user, logout }) {
               const onerilen = scaffoldData.onerilen_seviye === sev;
               return (
                 <button key={sev} onClick={() => setScaffoldSeviye(sev)}
-                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold border-2 transition-all ${scaffoldSeviye===sev?"border-indigo-500 bg-indigo-500 text-white":"border-gray-200 bg-white text-gray-600 hover:border-indigo-300"}`}>
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold border-2 transition-all ${scaffoldSeviye===sev?"border-indigo-500 bg-indigo-500 text-white":"border-line bg-surface text-subtle hover:border-indigo-300"}`}>
                   {etiket}{onerilen && <span className="block text-[9px] opacity-80">⭐ Önerilen</span>}
                 </button>
               );
@@ -6703,15 +6566,15 @@ function OgrenciPaneli({ user, logout }) {
           </div>
 
           {/* Metin */}
-          <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+          <div className="bg-surface rounded-2xl border shadow-sm overflow-hidden">
             <div className={`px-4 py-3 border-b ${scaffoldSeviye==="kolay"?"bg-green-50 border-green-100":scaffoldSeviye==="orta"?"bg-yellow-50 border-yellow-100":"bg-indigo-50 border-indigo-100"}`}>
               <div className="flex items-center justify-between">
-                <div className="font-bold text-sm text-gray-800">{mevcut.baslik}</div>
-                <div className="text-xs text-gray-400">{mevcut.kelime_sayisi} kelime</div>
+                <div className="font-bold text-sm text-content">{mevcut.baslik}</div>
+                <div className="text-xs text-subtle">{mevcut.kelime_sayisi} kelime</div>
               </div>
             </div>
             <div className="p-4">
-              <p className="text-sm text-gray-800 leading-relaxed">{mevcut.metin}</p>
+              <p className="text-sm text-content leading-relaxed">{mevcut.metin}</p>
             </div>
             {mevcut.anahtar_kelimeler?.length > 0 && (
               <div className="px-4 pb-4 flex flex-wrap gap-1.5">
@@ -6751,13 +6614,13 @@ function OgrenciPaneli({ user, logout }) {
     const dk = Math.max(1, Math.round(okumaSuresi / 60));
     return (
       <div className="min-h-screen bg-gradient-to-b from-orange-50 to-yellow-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full"><Card className="border-0 shadow-lg"><CardHeader className="text-center"><div className="text-4xl mb-2">🌳🌳🌳</div><CardTitle>Harika! {dk} dakika okudun.</CardTitle><p className="text-gray-500 text-sm">Bugün ne okudun?</p></CardHeader>
+        <div className="max-w-md w-full"><Card className="border border-line shadow-lg"><CardHeader className="text-center"><div className="text-4xl mb-2"></div><CardTitle>Harika! {dk} dakika okudun.</CardTitle><p className="text-subtle text-sm">Bugün ne okudun?</p></CardHeader>
           <CardContent><form onSubmit={okumaKaydet} className="space-y-4">
             <div><Label>Kitap Adı *</Label><Input value={neOkudunForm.kitap_adi} onChange={e => setNeOkudunForm({...neOkudunForm, kitap_adi: e.target.value})} required placeholder="Kitabın adı" /></div>
             <div><Label>Bölüm</Label><Input value={neOkudunForm.bolum} onChange={e => setNeOkudunForm({...neOkudunForm, bolum: e.target.value})} placeholder="Bölüm 3" /></div>
             <div className="grid grid-cols-2 gap-3"><div><Label>Başlangıç Sayfa</Label><Input type="number" value={neOkudunForm.baslangic_sayfa} onChange={e => setNeOkudunForm({...neOkudunForm, baslangic_sayfa: e.target.value})} /></div><div><Label>Bitiş Sayfa</Label><Input type="number" value={neOkudunForm.bitis_sayfa} onChange={e => setNeOkudunForm({...neOkudunForm, bitis_sayfa: e.target.value})} /></div></div>
             <div><Label>Not</Label><Input value={neOkudunForm.not_text} onChange={e => setNeOkudunForm({...neOkudunForm, not_text: e.target.value})} placeholder="Kısa not..." /></div>
-            <Button type="submit" className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 rounded-xl">Kaydet 📝</Button>
+            <Button type="submit" className="w-full bg-primary hover:bg-primary-hover text-white py-3 rounded-xl"><Save className="h-4 w-4 mr-1" />Kaydet</Button>
             <Button type="button" variant="outline" className="w-full" onClick={() => { setOkumaSuresi(0); setAktifEkran(null); setSocraticSoru(null); }}>Atla</Button>
           </form></CardContent></Card>
 
@@ -6765,10 +6628,10 @@ function OgrenciPaneli({ user, logout }) {
           {socraticSoru && (
             <Card className="border-2 border-cyan-300 shadow-lg">
               <CardHeader className="bg-gradient-to-r from-cyan-50 to-blue-50 pb-2">
-                <CardTitle className="text-base flex items-center gap-2">🤖 Okuma Koçun Soruyor</CardTitle>
+                <CardTitle className="text-base flex items-center gap-2">Okuma Koçun Soruyor</CardTitle>
               </CardHeader>
               <CardContent className="pt-3 space-y-3">
-                <p className="text-sm font-medium text-gray-800">{socraticSoru.soru}</p>
+                <p className="text-sm font-medium text-content">{socraticSoru.soru}</p>
                 {socraticSoru.ipucu && <p className="text-xs text-cyan-600 italic">💡 İpucu: {socraticSoru.ipucu}</p>}
                 {!socraticSonuc ? (<>
                   <textarea value={socraticCevap} onChange={e => setSocraticCevap(e.target.value)} className="w-full border rounded-lg p-2 text-sm min-h-[60px]" placeholder="Düşünceni yaz..." />
@@ -6787,7 +6650,7 @@ function OgrenciPaneli({ user, logout }) {
                       {[1,2,3,4,5].map(s => <span key={s} className={`text-lg ${s <= socraticSonuc.puan ? '⭐' : '☆'}`}>{s <= socraticSonuc.puan ? '⭐' : '☆'}</span>)}
                       <span className="text-xs text-green-600 font-bold">+{socraticSonuc.xp} XP</span>
                     </div>
-                    <p className="text-sm text-gray-700 bg-cyan-50 p-2 rounded-lg">{socraticSonuc.geri_bildirim}</p>
+                    <p className="text-sm text-content bg-cyan-50 p-2 rounded-lg">{socraticSonuc.geri_bildirim}</p>
                     <Button className="w-full bg-green-600 text-white text-sm" onClick={() => { setSocraticSoru(null); setSocraticSonuc(null); setAktifEkran(null); }}>Tamam ✅</Button>
                   </div>
                 )}
@@ -6809,13 +6672,14 @@ function OgrenciPaneli({ user, logout }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {sinavCozum && <SinavCozum apiBase={API} odevId={sinavCozum.odevId} gorevId={sinavCozum.gorevId} onClose={() => setSinavCozum(null)} onComplete={(gid) => { if (gid) gorevTamamla(gid); setSinavCozum(null); }} />}
       {/* Header — tam ekran egzersiz modunda gizlenir */}
       {!isFullscreen && (
-      <div className="bg-white border-b sticky top-0 z-30">
+      <div className="bg-surface border-b sticky top-0 z-30">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-red-500 rounded-xl flex items-center justify-center"><BookOpen className="h-5 w-5 text-white" /></div>
-            <div><div className="font-bold text-gray-900 text-sm">{user.ad} {user.soyad}</div><div className="text-xs text-gray-500">{profil?.kur ? `Kur: ${profil.kur}` : "Öğrenci"} {profil?.sinif ? `• ${profil.sinif}. sınıf` : ""}</div></div>
+            <div><div className="font-bold text-content text-sm">{user.ad} {user.soyad}</div><div className="text-xs text-subtle">{profil?.kur ? `Kur: ${profil.kur}` : "Öğrenci"} {profil?.sinif ? `• ${profil.sinif}. sınıf` : ""}</div></div>
           </div>
           <div className="flex items-center gap-2">
             <div className="text-center"><div className="text-lg font-bold text-orange-600">{seviyeEmoji} Sv.{seviye}</div></div>
@@ -6828,11 +6692,11 @@ function OgrenciPaneli({ user, logout }) {
 
       {/* 5 Tab — temiz, taşmaz — tam ekran egzersiz modunda gizlenir */}
       {!isFullscreen && (
-      <div className="bg-white border-b sticky top-[60px] z-20">
+      <div className="bg-surface border-b sticky top-[60px] z-20">
         <div className="max-w-2xl mx-auto px-2 flex justify-between py-2">
           {sekmeler.map(s => (
             <button key={s.id} onClick={() => setAktifSekme(s.id)}
-              className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl text-[11px] font-medium transition-all min-w-0 flex-1 ${aktifSekme === s.id ? 'bg-orange-500 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>
+              className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl text-[11px] font-medium transition-all min-w-0 flex-1 ${aktifSekme === s.id ? 'bg-primary text-white shadow' : 'text-subtle hover:bg-app'}`}>
               <span className="text-base">{s.icon}</span>
               <span className="truncate">{s.label}</span>
               {s.badge > 0 && <span className={`px-1.5 rounded-full text-[9px] font-bold ${aktifSekme === s.id ? 'bg-white/30' : 'bg-red-100 text-red-600'}`}>{s.badge}</span>}
@@ -6848,33 +6712,33 @@ function OgrenciPaneli({ user, logout }) {
         {aktifSekme === "ana" && (<>
           {/* Lig Durumu (XP yalnızca sıralama ekranında görünür) */}
           {xpDurum && (
-            <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl p-4 text-white">
+            <div className="bg-primary hover:bg-primary-hover rounded-2xl p-4 text-white">
               <div className="flex items-center justify-between mb-2">
                 <div className="text-lg font-bold">{xpDurum.lig_label}</div>
               </div>
               {xpDurum.sonraki_lig && (<>
-                <div className="bg-white/20 rounded-full h-2.5 overflow-hidden"><div className="h-full bg-white rounded-full transition-all" style={{ width: `${Math.min(100, ((xpDurum.toplam_xp - (LIG_ESIKLERI_FE[xpDurum.lig] || 0)) / Math.max(1, xpDurum.sonraki_esik - (LIG_ESIKLERI_FE[xpDurum.lig] || 0))) * 100)}%` }} /></div>
+                <div className="bg-white/20 rounded-full h-2.5 overflow-hidden"><div className="h-full bg-surface rounded-full transition-all" style={{ width: `${Math.min(100, ((xpDurum.toplam_xp - (LIG_ESIKLERI_FE[xpDurum.lig] || 0)) / Math.max(1, xpDurum.sonraki_esik - (LIG_ESIKLERI_FE[xpDurum.lig] || 0))) * 100)}%` }} /></div>
                 <p className="text-xs opacity-70 mt-1">Sonraki lig: {({"gumus":"🥈 Gümüş","altin":"🥇 Altın","elmas":"💎 Elmas"})[xpDurum.sonraki_lig]}</p>
               </>)}
               {!xpDurum.sonraki_lig && <p className="text-xs opacity-80 mt-1">En yüksek lige ulaştın! 🎉</p>}
             </div>
           )}
           {!xpDurum && (
-            <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl p-4 text-white">
+            <div className="bg-primary hover:bg-primary-hover rounded-2xl p-4 text-white">
               <div className="text-lg font-bold">{seviyeEmoji} Seviye {seviye}</div>
-              <div className="bg-white/20 rounded-full h-2.5 overflow-hidden mt-2"><div className="h-full bg-white rounded-full" style={{ width: `${seviyeIlerleme}%` }} /></div>
+              <div className="bg-white/20 rounded-full h-2.5 overflow-hidden mt-2"><div className="h-full bg-surface rounded-full" style={{ width: `${seviyeIlerleme}%` }} /></div>
               <p className="text-xs opacity-70 mt-1">Sonraki seviye için {100 - seviyeIlerleme} dk oku</p>
             </div>
           )}
 
           {/* 2x3 istatistik grid */}
           <div className="grid grid-cols-3 gap-2">
-            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-orange-600">{istatistik?.streak || 0}</div><div className="text-[10px] text-gray-500">🔥 Gün Streak</div></div>
-            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-green-600">{istatistik?.bugun_dakika || 0}</div><div className="text-[10px] text-gray-500">⏱ Bugün (dk)</div></div>
-            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-blue-600">{istatistik?.toplam_kitap || 0}</div><div className="text-[10px] text-gray-500">📚 Kitap</div></div>
-            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-purple-600">{toplamOkumaSaati}</div><div className="text-[10px] text-gray-500">⏳ Saat Okuma</div></div>
-            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-pink-600">{okunanSayfa}</div><div className="text-[10px] text-gray-500">📄 Sayfa</div></div>
-            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-teal-600">{tamamlananGorevSayisi + tamamlananGelisim}</div><div className="text-[10px] text-gray-500">✅ Tamamlanan</div></div>
+            <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-orange-600">{istatistik?.streak || 0}</div><div className="text-[10px] text-subtle">🔥 Gün Streak</div></div>
+            <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-green-600">{istatistik?.bugun_dakika || 0}</div><div className="text-[10px] text-subtle">⏱ Bugün (dk)</div></div>
+            <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-blue-600">{istatistik?.toplam_kitap || 0}</div><div className="text-[10px] text-subtle">📚 Kitap</div></div>
+            <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-purple-600">{toplamOkumaSaati}</div><div className="text-[10px] text-subtle">⏳ Saat Okuma</div></div>
+            <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-pink-600">{okunanSayfa}</div><div className="text-[10px] text-subtle">📄 Sayfa</div></div>
+            <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-teal-600">{tamamlananGorevSayisi + tamamlananGelisim}</div><div className="text-[10px] text-subtle">✅ Tamamlanan</div></div>
           </div>
 
           {/* 🤖 AI Günlük Motivasyon + Mikro Hedef */}
@@ -6886,7 +6750,7 @@ function OgrenciPaneli({ user, logout }) {
           )}
 
           {/* Haftalık hedef */}
-          {istatistik && (<div className="bg-white rounded-2xl p-4 shadow-sm border"><div className="flex items-center justify-between mb-2"><div className="text-sm font-medium text-gray-700">Haftalık Hedef</div><span className="text-sm font-bold text-gray-700">{istatistik.aktif_gunler_7}/4 gün</span></div><div className="flex gap-1">{[0,1,2,3].map(i => (<div key={i} className={`flex-1 h-3 rounded-full ${i < istatistik.aktif_gunler_7 ? 'bg-gradient-to-r from-orange-400 to-red-500' : 'bg-gray-100'}`} />))}</div><p className="text-xs text-gray-400 mt-2">Haftada en az 4 gün okuma 📖</p></div>)}
+          {istatistik && (<div className="bg-surface rounded-2xl p-4 shadow-sm border"><div className="flex items-center justify-between mb-2"><div className="text-sm font-medium text-content">Haftalık Hedef</div><span className="text-sm font-bold text-content">{istatistik.aktif_gunler_7}/4 gün</span></div><div className="flex gap-1">{[0,1,2,3].map(i => (<div key={i} className={`flex-1 h-3 rounded-full ${i < istatistik.aktif_gunler_7 ? 'bg-gradient-to-r from-orange-400 to-red-500' : 'bg-gray-100'}`} />))}</div><p className="text-xs text-subtle mt-2">Haftada en az 4 gün okuma 📖</p></div>)}
 
           {/* 🧠 Okuma Zekâm */}
           {dnaData && (() => {
@@ -6902,7 +6766,7 @@ function OgrenciPaneli({ user, logout }) {
             const guclu = satirlar.filter(s => (boyutlar[s.key]||0) >= 70);
             const gelistir = satirlar.filter(s => (boyutlar[s.key]||0) < 50);
             return (
-              <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+              <div className="bg-surface rounded-2xl border shadow-sm overflow-hidden">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -6921,12 +6785,12 @@ function OgrenciPaneli({ user, logout }) {
                     return (
                       <div key={key}>
                         <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-1.5 text-xs text-gray-700 font-medium">
+                          <div className="flex items-center gap-1.5 text-xs text-content font-medium">
                             <span>{emoji}</span><span>{label}</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-gray-800">{val}</span>
-                            <span className="text-[9px] text-gray-400">/100</span>
+                            <span className="text-xs font-bold text-content">{val}</span>
+                            <span className="text-[9px] text-subtle">/100</span>
                           </div>
                         </div>
                         <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
@@ -6967,12 +6831,12 @@ function OgrenciPaneli({ user, logout }) {
               <div className="space-y-2">
                 {kitapTavsiye.slice(0,3).map((k,i) => (
                   <div key={i} onClick={() => setZekaModal({kitap_adi:k.kitap_adi,yazar:k.yazar,profil:k,yukleniyor:false})}
-                    className="bg-white rounded-xl p-3 flex items-center justify-between gap-2 cursor-pointer hover:bg-purple-50 transition-all border border-purple-100 active:scale-[0.98]">
+                    className="bg-surface rounded-xl p-3 flex items-center justify-between gap-2 cursor-pointer hover:bg-purple-50 transition-all border border-purple-100 active:scale-[0.98]">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-2xl flex-shrink-0">{["🥇","🥈","🥉"][i]}</span>
-                      <div className="min-w-0"><div className="font-semibold text-xs text-gray-800 truncate">{k.kitap_adi}</div>{k.yazar && <div className="text-[10px] text-gray-400 truncate">{k.yazar}</div>}</div>
+                      <div className="min-w-0"><div className="font-semibold text-xs text-content truncate">{k.kitap_adi}</div>{k.yazar && <div className="text-[10px] text-subtle truncate">{k.yazar}</div>}</div>
                     </div>
-                    <div className="flex flex-col items-end flex-shrink-0"><div className="text-xs font-bold text-purple-600">%{Math.round(k.uyum_skoru)}</div><div className="text-[9px] text-gray-400">uyum</div></div>
+                    <div className="flex flex-col items-end flex-shrink-0"><div className="text-xs font-bold text-purple-600">%{Math.round(k.uyum_skoru)}</div><div className="text-[9px] text-subtle">uyum</div></div>
                   </div>
                 ))}
               </div>
@@ -6996,33 +6860,33 @@ function OgrenciPaneli({ user, logout }) {
           {/* ═══ AI ÖZELLİKLERİ KISAYOLLAR ═══ */}
           {(ozellikAktif("ogrenci_scaffold") || ozellikAktif("ogrenci_hikaye") || ozellikAktif("ogrenci_materyal")) && (
           <div>
-            <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 px-1">🤖 AI Araçları</div>
+            <div className="text-xs font-bold text-subtle uppercase tracking-wide mb-2 px-1">🤖 AI Araçları</div>
             <div className="grid grid-cols-3 gap-2">
               {/* Scaffold Reading */}
               {ozellikAktif("ogrenci_scaffold") && (
               <button onClick={() => { setScaffoldData(null); setAktifEkran("scaffold"); }}
-                className="bg-white rounded-2xl p-3 border shadow-sm text-center hover:border-indigo-400 hover:bg-indigo-50 transition-all active:scale-95 group">
+                className="bg-surface rounded-2xl p-3 border shadow-sm text-center hover:border-indigo-400 hover:bg-indigo-50 transition-all active:scale-95 group">
                 <div className="text-2xl mb-1.5">📖</div>
-                <div className="text-[11px] font-bold text-gray-800 group-hover:text-indigo-700">Seviyeli Okuma</div>
-                <div className="text-[9px] text-gray-400 mt-0.5">Kolay → Orta → Zor</div>
+                <div className="text-[11px] font-bold text-content group-hover:text-indigo-700">Seviyeli Okuma</div>
+                <div className="text-[9px] text-subtle mt-0.5">Kolay → Orta → Zor</div>
               </button>
               )}
               {/* Adaptive Story */}
               {ozellikAktif("ogrenci_hikaye") && (
               <button onClick={() => { setAktifSekme("gelisim"); setGelisimAltSekme("hikayem"); }}
-                className="bg-white rounded-2xl p-3 border shadow-sm text-center hover:border-pink-400 hover:bg-pink-50 transition-all active:scale-95 group">
+                className="bg-surface rounded-2xl p-3 border shadow-sm text-center hover:border-pink-400 hover:bg-pink-50 transition-all active:scale-95 group">
                 <div className="text-2xl mb-1.5">✨</div>
-                <div className="text-[11px] font-bold text-gray-800 group-hover:text-pink-700">Bana Özel Hikâye</div>
-                <div className="text-[9px] text-gray-400 mt-0.5">AI hikâye yazar</div>
+                <div className="text-[11px] font-bold text-content group-hover:text-pink-700">Bana Özel Hikâye</div>
+                <div className="text-[9px] text-subtle mt-0.5">AI hikâye yazar</div>
               </button>
               )}
               {/* Materyal Üretici */}
               {ozellikAktif("ogrenci_materyal") && (
               <button onClick={() => { setAktifSekme("gelisim"); setGelisimAltSekme("materyal"); }}
-                className="bg-white rounded-2xl p-3 border shadow-sm text-center hover:border-teal-400 hover:bg-teal-50 transition-all active:scale-95 group">
+                className="bg-surface rounded-2xl p-3 border shadow-sm text-center hover:border-teal-400 hover:bg-teal-50 transition-all active:scale-95 group">
                 <div className="text-2xl mb-1.5">📋</div>
-                <div className="text-[11px] font-bold text-gray-800 group-hover:text-teal-700">Materyal Üret</div>
-                <div className="text-[9px] text-gray-400 mt-0.5">Soru seti, kelime</div>
+                <div className="text-[11px] font-bold text-content group-hover:text-teal-700">Materyal Üret</div>
+                <div className="text-[9px] text-subtle mt-0.5">Soru seti, kelime</div>
               </button>
               )}
             </div>
@@ -7030,8 +6894,8 @@ function OgrenciPaneli({ user, logout }) {
           )}
 
           {/* Bekleyen görevler kısa */}
-          {bekleyenGorevler.length > 0 && (<div className="bg-white rounded-2xl p-4 shadow-sm border">
-            <div className="flex items-center justify-between mb-3"><h3 className="font-bold text-sm text-gray-900">📌 Görevlerin</h3><button onClick={() => setAktifSekme("gorevler")} className="text-xs text-blue-600">Tümü →</button></div>
+          {bekleyenGorevler.length > 0 && (<div className="bg-surface rounded-2xl p-4 shadow-sm border">
+            <div className="flex items-center justify-between mb-3"><h3 className="font-bold text-sm text-content">Görevlerin</h3><button onClick={() =>setAktifSekme("gorevler")} className="text-xs text-blue-600">Tümü →</button></div>
             <div className="space-y-2">{bekleyenGorevler.slice(0,3).map(g => (<div key={g.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-xl"><div className="text-sm font-medium truncate flex-1 mr-2">{g.baslik}</div><Button size="sm" className="bg-green-600 text-white text-[10px] px-2 h-7" onClick={() => gorevTamamla(g.id)}>Tamamla</Button></div>))}</div>
           </div>)}
 
@@ -7040,40 +6904,40 @@ function OgrenciPaneli({ user, logout }) {
             {(ligSiralama || siralama) && (<div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-2xl p-4 border border-yellow-100 cursor-pointer" onClick={() => setAktifSekme("siralama")}>
               <div className="text-xs font-medium text-yellow-800">🏆 Sıralaman</div>
               <div className="text-3xl font-bold text-orange-600 mt-1">{ligSiralama?.benim_siram || siralama?.benim_siram || "—"}.</div>
-              <div className="text-[10px] text-gray-500">{ligSiralama?.toplam || siralama?.toplam_ogrenci || 0} öğrenci</div>
+              <div className="text-[10px] text-subtle">{ligSiralama?.toplam || siralama?.toplam_ogrenci || 0} öğrenci</div>
             </div>)}
             {profil?.ogretmen_bilgi && (<div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-4 border border-blue-100 cursor-pointer" onClick={() => setAktifSekme("mesajlar")}>
               <div className="text-xs font-medium text-blue-800">👩‍🏫 Öğretmenin</div>
-              <div className="font-bold text-gray-900 text-sm mt-1">{profil.ogretmen_bilgi.ad} {profil.ogretmen_bilgi.soyad}</div>
+              <div className="font-bold text-content text-sm mt-1">{profil.ogretmen_bilgi.ad} {profil.ogretmen_bilgi.soyad}</div>
               <div className="text-[10px] text-blue-600 mt-1">✉️ Mesaj gönder</div>
             </div>)}
           </div>
 
           {/* Rozetlerim */}
           {ogrenciRozetTanim.length > 0 && (
-            <div className="bg-white rounded-2xl p-4 shadow-sm border">
+            <div className="bg-surface rounded-2xl p-4 shadow-sm border">
               <RozetGrid tanimlar={ogrenciRozetTanim} kazanilanlar={ogrenciRozetler} baslik="🏅 Rozetlerim" />
             </div>
           )}
 
           {/* Son 3 okuma */}
-          {okumaKayitlari.length > 0 && (<div className="bg-white rounded-2xl p-4 shadow-sm border">
-            <div className="flex items-center justify-between mb-2"><h3 className="font-bold text-sm text-gray-900">📖 Son Okumalar</h3><button onClick={() => { setAktifSekme("gelisim"); setGelisimAltSekme("okumalarim"); }} className="text-xs text-blue-600">Tümü →</button></div>
-            {okumaKayitlari.slice(0,3).map(k => (<div key={k.id} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0"><div className="text-sm font-medium truncate flex-1">{k.kitap_adi || "—"}</div><div className="text-xs text-gray-400">{k.sure_dakika} dk</div></div>))}
+          {okumaKayitlari.length > 0 && (<div className="bg-surface rounded-2xl p-4 shadow-sm border">
+            <div className="flex items-center justify-between mb-2"><h3 className="font-bold text-sm text-content">Son Okumalar</h3><button onClick={() =>{ setAktifSekme("gelisim"); setGelisimAltSekme("okumalarim"); }} className="text-xs text-blue-600">Tümü →</button></div>
+            {okumaKayitlari.slice(0,3).map(k => (<div key={k.id} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0"><div className="text-sm font-medium truncate flex-1">{k.kitap_adi || "—"}</div><div className="text-xs text-subtle">{k.sure_dakika} dk</div></div>))}
           </div>)}
         </>)}
 
         {/* ═══ GÖREVLERİM ═══ */}
-        {aktifSekme === "gorevler" && (<div className="space-y-3"><h2 className="text-lg font-bold">📌 Görevlerim</h2>
-          {bekleyenGorevler.length === 0 && tamamlananGorevler.length === 0 ? (<div className="text-center py-12"><div className="text-5xl mb-3">✅</div><p className="text-gray-500">Tüm görevler tamamlandı!</p></div>) : (<>
-            {bekleyenGorevler.map(g => (<Card key={g.id} className="border-0 shadow-sm"><CardContent className="p-4 flex items-start justify-between gap-3"><div className="min-w-0"><div className="font-bold text-sm">{g.baslik}</div>{g.aciklama && <p className="text-xs text-gray-500 mt-1">{g.aciklama}</p>}<div className="text-xs text-gray-400 mt-1">{g.atayan_ad && `Atayan: ${g.atayan_ad}`}{g.son_tarih && ` • Son: ${new Date(g.son_tarih).toLocaleDateString('tr-TR')}`}</div>{g.film_link && <a href={g.film_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 block mt-1">🎬 Film Linki</a>}{g.makale_link && <a href={g.makale_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 block mt-1">📄 Makale</a>}</div><Button size="sm" className="bg-green-600 text-white text-xs shrink-0" onClick={() => gorevTamamla(g.id)}>Tamamla</Button></CardContent></Card>))}
-            {tamamlananGorevler.length > 0 && (<><h3 className="text-xs font-medium text-gray-400 mt-4">Tamamlanan ({tamamlananGorevler.length})</h3>{tamamlananGorevler.slice(0,5).map(g => (<div key={g.id} className="bg-green-50 rounded-xl p-3 border border-green-100 opacity-60 text-sm">✅ {g.baslik}</div>))}</>)}
+        {aktifSekme === "gorevler" && (<div className="space-y-3"><h2 className="text-lg font-bold">Görevlerim</h2>
+          {bekleyenGorevler.length === 0 && tamamlananGorevler.length === 0 ? (<div className="text-center py-12"><div className="text-5xl mb-3">✅</div><p className="text-subtle">Tüm görevler tamamlandı!</p></div>) : (<>
+            {bekleyenGorevler.map(g => (<Card key={g.id} className="border border-line shadow-sm"><CardContent className="p-4 flex items-start justify-between gap-3"><div className="min-w-0"><div className="font-bold text-sm">{g.baslik}</div>{g.aciklama && <p className="text-xs text-subtle mt-1">{g.aciklama}</p>}<div className="text-xs text-subtle mt-1">{g.atayan_ad && `Atayan: ${g.atayan_ad}`}{g.son_tarih && ` • Son: ${new Date(g.son_tarih).toLocaleDateString('tr-TR')}`}</div>{g.film_link && <a href={g.film_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 block mt-1">🎬 Film Linki</a>}{g.makale_link && <a href={g.makale_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 block mt-1">📄 Makale</a>}</div>{g.tur === "sinav_odevi" ? <Button size="sm" className="bg-indigo-600 text-white text-xs shrink-0" onClick={() => sinavBaslat(g.icerik_id, g.id)}>Sınavı Başlat</Button> : <Button size="sm" className="bg-green-600 text-white text-xs shrink-0" onClick={() => gorevTamamla(g.id)}>Tamamla</Button>}</CardContent></Card>))}
+            {tamamlananGorevler.length >0 && (<><h3 className="text-xs font-medium text-subtle mt-4">Tamamlanan ({tamamlananGorevler.length})</h3>{tamamlananGorevler.slice(0,5).map(g =>(<div key={g.id} className="bg-green-50 rounded-xl p-3 border border-green-100 opacity-60 text-sm">{g.baslik}</div>))}</>)}
           </>)}
         </div>)}
 
         {/* ═══ GELİŞİM (İçerikler + Egzersizler + Okumalarım alt sekmeli) ═══ */}
         {aktifSekme === "gelisim" && (<div className="space-y-4">
-          <h2 className="text-lg font-bold">🎯 Gelişim</h2>
+          <h2 className="text-lg font-bold">Gelişim</h2>
           {/* Alt sekmeler — 2 satır */}
           <div className="grid grid-cols-4 gap-1">
             {[
@@ -7090,8 +6954,8 @@ function OgrenciPaneli({ user, logout }) {
               <button key={s.id} onClick={() => setGelisimAltSekme(s.id)}
                 className={`flex flex-col items-center gap-0.5 py-2 px-1 rounded-xl text-[10px] font-medium transition-all
                   ${gelisimAltSekme === s.id
-                    ? 'bg-orange-500 text-white shadow-md'
-                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                    ? 'bg-primary text-white shadow-md'
+                    : 'bg-app text-subtle hover:bg-line'}`}>
                 <span className="text-base">{s.emoji}</span>
                 <span className="leading-none">{s.l}</span>
               </button>
@@ -7166,7 +7030,7 @@ function OgrenciPaneli({ user, logout }) {
                   <div key={i} className="bg-orange-50 border border-orange-200 rounded-xl p-2 text-center">
                     <div className="text-2xl mb-1">{f.emoji}</div>
                     <div className="text-[10px] font-bold text-orange-700">{f.baslik}</div>
-                    <div className="text-[9px] text-gray-500 mt-0.5">{f.aciklama}</div>
+                    <div className="text-[9px] text-subtle mt-0.5">{f.aciklama}</div>
                   </div>
                 ))}
               </div>
@@ -7175,11 +7039,11 @@ function OgrenciPaneli({ user, logout }) {
 
           {/* İçerikler */}
           {gelisimAltSekme === "icerikler" && (<>
-            {gelisimIcerikleri.length === 0 ? (<div className="text-center py-8"><p className="text-gray-500 text-sm">Henüz içerik yok</p></div>) : (
+            {gelisimIcerikleri.length === 0 ? (<div className="text-center py-8"><p className="text-subtle text-sm">Henüz içerik yok</p></div>) : (
               gelisimIcerikleri.map(ic => { const done = isTamamlandi(ic.id); return (
-                <Card key={ic.id} className={`border-0 shadow-sm ${done ? 'opacity-60' : ''}`}><CardContent className="p-4"><div className="flex items-start justify-between gap-3"><div>
+                <Card key={ic.id} className={`border border-line shadow-sm ${done ? 'opacity-60' : ''}`}><CardContent className="p-4"><div className="flex items-start justify-between gap-3"><div>
                   <div className="flex items-center gap-2"><span className="text-lg">{({hizmetici:"🎓",film:"🎬",kitap:"📚",makale:"📄"})[ic.tur] || "📋"}</span><div className="font-bold text-sm truncate">{ic.baslik}</div></div>
-                  {ic.aciklama && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{ic.aciklama}</p>}
+                  {ic.aciklama && <p className="text-xs text-subtle mt-1 line-clamp-2">{ic.aciklama}</p>}
                   {ic.tur === "kitap" && (
                     <div className="flex items-center gap-3 mt-1">
                       <button onClick={async () => {
@@ -7240,7 +7104,7 @@ function OgrenciPaneli({ user, logout }) {
             <ExerciseStarter title="Sokratik Okuma" icon="🤖"
               description="Okuduğun kitabı yaz, okuma koçun sana düşündürücü sorular sorsun.">
               <div className="space-y-3">
-                <div className="bg-white rounded-2xl p-4 border shadow-sm space-y-3">
+                <div className="bg-surface rounded-2xl p-4 border shadow-sm space-y-3">
                   <div><Label className="text-xs">Kitap Adı *</Label><Input value={sokratikForm.kitap_adi} onChange={e => setSokratikForm({...sokratikForm, kitap_adi: e.target.value})} placeholder="Hangi kitabı okudun?" /></div>
                   <div><Label className="text-xs">Bölüm</Label><Input value={sokratikForm.bolum} onChange={e => setSokratikForm({...sokratikForm, bolum: e.target.value})} placeholder="Bölüm 3 (isteğe bağlı)" /></div>
                   <Button disabled={!sokratikForm.kitap_adi.trim() || sokratikYukleniyor} onClick={async () => {
@@ -7258,10 +7122,10 @@ function OgrenciPaneli({ user, logout }) {
                 {socraticSoru && (
                   <Card className="border-2 border-cyan-300 shadow-lg">
                     <CardHeader className="bg-gradient-to-r from-cyan-50 to-blue-50 pb-2">
-                      <CardTitle className="text-base flex items-center gap-2">🤖 Okuma Koçun Soruyor</CardTitle>
+                      <CardTitle className="text-base flex items-center gap-2">Okuma Koçun Soruyor</CardTitle>
                     </CardHeader>
                     <CardContent className="pt-3 space-y-3">
-                      <p className="text-sm font-medium text-gray-800">{socraticSoru.soru}</p>
+                      <p className="text-sm font-medium text-content">{socraticSoru.soru}</p>
                       {socraticSoru.ipucu && <p className="text-xs text-cyan-600 italic">💡 İpucu: {socraticSoru.ipucu}</p>}
                       {!socraticSonuc ? (<>
                         <textarea value={socraticCevap} onChange={e => setSocraticCevap(e.target.value)} className="w-full border rounded-lg p-2 text-sm min-h-[60px]" placeholder="Düşünceni yaz..." />
@@ -7275,7 +7139,7 @@ function OgrenciPaneli({ user, logout }) {
                             {[1,2,3,4,5].map(s => <span key={s} className="text-lg">{s <= socraticSonuc.puan ? '⭐' : '☆'}</span>)}
                             <span className="text-xs text-green-600 font-bold">+{socraticSonuc.xp} XP</span>
                           </div>
-                          <p className="text-sm text-gray-700 bg-cyan-50 p-2 rounded-lg">{socraticSonuc.geri_bildirim}</p>
+                          <p className="text-sm text-content bg-cyan-50 p-2 rounded-lg">{socraticSonuc.geri_bildirim}</p>
                           <Button className="w-full bg-green-600 text-white text-sm" onClick={() => { setSocraticSoru(null); setSocraticSonuc(null); setSocraticCevap(""); }}>Tekrar Sor 🔄</Button>
                         </div>
                       )}
@@ -7288,8 +7152,8 @@ function OgrenciPaneli({ user, logout }) {
 
           {/* Okumalarım */}
           {gelisimAltSekme === "okumalarim" && (<>
-            {okumaKayitlari.length === 0 ? (<div className="text-center py-8"><p className="text-gray-500 text-sm">Henüz okuma kaydı yok</p><Button onClick={okumaBaslat} className="mt-3 bg-green-600 text-white text-sm">🌳 Okumaya Başla</Button></div>) : (
-              okumaKayitlari.map(k => (<Card key={k.id} className="border-0 shadow-sm"><CardContent className="p-3 flex items-center justify-between"><div><div className="font-medium text-sm">{k.kitap_adi || "—"}</div><div className="text-xs text-gray-400">{k.bolum && `${k.bolum} • `}⏱ {k.sure_dakika} dk {k.baslangic_sayfa && k.bitis_sayfa && `• s.${k.baslangic_sayfa}-${k.bitis_sayfa}`}</div>{k.not_text && <p className="text-[10px] text-blue-600 mt-0.5">💬 {k.not_text}</p>}</div><div className="text-[10px] text-gray-400">{new Date(k.tarih).toLocaleDateString('tr-TR')}</div></CardContent></Card>))
+            {okumaKayitlari.length === 0 ? (<div className="text-center py-8"><p className="text-subtle text-sm">Henüz okuma kaydı yok</p><Button onClick={okumaBaslat} className="mt-3 bg-green-600 text-white text-sm">🌳 Okumaya Başla</Button></div>) : (
+              okumaKayitlari.map(k => (<Card key={k.id} className="border border-line shadow-sm"><CardContent className="p-3 flex items-center justify-between"><div><div className="font-medium text-sm">{k.kitap_adi || "—"}</div><div className="text-xs text-subtle">{k.bolum && `${k.bolum} • `}⏱ {k.sure_dakika} dk {k.baslangic_sayfa && k.bitis_sayfa && `• s.${k.baslangic_sayfa}-${k.bitis_sayfa}`}</div>{k.not_text && <p className="text-[10px] text-blue-600 mt-0.5">💬 {k.not_text}</p>}</div><div className="text-[10px] text-subtle">{new Date(k.tarih).toLocaleDateString('tr-TR')}</div></CardContent></Card>))
             )}
           </>)}
 
@@ -7330,8 +7194,8 @@ function OgrenciPaneli({ user, logout }) {
                       setOyunData(d);
                       oyunSureRef.current = setInterval(() => setOyunSure(s => s+1), 1000);
                     } catch(e2) {}
-                  }} className="bg-white rounded-xl p-4 border shadow-sm text-center hover:bg-cyan-50 transition-all active:scale-95">
-                    <div className="text-2xl mb-1">{e}</div><div className="text-xs font-medium text-gray-700">{l}</div>
+                  }} className="bg-surface rounded-xl p-4 border shadow-sm text-center hover:bg-cyan-50 transition-all active:scale-95">
+                    <div className="text-2xl mb-1">{e}</div><div className="text-xs font-medium text-content">{l}</div>
                   </button>
                 ))}
               </div>
@@ -7340,13 +7204,13 @@ function OgrenciPaneli({ user, logout }) {
               {oyunSkor && !oyunData && (
                 <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-2xl p-5 border-2 border-yellow-300 text-center shadow-md">
                   <div className="text-4xl mb-2">{oyunSkor.yeniRekor ? "🏆" : "🎮"}</div>
-                  <h3 className="font-bold text-gray-800 text-base mb-1">{oyunSkor.yeniRekor ? "Yeni Rekor!" : "Tamamlandı!"}</h3>
+                  <h3 className="font-bold text-content text-base mb-1">{oyunSkor.yeniRekor ? "Yeni Rekor!" : "Tamamlandı!"}</h3>
                   <div className="grid grid-cols-2 gap-3 my-3">
-                    <div className="bg-white rounded-xl p-3 border"><div className="text-2xl font-bold text-indigo-600 font-mono">{`${Math.floor(oyunSkor.sure/60).toString().padStart(2,'0')}:${(oyunSkor.sure%60).toString().padStart(2,'0')}`}</div><div className="text-xs text-gray-500">⏱ Bu Süre</div></div>
-                    <div className="bg-white rounded-xl p-3 border"><div className="text-2xl font-bold text-green-600 font-mono">{`${Math.floor(oyunSkor.rekor/60).toString().padStart(2,'0')}:${(oyunSkor.rekor%60).toString().padStart(2,'0')}`}</div><div className="text-xs text-gray-500">🥇 En İyi</div></div>
+                    <div className="bg-surface rounded-xl p-3 border"><div className="text-2xl font-bold text-indigo-600 font-mono">{`${Math.floor(oyunSkor.sure/60).toString().padStart(2,'0')}:${(oyunSkor.sure%60).toString().padStart(2,'0')}`}</div><div className="text-xs text-subtle">⏱ Bu Süre</div></div>
+                    <div className="bg-surface rounded-xl p-3 border"><div className="text-2xl font-bold text-green-600 font-mono">{`${Math.floor(oyunSkor.rekor/60).toString().padStart(2,'0')}:${(oyunSkor.rekor%60).toString().padStart(2,'0')}`}</div><div className="text-xs text-subtle">🥇 En İyi</div></div>
                   </div>
                   <div className="text-sm font-bold text-orange-600 mb-3">+{oyunSkor.xp} XP kazandın!</div>
-                  <button onClick={() => setOyunSkor(null)} className="text-xs text-gray-400 underline">Kapat</button>
+                  <button onClick={() => setOyunSkor(null)} className="text-xs text-subtle underline">Kapat</button>
                 </div>
               )}
 
@@ -7373,7 +7237,7 @@ function OgrenciPaneli({ user, logout }) {
                     <h3 className="font-bold text-sm">{emoji} {baslik}</h3>
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-sm font-bold text-indigo-600">⏱ {sureFmt(oyunSure)}</span>
-                      <button onClick={() => { clearInterval(oyunSureRef.current); setOyunData(null); }} className="text-gray-400 text-xl leading-none">✕</button>
+                      <button onClick={() => { clearInterval(oyunSureRef.current); setOyunData(null); }} className="text-subtle text-xl leading-none">✕</button>
                     </div>
                   </div>
                 );
@@ -7381,18 +7245,18 @@ function OgrenciPaneli({ user, logout }) {
                 if (oyunData.tur === "cumle_kurma") {
                   const sorular = oyunData.sorular || [];
                   return (
-                    <div className="bg-white rounded-2xl p-4 border-2 border-cyan-300 shadow-md">
+                    <div className="bg-surface rounded-2xl p-4 border-2 border-cyan-300 shadow-md">
                       <SayacHeader emoji="📝" baslik={oyunData.baslik} />
-                      <p className="text-xs text-gray-500 mb-3">{oyunData.aciklama}</p>
+                      <p className="text-xs text-subtle mb-3">{oyunData.aciklama}</p>
                       <div className="space-y-4">
                         {sorular.map((s, si) => {
                           const secilen = oyunDurum[`ck_${si}`] || [];
                           const tamamlandi = oyunDurum[`ck_${si}_ok`];
                           const yanlis = oyunDurum[`ck_${si}_yanlis`];
                           return (
-                            <div key={si} className={`rounded-xl p-3 border-2 transition-all ${tamamlandi?"border-green-400 bg-green-50":yanlis?"border-red-300 bg-red-50":"border-gray-200 bg-gray-50"}`}>
-                              <div className="text-[10px] text-gray-400 mb-1">Hedef: <b>{s.hedef_kelime}</b></div>
-                              <div className={`min-h-[32px] flex flex-wrap gap-1 rounded-lg p-2 mb-2 border ${tamamlandi?"border-green-300 bg-green-100":yanlis?"border-red-200":"border-dashed border-gray-300 bg-white"}`}>
+                            <div key={si} className={`rounded-xl p-3 border-2 transition-all ${tamamlandi?"border-green-400 bg-green-50":yanlis?"border-red-300 bg-red-50":"border-line bg-gray-50"}`}>
+                              <div className="text-[10px] text-subtle mb-1">Hedef: <b>{s.hedef_kelime}</b></div>
+                              <div className={`min-h-[32px] flex flex-wrap gap-1 rounded-lg p-2 mb-2 border ${tamamlandi?"border-green-300 bg-green-100":yanlis?"border-red-200":"border-dashed border-gray-300 bg-surface"}`}>
                                 {secilen.length===0 && <span className="text-[10px] text-gray-300">Kelimelere tıkla...</span>}
                                 {secilen.map((k,ki) => (<span key={ki} onClick={() => { if(tamamlandi) return; setOyunDurum(d=>({...d,[`ck_${si}`]:secilen.filter((_,i)=>i!==ki),[`ck_${si}_yanlis`]:false})); }} className="bg-blue-500 text-white text-xs px-2 py-0.5 rounded cursor-pointer hover:bg-red-400">{k}</span>))}
                               </div>
@@ -7407,7 +7271,7 @@ function OgrenciPaneli({ user, logout }) {
                                       if(dogruMu) { sesCalDogru(); setOyunDurum(d=>({...d,[`ck_${si}_ok`]:true})); }
                                       else { sesCalYanlis(); setOyunDurum(d=>({...d,[`ck_${si}_yanlis`]:true})); setTimeout(()=>setOyunDurum(d=>({...d,[`ck_${si}`]:[],[`ck_${si}_yanlis`]:false})),800); }
                                     }
-                                  }} className={`text-xs px-2 py-1 rounded border transition-all ${secildi||tamamlandi?"opacity-30 cursor-not-allowed bg-gray-100":"bg-white hover:bg-cyan-50 hover:border-cyan-400 cursor-pointer"}`}>{k}</button>);
+                                  }} className={`text-xs px-2 py-1 rounded border transition-all ${secildi||tamamlandi?"opacity-30 cursor-not-allowed bg-gray-100":"bg-surface hover:bg-cyan-50 hover:border-cyan-400 cursor-pointer"}`}>{k}</button>);
                                 })}
                               </div>
                               {tamamlandi && <div className="text-xs text-green-600 font-bold mt-1">✅ Doğru!</div>}
@@ -7426,9 +7290,9 @@ function OgrenciPaneli({ user, logout }) {
                 if (oyunData.tur === "bosluk_doldurma") {
                   const sorular = oyunData.sorular || [];
                   return (
-                    <div className="bg-white rounded-2xl p-4 border-2 border-cyan-300 shadow-md">
+                    <div className="bg-surface rounded-2xl p-4 border-2 border-cyan-300 shadow-md">
                       <SayacHeader emoji="⬜" baslik={oyunData.baslik} />
-                      <p className="text-xs text-gray-500 mb-3">{oyunData.aciklama}</p>
+                      <p className="text-xs text-subtle mb-3">{oyunData.aciklama}</p>
                       <div className="space-y-4">
                         {sorular.map((s, si) => {
                           const secilen = oyunDurum[`bd_${si}`];
@@ -7436,9 +7300,9 @@ function OgrenciPaneli({ user, logout }) {
                           const yanlis = oyunDurum[`bd_${si}_yanlis`];
                           const cumle = s.cumle_bos || "";
                           return (
-                            <div key={si} className={`rounded-xl p-3 border-2 transition-all ${tamamlandi?"border-green-400 bg-green-50":yanlis?"border-red-300 bg-red-50":"border-gray-200 bg-gray-50"}`}>
-                              <p className="text-sm font-medium mb-2 text-gray-800">
-                                {cumle.split("__").map((part,pi) => (<span key={pi}>{part}{pi<cumle.split("__").length-1 && (<span className={`inline-block mx-1 px-3 py-0.5 rounded-lg border-2 font-bold text-sm min-w-[60px] text-center transition-all ${tamamlandi?"bg-green-200 border-green-400 text-green-700":yanlis?"bg-red-100 border-red-300 text-red-600":"bg-white border-dashed border-gray-400 text-gray-400"}`}>{secilen || "___"}</span>)}</span>))}
+                            <div key={si} className={`rounded-xl p-3 border-2 transition-all ${tamamlandi?"border-green-400 bg-green-50":yanlis?"border-red-300 bg-red-50":"border-line bg-gray-50"}`}>
+                              <p className="text-sm font-medium mb-2 text-content">
+                                {cumle.split("__").map((part,pi) => (<span key={pi}>{part}{pi<cumle.split("__").length-1 && (<span className={`inline-block mx-1 px-3 py-0.5 rounded-lg border-2 font-bold text-sm min-w-[60px] text-center transition-all ${tamamlandi?"bg-green-200 border-green-400 text-green-700":yanlis?"bg-red-100 border-red-300 text-red-600":"bg-surface border-dashed border-gray-400 text-subtle"}`}>{secilen || "___"}</span>)}</span>))}
                               </p>
                               <div className="flex flex-wrap gap-2">
                                 {(s.secenekler||[]).map((sec,j) => (<button key={j} disabled={!!tamamlandi} onClick={() => {
@@ -7446,7 +7310,7 @@ function OgrenciPaneli({ user, logout }) {
                                   setOyunDurum(d=>({...d,[`bd_${si}`]:sec}));
                                   if(dogruMu) { sesCalDogru(); setTimeout(()=>setOyunDurum(d=>({...d,[`bd_${si}_ok`]:true})),300); }
                                   else { sesCalYanlis(); setOyunDurum(d=>({...d,[`bd_${si}_yanlis`]:true})); setTimeout(()=>setOyunDurum(d=>({...d,[`bd_${si}`]:null,[`bd_${si}_yanlis`]:false})),700); }
-                                }} className={`text-xs px-3 py-1.5 rounded-lg border-2 font-medium transition-all ${tamamlandi?"opacity-40 cursor-not-allowed":"hover:border-cyan-400 hover:bg-cyan-50 cursor-pointer bg-white border-gray-200"}`}>{sec}</button>))}
+                                }} className={`text-xs px-3 py-1.5 rounded-lg border-2 font-medium transition-all ${tamamlandi?"opacity-40 cursor-not-allowed":"hover:border-cyan-400 hover:bg-cyan-50 cursor-pointer bg-surface border-line"}`}>{sec}</button>))}
                               </div>
                               {tamamlandi && <div className="text-xs text-green-600 font-bold mt-1">✅ Doğru!</div>}
                               {yanlis && <div className="text-xs text-red-500 mt-1">❌ Yanlış, tekrar dene!</div>}
@@ -7466,7 +7330,7 @@ function OgrenciPaneli({ user, logout }) {
                   const tumKelimeler = oyunData.tumKelimeler || hedefler;
                   const bulunanlar = oyunDurum.ka_bulunanlar || [];
                   return (
-                    <div className="bg-white rounded-2xl p-4 border-2 border-cyan-300 shadow-md">
+                    <div className="bg-surface rounded-2xl p-4 border-2 border-cyan-300 shadow-md">
                       <SayacHeader emoji="🔍" baslik={oyunData.baslik} />
                       <div className="flex flex-wrap gap-1 mb-3">
                         {hedefler.map((h,i) => (<span key={i} className={`text-xs px-2 py-1 rounded-full border font-medium transition-all ${bulunanlar.includes(h)?"bg-green-500 text-white border-green-500 line-through":"bg-yellow-50 text-yellow-700 border-yellow-300"}`}>{h}</span>))}
@@ -7478,10 +7342,10 @@ function OgrenciPaneli({ user, logout }) {
                           return (<button key={i} disabled={bulundu} onClick={() => {
                             if(hedefMi) { sesCalDogru(); setOyunDurum(d=>({...d,ka_bulunanlar:[...(d.ka_bulunanlar||[]),k]})); }
                             else { sesCalYanlis(); setOyunDurum(d=>({...d,ka_yanlis:k})); setTimeout(()=>setOyunDurum(d=>({...d,ka_yanlis:null})),600); }
-                          }} className={`text-xs px-3 py-1.5 rounded-xl border-2 font-medium transition-all ${bulundu?"bg-green-500 text-white border-green-500 cursor-not-allowed":oyunDurum.ka_yanlis===k?"bg-red-100 border-red-400 text-red-600 animate-pulse":"bg-white border-gray-200 hover:border-cyan-400 hover:bg-cyan-50 cursor-pointer"}`}>{k}</button>);
+                          }} className={`text-xs px-3 py-1.5 rounded-xl border-2 font-medium transition-all ${bulundu?"bg-green-500 text-white border-green-500 cursor-not-allowed":oyunDurum.ka_yanlis===k?"bg-red-100 border-red-400 text-red-600 animate-pulse":"bg-surface border-line hover:border-cyan-400 hover:bg-cyan-50 cursor-pointer"}`}>{k}</button>);
                         })}
                       </div>
-                      <div className="text-xs text-gray-400 mt-2">{bulunanlar.length}/{hedefler.length} bulundu</div>
+                      <div className="text-xs text-subtle mt-2">{bulunanlar.length}/{hedefler.length} bulundu</div>
                       {bulunanlar.length === hedefler.length && (
                         <button className="w-full mt-3 bg-green-600 text-white rounded-xl py-2 text-sm font-bold" onClick={() => oyunuBitir(oyunData.tur, hedefler.length, hedefler.length)}>🏆 Tamamla!</button>
                       )}
@@ -7496,9 +7360,9 @@ function OgrenciPaneli({ user, logout }) {
                   const eslesmiş = oyunDurum.es_eslesmis || [];
                   const yanlisPair = oyunDurum.es_yanlis;
                   return (
-                    <div className="bg-white rounded-2xl p-4 border-2 border-cyan-300 shadow-md">
+                    <div className="bg-surface rounded-2xl p-4 border-2 border-cyan-300 shadow-md">
                       <SayacHeader emoji="🎲" baslik={oyunData.baslik} />
-                      <p className="text-xs text-gray-500 mb-3">Bir kelime seç, sonra anlamına tıkla!</p>
+                      <p className="text-xs text-subtle mb-3">Bir kelime seç, sonra anlamına tıkla!</p>
                       <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-2">
                           {kelimeler.map((k,i) => (<button key={i} disabled={eslesmiş.includes(i)} onClick={() => setOyunDurum(d=>({...d,es_seciliKelime:i===seciliKelime?null:i}))}
@@ -7510,10 +7374,10 @@ function OgrenciPaneli({ user, logout }) {
                             const dogruMu = a.gercekIdx === seciliKelime;
                             if(dogruMu) { sesCalDogru(); setOyunDurum(d=>({...d,es_eslesmis:[...(d.es_eslesmis||[]),seciliKelime],es_seciliKelime:null})); }
                             else { sesCalYanlis(); setOyunDurum(d=>({...d,es_yanlis:[seciliKelime,a.gercekIdx]})); setTimeout(()=>setOyunDurum(d=>({...d,es_yanlis:null,es_seciliKelime:null})),800); }
-                          }} className={`w-full text-[10px] px-2 py-2 rounded-xl border-2 text-left transition-all ${eslesmiş.includes(a.gercekIdx)?"bg-green-100 border-green-400 text-green-700 cursor-not-allowed":yanlisPair?.includes(a.gercekIdx)?"bg-red-100 border-red-400 animate-pulse":seciliKelime!==null&&seciliKelime!==undefined?"border-purple-300 hover:bg-purple-50 cursor-pointer bg-white":"bg-white border-gray-200 cursor-not-allowed opacity-50"}`}>{a.anlam}</button>))}
+                          }} className={`w-full text-[10px] px-2 py-2 rounded-xl border-2 text-left transition-all ${eslesmiş.includes(a.gercekIdx)?"bg-green-100 border-green-400 text-green-700 cursor-not-allowed":yanlisPair?.includes(a.gercekIdx)?"bg-red-100 border-red-400 animate-pulse":seciliKelime!==null&&seciliKelime!==undefined?"border-purple-300 hover:bg-purple-50 cursor-pointer bg-surface":"bg-surface border-line cursor-not-allowed opacity-50"}`}>{a.anlam}</button>))}
                         </div>
                       </div>
-                      <div className="text-xs text-gray-400 mt-2 text-center">{eslesmiş.length}/{kelimeler.length} eşleşti</div>
+                      <div className="text-xs text-subtle mt-2 text-center">{eslesmiş.length}/{kelimeler.length} eşleşti</div>
                       {eslesmiş.length === kelimeler.length && (
                         <button className="w-full mt-3 bg-green-600 text-white rounded-xl py-2 text-sm font-bold" onClick={() => oyunuBitir(oyunData.tur, kelimeler.length, kelimeler.length)}>🏆 Tamamla!</button>
                       )}
@@ -7525,19 +7389,19 @@ function OgrenciPaneli({ user, logout }) {
 
 
               {kelimeData?.bekleyenler?.length > 0 && !oyunData && (<>
-                <h3 className="font-bold text-sm text-gray-700">📝 Bugün Tekrar Edilecek Kelimeler</h3>
+                <h3 className="font-bold text-sm text-content">Bugün Tekrar Edilecek Kelimeler</h3>
                 {!aktifKelime ? (
                   <button onClick={() => { setAktifKelime(kelimeData.bekleyenler[0]); setCevapGosterim(false); }} className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl p-4 shadow-md">
                     <div className="text-lg font-bold">🧠 Tekrara Başla</div><div className="text-xs opacity-80">{kelimeData.bekleyenler.length} kelime bekliyor</div>
                   </button>
                 ) : (
-                  <div className="bg-white rounded-xl p-4 border-2 border-cyan-300 shadow-md text-center space-y-3">
-                    <div className="text-xs text-gray-400">Kutu {aktifKelime.kutu}/5 • Tekrar #{(aktifKelime.tekrar_sayisi||0)+1}</div>
+                  <div className="bg-surface rounded-xl p-4 border-2 border-cyan-300 shadow-md text-center space-y-3">
+                    <div className="text-xs text-subtle">Kutu {aktifKelime.kutu}/5 • Tekrar #{(aktifKelime.tekrar_sayisi||0)+1}</div>
                     <div className="text-2xl font-bold text-cyan-700">{aktifKelime.kelime}</div>
                     {!cevapGosterim ? (
                       <Button onClick={() => setCevapGosterim(true)} className="bg-yellow-500 text-white">Anlamını Göster 👀</Button>
                     ) : (<>
-                      <div className="bg-cyan-50 rounded-lg p-3"><p className="text-sm font-medium">{aktifKelime.anlam}</p>{aktifKelime.ornek_cumle && <p className="text-xs text-gray-500 mt-1 italic">"{aktifKelime.ornek_cumle}"</p>}</div>
+                      <div className="bg-cyan-50 rounded-lg p-3"><p className="text-sm font-medium">{aktifKelime.anlam}</p>{aktifKelime.ornek_cumle && <p className="text-xs text-subtle mt-1 italic">"{aktifKelime.ornek_cumle}"</p>}</div>
                       <div className="flex gap-2">
                         <Button className="flex-1 bg-red-500 text-white text-sm" onClick={async () => { try { await axios.post(`${API}/ai/kelime-evrimi/cevapla`, { kelime_id: aktifKelime.id, dogru: false }); } catch(e) {} const kalan = kelimeData.bekleyenler.filter(k => k.id !== aktifKelime.id); setKelimeData({...kelimeData, bekleyenler: kalan}); setAktifKelime(kalan[0] || null); setCevapGosterim(false); if (!kalan[0]) toast({ title: "🎉 Tamamlandı!" }); }}>❌ Bilmiyordum</Button>
                         <Button className="flex-1 bg-green-500 text-white text-sm" onClick={async () => { try { await axios.post(`${API}/ai/kelime-evrimi/cevapla`, { kelime_id: aktifKelime.id, dogru: true }); } catch(e) {} const kalan = kelimeData.bekleyenler.filter(k => k.id !== aktifKelime.id); setKelimeData({...kelimeData, bekleyenler: kalan}); setAktifKelime(kalan[0] || null); setCevapGosterim(false); if (!kalan[0]) toast({ title: "🎉 Tamamlandı!" }); }}>✅ Biliyordum</Button>
@@ -7548,7 +7412,7 @@ function OgrenciPaneli({ user, logout }) {
               </>)}
 
               {kelimeData?.bekleyenler?.length === 0 && !oyunData && (
-                <div className="text-center py-8 text-gray-500"><div className="text-3xl mb-2">🎉</div><p className="text-sm">Bugün tekrar edilecek kelime yok!</p><p className="text-xs text-gray-400 mt-1">Yeni kelimeler okudukça eklenecek</p></div>
+                <div className="text-center py-8 text-subtle"><div className="text-3xl mb-2">🎉</div><p className="text-sm">Bugün tekrar edilecek kelime yok!</p><p className="text-xs text-subtle mt-1">Yeni kelimeler okudukça eklenecek</p></div>
               )}
             </div>);
             })()}
@@ -7561,26 +7425,26 @@ function OgrenciPaneli({ user, logout }) {
               description="DNA profilin ve ilgi alanına göre AI hikâye yazar, Bloom soruları üretir.">
             <div className="space-y-4">
               {!hikayeData ? (
-                <div className="bg-white rounded-2xl p-5 border shadow-sm space-y-4">
+                <div className="bg-surface rounded-2xl p-5 border shadow-sm space-y-4">
                   <div className="flex items-center gap-3 mb-1">
                     <div className="w-10 h-10 bg-gradient-to-br from-pink-400 to-purple-500 rounded-xl flex items-center justify-center text-xl">✨</div>
-                    <div><div className="font-bold text-sm">Bana Özel Hikâye</div><div className="text-xs text-gray-500">AI senin için kişisel hikâye yazar</div></div>
+                    <div><div className="font-bold text-sm">Bana Özel Hikâye</div><div className="text-xs text-subtle">AI senin için kişisel hikâye yazar</div></div>
                   </div>
 
                   <div>
-                    <div className="text-xs text-gray-600 font-medium mb-2">Kahraman adın</div>
+                    <div className="text-xs text-subtle font-medium mb-2">Kahraman adın</div>
                     <input value={hikayeForm.kahraman_ad} onChange={e => setHikayeForm(f=>({...f,kahraman_ad:e.target.value}))}
                       placeholder={`${user.ad || "Kahraman"}`}
                       className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300" />
                   </div>
 
                   <div>
-                    <div className="text-xs text-gray-600 font-medium mb-2">İlgi alanın</div>
+                    <div className="text-xs text-subtle font-medium mb-2">İlgi alanın</div>
                     <div className="grid grid-cols-3 gap-2">
                       {[["macera","🗺️","Macera"],["hayvan","🐾","Hayvan"],["uzay","🚀","Uzay"],["tarih","🏰","Tarih"],["spor","⚽","Spor"],["arkadaşlık","🤝","Arkadaşlık"]].map(([v,e,l]) => (
                         <button key={v} onClick={() => setHikayeForm(f=>({...f,ilgi_alani:v}))}
                           className={`py-3 rounded-xl text-center border-2 transition-all ${hikayeForm.ilgi_alani===v?"border-purple-500 bg-purple-50":"border-gray-100 bg-gray-50 hover:border-purple-200"}`}>
-                          <div className="text-2xl">{e}</div><div className="text-[10px] font-medium text-gray-700 mt-0.5">{l}</div>
+                          <div className="text-2xl">{e}</div><div className="text-[10px] font-medium text-content mt-0.5">{l}</div>
                         </button>
                       ))}
                     </div>
@@ -7608,7 +7472,7 @@ function OgrenciPaneli({ user, logout }) {
               ) : (
                 <div className="space-y-4">
                   {/* Hikâye metni */}
-                  <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+                  <div className="bg-surface rounded-2xl border shadow-sm overflow-hidden">
                     <div className="bg-gradient-to-r from-pink-500 to-purple-600 p-4 text-white">
                       <div className="text-xs opacity-70 mb-1">✨ Senin Hikâyen</div>
                       <div className="font-bold text-base">{hikayeData.baslik}</div>
@@ -7618,7 +7482,7 @@ function OgrenciPaneli({ user, logout }) {
                       </div>
                     </div>
                     <div className="p-4">
-                      <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-line">{hikayeData.hikaye}</p>
+                      <p className="text-sm text-content leading-relaxed whitespace-pre-line">{hikayeData.hikaye}</p>
                     </div>
                   </div>
 
@@ -7636,7 +7500,7 @@ function OgrenciPaneli({ user, logout }) {
 
                   {/* Bloom Soruları */}
                   {hikayeData.bloom_sorulari?.length > 0 && (
-                    <div className="bg-white rounded-2xl border shadow-sm p-4">
+                    <div className="bg-surface rounded-2xl border shadow-sm p-4">
                       <div className="font-bold text-sm mb-3">🎯 Düşünme Soruları</div>
                       <div className="space-y-2">
                         {hikayeData.bloom_sorulari.map((s,i) => (
@@ -7646,9 +7510,9 @@ function OgrenciPaneli({ user, logout }) {
                               <div className="flex items-center gap-2">
                                 <span className="text-xs bg-purple-100 text-purple-700 font-bold px-2 py-0.5 rounded-full">{s.basamak}</span>
                               </div>
-                              <span className="text-gray-400 text-xs">{hikayeBloom===i?"▲":"▼"}</span>
+                              <span className="text-subtle text-xs">{hikayeBloom===i?"▲":"▼"}</span>
                             </div>
-                            <p className="text-sm font-medium text-gray-800 mt-1.5">{s.soru}</p>
+                            <p className="text-sm font-medium text-content mt-1.5">{s.soru}</p>
                             {hikayeBloom===i && <p className="text-xs text-purple-600 mt-1.5 italic">💡 İpucu: {s.ipucu}</p>}
                           </div>
                         ))}
@@ -7658,13 +7522,13 @@ function OgrenciPaneli({ user, logout }) {
 
                   {/* Kelime Kartları */}
                   {hikayeData.kelime_kartlari?.length > 0 && (
-                    <div className="bg-white rounded-2xl border shadow-sm p-4">
+                    <div className="bg-surface rounded-2xl border shadow-sm p-4">
                       <div className="font-bold text-sm mb-3">🃏 Kelime Kartları</div>
                       <div className="space-y-2">
                         {hikayeData.kelime_kartlari.map((k,i) => (
                           <div key={i} className="bg-indigo-50 rounded-xl p-3 border border-indigo-100">
                             <div className="font-bold text-indigo-800 text-sm">{k.kelime}</div>
-                            <div className="text-xs text-gray-600 mt-0.5">{k.anlam}</div>
+                            <div className="text-xs text-subtle mt-0.5">{k.anlam}</div>
                             <div className="text-xs text-indigo-600 italic mt-1">"{k.cumle}"</div>
                           </div>
                         ))}
@@ -7685,15 +7549,15 @@ function OgrenciPaneli({ user, logout }) {
           {/* ═══ MATERYAL ÜRETİCİ ═══ */}
           {gelisimAltSekme === "materyal" && (
             <div className="space-y-4">
-              <div className="bg-white rounded-2xl border shadow-sm p-4">
+              <div className="bg-surface rounded-2xl border shadow-sm p-4">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 bg-gradient-to-br from-teal-400 to-cyan-500 rounded-xl flex items-center justify-center text-xl">📋</div>
-                  <div><div className="font-bold text-sm">AI Materyal Üretici</div><div className="text-xs text-gray-500">Kitabın için çalışma materyali üret</div></div>
+                  <div><div className="font-bold text-sm">AI Materyal Üretici</div><div className="text-xs text-subtle">Kitabın için çalışma materyali üret</div></div>
                 </div>
 
                 {/* Kitap seçimi — havuzdan + manuel */}
                 <div className="mb-4">
-                  <div className="text-xs font-medium text-gray-600 mb-1.5">📚 Kitap Seç</div>
+                  <div className="text-xs font-medium text-subtle mb-1.5">📚 Kitap Seç</div>
                   {(() => {
                     const havuzKitaplar = gelisimIcerikleri.filter(i => i.tur === "kitap");
                     return havuzKitaplar.length > 0 ? (
@@ -7701,7 +7565,7 @@ function OgrenciPaneli({ user, logout }) {
                         <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
                           {havuzKitaplar.map(k => (
                             <button key={k.id} onClick={() => setMateryalKitapAdi(k.baslik)}
-                              className={`text-[11px] px-2.5 py-1.5 rounded-xl border-2 transition-all flex items-center gap-1 ${materyalKitapAdi===k.baslik?"bg-teal-500 text-white border-teal-500":"bg-gray-50 text-gray-600 border-gray-200 hover:border-teal-400 hover:bg-teal-50"}`}>
+                              className={`text-[11px] px-2.5 py-1.5 rounded-xl border-2 transition-all flex items-center gap-1 ${materyalKitapAdi===k.baslik?"bg-teal-500 text-white border-teal-500":"bg-gray-50 text-subtle border-line hover:border-teal-400 hover:bg-teal-50"}`}>
                               📚 {k.baslik}
                             </button>
                           ))}
@@ -7709,19 +7573,19 @@ function OgrenciPaneli({ user, logout }) {
                         <div className="relative">
                           <input value={materyalKitapAdi} onChange={e => setMateryalKitapAdi(e.target.value)}
                             placeholder="veya farklı kitap adı yaz..."
-                            className="w-full border-2 border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-teal-400 transition-colors" />
-                          {materyalKitapAdi && <button onClick={() => setMateryalKitapAdi("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">✕</button>}
+                            className="w-full border-2 border-line rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-teal-400 transition-colors" />
+                          {materyalKitapAdi && <button onClick={() => setMateryalKitapAdi("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle text-sm">✕</button>}
                         </div>
                       </div>
                     ) : (
                       <div className="space-y-2">
                         <input value={materyalKitapAdi} onChange={e => setMateryalKitapAdi(e.target.value)}
                           placeholder="Kitap adını yaz..."
-                          className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-teal-400 transition-colors" />
+                          className="w-full border-2 border-line rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-teal-400 transition-colors" />
                         <div className="flex flex-wrap gap-1.5">
                           {["Küçük Prens","Pinokyo","Alice Harikalar Diyarında","Heidi","Pollyanna"].map(k => (
                             <button key={k} onClick={() => setMateryalKitapAdi(k)}
-                              className={`text-[11px] px-2.5 py-1 rounded-full border transition-all ${materyalKitapAdi===k?"bg-teal-500 text-white border-teal-500":"bg-gray-50 text-gray-600 border-gray-200 hover:border-teal-400"}`}>
+                              className={`text-[11px] px-2.5 py-1 rounded-full border transition-all ${materyalKitapAdi===k?"bg-teal-500 text-white border-teal-500":"bg-gray-50 text-subtle border-line hover:border-teal-400"}`}>
                               {k}
                             </button>
                           ))}
@@ -7732,7 +7596,7 @@ function OgrenciPaneli({ user, logout }) {
                 </div>
 
                 {/* Materyal tipi */}
-                <div className="text-xs font-medium text-gray-600 mb-2">Materyal Türü Seç</div>
+                <div className="text-xs font-medium text-subtle mb-2">Materyal Türü Seç</div>
                 <div className="grid grid-cols-2 gap-2 mb-4">
                   {[
                     {id:"soru_seti",e:"📝",l:"Soru Seti",a:"10 soruluk anlama testi"},
@@ -7760,15 +7624,15 @@ function OgrenciPaneli({ user, logout }) {
                       }} disabled={materyalYukleniyor}
                         className={`p-3 rounded-xl border-2 text-left transition-all ${secili?"border-teal-400 bg-teal-50":"border-gray-100 bg-gray-50 hover:border-teal-300"} disabled:opacity-50`}>
                         <div className="text-2xl mb-1">{t.e}</div>
-                        <div className="font-bold text-xs text-gray-800">{t.l}</div>
-                        <div className="text-[10px] text-gray-500 mt-0.5">{t.a}</div>
+                        <div className="font-bold text-xs text-content">{t.l}</div>
+                        <div className="text-[10px] text-subtle mt-0.5">{t.a}</div>
                       </button>
                     );
                   })}
                 </div>
 
                 {materyalYukleniyor && (
-                  <div className="text-center py-6"><div className="text-3xl animate-spin mb-2">⚙️</div><div className="text-sm text-gray-500">Materyal hazırlanıyor...</div></div>
+                  <div className="text-center py-6"><div className="text-3xl animate-spin mb-2">⚙️</div><div className="text-sm text-subtle">Materyal hazırlanıyor...</div></div>
                 )}
               </div>
 
@@ -7776,7 +7640,7 @@ function OgrenciPaneli({ user, logout }) {
               {materyalSonuc && !materyalYukleniyor && (() => {
                 const m = materyalSonuc;
                 return (
-                  <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+                  <div className="bg-surface rounded-2xl border shadow-sm overflow-hidden">
                     <div className="bg-gradient-to-r from-teal-500 to-cyan-600 p-4 text-white">
                       <div className="text-xs opacity-70 mb-0.5">📋 {m.kitap_adi}</div>
                       <div className="font-bold text-base">{m.baslik}</div>
@@ -7788,10 +7652,10 @@ function OgrenciPaneli({ user, logout }) {
                           <div className="flex items-start gap-2">
                             <span className="text-xs bg-teal-100 text-teal-700 font-bold px-1.5 py-0.5 rounded min-w-[20px] text-center">{i+1}</span>
                             <div className="flex-1">
-                              <p className="text-sm font-medium text-gray-800">{s.soru}</p>
+                              <p className="text-sm font-medium text-content">{s.soru}</p>
                               <div className="mt-2 grid grid-cols-2 gap-1">
                                 {(s.secenekler||[]).map((sec,j) => (
-                                  <div key={j} className={`text-xs px-2 py-1 rounded-lg border ${sec===s.dogru?"bg-green-100 border-green-300 text-green-700 font-medium":"bg-white border-gray-200 text-gray-600"}`}>{sec}</div>
+                                  <div key={j} className={`text-xs px-2 py-1 rounded-lg border ${sec===s.dogru?"bg-green-100 border-green-300 text-green-700 font-medium":"bg-surface border-line text-subtle"}`}>{sec}</div>
                                 ))}
                               </div>
                               {s.bloom_basamak && <div className="text-[10px] text-purple-500 mt-1">📊 {s.bloom_basamak}</div>}
@@ -7803,7 +7667,7 @@ function OgrenciPaneli({ user, logout }) {
                       {m.tur === "kelime_listesi" && m.kelimeler?.map((k,i) => (
                         <div key={i} className="bg-indigo-50 rounded-xl p-3 border border-indigo-100 flex items-start gap-3">
                           <span className="font-bold text-indigo-600 text-sm min-w-[80px]">{k.kelime}</span>
-                          <div className="flex-1 text-xs"><div className="text-gray-700">{k.anlam}</div><div className="text-indigo-500 italic mt-0.5">"{k.cumle}"</div></div>
+                          <div className="flex-1 text-xs"><div className="text-content">{k.anlam}</div><div className="text-indigo-500 italic mt-0.5">"{k.cumle}"</div></div>
                           <div className="flex gap-0.5">{[1,2,3,4,5].map(n => <div key={n} className={`w-1.5 h-1.5 rounded-full ${n<=k.zorluk?"bg-orange-400":"bg-gray-200"}`} />)}</div>
                         </div>
                       ))}
@@ -7814,11 +7678,11 @@ function OgrenciPaneli({ user, logout }) {
                           <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full">👥 {m.grup_sayisi} grup</span>
                         </div>
                         {m.adimlar?.map((a,i) => <div key={i} className="flex items-start gap-2 text-sm"><span className="text-teal-600 font-bold">{i+1}.</span><span>{a}</span></div>)}
-                        {m.kazanimlar?.length > 0 && <div className="mt-2"><div className="text-xs font-bold text-gray-600 mb-1">🎯 Kazanımlar</div>{m.kazanimlar.map((k,i) => <div key={i} className="text-xs text-gray-600">• {k}</div>)}</div>}
+                        {m.kazanimlar?.length > 0 && <div className="mt-2"><div className="text-xs font-bold text-subtle mb-1">🎯 Kazanımlar</div>{m.kazanimlar.map((k,i) => <div key={i} className="text-xs text-subtle">• {k}</div>)}</div>}
                       </>)}
                       {/* TAHMİN */}
                       {m.tur === "tahmin" && (<>
-                        <p className="text-sm text-gray-600 italic">{m.giris}</p>
+                        <p className="text-sm text-subtle italic">{m.giris}</p>
                         {m.sorular?.map((s,i) => (
                           <div key={i} className="bg-amber-50 rounded-xl p-3 border border-amber-100">
                             <p className="text-sm font-medium">{s.soru}</p>
@@ -7837,31 +7701,31 @@ function OgrenciPaneli({ user, logout }) {
 
         {/* ═══ SIRALAMA (XP Lig Bazlı) ═══ */}
         {aktifSekme === "siralama" && (<div className="space-y-4">
-          <h2 className="text-lg font-bold">🏆 Lig Sıralaması</h2>
+          <h2 className="text-lg font-bold">Lig Sıralaması</h2>
           {xpDurum && (<div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-2xl p-4 border border-yellow-100 flex items-center justify-between">
-            <div><div className="text-2xl font-bold">{xpDurum.lig_label}</div><div className="text-sm text-gray-600">{xpDurum.toplam_xp} XP</div></div>
-            {xpDurum.sonraki_lig && <div className="text-right"><div className="text-xs text-gray-500">Sonraki: {({"gumus":"🥈 Gümüş","altin":"🥇 Altın","elmas":"💎 Elmas"})[xpDurum.sonraki_lig]}</div><div className="text-sm font-bold text-orange-600">{xpDurum.kalan_xp} XP kaldı</div></div>}
+            <div><div className="text-2xl font-bold">{xpDurum.lig_label}</div><div className="text-sm text-subtle">{xpDurum.toplam_xp} XP</div></div>
+            {xpDurum.sonraki_lig && <div className="text-right"><div className="text-xs text-subtle">Sonraki: {({"gumus":"🥈 Gümüş","altin":"🥇 Altın","elmas":"💎 Elmas"})[xpDurum.sonraki_lig]}</div><div className="text-sm font-bold text-orange-600">{xpDurum.kalan_xp} XP kaldı</div></div>}
           </div>)}
-          {xpDurum?.son_xp?.length > 0 && (<div className="bg-white rounded-2xl p-3 shadow-sm border"><div className="text-xs font-medium text-gray-500 mb-2">Son Kazanımlar</div>
-            {xpDurum.son_xp.slice(0,5).map((x,i) => (<div key={i} className="flex items-center justify-between py-1 text-xs"><span className="text-gray-600">{({"okuma_gorevi":"📖 Okuma","anlama_testi":"📝 Test","egzersiz":"🎯 Egzersiz","gorev_tamamla":"✅ Görev","gelisim_tamamla":"🎓 Gelişim","kitap_bitirme":"📚 Kitap","gunluk_streak":"🔥 Streak"})[x.eylem] || x.eylem}</span><span className="font-bold text-green-600">+{x.xp} XP</span></div>))}
+          {xpDurum?.son_xp?.length > 0 && (<div className="bg-surface rounded-2xl p-3 shadow-sm border"><div className="text-xs font-medium text-subtle mb-2">Son Kazanımlar</div>
+            {xpDurum.son_xp.slice(0,5).map((x,i) => (<div key={i} className="flex items-center justify-between py-1 text-xs"><span className="text-subtle">{({"okuma_gorevi":"📖 Okuma","anlama_testi":"📝 Test","egzersiz":"🎯 Egzersiz","gorev_tamamla":"✅ Görev","gelisim_tamamla":"🎓 Gelişim","kitap_bitirme":"📚 Kitap","gunluk_streak":"🔥 Streak"})[x.eylem] || x.eylem}</span><span className="font-bold text-green-600">+{x.xp} XP</span></div>))}
           </div>)}
           <div className="flex items-center justify-between">
-            <p className="text-xs text-gray-500">Toplam XP'ye göre sıralama</p>
+            <p className="text-xs text-subtle">Toplam XP'ye göre sıralama</p>
             <span className="text-[10px] font-medium text-orange-600 bg-orange-50 border border-orange-100 rounded-full px-2 py-0.5">🎓 Sadece öğrenciler</span>
           </div>
-          {ligSiralama && ligSiralama.siralama.length > 0 ? (<div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
-            {ligSiralama.siralama.filter(s => !s.role || s.role === "student").map((s, i) => (<div key={i} className={`flex items-center justify-between px-4 py-3 ${s.ben ? 'bg-orange-50 border-l-4 border-l-orange-500 font-bold' : i%2===0 ? 'bg-white' : 'bg-gray-50'} ${i>0 ? 'border-t border-gray-100' : ''}`}>
-              <div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${s.sira<=3 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'}`}>{s.sira===1?"🥇":s.sira===2?"🥈":s.sira===3?"🥉":s.sira}</div><span className={`text-sm ${s.ben ? 'text-orange-700' : 'text-gray-700'}`}>{s.ad}</span><span className="text-xs">{s.lig_label}</span></div>
-              <span className={`text-sm font-medium ${s.ben ? 'text-orange-600' : 'text-gray-500'}`}>{s.xp} XP</span>
+          {ligSiralama && ligSiralama.siralama.length > 0 ? (<div className="bg-surface rounded-2xl shadow-sm border overflow-hidden">
+            {ligSiralama.siralama.filter(s => !s.role || s.role === "student").map((s, i) => (<div key={i} className={`flex items-center justify-between px-4 py-3 ${s.ben ? 'bg-orange-50 border-l-4 border-l-orange-500 font-bold' : i%2===0 ? 'bg-surface' : 'bg-gray-50'} ${i>0 ? 'border-t border-gray-100' : ''}`}>
+              <div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${s.sira<=3 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-subtle'}`}>{s.sira===1?"🥇":s.sira===2?"🥈":s.sira===3?"🥉":s.sira}</div><span className={`text-sm ${s.ben ? 'text-orange-700' : 'text-content'}`}>{s.ad}</span><span className="text-xs">{s.lig_label}</span></div>
+              <span className={`text-sm font-medium ${s.ben ? 'text-orange-600' : 'text-subtle'}`}>{s.xp} XP</span>
             </div>))}
-          </div>) : (<div className="text-center py-12"><div className="text-5xl mb-3">🏆</div><p className="text-gray-500">Henüz yeterli veri yok</p></div>)}
+          </div>) : (<div className="text-center py-12"><div className="text-5xl mb-3">🏆</div><p className="text-subtle">Henüz yeterli veri yok</p></div>)}
         </div>)}
 
         {/* ═══ MESAJLAR ═══ */}
         {aktifSekme === "mesajlar" && (<div className="space-y-4">
-          <h2 className="text-lg font-bold">✉️ Mesajlar</h2>
+          <h2 className="text-lg font-bold">Mesajlar</h2>
           {profil?.ogretmen_bilgi && (
-            <Card className="border-0 shadow-sm border-l-4 border-l-blue-500"><CardHeader className="pb-2"><CardTitle className="text-sm">📝 Öğretmenime Mesaj</CardTitle><p className="text-xs text-gray-500">{profil.ogretmen_bilgi.ad} {profil.ogretmen_bilgi.soyad}</p></CardHeader>
+            <Card className="border border-line shadow-sm border-l-4 border-l-blue-500"><CardHeader className="pb-2"><CardTitle className="text-sm">Öğretmenime Mesaj</CardTitle><p className="text-xs text-subtle">{profil.ogretmen_bilgi.ad} {profil.ogretmen_bilgi.soyad}</p></CardHeader>
               <CardContent><form onSubmit={mesajGonder} className="space-y-3">
                 <div><Label className="text-xs">Konu</Label><Input value={mesajForm.konu} onChange={e => setMesajForm({...mesajForm, konu: e.target.value})} placeholder="Konu..." className="text-sm" /></div>
                 <div><Label className="text-xs">Mesaj *</Label><textarea value={mesajForm.icerik} onChange={e => setMesajForm({...mesajForm, icerik: e.target.value})} required placeholder="Mesajınızı yazın..." className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px]" /></div>
@@ -7870,12 +7734,12 @@ function OgrenciPaneli({ user, logout }) {
             </Card>
           )}
           {!profil?.ogretmen_bilgi && (<div className="bg-yellow-50 rounded-xl p-4 border border-yellow-200 text-sm text-yellow-800">Henüz öğretmen atanmamış.</div>)}
-          {mesajlar.length > 0 && (<><h3 className="text-xs font-medium text-gray-500">Geçmiş</h3>
+          {mesajlar.length > 0 && (<><h3 className="text-xs font-medium text-subtle">Geçmiş</h3>
             {mesajlar.map(m => { const ben = m.gonderen_id === user.id; return (
-              <div key={m.id} className={`rounded-xl p-3 border ${ben ? 'bg-blue-50 border-blue-100 ml-8' : 'bg-white border-gray-100 mr-8'}`} onClick={() => !ben && !m.okundu && mesajOkundu(m.id)}>
-                <div className="flex items-center justify-between mb-1"><span className="text-xs text-gray-500">{ben ? `Sen → ${m.alici_ad}` : `${m.gonderen_ad}`}</span><div className="flex items-center gap-1"><span className="text-[10px] text-gray-400">{new Date(m.tarih).toLocaleDateString('tr-TR')}</span>{!ben && !m.okundu && <span className="w-2 h-2 bg-red-500 rounded-full" />}</div></div>
-                {m.konu && <div className="text-xs font-bold text-gray-700">{m.konu}</div>}
-                <p className="text-sm text-gray-800 mt-0.5">{m.icerik}</p>
+              <div key={m.id} className={`rounded-xl p-3 border ${ben ? 'bg-blue-50 border-blue-100 ml-8' : 'bg-surface border-gray-100 mr-8'}`} onClick={() => !ben && !m.okundu && mesajOkundu(m.id)}>
+                <div className="flex items-center justify-between mb-1"><span className="text-xs text-subtle">{ben ? `Sen → ${m.alici_ad}` : `${m.gonderen_ad}`}</span><div className="flex items-center gap-1"><span className="text-[10px] text-subtle">{new Date(m.tarih).toLocaleDateString('tr-TR')}</span>{!ben && !m.okundu && <span className="w-2 h-2 bg-red-500 rounded-full" />}</div></div>
+                {m.konu && <div className="text-xs font-bold text-content">{m.konu}</div>}
+                <p className="text-sm text-content mt-0.5">{m.icerik}</p>
               </div>);
             })}</>)}
         </div>)}
@@ -7884,7 +7748,7 @@ function OgrenciPaneli({ user, logout }) {
       {/* 🧠 Zekâ Haritası Modalı */}
       {zekaModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-4" onClick={() => setZekaModal(null)}>
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="bg-surface rounded-2xl w-full max-w-sm shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-t-2xl p-4 text-white">
               <div className="flex items-start justify-between">
                 <div><div className="text-xs opacity-70 mb-0.5">🧠 Zekâ Haritası</div><div className="font-bold text-base leading-tight">{zekaModal.kitap_adi}</div>{zekaModal.yazar && <div className="text-xs opacity-80 mt-0.5">{zekaModal.yazar}</div>}</div>
@@ -7892,7 +7756,7 @@ function OgrenciPaneli({ user, logout }) {
               </div>
             </div>
             {zekaModal.yukleniyor ? (
-              <div className="p-8 text-center"><div className="text-4xl mb-3 animate-spin">🧠</div><div className="text-sm text-gray-500">AI analiz ediyor...</div></div>
+              <div className="p-8 text-center"><div className="text-4xl mb-3 animate-spin">🧠</div><div className="text-sm text-subtle">AI analiz ediyor...</div></div>
             ) : zekaModal.profil ? (() => {
               const boyutlar = zekaModal.profil.boyutlar || {};
               const etiketler = {soyutluk:"Soyutluk",kelime_zorlugu:"Kelime Zorluğu",hayal_gucu:"Hayal Gücü",felsefi_derinlik:"Felsefi Derinlik",aksiyon:"Aksiyon",duygusal_yogunluk:"Duygusal Yoğunluk",hedef_kelime_yogunlugu:"Kelime Yoğunluğu"};
@@ -7902,7 +7766,7 @@ function OgrenciPaneli({ user, logout }) {
               return (
                 <div className="p-4 space-y-4">
                   <div className="flex items-center justify-between bg-gray-50 rounded-xl p-3">
-                    <div className="text-sm font-medium text-gray-700">Genel Zorluk</div>
+                    <div className="text-sm font-medium text-content">Genel Zorluk</div>
                     <div className="flex items-center gap-2">
                       <div className="flex gap-0.5">{[1,2,3,4,5,6,7,8,9,10].map(n => (<div key={n} className={`w-2.5 h-2.5 rounded-full ${n <= genelZorluk ? "bg-purple-500" : "bg-gray-200"}`} />))}</div>
                       <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${seviye.r}`}>{seviye.l}</span>
@@ -7910,15 +7774,15 @@ function OgrenciPaneli({ user, logout }) {
                   </div>
                   <div className="space-y-2">
                     {Object.entries(etiketler).map(([k,label]) => { const val = boyutlar[k] || 0; return (
-                      <div key={k}><div className="flex justify-between text-xs mb-1"><span className="text-gray-600">{label}</span><span className="font-bold">{val}/10</span></div><div className="h-2.5 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full rounded-full ${renkler[k]}`} style={{width:`${val*10}%`}} /></div></div>
+                      <div key={k}><div className="flex justify-between text-xs mb-1"><span className="text-subtle">{label}</span><span className="font-bold">{val}/10</span></div><div className="h-2.5 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full rounded-full ${renkler[k]}`} style={{width:`${val*10}%`}} /></div></div>
                     );})}
                   </div>
-                  {zekaModal.profil.aciklama && (<div className="bg-purple-50 rounded-xl p-3 border border-purple-100"><div className="text-xs text-purple-700 font-medium mb-1">🤖 AI Yorumu</div><p className="text-xs text-gray-700 leading-relaxed">{zekaModal.profil.aciklama}</p></div>)}
+                  {zekaModal.profil.aciklama && (<div className="bg-purple-50 rounded-xl p-3 border border-purple-100"><div className="text-xs text-purple-700 font-medium mb-1">🤖 AI Yorumu</div><p className="text-xs text-content leading-relaxed">{zekaModal.profil.aciklama}</p></div>)}
                   {zekaModal.profil.uyum_skoru !== undefined && (<div className="bg-green-50 rounded-xl p-3 border border-green-100 flex items-center justify-between"><div className="text-xs font-medium text-green-700">Sana Uyum</div><div className="text-2xl font-bold text-green-600">%{Math.round(zekaModal.profil.uyum_skoru)}</div></div>)}
                   <button onClick={() => setZekaModal(null)} className="w-full bg-purple-600 text-white rounded-xl py-3 text-sm font-bold">Kapat</button>
                 </div>
               );
-            })() : (<div className="p-6 text-center text-sm text-gray-400">Profil yüklenemedi.</div>)}
+            })() : (<div className="p-6 text-center text-sm text-subtle">Profil yüklenemedi.</div>)}
           </div>
         </div>
       )}
@@ -7977,16 +7841,16 @@ function MesajlarPanel({ user }) {
 
   const mesajOkundu = async (id) => { try { await axios.put(`${API}/mesajlar/${id}/okundu`); fetchAll(); } catch(e) {} };
 
-  const rolRenk = (r) => ({ admin: "bg-red-100 text-red-700", coordinator: "bg-orange-100 text-orange-700", teacher: "bg-blue-100 text-blue-700", student: "bg-green-100 text-green-700", parent: "bg-purple-100 text-purple-700" })[r] || "bg-gray-100 text-gray-600";
+  const rolRenk = (r) => ({ admin: "bg-red-100 text-red-700", coordinator: "bg-orange-100 text-orange-700", teacher: "bg-blue-100 text-blue-700", student: "bg-green-100 text-green-700", parent: "bg-purple-100 text-purple-700" })[r] || "bg-gray-100 text-subtle";
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Mesajlar</h2>
-          <p className="text-gray-500 text-sm mt-1">{okunmamisSayisi > 0 ? `${okunmamisSayisi} okunmamış mesaj` : "Tüm mesajlar okundu"}</p>
+          <h2 className="text-2xl font-bold text-content">Mesajlar</h2>
+          <p className="text-subtle text-sm mt-1">{okunmamisSayisi > 0 ? `${okunmamisSayisi} okunmamış mesaj` : "Tüm mesajlar okundu"}</p>
         </div>
-        <Button onClick={() => setGorunum("yeni")} className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
+        <Button onClick={() => setGorunum("yeni")} className="bg-primary hover:bg-primary-hover text-white">
           <Send className="h-4 w-4 mr-2" /> Yeni Mesaj
         </Button>
       </div>
@@ -7999,16 +7863,16 @@ function MesajlarPanel({ user }) {
           { v: "yeni", l: "Yeni Mesaj" },
         ].map(t => (
           <button key={t.v} onClick={() => setGorunum(t.v)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all border flex items-center gap-2 ${gorunum === t.v ? 'bg-blue-500 text-white border-blue-500 shadow' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}>
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all border flex items-center gap-2 ${gorunum === t.v ? 'bg-primary text-white border-primary shadow' : 'bg-surface text-subtle border-line hover:border-primary'}`}>
             {t.l}
-            {t.badge > 0 && <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${gorunum === t.v ? 'bg-white/30' : 'bg-red-100 text-red-600'}`}>{t.badge}</span>}
+            {t.badge > 0 && <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold tabular-nums ${gorunum === t.v ? 'bg-white/30' : 'bg-red-100 text-red-600'}`}>{t.badge}</span>}
           </button>
         ))}
       </div>
 
       {/* Yeni Mesaj */}
       {gorunum === "yeni" && (
-        <Card className="border-0 shadow-sm">
+        <Card className="border border-line shadow-sm">
           <CardHeader><CardTitle className="text-base flex items-center gap-2"><Send className="h-4 w-4" /> Yeni Mesaj</CardTitle></CardHeader>
           <CardContent>
             <form onSubmit={mesajGonder} className="space-y-4">
@@ -8035,7 +7899,7 @@ function MesajlarPanel({ user }) {
               <div><Label>Konu</Label><Input value={form.konu} onChange={e => setForm({...form, konu: e.target.value})} placeholder="Mesaj konusu..." /></div>
               <div><Label>Mesaj *</Label><textarea value={form.icerik} onChange={e => setForm({...form, icerik: e.target.value})} required placeholder="Mesajınızı yazın..." className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[120px]" /></div>
               <div className="flex gap-3">
-                <Button type="submit" disabled={gonderiliyor || !form.icerik.trim()} className="flex-1 bg-blue-600 text-white">{gonderiliyor ? "Gönderiliyor..." : "✉️ Gönder"}</Button>
+                <Button type="submit" disabled={gonderiliyor || !form.icerik.trim()} className="flex-1 bg-primary hover:bg-primary-hover text-white">{gonderiliyor ? "Gönderiliyor..." : <><Send className="h-4 w-4 mr-1" />Gönder</>}</Button>
                 <Button type="button" variant="outline" onClick={() => setGorunum("gelen")} className="flex-1">İptal</Button>
               </div>
             </form>
@@ -8047,26 +7911,26 @@ function MesajlarPanel({ user }) {
       {gorunum === "gelen" && (
         <div className="space-y-3">
           <div className="flex gap-2 mb-2">
-            <button onClick={() => setFiltre("hepsi")} className={`text-xs px-3 py-1 rounded-full border ${filtre === "hepsi" ? 'bg-gray-800 text-white' : 'bg-white text-gray-600'}`}>Tümü ({gelenMesajlar.length})</button>
-            <button onClick={() => setFiltre("okunmamis")} className={`text-xs px-3 py-1 rounded-full border ${filtre === "okunmamis" ? 'bg-red-500 text-white' : 'bg-white text-gray-600'}`}>Okunmamış ({okunmamislar.length})</button>
+            <button onClick={() => setFiltre("hepsi")} className={`text-xs px-3 py-1 rounded-full border tabular-nums ${filtre === "hepsi" ? 'bg-primary text-white border-primary' : 'bg-surface text-subtle border-line'}`}>Tümü ({gelenMesajlar.length})</button>
+            <button onClick={() => setFiltre("okunmamis")} className={`text-xs px-3 py-1 rounded-full border tabular-nums ${filtre === "okunmamis" ? 'bg-primary text-white border-primary' : 'bg-surface text-subtle border-line'}`}>Okunmamış ({okunmamislar.length})</button>
           </div>
           {(filtre === "okunmamis" ? okunmamislar : gelenMesajlar).length === 0 ? (
-            <div className="text-center py-12"><Mail className="h-12 w-12 text-gray-300 mx-auto mb-3" /><p className="text-gray-500">{filtre === "okunmamis" ? "Okunmamış mesaj yok" : "Gelen mesaj yok"}</p></div>
+            <div className="text-center py-12"><Mail className="h-12 w-12 text-subtle mx-auto mb-3" /><p className="text-subtle">{filtre === "okunmamis" ? "Okunmamış mesaj yok" : "Gelen mesaj yok"}</p></div>
           ) : (
             (filtre === "okunmamis" ? okunmamislar : gelenMesajlar).map(m => (
-              <Card key={m.id} className={`border-0 shadow-sm cursor-pointer transition-all hover:shadow-md ${!m.okundu ? 'border-l-4 border-l-blue-500 bg-blue-50/30' : ''}`} onClick={() => !m.okundu && mesajOkundu(m.id)}>
+              <Card key={m.id} className={`border border-line shadow-sm cursor-pointer transition-all hover:shadow-md ${!m.okundu ? 'border-l-4 border-l-blue-500 bg-blue-50/30' : ''}`} onClick={() => !m.okundu && mesajOkundu(m.id)}>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${rolRenk(m.gonderen_rol)}`}>{({admin:"Yönetici",coordinator:"Koord.",teacher:"Öğretmen",student:"Öğrenci",parent:"Veli"})[m.gonderen_rol] || "—"}</span>
-                        <span className="font-medium text-sm text-gray-900">{m.gonderen_ad}</span>
+                        <span className="font-medium text-sm text-content">{m.gonderen_ad}</span>
                         {!m.okundu && <span className="w-2 h-2 bg-blue-500 rounded-full" />}
                       </div>
-                      {m.konu && <div className="font-bold text-sm text-gray-800 mt-1">{m.konu}</div>}
-                      <p className="text-sm text-gray-600 mt-1 line-clamp-2">{m.icerik}</p>
+                      {m.konu && <div className="font-bold text-sm text-content mt-1">{m.konu}</div>}
+                      <p className="text-sm text-subtle mt-1 line-clamp-2">{m.icerik}</p>
                     </div>
-                    <div className="text-xs text-gray-400 whitespace-nowrap">{new Date(m.tarih).toLocaleDateString('tr-TR')}</div>
+                    <div className="text-xs text-subtle whitespace-nowrap">{new Date(m.tarih).toLocaleDateString('tr-TR')}</div>
                   </div>
                 </CardContent>
               </Card>
@@ -8079,22 +7943,22 @@ function MesajlarPanel({ user }) {
       {gorunum === "giden" && (
         <div className="space-y-3">
           {gidenMesajlar.length === 0 ? (
-            <div className="text-center py-12"><Send className="h-12 w-12 text-gray-300 mx-auto mb-3" /><p className="text-gray-500">Gönderilen mesaj yok</p></div>
+            <div className="text-center py-12"><Send className="h-12 w-12 text-subtle mx-auto mb-3" /><p className="text-subtle">Gönderilen mesaj yok</p></div>
           ) : (
             gidenMesajlar.map(m => (
-              <Card key={m.id} className="border-0 shadow-sm"><CardContent className="p-4">
+              <Card key={m.id} className="border border-line shadow-sm"><CardContent className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs text-gray-500">→</span>
+                      <span className="text-xs text-subtle">→</span>
                       <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${rolRenk(m.alici_rol)}`}>{({admin:"Yönetici",coordinator:"Koord.",teacher:"Öğretmen",student:"Öğrenci",parent:"Veli"})[m.alici_rol] || "—"}</span>
-                      <span className="font-medium text-sm text-gray-900">{m.alici_ad}</span>
-                      {m.okundu ? <span className="text-xs text-green-600">✓ okundu</span> : <span className="text-xs text-gray-400">gönderildi</span>}
+                      <span className="font-medium text-sm text-content">{m.alici_ad}</span>
+                      {m.okundu ? <span className="inline-flex items-center gap-1 text-xs text-green-600"><Check className="h-3 w-3" />okundu</span> : <span className="text-xs text-subtle">gönderildi</span>}
                     </div>
-                    {m.konu && <div className="font-bold text-sm text-gray-800 mt-1">{m.konu}</div>}
-                    <p className="text-sm text-gray-600 mt-1 line-clamp-2">{m.icerik}</p>
+                    {m.konu && <div className="font-bold text-sm text-content mt-1">{m.konu}</div>}
+                    <p className="text-sm text-subtle mt-1 line-clamp-2">{m.icerik}</p>
                   </div>
-                  <div className="text-xs text-gray-400 whitespace-nowrap">{new Date(m.tarih).toLocaleDateString('tr-TR')}</div>
+                  <div className="text-xs text-subtle whitespace-nowrap">{new Date(m.tarih).toLocaleDateString('tr-TR')}</div>
                 </div>
               </CardContent></Card>
             ))
@@ -8204,11 +8068,11 @@ function VeliPaneli({ user, logout }) {
   const gidenMesajlar = mesajlar.filter(m => m.gonderen_id === user.id);
 
   const sekmeler = [
-    ozellikAktif("veli_dashboard")    && { id: "ozet",     label: "Özet",        icon: "📊" },
-    ozellikAktif("veli_okuma_gecmisi")&& { id: "okumalar", label: "Okumalar",    icon: "📖" },
-    ozellikAktif("veli_gorev_takip")  && { id: "gorevler", label: "Görevler",    icon: "📌" },
-    ozellikAktif("veli_anket")        && { id: "anket",    label: "Değerlendir", icon: "⭐" },
-    ozellikAktif("veli_mesajlar")     && { id: "mesajlar", label: "Mesajlar",    icon: "✉️", badge: okunmamisSayisi || null },
+    ozellikAktif("veli_dashboard")    && { id: "ozet",     label: "Özet",        icon: <BarChart3 className="h-4 w-4" /> },
+    ozellikAktif("veli_okuma_gecmisi")&& { id: "okumalar", label: "Okumalar",    icon: <BookOpen className="h-4 w-4" /> },
+    ozellikAktif("veli_gorev_takip")  && { id: "gorevler", label: "Görevler",    icon: <Pin className="h-4 w-4" /> },
+    ozellikAktif("veli_anket")        && { id: "anket",    label: "Değerlendir", icon: <Star className="h-4 w-4" /> },
+    ozellikAktif("veli_mesajlar")     && { id: "mesajlar", label: "Mesajlar",    icon: <Mail className="h-4 w-4" />, badge: okunmamisSayisi || null },
   ].filter(Boolean);
 
   return (
@@ -8259,7 +8123,7 @@ function VeliPaneli({ user, logout }) {
 
       <div className="max-w-2xl mx-auto p-4 space-y-5">
         {!seciliCocuk && cocuklar.length === 0 ? (
-          <div className="text-center py-16"><div className="text-5xl mb-4">👶</div><h3 className="font-bold text-content">Çocuk kaydı bulunamadı</h3><p className="text-subtle text-sm mt-1">Lütfen yöneticinize başvurun.</p></div>
+          <div className="text-center py-16"><Users className="h-12 w-12 mx-auto mb-4 text-subtle" /><h3 className="font-bold text-content">Çocuk kaydı bulunamadı</h3><p className="text-subtle text-sm mt-1">Lütfen yöneticinize başvurun.</p></div>
         ) : (<>
 
           {/* ÖZET */}
@@ -8276,16 +8140,16 @@ function VeliPaneli({ user, logout }) {
               <div className="bg-surface rounded-2xl p-3 text-center shadow-sm border"><div className="text-2xl font-bold text-primary">{istatistik.toplam_kitap}</div><div className="text-xs text-subtle">📚 Kitap</div></div>
             </div>)}
             {istatistik && (<div className="bg-surface rounded-2xl p-4 shadow-sm border"><div className="text-sm font-medium text-content mb-2">Bu Hafta</div><div className="flex items-center gap-2"><div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden"><div className="h-full bg-gradient-to-r from-purple-400 to-pink-500 rounded-full" style={{ width: `${Math.min(100,(istatistik.aktif_gunler_7/4)*100)}%` }} /></div><span className="text-sm font-bold">{istatistik.aktif_gunler_7}/4 gün</span></div></div>)}
-            {istatistik && (<div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-4 text-center border"><div className="text-3xl font-bold text-purple-600">{istatistik.toplam_dakika}</div><div className="text-sm text-subtle">toplam dakika okuma</div></div>)}
+            {istatistik && (<div className="bg-app rounded-2xl p-4 text-center border border-line"><div className="text-3xl font-bold text-primary tabular-nums">{istatistik.toplam_dakika}</div><div className="text-sm text-subtle">toplam dakika okuma</div></div>)}
 
-            {/* 🤖 AI Gelişim Raporu */}
+            {/* AI Gelişim Raporu */}
             {istatistik && (
-              <div className="bg-gradient-to-r from-cyan-50 to-blue-50 rounded-2xl p-4 border border-cyan-200">
-                <div className="flex items-center gap-2 mb-3"><span className="text-lg">🤖</span><span className="font-bold text-sm text-cyan-800">AI Gelişim Raporu</span></div>
+              <div className="bg-blue-50 rounded-2xl p-4 border border-blue-200">
+                <div className="flex items-center gap-2 mb-3"><Sparkles className="h-5 w-5 text-primary" /><span className="font-bold text-sm text-primary">AI Gelişim Raporu</span></div>
                 <div className="space-y-2 text-xs text-subtle">
-                  <div className="flex items-center justify-between"><span>📚 Bu ay okunan kitap</span><span className="font-bold text-primary">{istatistik.toplam_kitap || 0}</span></div>
-                  <div className="flex items-center justify-between"><span>🔥 Mevcut streak</span><span className="font-bold text-orange-600">{istatistik.streak || 0} gün</span></div>
-                  <div className="flex items-center justify-between"><span>⏱ Günlük ortalama</span><span className="font-bold text-green-600">{Math.round((istatistik.toplam_dakika || 0) / Math.max(istatistik.aktif_gunler_7 || 1, 1))} dk</span></div>
+                  <div className="flex items-center justify-between"><span className="inline-flex items-center gap-1.5"><BookMarked className="h-3.5 w-3.5" />Bu ay okunan kitap</span><span className="font-bold text-primary tabular-nums">{istatistik.toplam_kitap || 0}</span></div>
+                  <div className="flex items-center justify-between"><span className="inline-flex items-center gap-1.5"><Flame className="h-3.5 w-3.5" />Mevcut streak</span><span className="font-bold text-orange-600 tabular-nums">{istatistik.streak || 0} gün</span></div>
+                  <div className="flex items-center justify-between"><span className="inline-flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" />Günlük ortalama</span><span className="font-bold text-green-600 tabular-nums">{Math.round((istatistik.toplam_dakika || 0) / Math.max(istatistik.aktif_gunler_7 || 1, 1))} dk</span></div>
                   {istatistik.streak >= 5 && <div className="bg-green-100 rounded-lg p-2 text-green-700 text-center">🎉 Harika! Çocuğunuz {istatistik.streak} gündür düzenli okuyor</div>}
                   {istatistik.streak < 2 && <div className="bg-yellow-100 rounded-lg p-2 text-yellow-700 text-center">💡 Birlikte 10 dakika okuma, alışkanlık oluşturur</div>}
                   {istatistik.streak >= 2 && istatistik.streak < 5 && <div className="bg-blue-100 rounded-lg p-2 text-primary text-center">👏 İyi gidiyor! Streak'i sürdürmek için bugün de okuyalım</div>}
@@ -8316,14 +8180,14 @@ function VeliPaneli({ user, logout }) {
           </>)}
 
           {/* OKUMALAR */}
-          {aktifSekme === "okumalar" && ozellikAktif("veli_okuma_gecmisi") && (<div className="space-y-3"><h2 className="text-xl font-bold">📖 Okuma Geçmişi</h2>
+          {aktifSekme === "okumalar" && ozellikAktif("veli_okuma_gecmisi") && (<div className="space-y-3"><h2 className="text-xl font-bold">Okuma Geçmişi</h2>
             {okumaKayitlari.length === 0 ? <p className="text-center text-subtle py-8">Henüz okuma kaydı yok</p> : (
               okumaKayitlari.map(k => (<div key={k.id} className="bg-surface rounded-xl p-3 shadow-sm border flex items-center justify-between"><div><div className="font-medium text-sm">{k.kitap_adi || "—"}</div><div className="text-xs text-subtle">{k.bolum && `${k.bolum} • `}⏱ {k.sure_dakika} dk</div></div><div className="text-xs text-subtle">{new Date(k.tarih).toLocaleDateString('tr-TR')}</div></div>))
             )}
           </div>)}
 
           {/* GÖREVLER */}
-          {aktifSekme === "gorevler" && ozellikAktif("veli_gorev_takip") && (<div className="space-y-3"><h2 className="text-xl font-bold">📌 Görevler</h2>
+          {aktifSekme === "gorevler" && ozellikAktif("veli_gorev_takip") && (<div className="space-y-3"><h2 className="text-xl font-bold">Görevler</h2>
             {gorevler.length === 0 ? <p className="text-center text-subtle py-8">Görev yok</p> : (
               gorevler.map(g => (<div key={g.id} className={`bg-surface rounded-xl p-3 shadow-sm border ${g.durum === "tamamlandi" ? "opacity-60" : ""}`}>
                 <div className="flex items-center justify-between"><div className="font-medium text-sm">{g.durum === "tamamlandi" ? "✅ " : ""}{g.baslik}</div><span className={`text-xs px-2 py-0.5 rounded-full ${g.durum === "tamamlandi" ? "bg-green-100 text-green-700" : g.durum === "bekliyor" ? "bg-yellow-100 text-yellow-700" : "bg-blue-100 text-primary"}`}>{g.durum === "tamamlandi" ? "Tamamlandı" : g.durum === "bekliyor" ? "Bekliyor" : "Devam"}</span></div>
@@ -8335,7 +8199,7 @@ function VeliPaneli({ user, logout }) {
           {/* MESAJLAR */}
           {/* ANKET */}
           {aktifSekme === "anket" && ozellikAktif("veli_anket") && (<div className="space-y-4">
-            <h2 className="text-xl font-bold">⭐ Öğretmen Değerlendirmesi</h2>
+            <h2 className="inline-flex items-center gap-2 text-xl font-bold"><Star className="h-5 w-5" />Öğretmen Değerlendirmesi</h2>
             {seciliCocuk ? (<>
               {(() => {
                 const ogretmenId = seciliCocuk.ogretmen_id;
@@ -8344,7 +8208,7 @@ function VeliPaneli({ user, logout }) {
 
                 if (zatenDoldurdu) return (
                   <div className="bg-green-50 rounded-2xl p-6 border border-green-200 text-center">
-                    <div className="text-4xl mb-2">✅</div><h3 className="font-bold text-green-800">Bu dönem için değerlendirmenizi yaptınız</h3>
+                    <CheckCircle className="h-10 w-10 mx-auto mb-2 text-green-600" /><h3 className="font-bold text-green-800">Bu dönem için değerlendirmenizi yaptınız</h3>
                     <p className="text-sm text-green-600 mt-1">Teşekkür ederiz! Sonraki dönemde tekrar doldurabilirsiniz.</p>
                   </div>
                 );
@@ -8369,7 +8233,7 @@ function VeliPaneli({ user, logout }) {
                 };
 
                 return (
-                  <Card className="border-0 shadow-sm"><CardContent className="p-5 space-y-5">
+                  <Card className="border border-line shadow-sm"><CardContent className="p-5 space-y-5">
                     <p className="text-sm text-subtle">{seciliCocuk.ad} {seciliCocuk.soyad}'ın öğretmenini değerlendirin. Yanıtlarınız anonim olarak iletilir.</p>
                     {anketSorulari.filter(s => s.tip === "puan").map(s => (
                       <div key={s.no}>
@@ -8388,7 +8252,7 @@ function VeliPaneli({ user, logout }) {
                       </div>
                     </div>
                     <div><Label className="text-sm">9. Eklemek istediğiniz not (opsiyonel)</Label><textarea value={anketNot} onChange={e => setAnketNot(e.target.value)} className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[60px] mt-1" placeholder="Düşünceleriniz..." /></div>
-                    <Button onClick={anketGonder} disabled={anketGonderiliyor} className="w-full bg-purple-600 text-white py-3">{anketGonderiliyor ? "Gönderiliyor..." : "⭐ Değerlendirmeyi Gönder"}</Button>
+                    <Button onClick={anketGonder} disabled={anketGonderiliyor} className="w-full bg-primary hover:bg-primary-hover text-white py-3">{anketGonderiliyor ? "Gönderiliyor..." : "⭐ Değerlendirmeyi Gönder"}</Button>
                   </CardContent></Card>
                 );
               })()}
@@ -8405,7 +8269,7 @@ function VeliPaneli({ user, logout }) {
           </div>)}
 
           {aktifSekme === "mesajlar" && ozellikAktif("veli_mesajlar") && (<div className="space-y-4">
-            <h2 className="text-xl font-bold">✉️ Mesajlar</h2>
+            <h2 className="inline-flex items-center gap-2 text-xl font-bold"><Mail className="h-5 w-5" />Mesajlar</h2>
             <div className="flex gap-2">
               {[{v:"gelen",l:`Gelen (${gelenMesajlar.length})`},{v:"giden",l:"Gönderilen"},{v:"yeni",l:"Yeni Mesaj"}].map(t => (
                 <button key={t.v} onClick={() => setMesajGorunum(t.v)} className={`px-3 py-1.5 rounded-xl text-xs font-medium border ${mesajGorunum === t.v ? 'bg-purple-500 text-white border-purple-500' : 'bg-surface text-subtle border-line'}`}>{t.l}</button>
@@ -8413,14 +8277,14 @@ function VeliPaneli({ user, logout }) {
             </div>
 
             {mesajGorunum === "yeni" && (
-              <Card className="border-0 shadow-sm"><CardContent className="p-4"><form onSubmit={mesajGonder} className="space-y-3">
+              <Card className="border border-line shadow-sm"><CardContent className="p-4"><form onSubmit={mesajGonder} className="space-y-3">
                 <div><Label className="text-xs">Alıcı *</Label>
                   <Select value={seciliAlici} onValueChange={setSeciliAlici}><SelectTrigger className="text-sm"><SelectValue placeholder="Öğretmen seçin..." /></SelectTrigger>
                     <SelectContent>{kullanicilar.map(u => (<SelectItem key={u.id} value={u.id}>{u.ad} {u.soyad} ({({admin:"Yönetici",coordinator:"Koord.",teacher:"Öğretmen"})[u.role]})</SelectItem>))}</SelectContent>
                   </Select></div>
                 <div><Label className="text-xs">Konu</Label><Input value={mesajForm.konu} onChange={e => setMesajForm({...mesajForm, konu: e.target.value})} placeholder="Konu..." className="text-sm" /></div>
                 <div><Label className="text-xs">Mesaj *</Label><textarea value={mesajForm.icerik} onChange={e => setMesajForm({...mesajForm, icerik: e.target.value})} required placeholder="Mesajınızı yazın..." className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px]" /></div>
-                <Button type="submit" disabled={mesajGonderiliyor} className="w-full bg-purple-600 text-white text-sm">{mesajGonderiliyor ? "..." : "✉️ Gönder"}</Button>
+                <Button type="submit" disabled={mesajGonderiliyor} className="w-full bg-primary hover:bg-primary-hover text-white text-sm">{mesajGonderiliyor ? "..." : "✉️ Gönder"}</Button>
               </form></CardContent></Card>
             )}
 
@@ -8555,7 +8419,7 @@ function YedeklemeYonetimi() {
 
   return (
     <div className="space-y-6">
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5" />Yedekleme Yönet</CardTitle>
         </CardHeader>
@@ -8575,7 +8439,7 @@ function YedeklemeYonetimi() {
         </CardContent>
       </Card>
 
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader>
           <CardTitle>Yedek Geçmişi</CardTitle>
         </CardHeader>
@@ -8727,7 +8591,7 @@ function GuncellemeKontrol() {
 
   return (
     <div className="space-y-6">
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><GitBranch className="h-5 w-5" />Mevcut Sürüm</CardTitle>
         </CardHeader>
@@ -8753,7 +8617,7 @@ function GuncellemeKontrol() {
         </CardContent>
       </Card>
 
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span className="flex items-center gap-2"><RefreshCw className={"h-5 w-5 " + (checking ? "animate-spin" : "")} />Güncelleme Durumu</span>
@@ -8884,7 +8748,7 @@ function TimiAnahtarPaneli() {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-2xl font-bold">🧠 TIMI Puanlama Anahtarı</h2>
+        <h2 className="inline-flex items-center gap-2 text-2xl font-bold"><Brain className="h-6 w-6" />TIMI Puanlama Anahtarı</h2>
         <p className="text-subtle text-sm">28 kartın A/B görsellerinin hangi zekâ alanına puan yazdığını düzenleyin. Değişiklik yalnızca <b>yeni</b> uygulamalara etki eder; geçmiş sonuçlar korunur.</p>
       </div>
 
@@ -8945,8 +8809,8 @@ function TimiAnahtarPaneli() {
       </div>
 
       <div className="flex gap-2 sticky bottom-0 bg-surface/95 py-2 border-t border-line">
-        <Button onClick={kaydet} disabled={kaydediliyor} className="bg-primary text-white">💾 {kaydediliyor ? "Kaydediliyor…" : "Kaydet"}</Button>
-        <Button variant="outline" onClick={varsayilana}>↩️ Varsayılana Sıfırla</Button>
+        <Button onClick={kaydet} disabled={kaydediliyor} className="bg-primary hover:bg-primary-hover text-white"><Save className="h-4 w-4 mr-1" />{kaydediliyor ? "Kaydediliyor…" : "Kaydet"}</Button>
+        <Button variant="outline" onClick={varsayilana}><RefreshCw className="h-4 w-4 mr-1" />Varsayılana Sıfırla</Button>
       </div>
     </div>
   );
@@ -8971,42 +8835,42 @@ function RaporOlcutleriPaneli() {
     setKayit("");
   };
   const varsayilana = async (tip) => {
-    try { const r = await axios.post(`${API}/admin/rapor-ayarlari/${tip}/varsayilana-don`); setTip(tip, r.data.degerler); toast({ title: "↩️ Varsayılana dönüldü" }); } catch (e) {}
+    try { const r = await axios.post(`${API}/admin/rapor-ayarlari/${tip}/varsayilana-don`); setTip(tip, r.data.degerler); toast({ title: "↩️ Varsayılana dönüldü" }); } catch (e) { hataBildir(toast, "Varsayılana dönülemedi"); }
   };
   const yeniId = (on) => `${on}_${Date.now()}`;
 
   if (!a) return <div className="p-6 text-subtle text-sm">Yükleniyor…</div>;
 
   const bolumler = [
-    { id: "normlar", l: "📏 Okuma Hızı Normları" },
-    { id: "dogruluk", l: "🎯 Doğruluk & Kur Eşikleri" },
-    { id: "anlama", l: "🧠 Anlama Rubriği" },
-    { id: "prozodik", l: "🎵 Prozodik Ölçütler" },
-    { id: "gelisim", l: "📈 Gelişim Eşikleri" },
+    { id: "normlar", l: "Okuma Hızı Normları", ik: Timer },
+    { id: "dogruluk", l: "Doğruluk & Kur Eşikleri", ik: Target },
+    { id: "anlama", l: "Anlama Rubriği", ik: Brain },
+    { id: "prozodik", l: "Prozodik Ölçütler", ik: Music },
+    { id: "gelisim", l: "Gelişim Eşikleri", ik: TrendingUp },
   ];
   const KaydetBtn = ({ tip }) => (
     <div className="flex gap-2 pt-2">
-      <Button onClick={() => kaydet(tip)} disabled={kayit === tip} className="bg-primary text-white">💾 Kaydet</Button>
-      <Button variant="outline" onClick={() => varsayilana(tip)}>↩️ Varsayılana Dön</Button>
+      <Button onClick={() => kaydet(tip)} disabled={kayit === tip} className="bg-primary hover:bg-primary-hover text-white"><Save className="h-4 w-4 mr-1" />Kaydet</Button>
+      <Button variant="outline" onClick={() => varsayilana(tip)}><RefreshCw className="h-4 w-4 mr-1" />Varsayılana Dön</Button>
     </div>
   );
 
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-2xl font-bold">📋 Rapor Ölçütleri</h2>
+        <h2 className="inline-flex items-center gap-2 text-2xl font-bold"><ClipboardList className="h-6 w-6" />Rapor Ölçütleri</h2>
         <p className="text-subtle text-sm">Giriş Analizi (Ölçüm & Gelişim) raporlarının norm, eşik ve rubrik ölçütleri. Değişiklikler yeni oluşturulan raporlara uygulanır.</p>
       </div>
       <div className="flex gap-2 flex-wrap">
-        {bolumler.map(b => (
+        {bolumler.map(b => { const Ik = b.ik; return (
           <button key={b.id} onClick={() => setBolum(b.id)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${bolum === b.id ? 'bg-primary text-white border-blue-600' : 'bg-surface text-subtle border-line'}`}>{b.l}</button>
-        ))}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${bolum === b.id ? 'bg-primary text-white border-primary' : 'bg-surface text-subtle border-line'}`}><Ik className="h-4 w-4" />{b.l}</button>
+        ); })}
       </div>
 
       {/* 📏 Okuma Hızı Normları */}
       {bolum === "normlar" && (
-        <Card className="border-0 shadow-sm"><CardHeader><CardTitle>Okuma Hızı Normları (kelime/dk)</CardTitle><p className="text-sm text-subtle">Sınıf bazlı Düşük/Orta/Yeterli eşikleri. WPM bu eşiklere göre düzeye çevrilir.</p></CardHeader><CardContent>
+        <Card className="border border-line shadow-sm"><CardHeader><CardTitle>Okuma Hızı Normları (kelime/dk)</CardTitle><p className="text-sm text-subtle">Sınıf bazlı Düşük/Orta/Yeterli eşikleri. WPM bu eşiklere göre düzeye çevrilir.</p></CardHeader><CardContent>
           <div className="overflow-x-auto"><table className="text-sm">
             <thead><tr className="text-subtle"><th className="p-1 text-left">Sınıf</th><th className="p-1">Düşük</th><th className="p-1">Orta</th><th className="p-1">Yeterli</th></tr></thead>
             <tbody>{Object.keys(a.okuma_hizi_normlari).sort().map(sn => (
@@ -9023,7 +8887,7 @@ function RaporOlcutleriPaneli() {
 
       {/* 🎯 Doğruluk & Kur Eşikleri */}
       {bolum === "dogruluk" && (
-        <Card className="border-0 shadow-sm"><CardHeader><CardTitle>Doğru Okuma Oranı Eşikleri (%)</CardTitle></CardHeader><CardContent className="space-y-4">
+        <Card className="border border-line shadow-sm"><CardHeader><CardTitle>Doğru Okuma Oranı Eşikleri (%)</CardTitle></CardHeader><CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-3 max-w-md">
             <div><Label className="text-sm">İyi (≥)</Label><Input type="number" value={a.dogruluk_esikleri.iyi} onChange={e => setTip("dogruluk_esikleri", { ...a.dogruluk_esikleri, iyi: parseInt(e.target.value) || 0 })} /></div>
             <div><Label className="text-sm">Geliştirilmeli (≥)</Label><Input type="number" value={a.dogruluk_esikleri.gelistirilmeli} onChange={e => setTip("dogruluk_esikleri", { ...a.dogruluk_esikleri, gelistirilmeli: parseInt(e.target.value) || 0 })} /></div>
@@ -9043,7 +8907,7 @@ function RaporOlcutleriPaneli() {
 
       {/* 🧠 Anlama Rubriği (4 boyut, madde ekle/düzenle/sil) */}
       {bolum === "anlama" && (
-        <Card className="border-0 shadow-sm"><CardHeader><CardTitle>Okuduğunu Anlama Rubriği</CardTitle><p className="text-sm text-subtle">4 alt boyut ve maddeleri. Eklediğiniz madde, yeni Ölçüm Raporu formunda otomatik satır olarak çıkar.</p></CardHeader><CardContent className="space-y-4">
+        <Card className="border border-line shadow-sm"><CardHeader><CardTitle>Okuduğunu Anlama Rubriği</CardTitle><p className="text-sm text-subtle">4 alt boyut ve maddeleri. Eklediğiniz madde, yeni Ölçüm Raporu formunda otomatik satır olarak çıkar.</p></CardHeader><CardContent className="space-y-4">
           {(a.anlama_rubrik_maddeleri || []).map((boyut, bi) => (
             <div key={boyut.id || bi} className="border rounded-xl p-3">
               <Input className="font-bold mb-2" value={boyut.baslik} onChange={e => { const c = [...a.anlama_rubrik_maddeleri]; c[bi] = { ...c[bi], baslik: e.target.value }; setTip("anlama_rubrik_maddeleri", c); }} />
@@ -9064,7 +8928,7 @@ function RaporOlcutleriPaneli() {
 
       {/* 🎵 Prozodik Ölçütler (ekle/düzenle/sil + 1-4 çapa) */}
       {bolum === "prozodik" && (
-        <Card className="border-0 shadow-sm"><CardHeader><CardTitle>Prozodik Okuma Ölçütleri</CardTitle><p className="text-sm text-subtle">Her ölçüt 1-4 puan; toplam puan ölçüt sayısına göre dinamik hesaplanır.</p></CardHeader><CardContent className="space-y-3">
+        <Card className="border border-line shadow-sm"><CardHeader><CardTitle>Prozodik Okuma Ölçütleri</CardTitle><p className="text-sm text-subtle">Her ölçüt 1-4 puan; toplam puan ölçüt sayısına göre dinamik hesaplanır.</p></CardHeader><CardContent className="space-y-3">
           {(a.prozodik_olcutler || []).map((olcut, oi) => (
             <div key={olcut.id || oi} className="border rounded-xl p-3 space-y-2">
               <div className="flex items-center gap-2">
@@ -9086,7 +8950,7 @@ function RaporOlcutleriPaneli() {
 
       {/* 📈 Gelişim Değişim Eşikleri */}
       {bolum === "gelisim" && (
-        <Card className="border-0 shadow-sm"><CardHeader><CardTitle>Gelişim Raporu Değişim Eşikleri</CardTitle><p className="text-sm text-subtle">Ön→son değişim bu eşiklere göre "Anlamlı Gelişim / Sabit-Sınırlı / Gerileme" olarak etiketlenir.</p></CardHeader><CardContent className="space-y-3">
+        <Card className="border border-line shadow-sm"><CardHeader><CardTitle>Gelişim Raporu Değişim Eşikleri</CardTitle><p className="text-sm text-subtle">Ön→son değişim bu eşiklere göre "Anlamlı Gelişim / Sabit-Sınırlı / Gerileme" olarak etiketlenir.</p></CardHeader><CardContent className="space-y-3">
           <div className="overflow-x-auto"><table className="text-sm">
             <thead><tr className="text-subtle"><th className="p-1 text-left">Metrik</th><th className="p-1">Anlamlı Gelişim (≥)</th><th className="p-1">Gerileme (≤)</th></tr></thead>
             <tbody>{[["wpm", "Okuma Hızı"], ["dogruluk", "Doğruluk %"], ["prozodik", "Prozodik Puan"], ["anlama", "Anlama %"]].map(([k, l]) => (
@@ -9204,23 +9068,23 @@ function SistemAyarlari({ user }) {
     setKayitEdiliyor(false);
   };
 
-  const xpEylemLabel = { okuma_gorevi: "📖 Okuma Görevi", anlama_testi: "📝 Anlama Testi", kelime_gorevi: "🔤 Kelime Görevi", gunluk_streak: "🔥 Günlük Streak", kitap_bitirme: "📚 Kitap Bitirme", yazili_ozet: "✍️ Yazılı Özet", egzersiz: "👁️ Egzersiz", gelisim_tamamla: "🎓 Gelişim Tamamla", gorev_tamamla: "✅ Görev Tamamla" };
-  const ligLabel = { bronz: "🥉 Bronz", gumus: "🥈 Gümüş", altin: "🥇 Altın", elmas: "💎 Elmas" };
+  const xpEylemLabel = { okuma_gorevi: "Okuma Görevi", anlama_testi: "Anlama Testi", kelime_gorevi: "Kelime Görevi", gunluk_streak: "Günlük Streak", kitap_bitirme: "Kitap Bitirme", yazili_ozet: "Yazılı Özet", egzersiz: "Egzersiz", gelisim_tamamla: "Gelişim Tamamla", gorev_tamamla: "Görev Tamamla" };
+  const ligLabel = { bronz: "Bronz", gumus: "Gümüş", altin: "Altın", elmas: "Elmas" };
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold">⚙️ Sistem Ayarları</h2>
+      <h2 className="inline-flex items-center gap-2 text-2xl font-bold"><Settings className="h-6 w-6" />Sistem Ayarları</h2>
       <p className="text-subtle text-sm">Rozet, XP, lig ve anket ayarlarını buradan yönetin. Değişiklikler anında uygulanır.</p>
 
       <div className="flex gap-2 flex-wrap">
-        {[{id:"ozellikler",l:"🎛️ Özellik Yönetimi"},{id:"xp",l:"💰 XP Değerleri"},{id:"ogretmen_xp",l:"👨‍🏫 Öğretmen XP"},{id:"lig",l:"🏆 Lig Eşikleri"},{id:"ogretmen_rozet",l:"🏅 Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"🎓 Öğrenci Rozetleri"},{id:"anket",l:"⭐ Anket Soruları"},{id:"kutulu_okuma",l:"📦 Kutulu Okuma"},{id:"rapor_olcutleri",l:"📋 Rapor Ölçütleri"},{id:"timi_anahtar",l:"🧠 TIMI Puanlama Anahtarı"},{id:"profil_gorunurluk",l:"👁️ Profil Görünürlüğü"},{id:"instagram",l:"📱 Instagram"},{id:"kvkk",l:"🔒 Veri & KVKK"},{id:"sezon",l:"🔄 Sezonluk Reset"}].map(s => (
+        {[{id:"ozellikler",l:"Özellik Yönetimi"},{id:"xp",l:"XP Değerleri"},{id:"ogretmen_xp",l:"Öğretmen XP"},{id:"lig",l:"Lig Eşikleri"},{id:"ogretmen_rozet",l:"Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"Öğrenci Rozetleri"},{id:"anket",l:"Anket Soruları"},{id:"kutulu_okuma",l:"Kutulu Okuma"},{id:"rapor_olcutleri",l:"Rapor Ölçütleri"},{id:"timi_anahtar",l:"TIMI Puanlama Anahtarı"},{id:"profil_gorunurluk",l:"Profil Görünürlüğü"},{id:"instagram",l:"Instagram"},{id:"kvkk",l:"Veri & KVKK"},{id:"sezon",l:"Sezonluk Reset"}].map(s => (
           <button key={s.id} onClick={() => setAyarSekme(s.id)}
             className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${ayarSekme === s.id ? 'bg-primary text-white border-blue-600' : 'bg-surface text-subtle border-line'}`}>{s.l}</button>
         ))}
       </div>
 
       {/* XP Değerleri */}
-      {ayarSekme === "xp" && (<Card className="border-0 shadow-sm"><CardHeader><CardTitle>💰 XP Değerleri</CardTitle><p className="text-sm text-subtle">Her eylem için kazanılan XP miktarı</p></CardHeader><CardContent><div className="space-y-3">
+      {ayarSekme === "xp" && (<Card className="border border-line shadow-sm"><CardHeader><CardTitle>XP Değerleri</CardTitle><p className="text-sm text-subtle">Her eylem için kazanılan XP miktarı</p></CardHeader><CardContent><div className="space-y-3">
         {Object.entries(xpTablosu).map(([key, val]) => (
           <div key={key} className="flex items-center justify-between gap-4">
             <Label className="text-sm flex-1">{xpEylemLabel[key] || key}</Label>
@@ -9232,7 +9096,7 @@ function SistemAyarlari({ user }) {
       </div></CardContent></Card>)}
 
       {/* Kutulu Okuma — kutu başına kelime genel varsayılanı */}
-      {ayarSekme === "kutulu_okuma" && (<Card className="border-0 shadow-sm"><CardHeader><CardTitle>📦 Kutulu Okuma</CardTitle><p className="text-sm text-subtle">Kutulu Okuma egzersizinde her kutuda kaç kelime gösterilsin (genel varsayılan). Öğrenci/eğitici egzersizi açtığında ayar çekmecesinden yine 1/2/3 olarak değiştirebilir.</p></CardHeader><CardContent><div className="space-y-4">
+      {ayarSekme === "kutulu_okuma" && (<Card className="border border-line shadow-sm"><CardHeader><CardTitle>Kutulu Okuma</CardTitle><p className="text-sm text-subtle">Kutulu Okuma egzersizinde her kutuda kaç kelime gösterilsin (genel varsayılan). Öğrenci/eğitici egzersizi açtığında ayar çekmecesinden yine 1/2/3 olarak değiştirebilir.</p></CardHeader><CardContent><div className="space-y-4">
         <div>
           <Label className="text-sm block mb-2">Kutu Başına Kelime Sayısı</Label>
           <div className="flex gap-2 max-w-xs">
@@ -9247,11 +9111,11 @@ function SistemAyarlari({ user }) {
       </div></CardContent></Card>)}
 
       {/* Öğretmen XP Ağırlıkları */}
-      {ayarSekme === "ogretmen_xp" && (<Card className="border-0 shadow-sm"><CardHeader><CardTitle>👨‍🏫 Öğretmen XP Ağırlıkları</CardTitle><p className="text-sm text-subtle">Öğretmen puanına etkinlik ve rozet dışında bu çıktılar da eklenir. Değişiklik anında sıralamaya yansır.</p></CardHeader><CardContent><div className="space-y-3">
+      {ayarSekme === "ogretmen_xp" && (<Card className="border border-line shadow-sm"><CardHeader><CardTitle>Öğretmen XP Ağırlıkları</CardTitle><p className="text-sm text-subtle">Öğretmen puanına etkinlik ve rozet dışında bu çıktılar da eklenir. Değişiklik anında sıralamaya yansır.</p></CardHeader><CardContent><div className="space-y-3">
         {[
-          {key:"ogrenci_basi", l:"👥 Aldığın öğrenci", birim:"puan/öğrenci"},
-          {key:"kur_basi", l:"🎓 Kur atlatma", birim:"puan/kur"},
-          {key:"veli_yildiz", l:"⭐ Veli anketi", birim:"puan/yıldız"},
+          {key:"ogrenci_basi", l:"Aldığın öğrenci", birim:"puan/öğrenci"},
+          {key:"kur_basi", l:"Kur atlatma", birim:"puan/kur"},
+          {key:"veli_yildiz", l:"Veli anketi", birim:"puan/yıldız"},
         ].map(({key, l, birim}) => (
           <div key={key} className="flex items-center justify-between gap-4">
             <Label className="text-sm flex-1">{l}</Label>
@@ -9268,7 +9132,7 @@ function SistemAyarlari({ user }) {
       </div></CardContent></Card>)}
 
       {/* Lig Eşikleri */}
-      {ayarSekme === "lig" && (<Card className="border-0 shadow-sm"><CardHeader><CardTitle>🏆 Lig Eşikleri</CardTitle><p className="text-sm text-subtle">Her lig seviyesi için gereken minimum XP</p></CardHeader><CardContent><div className="space-y-3">
+      {ayarSekme === "lig" && (<Card className="border border-line shadow-sm"><CardHeader><CardTitle>Lig Eşikleri</CardTitle><p className="text-sm text-subtle">Her lig seviyesi için gereken minimum XP</p></CardHeader><CardContent><div className="space-y-3">
         {Object.entries(ligEsikleri).map(([key, val]) => (
           <div key={key} className="flex items-center justify-between gap-4">
             <Label className="text-sm flex-1">{ligLabel[key] || key}</Label>
@@ -9280,7 +9144,7 @@ function SistemAyarlari({ user }) {
       </div></CardContent></Card>)}
 
       {/* Öğretmen Rozetleri */}
-      {ayarSekme === "ogretmen_rozet" && (<Card className="border-0 shadow-sm"><CardHeader><CardTitle>🏅 Öğretmen Rozetleri ({ogretmenRozetler.length})</CardTitle></CardHeader><CardContent><div className="space-y-3">
+      {ayarSekme === "ogretmen_rozet" && (<Card className="border border-line shadow-sm"><CardHeader><CardTitle>Öğretmen Rozetleri ({ogretmenRozetler.length})</CardTitle></CardHeader><CardContent><div className="space-y-3">
         {ogretmenRozetler.map((r, i) => (
           <div key={r.kod} className="bg-app rounded-xl p-3 space-y-2">
             <div className="flex items-center gap-2"><span className="text-xl">{r.ikon}</span><span className="font-medium text-sm">{r.ad}</span><span className={`text-xs px-2 py-0.5 rounded-full ${r.seviye === "elmas" ? "bg-purple-100 text-purple-700" : r.seviye === "altin" ? "bg-yellow-100 text-yellow-700" : r.seviye === "gumus" ? "bg-gray-100 text-content" : "bg-orange-100 text-orange-700"}`}>{r.seviye}</span><span className="text-xs text-subtle">{r.kategori}</span></div>
@@ -9295,7 +9159,7 @@ function SistemAyarlari({ user }) {
       </div></CardContent></Card>)}
 
       {/* Öğrenci Rozetleri */}
-      {ayarSekme === "ogrenci_rozet" && (<Card className="border-0 shadow-sm"><CardHeader><CardTitle>🎓 Öğrenci Rozetleri ({ogrenciRozetler.length})</CardTitle></CardHeader><CardContent><div className="space-y-3">
+      {ayarSekme === "ogrenci_rozet" && (<Card className="border border-line shadow-sm"><CardHeader><CardTitle>Öğrenci Rozetleri ({ogrenciRozetler.length})</CardTitle></CardHeader><CardContent><div className="space-y-3">
         {ogrenciRozetler.map((r, i) => (
           <div key={r.kod} className="bg-app rounded-xl p-3 space-y-2">
             <div className="flex items-center gap-2"><span className="text-xl">{r.ikon}</span><span className="font-medium text-sm">{r.ad}</span><span className="text-xs text-subtle">{r.kategori}</span></div>
@@ -9310,7 +9174,7 @@ function SistemAyarlari({ user }) {
       </div></CardContent></Card>)}
 
       {/* Anket Soruları */}
-      {ayarSekme === "anket" && (<Card className="border-0 shadow-sm"><CardHeader><CardTitle>⭐ Veli Anket Soruları ({anketSorulari.length})</CardTitle><p className="text-sm text-subtle">Velilerin öğretmenleri değerlendirirken göreceği sorular</p></CardHeader><CardContent><div className="space-y-3">
+      {ayarSekme === "anket" && (<Card className="border border-line shadow-sm"><CardHeader><CardTitle>Veli Anket Soruları ({anketSorulari.length})</CardTitle><p className="text-sm text-subtle">Velilerin öğretmenleri değerlendirirken göreceği sorular</p></CardHeader><CardContent><div className="space-y-3">
         {anketSorulari.map((s, i) => (
           <div key={i} className="bg-app rounded-xl p-3 space-y-2">
             <div className="flex items-center gap-2"><span className="text-xs bg-blue-100 text-primary px-2 py-0.5 rounded-full">{s.tip}</span><span className="text-xs text-subtle">{s.kategori}</span></div>
@@ -9332,7 +9196,7 @@ function SistemAyarlari({ user }) {
       {ayarSekme === "timi_anahtar" && <TimiAnahtarPaneli />}
 
       {ayarSekme === "ozellikler" && (
-        <Card className="border-0 shadow-sm">
+        <Card className="border border-line shadow-sm">
           <CardContent className="pt-6">
             <OzellikYonetimi />
           </CardContent>
@@ -9635,9 +9499,9 @@ function KvkkVeriPaneli({ user }) {
 
   return (
     <div className="space-y-4">
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader>
-          <CardTitle>🔒 Kişisel Veri Yönetimi</CardTitle>
+          <CardTitle>Kişisel Veri Yönetimi</CardTitle>
           <p className="text-sm text-subtle">KVKK (6698 sayılı Kanun) Madde 11 kapsamında haklarınız</p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -9734,9 +9598,9 @@ function SezonlukReset({ user }) {
 
   return (
     <div className="space-y-4">
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-line shadow-sm">
         <CardHeader>
-          <CardTitle>🔄 Sezonluk Sıfırlama</CardTitle>
+          <CardTitle>Sezonluk Sıfırlama</CardTitle>
           <p className="text-sm text-subtle">Her dönem sonunda puanları sıfırla, başarıları koru</p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -9830,6 +9694,12 @@ function GorevYonetimi({ user, students, teachers }) {
   const [kitapYukleniyor, setKitapYukleniyor] = useState(false);
   const [gelisimIcerikleri, setGelisimIcerikleri] = useState([]);
   const [icerikSecDialogu, setIcerikSecDialogu] = useState(false);
+  // Sınav ödevi seti (otomatik kriter)
+  const [sinavDersler, setSinavDersler] = useState([]);
+  const [sinavKriter, setSinavKriter] = useState({ ders: "", zorluk: "", soruSayisi: 10 });
+  const [sinavSetHazir, setSinavSetHazir] = useState(null);
+  const [sinavSetYukleniyor, setSinavSetYukleniyor] = useState(false);
+  const [sinavSonuc, setSinavSonuc] = useState(null); // öğretmen sonuç modalı
 
   const fetchAll = useCallback(async () => {
     try { const r = await axios.get(`${API}/gorevler`); setGorevler(r.data); } catch(e) {}
@@ -9842,25 +9712,26 @@ function GorevYonetimi({ user, students, teachers }) {
     try { const r = await axios.get(`${API}/gelisim/icerik`); const gd = Array.isArray(r.data) ? r.data : []; setGelisimIcerikleri(gd.filter(i => i.durum === "yayinda")); } catch(e) {}
   };
 
-  const turIcon = (tur) => ({ ozel: "📝", film: "🎬", kitap: "📚", makale: "📄", hizmetici: "🎓", egzersiz: "🎯" }[tur] || "📋");
-  const turLabelGorev = (tur) => ({ ozel: "Özel Görev", film: "Film", kitap: "Kitap", makale: "Makale", hizmetici: "Hizmetiçi Eğitim", egzersiz: "Egzersiz" }[tur] || tur);
-  const turColorGorev = (tur) => ({ ozel: "bg-gray-100 text-subtle", film: "bg-purple-100 text-purple-600", kitap: "bg-green-100 text-green-600", makale: "bg-orange-100 text-orange-600", hizmetici: "bg-blue-100 text-primary", egzersiz: "bg-pink-100 text-pink-600" }[tur] || "bg-gray-100 text-subtle");
+  const turIcon = (tur) => ({ ozel: <FileText className="h-4 w-4"/>, film: <Film className="h-4 w-4"/>, kitap: <BookMarked className="h-4 w-4"/>, makale: <FileText className="h-4 w-4"/>, hizmetici: <GraduationCap className="h-4 w-4"/>, egzersiz: <Target className="h-4 w-4"/>, sinav_odevi: <ClipboardList className="h-4 w-4"/> }[tur] || <ClipboardList className="h-4 w-4"/>);
+  const turLabelGorev = (tur) => ({ ozel: "Özel Görev", film: "Film", kitap: "Kitap", makale: "Makale", hizmetici: "Hizmetiçi Eğitim", egzersiz: "Egzersiz", sinav_odevi: "Sınav" }[tur] || tur);
+  const turColorGorev = (tur) => ({ ozel: "bg-app text-subtle", film: "bg-purple-100 text-purple-600", kitap: "bg-green-100 text-green-600", makale: "bg-orange-100 text-orange-600", hizmetici: "bg-blue-100 text-primary", egzersiz: "bg-pink-100 text-pink-600", sinav_odevi: "bg-indigo-100 text-indigo-600" }[tur] || "bg-app text-subtle");
   const durumBadgeGorev = (d) => ({
-    bekliyor: <span className="px-2.5 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full font-medium">⏳ Bekliyor</span>,
-    devam_ediyor: <span className="px-2.5 py-1 bg-blue-100 text-primary text-xs rounded-full font-medium">🔄 Devam Ediyor</span>,
-    tamamlandi: <span className="px-2.5 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium">✅ Tamamlandı</span>,
-    suresi_doldu: <span className="px-2.5 py-1 bg-red-100 text-red-700 text-xs rounded-full font-medium">⏰ Süresi Doldu</span>,
+    bekliyor: <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-100 text-amber-700 text-xs rounded-full font-medium"><Clock className="h-3 w-3" />Bekliyor</span>,
+    devam_ediyor: <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-100 text-primary text-xs rounded-full font-medium"><RefreshCw className="h-3 w-3" />Devam Ediyor</span>,
+    tamamlandi: <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium"><CheckCircle className="h-3 w-3" />Tamamlandı</span>,
+    suresi_doldu: <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-100 text-red-700 text-xs rounded-full font-medium"><Clock className="h-3 w-3" />Süresi Doldu</span>,
   }[d] || null);
 
   const hedefTipBadge = (tip) => tip === "ogretmen"
-    ? <span className="px-2 py-0.5 bg-indigo-100 text-indigo-600 text-xs rounded-full font-medium">👩‍🏫 Öğretmen</span>
-    : <span className="px-2 py-0.5 bg-emerald-100 text-emerald-600 text-xs rounded-full font-medium">🎓 Öğrenci</span>;
+    ? <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-primary text-xs rounded-full font-medium"><Users className="h-3 w-3" />Öğretmen</span>
+    : <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-600 text-xs rounded-full font-medium"><GraduationCap className="h-3 w-3" />Öğrenci</span>;
 
   const resetForm = () => setForm({ baslik: "", aciklama: "", tur: "ozel", hedef_tip: form.hedef_tip, son_tarih: "", icerik_id: "", makale_link: "", kitap_yazar: "", kitap_isbn: "", kitap_link: "", kitap_kapak: "", film_link: "" });
 
   const gorevOlustur = async (e) => {
     e.preventDefault();
     if (seciliHedefler.length === 0) { toast({ title: "Uyarı", description: "En az bir kişi seçmelisiniz", variant: "destructive" }); return; }
+    if (form.tur === "sinav_odevi" && !form.icerik_id) { toast({ title: "Uyarı", description: "Önce sınav seti oluşturun", variant: "destructive" }); return; }
     try {
       if (seciliHedefler.length === 1) {
         await axios.post(`${API}/gorevler`, { ...form, hedef_id: seciliHedefler[0], hedef_tip: form.hedef_tip });
@@ -9868,7 +9739,7 @@ function GorevYonetimi({ user, students, teachers }) {
         await axios.post(`${API}/gorevler/toplu`, { hedef_idler: seciliHedefler, hedef_tip: form.hedef_tip, gorev: form });
       }
       toast({ title: "✅ Görev atandı", description: `${seciliHedefler.length} kişiye görev oluşturuldu` });
-      resetForm(); setSeciliHedefler([]); setGorunum("liste"); fetchAll();
+      resetForm(); setSeciliHedefler([]); setSinavSetHazir(null); setGorunum("liste"); fetchAll();
     } catch(e) { toast({ title: "Hata", description: e.response?.data?.detail || "Görev oluşturulamadı", variant: "destructive" }); }
   };
 
@@ -9903,6 +9774,31 @@ function GorevYonetimi({ user, students, teachers }) {
     toast({ title: `"${icerik.baslik}" içeriği görev olarak seçildi` });
   };
 
+  // ── Sınav ödevi seti ──
+  useEffect(() => {
+    axios.get(`${API}/sinav/dersler`).then(r => setSinavDersler(r.data?.dersler || [])).catch(() => {});
+  }, []);
+  const sinavSetiOlustur = async () => {
+    if (!sinavKriter.ders) { toast({ title: "Ders seçin", variant: "destructive" }); return; }
+    setSinavSetYukleniyor(true);
+    try {
+      const r = await axios.post(`${API}/sinav/odev`, {
+        ad: form.baslik || "Sınav Ödevi",
+        otomatikKriter: { ders: sinavKriter.ders, zorluk: sinavKriter.zorluk || undefined, soruSayisi: Number(sinavKriter.soruSayisi) || 10 },
+      });
+      setSinavSetHazir({ odev_id: r.data.odev_id, soruSayisi: r.data.soruSayisi });
+      setForm(prev => ({ ...prev, tur: "sinav_odevi", icerik_id: r.data.odev_id, baslik: prev.baslik || r.data.ad }));
+      toast({ title: `✅ ${r.data.soruSayisi} soruluk set hazır` });
+    } catch (e) {
+      toast({ title: "Set oluşturulamadı", description: e?.response?.data?.detail || "", variant: "destructive" });
+    } finally { setSinavSetYukleniyor(false); }
+  };
+  const sinavSonucGetir = async (odevId) => {
+    if (!odevId) { toast({ title: "Bu görevde sınav bulunamadı", variant: "destructive" }); return; }
+    try { const r = await axios.get(`${API}/sinav/odev/${odevId}/sonuc`); setSinavSonuc(r.data); }
+    catch (e) { toast({ title: "Sonuç alınamadı", description: e?.response?.data?.detail || "", variant: "destructive" }); }
+  };
+
   const [ogretmenUsers, setOgretmenUsers] = useState([]);
   useEffect(() => {
     if (user.role === "admin" || user.role === "coordinator") {
@@ -9932,19 +9828,19 @@ function GorevYonetimi({ user, students, teachers }) {
     return (
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => { setTamamlamaDialogu(null); setTamamlamaNotu(""); }}>← Geri</Button>
+          <Button variant="outline" size="sm" onClick={() => { setTamamlamaDialogu(null); setTamamlamaNotu(""); }}><ArrowLeft className="h-4 w-4 mr-1" />Geri</Button>
           <h2 className="text-xl font-bold">Görevi Tamamla</h2>
         </div>
-        <Card className="border-0 shadow-sm"><CardHeader><div className="flex items-center gap-2"><span className="text-2xl">{turIcon(g.tur)}</span><CardTitle>{g.baslik}</CardTitle></div>
+        <Card className="border border-line shadow-sm"><CardHeader><div className="flex items-center gap-2"><span className="text-primary">{turIcon(g.tur)}</span><CardTitle>{g.baslik}</CardTitle></div>
           {g.aciklama && <p className="text-subtle text-sm mt-1">{g.aciklama}</p>}
-          {g.kitap_yazar && <p className="text-sm text-subtle">📚 {g.kitap_yazar}</p>}
-          {g.film_link && <a href={g.film_link} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline">🎬 Film Linki</a>}
-          {g.makale_link && <a href={g.makale_link} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline">📄 Makale Linki</a>}
+          {g.kitap_yazar && <p className="inline-flex items-center gap-1.5 text-sm text-subtle"><BookMarked className="h-3.5 w-3.5" />{g.kitap_yazar}</p>}
+          {g.film_link && <a href={g.film_link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"><Film className="h-3.5 w-3.5" />Film Linki</a>}
+          {g.makale_link && <a href={g.makale_link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"><FileText className="h-3.5 w-3.5" />Makale Linki</a>}
         </CardHeader></Card>
         <div><Label>Tamamlama Notu (opsiyonel)</Label><Input value={tamamlamaNotu} onChange={e => setTamamlamaNotu(e.target.value)} placeholder="Ne yaptığınızı kısaca yazın..." /></div>
         <Button onClick={() => durumGuncelle(g.id, "tamamlandi", { not: tamamlamaNotu })}
-          className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3">
-          Görevi Tamamla ✅
+          className="w-full inline-flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white py-3">
+          <CheckCircle className="h-4 w-4" />Görevi Tamamla
         </Button>
       </div>
     );
@@ -9954,18 +9850,18 @@ function GorevYonetimi({ user, students, teachers }) {
   if (gorunum === "olustur") {
     return (
       <div className="max-w-3xl mx-auto">
-        <div className="flex items-center gap-3 mb-6"><Button variant="outline" size="sm" onClick={() => setGorunum("liste")}>← Geri</Button><h2 className="text-xl font-bold">Yeni Görev Ata</h2></div>
+        <div className="flex items-center gap-3 mb-6"><Button variant="outline" size="sm" onClick={() =>setGorunum("liste")}><ArrowLeft className="h-4 w-4 mr-1" />Geri</Button><h2 className="text-xl font-bold">Yeni Görev Ata</h2></div>
         <form onSubmit={gorevOlustur} className="space-y-6">
-          <Card className="border-0 shadow-sm"><CardHeader><CardTitle className="text-base">1. Kime Atanacak?</CardTitle></CardHeader>
+          <Card className="border border-line shadow-sm"><CardHeader><CardTitle className="text-base">1. Kime Atanacak?</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               {(user.role === "admin" || user.role === "coordinator") && (
                 <div className="flex gap-2">
                   <button type="button" onClick={() => { setForm({ ...form, hedef_tip: "ogretmen" }); setSeciliHedefler([]); }}
-                    className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all border ${form.hedef_tip === "ogretmen" ? 'bg-indigo-500 text-white border-indigo-500 shadow' : 'bg-surface text-subtle border-line hover:border-indigo-300'}`}>
-                    👩‍🏫 Öğretmenlere</button>
+                    className={`flex-1 inline-flex items-center justify-center gap-1.5 py-3 rounded-xl text-sm font-medium transition-all border ${form.hedef_tip === "ogretmen" ? 'bg-primary text-white border-primary shadow' : 'bg-surface text-subtle border-line hover:border-primary'}`}>
+                    <Users className="h-4 w-4" />Öğretmenlere</button>
                   <button type="button" onClick={() => { setForm({ ...form, hedef_tip: "ogrenci" }); setSeciliHedefler([]); }}
-                    className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all border ${form.hedef_tip === "ogrenci" ? 'bg-emerald-500 text-white border-emerald-500 shadow' : 'bg-surface text-subtle border-line hover:border-emerald-300'}`}>
-                    🎓 Öğrencilere</button>
+                    className={`flex-1 inline-flex items-center justify-center gap-1.5 py-3 rounded-xl text-sm font-medium transition-all border ${form.hedef_tip === "ogrenci" ? 'bg-emerald-500 text-white border-emerald-500 shadow' : 'bg-surface text-subtle border-line hover:border-emerald-300'}`}>
+                    <GraduationCap className="h-4 w-4" />Öğrencilere</button>
                 </div>)}
               <div className="flex items-center justify-between">
                 <Label className="text-sm text-subtle">{seciliHedefler.length} / {hedefKisiler.length} kişi seçildi</Label>
@@ -9973,40 +9869,66 @@ function GorevYonetimi({ user, students, teachers }) {
               </div>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-1">
                 {hedefKisiler.map(k => (<button key={k.id} type="button" onClick={() => toggleHedef(k.id)}
-                  className={`p-2.5 rounded-xl text-sm text-left transition-all border ${seciliHedefler.includes(k.id) ? 'bg-orange-50 border-orange-400 ring-2 ring-orange-200' : 'bg-surface border-line hover:border-line'}`}>
+                  className={`p-2.5 rounded-xl text-sm text-left transition-all border ${seciliHedefler.includes(k.id) ? 'bg-blue-50 border-primary ring-2 ring-blue-200' : 'bg-surface border-line hover:border-line'}`}>
                   <div className="font-medium truncate">{k.ad}</div>{k.sinif && <div className="text-xs text-subtle">{k.sinif}. sınıf</div>}</button>))}
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-sm"><CardHeader><div className="flex items-center justify-between"><CardTitle className="text-base">2. Görev Detayı</CardTitle>
+          <Card className="border border-line shadow-sm"><CardHeader><div className="flex items-center justify-between"><CardTitle className="text-base">2. Görev Detayı</CardTitle>
             <button type="button" onClick={() => { fetchGelisimIcerikleri(); setIcerikSecDialogu(true); }} className="text-xs text-primary hover:underline flex items-center gap-1"><BookOpen className="h-3 w-3" /> Mevcut içerikten seç</button></div></CardHeader>
             <CardContent className="space-y-4">
               <div><Label className="mb-2 block">Görev Türü</Label><div className="flex flex-wrap gap-2">
-                {[{v:"ozel",l:"📝 Özel Görev"},{v:"hizmetici",l:"🎓 Hizmetiçi"},{v:"film",l:"🎬 Film"},{v:"kitap",l:"📚 Kitap"},{v:"makale",l:"📄 Makale"},{v:"egzersiz",l:"🎯 Egzersiz"}].map(t => (
+                {[{v:"ozel",l:"Özel Görev"},{v:"hizmetici",l:"Hizmetiçi"},{v:"film",l:"Film"},{v:"kitap",l:"Kitap"},{v:"makale",l:"Makale"},{v:"egzersiz",l:"Egzersiz"},{v:"sinav_odevi",l:"Sınav"}].map(t => (
                   <button key={t.v} type="button" onClick={() => setForm({...form, tur: t.v})}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${form.tur === t.v ? 'bg-orange-500 text-white border-orange-500 shadow' : 'bg-surface text-subtle border-line hover:border-orange-300'}`}>{t.l}</button>))}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${form.tur === t.v ? 'bg-primary text-white border-primary shadow' : 'bg-surface text-subtle border-line hover:border-primary'}`}>{t.l}</button>))}
               </div></div>
               <div><Label>Başlık *</Label><Input value={form.baslik} onChange={e => setForm({...form, baslik: e.target.value})} required placeholder="Görev başlığı..." /></div>
               <div><Label>Açıklama</Label><textarea value={form.aciklama} onChange={e => setForm({...form, aciklama: e.target.value})} placeholder="Detaylı açıklama..." className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px]" /></div>
               <div><Label>Son Tarih</Label><Input type="date" value={form.son_tarih} onChange={e => setForm({...form, son_tarih: e.target.value})} /></div>
 
-              {form.tur === "film" && (<div className="p-4 bg-purple-50 border border-purple-200 rounded-xl space-y-3"><div className="font-semibold text-sm text-purple-800">🎬 Film Bilgileri</div><div><Label>Film Linki</Label><Input value={form.film_link} onChange={e => setForm({...form, film_link: e.target.value})} placeholder="https://..." /></div></div>)}
+              {form.tur === "film" && (<div className="p-4 bg-app border border-line rounded-xl space-y-3"><div className="inline-flex items-center gap-1.5 font-semibold text-sm text-content"><Film className="h-4 w-4" />Film Bilgileri</div><div><Label>Film Linki</Label><Input value={form.film_link} onChange={e => setForm({...form, film_link: e.target.value})} placeholder="https://..." /></div></div>)}
 
-              {form.tur === "kitap" && (<div className="p-4 bg-green-50 border border-green-200 rounded-xl space-y-3"><div className="font-semibold text-sm text-green-800">📚 Kitap Bilgileri</div>
+              {form.tur === "kitap" && (<div className="p-4 bg-app border border-line rounded-xl space-y-3"><div className="inline-flex items-center gap-1.5 font-semibold text-sm text-content"><BookMarked className="h-4 w-4" />Kitap Bilgileri</div>
                 <div className="flex gap-2"><Input placeholder="ISBN veya Barkod" value={form.kitap_isbn} onChange={e => setForm({...form, kitap_isbn: e.target.value})} className="flex-1" />
-                  <Button type="button" size="sm" className="bg-green-600 text-white" disabled={kitapYukleniyor || !form.kitap_isbn.trim()} onClick={() => kitapBilgiCekGorev(form.kitap_isbn, 'isbn')}>{kitapYukleniyor ? '⏳' : '🔍'} Ara</Button></div>
+                  <Button type="button" size="sm" className="bg-primary hover:bg-primary-hover text-white" disabled={kitapYukleniyor || !form.kitap_isbn.trim()} onClick={() => kitapBilgiCekGorev(form.kitap_isbn, 'isbn')}>{kitapYukleniyor ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}<span className="ml-1">Ara</span></Button></div>
                 <div className="flex gap-2"><Input placeholder="Kitap sitesi linki" value={form.kitap_link} onChange={e => setForm({...form, kitap_link: e.target.value})} className="flex-1" />
-                  <Button type="button" size="sm" className="bg-primary text-white" disabled={kitapYukleniyor || !form.kitap_link.trim()} onClick={() => kitapBilgiCekGorev(form.kitap_link, 'link')}>{kitapYukleniyor ? '⏳' : '🔗'} Çek</Button></div>
+                  <Button type="button" size="sm" className="bg-primary hover:bg-primary-hover text-white" disabled={kitapYukleniyor || !form.kitap_link.trim()} onClick={() => kitapBilgiCekGorev(form.kitap_link, 'link')}>{kitapYukleniyor ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}<span className="ml-1">Çek</span></Button></div>
                 {form.kitap_kapak && <img src={form.kitap_kapak} alt="Kapak" className="h-32 rounded-lg shadow" onError={e => { e.target.style.display='none'; }} />}
                 <div><Label>Yazar</Label><Input value={form.kitap_yazar} onChange={e => setForm({...form, kitap_yazar: e.target.value})} /></div></div>)}
 
-              {form.tur === "makale" && (<div className="p-4 bg-orange-50 border border-orange-200 rounded-xl space-y-3"><div className="font-semibold text-sm text-orange-800">📄 Makale Linki</div><Input value={form.makale_link} onChange={e => setForm({...form, makale_link: e.target.value})} placeholder="https://..." /></div>)}
+              {form.tur === "makale" && (<div className="p-4 bg-app border border-line rounded-xl space-y-3"><div className="inline-flex items-center gap-1.5 font-semibold text-sm text-content"><FileText className="h-4 w-4" />Makale Linki</div><Input value={form.makale_link} onChange={e => setForm({...form, makale_link: e.target.value})} placeholder="https://..." /></div>)}
+              {form.tur === "sinav_odevi" && (
+                <div className="p-4 bg-app border border-line rounded-xl space-y-3">
+                  <div className="inline-flex items-center gap-1.5 font-semibold text-sm text-content"><ClipboardList className="h-4 w-4" />Sınav Seti (otomatik seçim)</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div><Label>Ders</Label>
+                      <select value={sinavKriter.ders} onChange={e => { setSinavKriter({ ...sinavKriter, ders: e.target.value }); setSinavSetHazir(null); }} className="w-full px-3 py-2 rounded-lg border border-line text-sm bg-surface">
+                        <option value="">Seçin…</option>
+                        {sinavDersler.map(d => <option key={d.key} value={d.key}>{d.ad}</option>)}
+                      </select>
+                    </div>
+                    <div><Label>Zorluk</Label>
+                      <select value={sinavKriter.zorluk} onChange={e => { setSinavKriter({ ...sinavKriter, zorluk: e.target.value }); setSinavSetHazir(null); }} className="w-full px-3 py-2 rounded-lg border border-line text-sm bg-surface">
+                        <option value="">Tümü</option><option value="kolay">kolay</option><option value="orta">orta</option><option value="zor">zor</option>
+                      </select>
+                    </div>
+                    <div><Label>Soru Sayısı</Label>
+                      <Input type="number" value={sinavKriter.soruSayisi} onChange={e => { setSinavKriter({ ...sinavKriter, soruSayisi: e.target.value }); setSinavSetHazir(null); }} />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={sinavSetiOlustur} disabled={sinavSetYukleniyor}>{sinavSetYukleniyor ? "Hazırlanıyor…" : "Seti Oluştur"}</Button>
+                    {sinavSetHazir && <span className="text-xs text-green-600 font-medium">✅ {sinavSetHazir.soruSayisi} soruluk set hazır</span>}
+                  </div>
+                  <div className="text-[11px] text-subtle">Yayındaki sorulardan rastgele seçilir. Seti oluşturduktan sonra aşağıdan öğrencileri seçip atayın.</div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
           <div className="flex gap-3">
-            <Button type="submit" className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white py-3">{seciliHedefler.length > 1 ? `${seciliHedefler.length} Kişiye Görev Ata` : "Görev Ata"}</Button>
+            <Button type="submit" className="flex-1 bg-primary hover:bg-primary-hover text-white py-3">{seciliHedefler.length > 1 ? `${seciliHedefler.length} Kişiye Görev Ata` : "Görev Ata"}</Button>
             <Button type="button" variant="outline" onClick={() => setGorunum("liste")} className="flex-1">İptal</Button>
           </div>
         </form>
@@ -10015,8 +9937,8 @@ function GorevYonetimi({ user, students, teachers }) {
           <div className="max-h-96 overflow-y-auto space-y-2">
             {gelisimIcerikleri.length === 0 && <p className="text-subtle text-sm text-center py-8">Yayında içerik yok</p>}
             {gelisimIcerikleri.map(ic => (<button key={ic.id} onClick={() => iceriktenGorev(ic)}
-              className="w-full text-left p-3 rounded-xl border border-line hover:border-orange-300 hover:bg-orange-50 transition-all">
-              <div className="flex items-center gap-2"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${turColorGorev(ic.tur)}`}>{turIcon(ic.tur)} {turLabelGorev(ic.tur)}</span><span className="font-medium text-sm">{ic.baslik}</span></div>
+              className="w-full text-left p-3 rounded-xl border border-line hover:border-primary hover:bg-app transition-all">
+              <div className="flex items-center gap-2"><span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${turColorGorev(ic.tur)}`}>{turIcon(ic.tur)} {turLabelGorev(ic.tur)}</span><span className="font-medium text-sm">{ic.baslik}</span></div>
               {ic.aciklama && <p className="text-xs text-subtle mt-1 truncate">{ic.aciklama}</p>}</button>))}
           </div></DialogContent></Dialog>
       </div>
@@ -10029,22 +9951,22 @@ function GorevYonetimi({ user, students, teachers }) {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div><h2 className="text-2xl font-bold text-content">Görev Yönetimi</h2>
           <p className="text-subtle text-sm mt-1">{user.role === "teacher" ? "Öğrencilerinize ödev atayın ve görevlerinizi takip edin" : "Öğretmenlere ve öğrencilere görev atayın, takip edin"}</p></div>
-        <Button onClick={() => { setGorunum("olustur"); setSeciliHedefler([]); }} className="bg-gradient-to-r from-orange-500 to-red-500 text-white"><Plus className="h-4 w-4 mr-2" /> Yeni Görev Ata</Button>
+        <Button onClick={() => { setGorunum("olustur"); setSeciliHedefler([]); }} className="bg-primary hover:bg-primary-hover text-white"><Plus className="h-4 w-4 mr-2" /> Yeni Görev Ata</Button>
       </div>
 
       {istatistik && (<div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        {[{ label: "Toplam", value: (istatistik.ogretmen?.toplam||0)+(istatistik.ogrenci?.toplam||0), color: "bg-app text-content", icon: "📋" },
-          { label: "Bekliyor", value: (istatistik.ogretmen?.bekliyor||0)+(istatistik.ogrenci?.bekliyor||0), color: "bg-yellow-50 text-yellow-700", icon: "⏳" },
-          { label: "Devam Ediyor", value: (istatistik.ogretmen?.devam_ediyor||0)+(istatistik.ogrenci?.devam_ediyor||0), color: "bg-blue-50 text-primary", icon: "🔄" },
-          { label: "Tamamlandı", value: (istatistik.ogretmen?.tamamlandi||0)+(istatistik.ogrenci?.tamamlandi||0), color: "bg-green-50 text-green-700", icon: "✅" },
-          { label: "Süresi Doldu", value: (istatistik.ogretmen?.suresi_doldu||0)+(istatistik.ogrenci?.suresi_doldu||0), color: "bg-red-50 text-red-700", icon: "⏰" },
-        ].map((s, i) => (<div key={i} className={`${s.color} rounded-xl p-3 text-center`}><div className="text-2xl font-bold">{s.value}</div><div className="text-xs font-medium">{s.icon} {s.label}</div></div>))}
+        {[{ label: "Toplam", value: (istatistik.ogretmen?.toplam||0)+(istatistik.ogrenci?.toplam||0), color: "bg-app text-content border-line", Icon: ClipboardList },
+          { label: "Bekliyor", value: (istatistik.ogretmen?.bekliyor||0)+(istatistik.ogrenci?.bekliyor||0), color: "bg-amber-50 text-amber-700 border-amber-200", Icon: Clock },
+          { label: "Devam Ediyor", value: (istatistik.ogretmen?.devam_ediyor||0)+(istatistik.ogrenci?.devam_ediyor||0), color: "bg-blue-50 text-primary border-blue-200", Icon: RefreshCw },
+          { label: "Tamamlandı", value: (istatistik.ogretmen?.tamamlandi||0)+(istatistik.ogrenci?.tamamlandi||0), color: "bg-green-50 text-green-700 border-green-200", Icon: CheckCircle },
+          { label: "Süresi Doldu", value: (istatistik.ogretmen?.suresi_doldu||0)+(istatistik.ogrenci?.suresi_doldu||0), color: "bg-red-50 text-red-700 border-red-200", Icon: Clock },
+        ].map((s, i) => (<div key={i} className={`${s.color} border rounded-xl p-3 text-center`}><div className="text-2xl font-bold tabular-nums">{s.value}</div><div className="inline-flex items-center gap-1 text-xs font-medium"><s.Icon className="h-3 w-3" />{s.label}</div></div>))}
       </div>)}
 
       {user.role === "teacher" && benimGorevlerim.filter(g => g.durum !== "tamamlandi").length > 0 && (
-        <Card className="border-0 shadow-sm border-l-4 border-l-indigo-500"><CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2">📌 Bana Atanan Görevler <Badge className="bg-indigo-100 text-indigo-700">{benimGorevlerim.filter(g => g.durum !== "tamamlandi").length} aktif</Badge></CardTitle></CardHeader>
+        <Card className="border border-line shadow-sm border-l-4 border-l-primary"><CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Pin className="h-4 w-4 text-primary" />Bana Atanan Görevler <Badge className="bg-blue-100 text-primary tabular-nums">{benimGorevlerim.filter(g =>g.durum !== "tamamlandi").length} aktif</Badge></CardTitle></CardHeader>
           <CardContent><div className="space-y-2">
-            {benimGorevlerim.filter(g => g.durum !== "tamamlandi").map(g => (<div key={g.id} className="flex items-center justify-between p-3 bg-indigo-50 rounded-xl">
+            {benimGorevlerim.filter(g => g.durum !== "tamamlandi").map(g => (<div key={g.id} className="flex items-center justify-between p-3 bg-app rounded-xl">
               <div className="flex items-center gap-3"><span className="text-lg">{turIcon(g.tur)}</span><div><div className="font-medium text-sm">{g.baslik}</div><div className="text-xs text-subtle">Atayan: {g.atayan_ad} {g.son_tarih && `• Son: ${new Date(g.son_tarih).toLocaleDateString('tr-TR')}`}</div></div></div>
               <div className="flex items-center gap-2">{durumBadgeGorev(g.durum)}
                 {g.durum !== "tamamlandi" && (<Button size="sm" className="bg-green-600 text-white text-xs" onClick={() => { setTamamlamaDialogu(g); setTamamlamaNotu(""); }}>Tamamla</Button>)}
@@ -10054,31 +9976,32 @@ function GorevYonetimi({ user, students, teachers }) {
       <div className="flex flex-wrap gap-2 items-center">
         <Input placeholder="Görev veya kişi ara..." value={aramaMetni} onChange={e => setAramaMetni(e.target.value)} className="w-64" />
         <div className="flex gap-1">
-          {[{v:"hepsi",l:"Hepsi"},{v:"bekliyor",l:"⏳ Bekliyor"},{v:"devam_ediyor",l:"🔄 Devam"},{v:"tamamlandi",l:"✅ Tamamlandı"}].map(f => (
-            <button key={f.v} onClick={() => setFiltre(f.v)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${filtre === f.v ? 'bg-orange-500 text-white border-orange-500' : 'bg-surface text-subtle border-line hover:border-orange-300'}`}>{f.l}</button>))}
+          {[{v:"hepsi",l:"Hepsi"},{v:"bekliyor",l:"Bekliyor"},{v:"devam_ediyor",l:"Devam"},{v:"tamamlandi",l:"Tamamlandı"}].map(f => (
+            <button key={f.v} onClick={() => setFiltre(f.v)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${filtre === f.v ? 'bg-primary text-white border-primary' : 'bg-surface text-subtle border-line hover:border-primary'}`}>{f.l}</button>))}
         </div>
         {(user.role === "admin" || user.role === "coordinator") && (<div className="flex gap-1 ml-2">
-          {[{v:"hepsi",l:"Tümü"},{v:"ogretmen",l:"👩‍🏫 Öğretmen"},{v:"ogrenci",l:"🎓 Öğrenci"}].map(f => (
-            <button key={f.v} onClick={() => setHedefTipFiltre(f.v)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${hedefTipFiltre === f.v ? 'bg-primary text-white border-blue-500' : 'bg-surface text-subtle border-line hover:border-blue-300'}`}>{f.l}</button>))}
+          {[{v:"hepsi",l:"Tümü"},{v:"ogretmen",l:"Öğretmen"},{v:"ogrenci",l:"Öğrenci"}].map(f => (
+            <button key={f.v} onClick={() => setHedefTipFiltre(f.v)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${hedefTipFiltre === f.v ? 'bg-primary text-white border-primary' : 'bg-surface text-subtle border-line hover:border-primary'}`}>{f.l}</button>))}
         </div>)}
       </div>
 
       {filtrelenmisGorevler.length === 0 ? (
-        <div className="text-center py-16"><div className="text-6xl mb-4">📋</div><h3 className="text-lg font-bold text-content">Henüz görev yok</h3><p className="text-subtle text-sm mt-1">Yeni bir görev oluşturarak başlayın.</p></div>
+        <div className="text-center py-16"><ClipboardList className="h-14 w-14 mx-auto mb-4 text-subtle" /><h3 className="text-lg font-bold text-content">Henüz görev yok</h3><p className="text-subtle text-sm mt-1">Yeni bir görev oluşturarak başlayın.</p></div>
       ) : (<div className="space-y-3">
         {filtrelenmisGorevler.map(g => (
-          <Card key={g.id} className={`border-0 shadow-sm transition-all hover:shadow-md ${g.durum === "tamamlandi" ? "opacity-70" : ""}`}><CardContent className="p-4"><div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3 flex-1 min-w-0"><span className="text-2xl mt-0.5">{turIcon(g.tur)}</span><div className="min-w-0 flex-1">
+          <Card key={g.id} className={`border border-line shadow-sm transition-all hover:shadow-md ${g.durum === "tamamlandi" ? "opacity-70" : ""}`}><CardContent className="p-4"><div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3 flex-1 min-w-0"><span className="text-primary mt-1">{turIcon(g.tur)}</span><div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap"><h4 className="font-bold text-content truncate">{g.baslik}</h4><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${turColorGorev(g.tur)}`}>{turLabelGorev(g.tur)}</span>{hedefTipBadge(g.hedef_tip)}</div>
               {g.aciklama && <p className="text-subtle text-sm mt-1 line-clamp-2">{g.aciklama}</p>}
               <div className="flex items-center gap-3 mt-2 text-xs text-subtle flex-wrap">
-                <span>📌 {g.hedef_ad}</span><span>🔄 Atayan: {g.atayan_ad}</span>
-                {g.son_tarih && <span>📅 Son: {new Date(g.son_tarih).toLocaleDateString('tr-TR')}</span>}
+                <span className="inline-flex items-center gap-1"><Pin className="h-3 w-3" />{g.hedef_ad}</span><span className="inline-flex items-center gap-1"><UserCheck className="h-3 w-3" />Atayan: {g.atayan_ad}</span>
+                {g.son_tarih && <span className="inline-flex items-center gap-1"><Calendar className="h-3 w-3" />Son: {new Date(g.son_tarih).toLocaleDateString('tr-TR')}</span>}
               </div>
-              {g.tamamlama_notu && <p className="text-xs text-primary mt-1 italic">💬 "{g.tamamlama_notu}"</p>}
+              {g.tamamlama_notu && <p className="inline-flex items-start gap-1 text-xs text-primary mt-1 italic"><MessageCircle className="h-3 w-3 mt-0.5 shrink-0" />"{g.tamamlama_notu}"</p>}
             </div></div>
             <div className="flex items-center gap-2 shrink-0">
               {durumBadgeGorev(g.durum)}
+              {g.tur === "sinav_odevi" && (g.atayan_id === user.id || user.role === "admin") && (<Button size="sm" variant="outline" className="text-xs" onClick={() => sinavSonucGetir(g.icerik_id)}>📊 Sonuç</Button>)}
               {g.durum === "bekliyor" && g.hedef_id === user.id && (<Button size="sm" variant="outline" className="text-xs" onClick={() => durumGuncelle(g.id, "devam_ediyor")}>Başla</Button>)}
               {(g.durum === "bekliyor" || g.durum === "devam_ediyor") && g.hedef_id === user.id && (
                 <Button size="sm" className="bg-green-600 text-white text-xs" onClick={() => { setTamamlamaDialogu(g); setTamamlamaNotu(""); }}>Tamamla</Button>)}
@@ -10086,6 +10009,51 @@ function GorevYonetimi({ user, students, teachers }) {
             </div>
           </div></CardContent></Card>))}
       </div>)}
+
+      {sinavSonuc && (
+        <div className="fixed inset-0 z-[80] bg-black/40 flex items-center justify-center p-4" onClick={() => setSinavSonuc(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[88vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-3 border-b flex items-center justify-between sticky top-0 bg-white rounded-t-2xl">
+              <div className="font-bold text-gray-800">📊 {sinavSonuc.ad || "Sınav"} — Sonuçlar</div>
+              <button onClick={() => setSinavSonuc(null)} className="text-gray-400 hover:text-gray-700 text-xl leading-none">✕</button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-indigo-50 rounded-xl p-3"><div className="text-2xl font-bold text-indigo-600">{sinavSonuc.cozenSayisi}</div><div className="text-[11px] text-indigo-500">çözen öğrenci</div></div>
+                <div className="bg-green-50 rounded-xl p-3"><div className="text-2xl font-bold text-green-600">{sinavSonuc.genel?.dogru ?? 0}/{sinavSonuc.genel?.toplam ?? 0}</div><div className="text-[11px] text-green-600">doğru / cevap</div></div>
+                <div className="bg-gray-50 rounded-xl p-3"><div className="text-2xl font-bold text-gray-700">{sinavSonuc.soruSayisi}</div><div className="text-[11px] text-gray-500">soru</div></div>
+              </div>
+              {sinavSonuc.ogrenciler?.length > 0 && (
+                <div>
+                  <div className="text-xs font-semibold text-gray-500 mb-2">Öğrenci Bazlı</div>
+                  <div className="space-y-1">
+                    {sinavSonuc.ogrenciler.map((o) => (
+                      <div key={o.ogrenciId} className="flex items-center justify-between text-sm px-3 py-1.5 rounded-lg bg-gray-50"><span className="text-gray-700">{o.ad}</span><span className="font-semibold text-gray-800">{o.dogru}/{o.toplam}</span></div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {sinavSonuc.konuBazli?.length > 0 && (
+                <div>
+                  <div className="text-xs font-semibold text-gray-500 mb-2">Konu Bazlı Kırılım <span className="text-gray-400">(zayıf alan üstte)</span></div>
+                  <div className="space-y-1.5">
+                    {sinavSonuc.konuBazli.map((k) => {
+                      const yuzde = k.toplam ? Math.round((k.dogru / k.toplam) * 100) : 0;
+                      return (
+                        <div key={k.konu}>
+                          <div className="flex justify-between text-xs text-gray-600"><span>{k.konu}</span><span>{k.dogru}/{k.toplam} (%{yuzde})</span></div>
+                          <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden"><div className={`h-full ${yuzde < 50 ? "bg-red-400" : yuzde < 75 ? "bg-amber-400" : "bg-green-500"}`} style={{ width: `${yuzde}%` }} /></div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {(!sinavSonuc.ogrenciler || sinavSonuc.ogrenciler.length === 0) && <div className="text-sm text-gray-400 text-center py-4">Henüz çözen öğrenci yok.</div>}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -10141,7 +10109,7 @@ function AiMerkezi({ user }) {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold flex items-center gap-2">🧠 AI Merkezi</h2>
+      <h2 className="text-2xl font-bold flex items-center gap-2"><Brain className="h-6 w-6" />AI Merkezi</h2>
 
       {/* Demo Veri Yükle butonu */}
       {user.role === "admin" && (
@@ -10152,13 +10120,13 @@ function AiMerkezi({ user }) {
             window.location.reload();
           } catch(e) { toast({ title: e.response?.data?.detail || "Hata", variant: "destructive" }); }
         }} className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-xl text-sm font-medium shadow hover:shadow-lg transition-all">
-          🚀 Demo Verileri Yükle / Yenile
+          Demo Verileri Yükle / Yenile
         </button>
       )}
 
       {/* Sekme butonları */}
       <div className="flex gap-1 flex-wrap">
-        {[["genel","📊 Genel"],["dna","🧬 DNA Profilleri"],["kocluk","🤖 Koçluk"],["kelimeler","📚 Kelime Haritası"],["yuklemeler","📁 Yüklemeler"],["socratic","💬 Socratic"],["simulasyon","📈 Simülasyon"],["hibrit","🛡️ Hibrit Onay"],["harita","🇹🇷 TR Haritası"],["kelime-harita","🌍 Global Kelime"],["peer-review","🏅 Peer Review"],["maliyet","💰 Maliyet"]].map(([k,l]) => (
+        {[["genel","Genel"],["dna","DNA Profilleri"],["kocluk","Koçluk"],["kelimeler","Kelime Haritası"],["yuklemeler","Yüklemeler"],["socratic","Socratic"],["simulasyon","Simülasyon"],["hibrit","Hibrit Onay"],["harita","TR Haritası"],["kelime-harita","Global Kelime"],["peer-review","Peer Review"],["maliyet","Maliyet"]].map(([k,l]) => (
           <button key={k} onClick={() => setAiSekme(k)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${aiSekme === k ? 'bg-cyan-600 text-white shadow' : 'bg-surface text-subtle border hover:bg-app'}`}>{l}</button>
         ))}
       </div>
@@ -10173,7 +10141,7 @@ function AiMerkezi({ user }) {
         </div>
         {maliyet && (
           <div className="bg-surface rounded-2xl p-4 border shadow-sm">
-            <h3 className="font-bold text-sm mb-3">💰 AI Maliyet Özeti</h3>
+            <h3 className="font-bold text-sm mb-3">AI Maliyet Özeti</h3>
             <div className="grid grid-cols-2 gap-4">
               <div><div className="text-xs text-subtle">Bugün</div><div className="text-lg font-bold text-cyan-600">{maliyet.gunluk?.istek || 0} istek</div><div className="text-sm text-subtle">${maliyet.gunluk?.maliyet_usd?.toFixed(4) || "0.00"}</div></div>
               <div><div className="text-xs text-subtle">Bu Ay</div><div className="text-lg font-bold text-primary">{maliyet.aylik?.istek || 0} istek</div><div className="text-sm text-subtle">${maliyet.aylik?.maliyet_usd?.toFixed(4) || "0.00"}</div></div>
@@ -10182,7 +10150,7 @@ function AiMerkezi({ user }) {
         )}
         {/* Son yüklemeler */}
         <div className="bg-surface rounded-2xl p-4 border shadow-sm">
-          <h3 className="font-bold text-sm mb-3">📁 Son Yüklemeler</h3>
+          <h3 className="font-bold text-sm mb-3">Son Yüklemeler</h3>
           <div className="space-y-2">{yuklemeler.slice(0, 5).map(y => (
             <div key={y.id} className="flex items-center justify-between p-2 bg-app rounded-lg">
               <div><div className="text-sm font-medium">{y.dosya_format === ".pdf" ? "📕" : "📘"} {y.kitap_adi}</div><div className="text-[10px] text-subtle">{y.yukleyen_ad} • {y.sinif}. sınıf • {new Date(y.tarih).toLocaleDateString('tr-TR')}</div></div>
@@ -10197,7 +10165,7 @@ function AiMerkezi({ user }) {
 
       {/* DNA PROFİLLERİ */}
       {aiSekme === "dna" && (<>
-        <h3 className="font-bold text-sm">🧬 Tüm Öğrenci DNA Profilleri ({dnaListesi.length})</h3>
+        <h3 className="font-bold text-sm">Tüm Öğrenci DNA Profilleri ({dnaListesi.length})</h3>
         <div className="space-y-3">{dnaListesi.map(d => {
           const b = d.boyutlar || {};
           const renk = (v) => v >= 70 ? "bg-green-500" : v >= 40 ? "bg-yellow-500" : "bg-red-500";
@@ -10226,7 +10194,7 @@ function AiMerkezi({ user }) {
 
       {/* KOÇLUK */}
       {aiSekme === "kocluk" && (<>
-        <h3 className="font-bold text-sm">🤖 AI Koçluk Raporları ({koclukListesi.length})</h3>
+        <h3 className="font-bold text-sm">AI Koçluk Raporları ({koclukListesi.length})</h3>
         {koclukListesi.length > 0 ? (
           <div className="space-y-3">{koclukListesi.map(k => {
             const a = k.ai_analiz || {};
@@ -10251,7 +10219,7 @@ function AiMerkezi({ user }) {
 
       {/* KELİME HARİTASI */}
       {aiSekme === "kelimeler" && (<>
-        <h3 className="font-bold text-sm">📚 MEB Kelime Haritası ({kelimeler.length} kelime)</h3>
+        <h3 className="font-bold text-sm">MEB Kelime Haritası ({kelimeler.length} kelime)</h3>
         {istatistik?.sinif_dagilimi && (
           <div className="grid grid-cols-4 gap-2">{Object.entries(istatistik.sinif_dagilimi).filter(([,v]) => v.kelime > 0).map(([s, c]) => (
             <div key={s} className="bg-surface rounded-xl p-3 border text-center"><div className="text-lg font-bold text-cyan-600">{c.kelime}</div><div className="text-[10px] text-subtle">{s}. Sınıf</div></div>
@@ -10259,7 +10227,7 @@ function AiMerkezi({ user }) {
         )}
         {istatistik?.top_contributors?.length > 0 && (
           <div className="bg-surface rounded-2xl p-4 border shadow-sm">
-            <h4 className="font-medium text-sm mb-2">🏆 En Çok Katkı Yapanlar</h4>
+            <h4 className="font-medium text-sm mb-2">En Çok Katkı Yapanlar</h4>
             <div className="space-y-1">{istatistik.top_contributors.map((t, i) => (
               <div key={i} className="flex items-center justify-between text-sm"><span>{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i+1}.`} {t.ad}</span><span className="text-xs text-subtle">{t.yukleme} dosya • {t.puan} puan</span></div>
             ))}</div>
@@ -10285,14 +10253,14 @@ function AiMerkezi({ user }) {
 
       {/* YÜKLEMELER */}
       {aiSekme === "yuklemeler" && (<>
-        <h3 className="font-bold text-sm">📁 Tüm Yüklemeler ({yuklemeler.length})</h3>
+        <h3 className="font-bold text-sm">Tüm Yüklemeler ({yuklemeler.length})</h3>
         <div className="space-y-2">{yuklemeler.map(y => (
           <div key={y.id} className="bg-surface rounded-xl p-3 border shadow-sm">
             <div className="flex items-center justify-between">
               <div><div className="text-sm font-medium">{y.dosya_format === ".pdf" ? "📕" : "📘"} {y.kitap_adi}</div><div className="text-[10px] text-subtle">{y.yukleyen_ad} • {y.sinif}. sınıf • {y.tur} • {(y.dosya_boyut/1024/1024).toFixed(1)} MB</div></div>
               <div className="flex items-center gap-2">
                 <span className={`text-[10px] px-2 py-0.5 rounded-full ${y.durum === 'tamamlandi' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{y.durum}</span>
-                {!y.onayli && y.durum !== 'hata' && <button onClick={async () => { try { await axios.put(`${API}/ai/bilgi-tabani/onayla/${y.id}`); toast({ title: "✅ Onaylandı!" }); const r = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setYuklemeler(Array.isArray(r.data)?r.data:[]); } catch(e) {} }} className="text-xs bg-green-600 text-white px-2 py-1 rounded">Onayla</button>}
+                {!y.onayli && y.durum !== 'hata' && <button onClick={async () => { try { await axios.put(`${API}/ai/bilgi-tabani/onayla/${y.id}`); toast({ title: "✅ Onaylandı!" }); const r = await axios.get(`${API}/ai/bilgi-tabani/gecmis`); setYuklemeler(Array.isArray(r.data)?r.data:[]); } catch(e) { toast({ title: "Onaylanamadı", variant: "destructive" }); } }} className="text-xs bg-green-600 text-white px-2 py-1 rounded">Onayla</button>}
               </div>
             </div>
             {y.sonuc && y.sonuc.cikarilan_kelime > 0 && <div className="flex gap-3 mt-1 text-[10px] text-subtle"><span>📚 {y.sonuc.cikarilan_kelime} kelime</span><span>📖 {y.sonuc.okuma_parcasi} parça</span><span>📝 {y.sonuc.uretilen_soru} soru</span></div>}
@@ -10302,7 +10270,7 @@ function AiMerkezi({ user }) {
 
       {/* SOCRATIC */}
       {aiSekme === "socratic" && (<>
-        <h3 className="font-bold text-sm">💬 Socratic Reading Geçmişi ({socraticListesi.length})</h3>
+        <h3 className="font-bold text-sm">Socratic Reading Geçmişi ({socraticListesi.length})</h3>
         <div className="space-y-2">{socraticListesi.map((s, i) => {
           const bloomRenk = {"bilgi":"bg-blue-100 text-primary","kavrama":"bg-green-100 text-green-700","analiz":"bg-orange-100 text-orange-700","sentez":"bg-red-100 text-red-700","degerlendirme":"bg-purple-100 text-purple-700"};
           return (
@@ -10346,7 +10314,7 @@ function AiMerkezi({ user }) {
 
       {/* MALİYET */}
       {aiSekme === "maliyet" && (<>
-        <h3 className="font-bold text-sm">💰 AI Maliyet Detayı</h3>
+        <h3 className="font-bold text-sm">AI Maliyet Detayı</h3>
         {maliyet ? (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -10617,6 +10585,12 @@ function KitapOyunGorunum({ oyun, oyunDurum, setOyunDurum, onBitir, onKapat }) {
   const sesCalYanlis = () => { try { const ctx=new AudioContext(); const o=ctx.createOscillator(); const g=ctx.createGain(); o.connect(g); g.connect(ctx.destination); o.frequency.setValueAtTime(200,ctx.currentTime); g.gain.setValueAtTime(0.3,ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+0.4); o.start(); o.stop(ctx.currentTime+0.4); } catch(e){} };
 
   const [cevaplanmis, setCevaplanmis] = React.useState({});
+  // Alt-oyun state'leri koşullu return'lerden ÖNCE tanımlı (Rules of Hooks) —
+  // her tür yalnız kendi state'ini kullanır.
+  const [secilenSol, setSecilenSol] = React.useState(null);
+  const [eslesmeler, setEslesmeler] = React.useState({});
+  const [yanlisMis, setYanlisMis] = React.useState(null);
+  const [cevaplanmis2, setCevaplanmis2] = React.useState({});
 
   const Header = () => (
     <div className="flex items-center justify-between mb-3">
@@ -10683,9 +10657,6 @@ function KitapOyunGorunum({ oyun, oyunDurum, setOyunDurum, onBitir, onKapat }) {
   if (oyun.tur === "eslestirme") {
     const ciftler = oyun.ciftler || [];
     const karisikSaglar = oyun.karisikSaglar || ciftler.map(c => c.sag);
-    const [secilenSol, setSecilenSol] = React.useState(null);
-    const [eslesmeler, setEslesmeler] = React.useState({});
-    const [yanlisMis, setYanlisMis] = React.useState(null);
 
     const tamamlandi = Object.keys(eslesmeler).length === ciftler.length;
     if (tamamlandi) {
@@ -10745,7 +10716,6 @@ function KitapOyunGorunum({ oyun, oyunDurum, setOyunDurum, onBitir, onKapat }) {
   // Boşluk doldurma
   if (oyun.tur === "bosluk_doldurma" || oyun.tur === "bosluk") {
     const sorular = oyun.sorular || [];
-    const [cevaplanmis2, setCevaplanmis2] = React.useState({});
     const dogruSayisi = Object.values(cevaplanmis2).filter(Boolean).length;
     if (Object.keys(cevaplanmis2).length === sorular.length && sorular.length > 0) {
       setTimeout(() => onBitir(dogruSayisi, sorular.length), 500);
@@ -12034,26 +12004,26 @@ function MikroHedefMotor({ user, aiMotMesaj, apiBase }) {
   const ilerleme = secilenDk > 0 ? Math.min(100, Math.round(okunanDk / secilenDk * 100)) : 0;
 
   return (
-    <div className="bg-gradient-to-r from-cyan-50 to-blue-50 rounded-2xl p-4 border border-cyan-200">
+    <div className="bg-blue-50 rounded-2xl p-4 border border-blue-200">
       {/* AI Koç mesajı */}
       {aiMotMesaj && (
         <div className="flex items-start gap-2 mb-3">
-          <span className="text-xl">🤖</span>
+          <Sparkles className="h-5 w-5 text-primary shrink-0" />
           <div>
-            <div className="text-[10px] font-bold text-cyan-700 uppercase tracking-wide">AI Koçun Diyor ki</div>
+            <div className="text-[11px] font-bold text-primary uppercase tracking-wide">AI Koçun Diyor ki</div>
             <p className="text-sm text-content mt-0.5">{aiMotMesaj}</p>
           </div>
         </div>
       )}
 
       {/* Mikro hedef seçimi */}
-      <div className="border-t border-cyan-100 pt-3">
-        <div className="text-xs font-bold text-content mb-2">⏱ Bugün ne kadar okuyacaksın?</div>
+      <div className="border-t border-blue-100 pt-3">
+        <div className="inline-flex items-center gap-1.5 text-xs font-bold text-content mb-2"><Clock className="h-3.5 w-3.5" />Bugün ne kadar okuyacaksın?</div>
         {!secilenDk ? (
           <div className="flex gap-2">
             {[5, 10, 15, 20].map(dk => (
               <button key={dk} onClick={() => hedefSec(dk)}
-                className="flex-1 bg-surface border-2 border-cyan-300 hover:border-cyan-500 hover:bg-cyan-50 rounded-xl py-2 text-sm font-bold text-cyan-700 transition-all active:scale-95">
+                className="flex-1 bg-surface border-2 border-blue-300 hover:border-primary hover:bg-blue-50 rounded-xl py-2 text-sm font-bold text-primary transition-all active:scale-95 tabular-nums">
                 {dk} dk
               </button>
             ))}
@@ -12061,22 +12031,22 @@ function MikroHedefMotor({ user, aiMotMesaj, apiBase }) {
         ) : (
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs text-subtle">
-              <span>{tamamlandi ? "🎉 Hedef tamamlandı!" : sayacAktif ? "⏱ Okuma devam ediyor..." : "⏸ Duraklatıldı"}</span>
-              <span className="font-bold">{okunanDk} / {secilenDk} dk</span>
+              <span className="inline-flex items-center gap-1">{tamamlandi ? <><CheckCircle className="h-3.5 w-3.5 text-green-600" />Hedef tamamlandı!</> : sayacAktif ? <><Clock className="h-3.5 w-3.5" />Okuma devam ediyor...</> : <><Pause className="h-3.5 w-3.5" />Duraklatıldı</>}</span>
+              <span className="font-bold tabular-nums">{okunanDk} / {secilenDk} dk</span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div className={`h-2 rounded-full transition-all ${tamamlandi ? "bg-green-500" : "bg-gradient-to-r from-cyan-400 to-blue-500"}`}
+            <div className="w-full bg-app rounded-full h-2">
+              <div className={`h-2 rounded-full transition-all ${tamamlandi ? "bg-green-500" : "bg-primary"}`}
                 style={{ width: `${ilerleme}%` }} />
             </div>
             <div className="flex gap-2">
               <button onClick={() => setSayacAktif(a => !a)}
-                className={`flex-1 text-xs py-1.5 rounded-lg border font-medium transition-all
-                  ${sayacAktif ? "bg-orange-50 border-orange-300 text-orange-600" : "bg-green-50 border-green-300 text-green-600"}`}>
-                {sayacAktif ? "⏸ Duraklat" : "▶ Devam Et"}
+                className={`flex-1 inline-flex items-center justify-center gap-1 text-xs py-1.5 rounded-lg border font-medium transition-all
+                  ${sayacAktif ? "bg-amber-50 border-amber-300 text-amber-600" : "bg-green-50 border-green-300 text-green-600"}`}>
+                {sayacAktif ? <><Pause className="h-3.5 w-3.5" />Duraklat</> : <><Play className="h-3.5 w-3.5" />Devam Et</>}
               </button>
               <button onClick={() => { setSecilenDk(0); setOkunanDk(0); setSayacAktif(false); try { localStorage.removeItem(bugunKey); } catch {} }}
-                className="text-xs py-1.5 px-3 rounded-lg border border-line text-subtle hover:text-subtle">
-                ↺
+                className="inline-flex items-center text-xs py-1.5 px-3 rounded-lg border border-line text-subtle hover:text-subtle" aria-label="Sıfırla">
+                <RefreshCw className="h-3.5 w-3.5" />
               </button>
             </div>
           </div>
@@ -12199,7 +12169,7 @@ function AiArkadasSekme({ apiBase, user }) {
             {m.rol === "assistant" && <span className="text-xl mr-1 mt-0.5">{kar.emoji}</span>}
             <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${
               m.rol === "user"
-                ? "bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-br-sm"
+                ? "bg-primary hover:bg-primary-hover text-white rounded-br-sm"
                 : `${kar.bg} ${kar.border} border text-content rounded-bl-sm`}`}>
               {m.icerik}
             </div>
@@ -13116,10 +13086,10 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
   const turLabel = (tur) => ({ hizmetici: "Hizmetiçi Eğitim", film: "Film", kitap: "Kitap", makale: "Makale", okuma_parcasi: "Okuma Parçası" }[tur] || tur);
   const turColor = (tur) => ({ hizmetici: "bg-blue-100 text-primary", film: "bg-purple-100 text-purple-600", kitap: "bg-green-100 text-green-600", makale: "bg-orange-100 text-orange-600", okuma_parcasi: "bg-amber-100 text-amber-600" }[tur] || "bg-gray-100 text-subtle");
   const durumBadge = (d) => ({
-    beklemede: <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full font-medium">⏳ Yönetici Onayı Bekliyor</span>,
-    oylama: <span className="px-2 py-1 bg-blue-100 text-primary text-xs rounded-full font-medium">🗳️ Öğretmen Oylamasında</span>,
-    yayinda: <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium">✅ Yayında</span>,
-    reddedildi: <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full font-medium">❌ Reddedildi</span>,
+    beklemede: <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-100 text-amber-700 text-xs rounded-full font-medium"><Clock className="h-3 w-3" />Yönetici Onayı Bekliyor</span>,
+    oylama: <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-primary text-xs rounded-full font-medium"><Users className="h-3 w-3" />Öğretmen Oylamasında</span>,
+    yayinda: <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium"><CheckCircle className="h-3 w-3" />Yayında</span>,
+    reddedildi: <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full font-medium"><XCircle className="h-3 w-3" />Reddedildi</span>,
   }[d] || null);
 
   const isTamamlandi = (id) => tamamlananlar.some(t => t.icerik_id === id);
@@ -13260,14 +13230,14 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => { setGorunum("liste"); setSoruYonetimiIcerik(null); }}>← Geri</Button>
-          <div><h2 className="text-lg font-bold">📝 {soruYonetimiIcerik.baslik}</h2>
-            <p className="text-xs text-subtle">{soruYonetimiIcerik.kitap_yazar} • {bolumSayisi} bölüm • {kitapSorulari.length} soru</p></div>
+          <Button variant="outline" size="sm" onClick={() => { setGorunum("liste"); setSoruYonetimiIcerik(null); }}><ArrowLeft className="h-4 w-4 mr-1" />Geri</Button>
+          <div><h2 className="inline-flex items-center gap-2 text-lg font-bold"><ClipboardList className="h-5 w-5" />{soruYonetimiIcerik.baslik}</h2>
+            <p className="text-xs text-subtle tabular-nums">{soruYonetimiIcerik.kitap_yazar} • {bolumSayisi} bölüm • {kitapSorulari.length} soru</p></div>
         </div>
 
         {/* Soru ekleme formu */}
-        <Card className="border-0 shadow-sm border-l-4 border-l-teal-500">
-          <CardHeader className="pb-2"><CardTitle className="text-sm">📝 Yeni Soru Ekle</CardTitle></CardHeader>
+        <Card className="border border-line shadow-sm border-l-4 border-l-primary">
+          <CardHeader className="pb-2"><CardTitle className="text-sm inline-flex items-center gap-1.5"><ClipboardList className="h-4 w-4" />Yeni Soru Ekle</CardTitle></CardHeader>
           <CardContent>
             <form onSubmit={soruEkle} className="space-y-3">
               <div className="grid grid-cols-3 gap-3">
@@ -13341,7 +13311,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                     toast({ title: `🤖 ${sorularAI.length} soru AI tarafından eklendi!` });
                     const rr = await axios.get(`${API}/kitaplar/${soruYonetimiIcerik.id}/sorular`); setKitapSorulari(Array.isArray(rr.data) ? rr.data : []);
                   } catch(e) { toast({ title: "AI soru üretilemedi", variant: "destructive" }); }
-                }}>🤖 AI ile Üret</Button>
+                }}><Sparkles className="h-4 w-4 mr-1" />AI ile Üret</Button>
               </div>
             </form>
           </CardContent>
@@ -13422,7 +13392,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
           </div>
         </div>
 
-        <Card className="border-0 shadow-sm">
+        <Card className="border border-line shadow-sm">
           <CardContent className="p-6">
             {/* Kitap türü için kapak + bilgiler */}
             {aktifIcerik.tur === "kitap" && (
@@ -13477,13 +13447,13 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
 
         <div className="flex gap-3">
           {aktifIcerik.sorular?.length > 0 && (
-            <Button onClick={() => { setGorunum("test"); setTestCevaplari([]); }} className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white">
-              📝 Anlama Testini Çöz (+10 puan)
+            <Button onClick={() => { setGorunum("test"); setTestCevaplari([]); }} className="flex-1 inline-flex items-center justify-center gap-1.5 bg-primary hover:bg-primary-hover text-white">
+              <ClipboardList className="h-4 w-4" />Anlama Testini Çöz (+10 puan)
             </Button>
           )}
           {!isTamamlandi && (
-            <Button variant="outline" onClick={() => handleTamamla(false, aktifIcerik)} className="flex-1">
-              ✓ Okudum, Tamamlandı (+1 puan)
+            <Button variant="outline" onClick={() => handleTamamla(false, aktifIcerik)} className="flex-1 inline-flex items-center justify-center gap-1.5">
+              <Check className="h-4 w-4" />Okudum, Tamamlandı (+1 puan)
             </Button>
           )}
           {isTamamlandi && (
@@ -13539,7 +13509,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
           <h2 className="text-xl font-bold">{aktifIcerik.baslik} — Test</h2>
         </div>
         {aktifIcerik.sorular.map((soru, i) => (
-          <Card key={i} className="border-0 shadow-sm">
+          <Card key={i} className="border border-line shadow-sm">
             <CardContent className="p-6">
               <p className="font-medium mb-4">{i + 1}. {soru.soru}</p>
               <div className="space-y-2">
@@ -13555,7 +13525,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
         ))}
         <Button onClick={() => handleTamamla(true)}
           disabled={testCevaplari.filter(c => c !== undefined).length < aktifIcerik.sorular.length}
-          className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-3">
+          className="w-full bg-primary hover:bg-primary-hover text-white py-3">
           Testi Tamamla ({testCevaplari.filter(c=>c!==undefined).length} / {aktifIcerik.sorular.length} cevaplandı)
         </Button>
       </div>
@@ -13576,7 +13546,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
           <Button variant="outline" size="sm" onClick={() => setGorunum("liste")}>← Geri</Button>
           <h2 className="text-xl font-bold">Yeni İçerik Ekle</h2>
         </div>
-        <Card className="border-0 shadow-sm">
+        <Card className="border border-line shadow-sm">
           <CardContent className="p-6">
             <form onSubmit={icerikKaydet} className="space-y-5">
               <div><Label>Başlık *</Label><Input value={adminForm.baslik} onChange={e => setAdminForm({...adminForm, baslik: e.target.value})} required /></div>
@@ -13884,7 +13854,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
               </div>
 
               <div className="flex gap-3">
-                <Button type="submit" className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white">
+                <Button type="submit" className="flex-1 bg-primary hover:bg-primary-hover text-white">
                   {(user.role === "admin" || user.role === "coordinator") ? "Oylama Başlat" : "Yöneticiye Gönder"}
                 </Button>
                 <Button type="button" variant="outline" onClick={() => setGorunum("liste")} className="flex-1">İptal</Button>
@@ -13908,16 +13878,16 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
       {!isFullscreen && (
       <div className="flex gap-2 mb-2 flex-wrap">
         {user.role === 'teacher' && (
-          <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'basarilarim' ? 'bg-purple-600 text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => setGelisimSekme('basarilarim')}>🏆 Başarılarım</button>
+          <button className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'basarilarim' ? 'bg-primary text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => setGelisimSekme('basarilarim')}><Trophy className="h-4 w-4" />Başarılarım</button>
         )}
-        <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'icerikler' ? 'bg-orange-500 text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => setGelisimSekme('icerikler')}>📚 İçerikler</button>
-        <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'egzersizler' ? 'bg-primary text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => setGelisimSekme('egzersizler')}>👁️ Egzersizler</button>
-        <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'gorevler' ? 'bg-green-500 text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => setGelisimSekme('gorevler')}>📌 Görevler</button>
-        <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'kurslar' ? 'bg-indigo-500 text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => { if (onTabChange) onTabChange('courses'); }}>📖 Kurslar</button>
-        <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'ai-bilgi' ? 'bg-cyan-500 text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => setGelisimSekme('ai-bilgi')}>🧠 AI Eğit</button>
-        <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'kitap-parcalari' ? 'bg-teal-500 text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => setGelisimSekme('kitap-parcalari')}>📖 Kitap Parçaları</button>
+        <button className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'icerikler' ? 'bg-primary text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => setGelisimSekme('icerikler')}><BookOpen className="h-4 w-4" />İçerikler</button>
+        <button className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'egzersizler' ? 'bg-primary text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => setGelisimSekme('egzersizler')}><Eye className="h-4 w-4" />Egzersizler</button>
+        <button className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'gorevler' ? 'bg-primary text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => setGelisimSekme('gorevler')}><Pin className="h-4 w-4" />Görevler</button>
+        <button className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'kurslar' ? 'bg-primary text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => { if (onTabChange) onTabChange('courses'); }}><GraduationCap className="h-4 w-4" />Kurslar</button>
+        <button className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'ai-bilgi' ? 'bg-primary text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => setGelisimSekme('ai-bilgi')}><Brain className="h-4 w-4" />AI Eğit</button>
+        <button className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'kitap-parcalari' ? 'bg-primary text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => setGelisimSekme('kitap-parcalari')}><BookMarked className="h-4 w-4" />Kitap Parçaları</button>
         {user.role === 'admin' && (
-          <button className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'puan-ayar' ? 'bg-purple-500 text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => setGelisimSekme('puan-ayar')}>⚙️ Egzersiz Puanları</button>
+          <button className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${gelisimSekme === 'puan-ayar' ? 'bg-primary text-white shadow' : 'bg-surface text-subtle border border-line hover:bg-app'}`} onClick={() => setGelisimSekme('puan-ayar')}><Settings className="h-4 w-4" />Egzersiz Puanları</button>
         )}
       </div>
       )}
@@ -14066,8 +14036,8 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
           )}
 
           {/* Yükleme formu */}
-          <Card className="border-0 shadow-sm border-l-4 border-l-cyan-500">
-            <CardHeader className="pb-2"><CardTitle className="text-sm">📤 AI'a Kitap / Doküman Öğret</CardTitle></CardHeader>
+          <Card className="border border-line shadow-sm border-l-4 border-l-cyan-500">
+            <CardHeader className="pb-2"><CardTitle className="text-sm">AI'a Kitap / Doküman Öğret</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               <div className="bg-cyan-50 rounded-lg p-3 border border-cyan-100">
                 <p className="text-xs text-cyan-700">📚 PDF veya Word dosyası yükleyin ya da direkt link yapıştırın. AI içeriği analiz ederek kelime haritası, okuma parçaları ve Bloom taksonomili sorular üretecek.</p>
@@ -14127,7 +14097,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
               {aiBilgiYukleniyor && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs"><span className="text-cyan-700 font-medium">{aiIslemDurum}</span><span className="text-subtle">{aiIlerleme}%</span></div>
-                  <div className="bg-gray-200 rounded-full h-3 overflow-hidden"><div className="h-3 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full transition-all duration-500" style={{width:`${aiIlerleme}%`}} /></div>
+                  <div className="bg-app rounded-full h-3 overflow-hidden"><div className="h-3 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full transition-all duration-500" style={{width:`${aiIlerleme}%`}} /></div>
                   <div className="flex justify-between text-[9px] text-subtle"><span>📤 Yükleme</span><span>📖 Parse</span><span>🧠 AI Analiz</span><span>💾 Kayıt</span><span>✅</span></div>
                 </div>
               )}
@@ -14136,7 +14106,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
               {aiSonuc && (aiSonuc.kelimeler?.length > 0 || aiSonuc.parcalar?.length > 0 || aiSonuc.sorular?.length > 0) && (
                 <div className="border-t-2 border-cyan-200 pt-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-bold text-sm text-cyan-800">🎉 AI Öğrenme Sonuçları</h3>
+                    <h3 className="font-bold text-sm text-cyan-800">AI Öğrenme Sonuçları</h3>
                     <button onClick={() => setAiSonuc(null)} className="text-xs text-subtle hover:text-red-400">✕ Kapat</button>
                   </div>
 
@@ -14212,7 +14182,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
 
           {/* Yükleme geçmişi */}
           {aiYuklemeler.length > 0 && (<div>
-            <h3 className="font-medium text-sm text-content mb-2">📋 Yükleme Geçmişi</h3>
+            <h3 className="font-medium text-sm text-content mb-2">Yükleme Geçmişi</h3>
             <div className="space-y-2">{aiYuklemeler.map(y => {
               const gs = y.guven_skoru;
               const gsRenk = gs ? (gs.toplam >= 70 ? 'text-green-600 bg-green-50' : gs.toplam >= 40 ? 'text-yellow-600 bg-yellow-50' : 'text-red-600 bg-red-50') : '';
@@ -14384,7 +14354,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
 
       {gelisimSekme === 'puan-ayar' && user.role === 'admin' && (
         <div className="bg-surface rounded-xl border border-line p-6">
-          <h3 className="font-bold mb-4">⚙️ Egzersiz Puan Ayarları</h3>
+          <h3 className="font-bold mb-4">Egzersiz Puan Ayarları</h3>
           <p className="text-sm text-subtle mb-4">Her egzersiz tamamlandığında öğrencinin kazanacağı puanı belirleyin.</p>
           <div className="space-y-3">
             {[
@@ -14430,7 +14400,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold">Gelişim Alanı</h2>
             {(user.role === "admin" || user.role === "teacher") && (
-              <Button onClick={() => setGorunum("icerikEkle")} className="bg-gradient-to-r from-orange-500 to-red-500 text-white">
+              <Button onClick={() => setGorunum("icerikEkle")} className="bg-primary hover:bg-primary-hover text-white">
                 <Plus className="h-4 w-4 mr-2"/>İçerik Ekle
               </Button>
             )}
@@ -14439,7 +14409,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
           {/* Yönetici onayı bekleyenler */}
           {(user.role === "admin" || user.role === "coordinator") && bekleyenler.length > 0 && (
             <div>
-              <h3 className="font-semibold text-yellow-700 mb-3">⏳ Onay Bekleyenler ({bekleyenler.length})</h3>
+              <h3 className="font-semibold text-yellow-700 mb-3">Onay Bekleyenler ({bekleyenler.length})</h3>
               <div className="space-y-3">
                 {bekleyenler.map(icerik => {
                   const isAcik = acikDetayId === "bek-" + icerik.id;
@@ -14496,7 +14466,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
           {oylamadakiler.length > 0 && (user.role === "admin" || user.role === "teacher") && (
             <div>
 
-              <h3 className="font-semibold text-primary mb-3">🗳️ Oylaması Bekleyenler ({oylamadakiler.length})</h3>
+              <h3 className="font-semibold text-primary mb-3">Oylaması Bekleyenler ({oylamadakiler.length})</h3>
               <div className="space-y-3">
                 {oylamadakiler.map(icerik => {
                   const kullandi = oyKullandi(icerik);
@@ -14554,7 +14524,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
 
                         {/* Oy bar + butonlar */}
                         <div className="px-5 pb-5">
-                          {oran !== null && (<div className="mb-3"><div className="w-full bg-gray-200 rounded-full h-2"><div className={`h-2 rounded-full transition-all ${oran >= 60 ? 'bg-green-500' : 'bg-orange-500'}`} style={{width:`${oran}%`}}></div></div><p className="text-xs text-subtle mt-1">%60 onay gerekli • Şu an %{oran}</p></div>)}
+                          {oran !== null && (<div className="mb-3"><div className="w-full bg-app rounded-full h-2"><div className={`h-2 rounded-full transition-all ${oran >= 60 ? 'bg-green-500' : 'bg-orange-500'}`} style={{width:`${oran}%`}}></div></div><p className="text-xs text-subtle mt-1">%60 onay gerekli • Şu an %{oran}</p></div>)}
                           {kullandi ? (<div className="text-sm text-subtle bg-app p-3 rounded-lg">✓ Oyunuzu kullandınız: <strong>{kullandi.onay ? "Onay ✅" : "Red ❌"}</strong>{!kullandi.onay && kullandi.sebep && <span className="text-subtle"> — {kullandi.sebep}</span>}</div>
                           ) : (<div className="flex gap-2"><Button size="sm" onClick={() => oyVer(true, "", icerik)} className="bg-green-600 hover:bg-green-700 text-white flex-1">✅ Onayla (+2 puan)</Button><Button size="sm" variant="destructive" className="flex-1" onClick={() => { setRedDialogIcerik(icerik); }}>❌ Reddet</Button></div>)}
                           {icerik.tur === "kitap" && (user.role === "admin" || user.role === "coordinator") && (
@@ -14593,14 +14563,14 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
           {/* Yayındaki içerikler */}
           {yayindakiler.length > 0 && (
             <div>
-              <h3 className="font-semibold text-green-700 mb-3">✅ Yayındaki İçerikler ({yayindakiler.length})</h3>
+              <h3 className="font-semibold text-green-700 mb-3">Yayındaki İçerikler ({yayindakiler.length})</h3>
               <div className="space-y-3">
                 {yayindakiler.map(icerik => {
                   const tamamlandi = isTamamlandi(icerik.id);
                   const puan = getPuan(icerik.id);
                   const isAcik = acikDetayId === "yay-" + icerik.id;
                   return (
-                    <Card key={icerik.id} className={`border-0 shadow-sm ${tamamlandi ? 'opacity-90' : ''}`}>
+                    <Card key={icerik.id} className={`border border-line shadow-sm ${tamamlandi ? 'opacity-90' : ''}`}>
                       <CardContent className="p-0">
                         {/* Başlık - tıklanabilir */}
                         <div className="flex items-start justify-between p-5 cursor-pointer hover:bg-gray-50/80 transition-colors"
@@ -14665,7 +14635,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
                             )}
                             {icerik.sorular?.length > 0 && (
                               <Button size="sm" onClick={() => { setAktifIcerik(icerik); setGorunum("test"); setTestCevaplari([]); }}
-                                className="bg-gradient-to-r from-orange-500 to-red-500 text-white">
+                                className="bg-primary hover:bg-primary-hover text-white">
                                 📝 {tamamlandi ? "Testi Tekrar Çöz" : "Testi Çöz (+10 puan)"}
                               </Button>
                             )}
@@ -14722,7 +14692,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
         {/* Puan Tablosu — öğretmende '🏆 Başarılarım' sekmesine taşındı; admin/coordinator'da kalır */}
         {user.role !== 'teacher' && (
         <div className="space-y-4">
-            <Card className="border-0 shadow-sm">
+            <Card className="border border-line shadow-sm">
               <CardHeader><CardTitle className="flex items-center gap-2"><Trophy className="h-5 w-5 text-yellow-500"/>Puan Tablosu</CardTitle></CardHeader>
               <CardContent>
                 <div className="space-y-2">
@@ -14747,9 +14717,9 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
             </Card>
 
           {/* Puan Rehberi */}
-          <Card className="border-0 shadow-sm bg-gradient-to-br from-orange-50 to-yellow-50">
+          <Card className="border border-line shadow-sm bg-gradient-to-br from-orange-50 to-yellow-50">
             <CardContent className="p-5">
-              <h4 className="font-semibold text-content mb-3">🎯 Puan Rehberi</h4>
+              <h4 className="font-semibold text-content mb-3">Puan Rehberi</h4>
               <div className="space-y-2 text-sm text-subtle">
                 <div className="flex justify-between"><span>✅ İçerik tamamla</span><span className="font-bold text-orange-600">+1</span></div>
                 <div className="flex justify-between"><span>📝 Test çöz (tam puan)</span><span className="font-bold text-orange-600">+10</span></div>
@@ -15099,7 +15069,7 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
           <div className="space-y-4">
             <textarea value={redSebep} onChange={e => setRedSebep(e.target.value)}
               placeholder="Lütfen reddetme sebebinizi açıklayın..." rows={4}
-              className="w-full border border-line rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none" />
+              className="w-full border border-line rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none" />
             <div className="flex gap-2">
               <Button variant="destructive" className="flex-1" disabled={!redSebep.trim()} onClick={() => oyVer(false, redSebep)}>Reddet</Button>
               <Button variant="outline" className="flex-1" onClick={() => { setRedDialogIcerik(null); setRedSebep(""); }}>İptal</Button>

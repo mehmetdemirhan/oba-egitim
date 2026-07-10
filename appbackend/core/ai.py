@@ -61,6 +61,56 @@ async def _gemini_call(prompt: str, system: str = "", max_tokens: int = 4000) ->
     raise Exception(f"Tüm Gemini modelleri başarısız. Son hata: {last_error}")
 
 
+async def _gemini_call_multimodal(prompt: str, images: list, system: str = "",
+                                  max_tokens: int = 4000) -> str:
+    """Gemini multimodal çağrısı — metin + görsel(ler). `_gemini_call` ile aynı
+    key/model rotasyonunu kullanır; yalnızca `parts` dizisine `inline_data` ekler.
+
+    images: [(mime_type, base64_str), ...]  (örn. ("image/png", "<b64>"))
+    """
+    all_keys = [k for k in [GEMINI_API_KEY, GEMINI_API_KEY_2, GEMINI_API_KEY_3] if k]
+    if not all_keys:
+        raise Exception("GEMINI_API_KEY tanımlı değil")
+
+    full_prompt = f"{system}\n\n{prompt}" if system else prompt
+    parts = [{"text": full_prompt}]
+    for mime, b64 in images:
+        parts.append({"inline_data": {"mime_type": mime, "data": b64}})
+
+    last_error = "Bilinmeyen hata"
+    for key in all_keys:
+        for model in GEMINI_MODELS:
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
+                payload = {
+                    "contents": [{"parts": parts}],
+                    "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.7},
+                }
+                async with httpx.AsyncClient(timeout=90.0) as c:
+                    r = await c.post(url, json=payload)
+                    data = r.json()
+
+                if "candidates" in data:
+                    logging.info(f"[GEMINI-MM] ✅ Başarılı: model={model}")
+                    return data["candidates"][0]["content"]["parts"][0]["text"]
+
+                err_code = data.get("error", {}).get("code", 0)
+                err_msg = str(data.get("error", {}).get("message", data))
+                last_error = f"{model}: {err_msg[:200]}"
+                is_quota = (err_code == 429 or "RESOURCE_EXHAUSTED" in err_msg or "quota" in err_msg.lower())
+                if is_quota:
+                    logging.warning(f"[GEMINI-MM] ⚠️ Kota ({model}) → sonraki deneniyor")
+                    continue
+                logging.error(f"[GEMINI-MM] ❌ Kalıcı hata {err_code}: {err_msg[:100]}")
+                break
+            except Exception as ex:
+                last_error = str(ex)[:200]
+                logging.warning(f"[GEMINI-MM] Exception ({model}): {last_error[:80]}")
+                continue
+
+    raise Exception(f"Tüm Gemini modelleri başarısız (multimodal). Son hata: {last_error}")
+
+
 def _mock_bilgi_tabani_response(user_message: str) -> dict:
     """API key yokken bilgi tabanı için mock veri üret."""
     import re as _re
@@ -119,8 +169,6 @@ async def call_claude(system_prompt: str, user_message: str, model: str = "sonne
         })
 
         # Try to parse JSON from response
-        import json as json_mod
-        parsed = None
         import json as json_mod
         parsed = None
         try:

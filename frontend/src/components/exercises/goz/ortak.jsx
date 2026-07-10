@@ -2,9 +2,12 @@
 // Tüm yeni göz/görme egzersizleri bu yardımcıları kullanır — tek tasarım dili,
 // tek başlat/durdur/süre mantığı, tek ses motoru (WebAudio, dış dosya yok).
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import axios from "axios";
 import { YardimBaloncugu } from "../ExerciseAyarlar";
 import { useFullscreenExercise } from "../../../context/FullscreenExerciseContext";
 import { Settings } from "lucide-react";
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 // ── WebAudio metronom / bip ─────────────────────────────────────────────
 // Dış ses dosyası yok; kısa sinüs tonu üretir. 13 Nokta gibi metronomlu
@@ -230,3 +233,50 @@ export function karistir(dizi) {
   return a;
 }
 export const rastgele = (dizi) => dizi[Math.floor(Math.random() * dizi.length)];
+
+// ── MEB-öncelikli kelime havuzu ──────────────────────────────────────────────
+// Göz/tarama egzersizleri artık kelimeleri öğrencinin sınıfına uygun MEB havuzundan
+// (meb_kelimeleri + meb_kelime_haritasi) çeker; böylece çocuğun uygulamada gördüğü
+// kelimeler okul kitaplarıyla örtüşür. Havuz yüklenene kadar veya boş/başarısızsa
+// yukarıdaki TR_KELIMELER'e düşülür (oyun asla kelimesiz kalmaz). Modül düzeyinde
+// bir kez yüklenir ve cache'lenir.
+let _mebKelimeCache = null;     // string[] | null
+let _mebYukleniyor = null;      // Promise | null
+
+async function _mebKelimeYukle() {
+  if (_mebKelimeCache) return _mebKelimeCache;
+  if (_mebYukleniyor) return _mebYukleniyor;
+  _mebYukleniyor = axios.get(`${API}/meb-kelime/oyun-havuzu?adet=150`)
+    .then((r) => {
+      const list = Array.isArray(r.data?.kelimeler) ? r.data.kelimeler.filter(Boolean) : [];
+      _mebKelimeCache = list.length ? list : null;   // boşsa cache'leme → fallback kalsın
+      return _mebKelimeCache;
+    })
+    .catch(() => { _mebKelimeCache = null; return null; })
+    .finally(() => { _mebYukleniyor = null; });
+  return _mebYukleniyor;
+}
+
+// Oyunlar bunu çağırır: yüklenene kadar TR_KELIMELER, sonra MEB havuzu döner.
+// opts.buyuk=true → büyük harf; opts.maxLen → kelime uzunluğu üst sınırı.
+export function useKelimeHavuzu(opts = {}) {
+  const { buyuk = false, maxLen = 0 } = opts;
+  const bicimle = useCallback((liste) => {
+    let out = liste;
+    if (maxLen) out = out.filter((w) => w && w.length <= maxLen);
+    if (!out.length) out = liste;
+    if (buyuk) out = out.map((w) => w.toLocaleUpperCase("tr"));
+    return out;
+  }, [buyuk, maxLen]);
+
+  const [havuz, setHavuz] = useState(() => bicimle(_mebKelimeCache || TR_KELIMELER));
+  useEffect(() => {
+    let iptal = false;
+    if (_mebKelimeCache) { setHavuz(bicimle(_mebKelimeCache)); return; }
+    _mebKelimeYukle().then((list) => {
+      if (!iptal && list && list.length) setHavuz(bicimle(list));
+    });
+    return () => { iptal = true; };
+  }, [bicimle]);
+  return havuz;
+}

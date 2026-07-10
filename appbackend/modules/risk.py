@@ -2,6 +2,7 @@
 
 server.py'dan birebir taşındı. Yollar ve davranış değişmedi.
 """
+import logging
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -128,8 +129,8 @@ async def get_toplu_risk(current_user=Depends(get_current_user)):
                 "streak": streak, "aktif_gunler_7": aktif_7, "dakika_7": dakika_7,
                 "ogretmen_id": s.get("ogretmen_id", ""),
             })
-        except:
-            pass
+        except Exception as e:
+            logging.error(f"[risk] öğrenci risk hesabı atlandı (id {s.get('id','?')}): {e}")
 
     sonuc.sort(key=lambda x: x["risk_skoru"], reverse=True)
     return sonuc

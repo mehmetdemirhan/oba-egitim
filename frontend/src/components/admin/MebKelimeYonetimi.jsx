@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import DeyimYonetimi from "./DeyimYonetimi";
 
 /**
  * MebKelimeYonetimi — yönetici MEB kelime listesi yönetimi (5 ders destekli).
@@ -24,6 +25,7 @@ function sinifAralik(siniflar) {
 }
 
 export default function MebKelimeYonetimi({ apiBase }) {
+  const [bolum, setBolum] = useState("kelimeler"); // "kelimeler" | "deyim"
   const [dersler, setDersler] = useState(DERSLER_FALLBACK);
   const [aktifDers, setAktifDers] = useState("turkce");
 
@@ -155,6 +157,17 @@ export default function MebKelimeYonetimi({ apiBase }) {
         <h3 className="text-lg font-bold text-gray-800">📖 MEB Kelimeleri</h3>
         <p className="text-sm text-gray-500">Ders ve sınıf bazlı MEB kelime/kavram listelerini yükleyin; kelimeler tüm kelime egzersizlerinde önceliklidir.</p>
       </div>
+
+      {/* Alt bölüm seçici */}
+      <div className="flex gap-2 flex-wrap">
+        <button onClick={() => setBolum("kelimeler")} className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${bolum === "kelimeler" ? "bg-primary text-white border-primary" : "bg-surface text-subtle border-line hover:bg-app"}`}>MEB Kelimeleri</button>
+        <button onClick={() => setBolum("deyim")} className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${bolum === "deyim" ? "bg-primary text-white border-primary" : "bg-surface text-subtle border-line hover:bg-app"}`}>Deyim, Atasözü &amp; Tekerleme</button>
+      </div>
+
+      {bolum === "deyim" ? (
+        <DeyimYonetimi apiBase={apiBase} />
+      ) : (
+      <>
 
       {/* ── 5 Ders kartı ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
@@ -367,6 +380,8 @@ export default function MebKelimeYonetimi({ apiBase }) {
         <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[80] px-4 py-2 rounded-xl text-sm font-medium shadow-lg ${toast.tip === "ok" ? "bg-green-600 text-white" : "bg-red-600 text-white"}`}>
           {toast.metin}
         </div>
+      )}
+      </>
       )}
     </div>
   );

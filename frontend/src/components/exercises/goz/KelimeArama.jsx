@@ -2,14 +2,17 @@
 // dikey yerleştirilir; kullanıcı kelimenin ilk ve son harfine tıklayarak seçer.
 // Görsel tarama hızını ve dikkati geliştirir.
 import React, { useEffect, useMemo, useState } from "react";
-import { EgzersizDuzen, Slider, Skor, TR_HARFLER, dogruSes, yanlisSes, useEgzersizOturum } from "./ortak";
+import { EgzersizDuzen, Slider, Skor, TR_HARFLER, dogruSes, yanlisSes, useEgzersizOturum, useKelimeHavuzu } from "./ortak";
 
-const HAVUZ = ["KİTAP", "OKUMA", "KALEM", "DEFTER", "HARF", "SAYFA", "METİN", "ANLAM", "MASA", "OKUL", "ÖĞRENCI", "SATIR"];
+// Havuz yüklenene / boş olursa yedek liste (büyük harf).
+const YEDEK_HAVUZ = ["KİTAP", "OKUMA", "KALEM", "DEFTER", "HARF", "SAYFA", "METİN", "ANLAM", "MASA", "OKUL", "ÖĞRENCİ", "SATIR"];
 const yon = [[0, 1], [1, 0]]; // yatay, dikey
 
-function gridUret(N, kelimeSayi) {
+function gridUret(N, kelimeSayi, havuz) {
   const g = Array.from({ length: N }, () => Array(N).fill(null));
-  const secili = [...HAVUZ].filter((w) => w.length <= N).sort(() => Math.random() - 0.5).slice(0, kelimeSayi);
+  let uygun = (havuz || []).filter((w) => w && w.length <= N && w.length >= 3);
+  if (uygun.length < kelimeSayi) uygun = uygun.concat(YEDEK_HAVUZ.filter((w) => w.length <= N));
+  const secili = uygun.sort(() => Math.random() - 0.5).slice(0, kelimeSayi);
   const yerlesen = [];
   for (const kelime of secili) {
     let konuldu = false;
@@ -42,8 +45,9 @@ export default function KelimeArama({ onTamamla }) {
   const [bulunan, setBulunan] = useState([]);
   const [secim, setSecim] = useState(null); // ilk tıklanan {r,c}
   const [skor, setSkor] = useState(0);
+  const havuz = useKelimeHavuzu({ buyuk: true, maxLen: 12 });
 
-  const { g, kelimeler } = useMemo(() => gridUret(boyut, Math.min(6, boyut - 2)), [boyut, tur]);
+  const { g, kelimeler } = useMemo(() => gridUret(boyut, Math.min(6, boyut - 2), havuz), [boyut, tur, havuz]);
   const [bulunanHucre, setBulunanHucre] = useState(new Set());
 
   useEffect(() => { setBulunan([]); setSecim(null); setBulunanHucre(new Set()); }, [tur, boyut]);

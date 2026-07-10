@@ -175,7 +175,8 @@ async def create_icerik(icerik: IcerikCreate, current_user=Depends(get_current_u
         data["neden_bonus"] = True
         try:
             await db.users.update_one({"id": current_user["id"]}, {"$inc": {"toplam_puan": puanlar.get("neden_bonus", 1)}})
-        except: pass
+        except Exception as e:
+            logging.error(f"[gelisim] neden_bonus puanı yazılamadı (kullanıcı {current_user['id']}): {e}")
 
     # Test soruları bonusu → her soru +test_soru_basi, tavan test_soru_max (merkezî)
     sorular = data.get("sorular", [])
@@ -184,7 +185,8 @@ async def create_icerik(icerik: IcerikCreate, current_user=Depends(get_current_u
         data["soru_bonus"] = soru_bonus
         try:
             await db.users.update_one({"id": current_user["id"]}, {"$inc": {"toplam_puan": soru_bonus}})
-        except: pass
+        except Exception as e:
+            logging.error(f"[gelisim] soru_bonus puanı yazılamadı (kullanıcı {current_user['id']}): {e}")
 
     await db.gelisim_icerik.insert_one(data)
 

@@ -41,10 +41,10 @@ export default function LoginPage() {
     setError("");
     try {
       const r = await axios.post(`${API}/auth/forgot-password`, { email_or_phone: emailOrPhone.trim() });
-      setForgotResult(r.data);
+      setForgotResult(r.data?.message || "İşlem tamamlandı.");
       setMode("reset-done");
     } catch (err) {
-      setError(err.response?.data?.detail || "Kullanıcı bulunamadı");
+      setError(err.response?.data?.detail || "İşlem şu an gerçekleştirilemedi. Lütfen sonra tekrar deneyin.");
     } finally {
       setLoading(false);
     }
@@ -157,7 +157,7 @@ export default function LoginPage() {
                 Şifremi Unuttum
               </h2>
               <p style={{ fontSize: 13, color: "#6B7280", textAlign: "center", marginBottom: 24 }}>
-                Kayıtlı e-posta veya telefon numaranızı girin. Geçici şifre oluşturulacak.
+                Kayıtlı e-posta veya telefon numaranızı girin. Hesabınız kayıtlıysa e-posta adresinize şifre sıfırlama bağlantısı gönderilecek.
               </p>
               <form onSubmit={handleForgot}>
                 <div style={{ marginBottom: 20 }}>
@@ -189,7 +189,7 @@ export default function LoginPage() {
                     color: "white", fontSize: 15, fontWeight: 600, cursor: loading ? "not-allowed" : "pointer",
                     marginBottom: 12,
                   }}>
-                  {loading ? "İşleniyor..." : "Geçici Şifre Gönder"}
+                  {loading ? "İşleniyor..." : "Sıfırlama Bağlantısı Gönder"}
                 </button>
                 <button type="button" onClick={() => { setMode("login"); setError(""); }}
                   style={{
@@ -206,22 +206,12 @@ export default function LoginPage() {
           {mode === "reset-done" && forgotResult && (
             <>
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
-                <h2 style={{ fontSize: 18, fontWeight: 600, color: "#1F2937", marginBottom: 8 }}>
-                  Geçici Şifre Oluşturuldu
+                <div style={{ fontSize: 48, marginBottom: 12 }}>📧</div>
+                <h2 style={{ fontSize: 18, fontWeight: 600, color: "#1F2937", marginBottom: 12 }}>
+                  Talebiniz Alındı
                 </h2>
-                <p style={{ fontSize: 13, color: "#6B7280", marginBottom: 20 }}>
-                  {forgotResult.kullanici} için geçici şifre:
-                </p>
-                <div style={{
-                  background: "#F0FDF4", border: "2px solid #86EFAC", borderRadius: 12,
-                  padding: "16px", fontSize: 28, fontWeight: 700, color: "#16A34A",
-                  letterSpacing: 4, marginBottom: 16,
-                }}>
-                  {forgotResult.gecici_sifre}
-                </div>
-                <p style={{ fontSize: 12, color: "#9CA3AF", marginBottom: 24 }}>
-                  Bu şifre ile giriş yapın, ardından şifrenizi değiştirin.
+                <p style={{ fontSize: 14, color: "#4B5563", marginBottom: 24, lineHeight: 1.6 }}>
+                  {forgotResult}
                 </p>
               </div>
               <button onClick={() => { setMode("login"); setPassword(""); setError(""); setForgotResult(null); }}

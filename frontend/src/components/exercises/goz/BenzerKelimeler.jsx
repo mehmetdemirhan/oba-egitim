@@ -2,7 +2,7 @@
 // birebir aynıdır; bir kutuda çift birbirinden (tek harf) farklıdır.
 // Kullanıcı FARKLI olan kutuyu bulur. Hızlı ayırt etme ve tarama becerisi.
 import React, { useEffect, useMemo, useState } from "react";
-import { EgzersizDuzen, Slider, Skor, TR_HARFLER, TR_KELIMELER, rastgele, dogruSes, yanlisSes, useEgzersizOturum } from "./ortak";
+import { EgzersizDuzen, Slider, Skor, TR_HARFLER, rastgele, dogruSes, yanlisSes, useEgzersizOturum, useKelimeHavuzu } from "./ortak";
 
 // Bir kelimeyi tek harf değiştirerek "benzer ama farklı" üret.
 function benzerYap(kelime) {
@@ -20,15 +20,16 @@ export default function BenzerKelimeler({ onTamamla }) {
   const [skor, setSkor] = useState(0);
   const [tur, setTur] = useState(0);
   const [geri, setGeri] = useState(null);
+  const havuz = useKelimeHavuzu();
 
   const soru = useMemo(() => {
     const farkliIdx = Math.floor(Math.random() * 4);
     const kutular = Array.from({ length: 4 }, (_, i) => {
-      const k = rastgele(TR_KELIMELER);
+      const k = rastgele(havuz);
       return i === farkliIdx ? [k, benzerYap(k)] : [k, k];
     });
     return { kutular, farkliIdx };
-  }, [tur]);
+  }, [tur, havuz]);
 
   useEffect(() => { if (!calisiyor) { setSkor(0); setTur(0); setGeri(null); } }, [calisiyor]);
 

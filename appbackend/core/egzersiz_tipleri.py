@@ -22,6 +22,7 @@ KATEGORILER = {
     "oyun": "Kelime Oyunları",
     "gelismis": "Gelişmiş Beceriler",
     "fonoloji": "Fonolojik Farkındalık",
+    "deyim": "Deyim & Atasözü",
 }
 
 # Tip kayıtları — id (snake_case) → meta
@@ -352,6 +353,39 @@ EGZERSIZ_TIPLERI = {
         "soru_sayisi": 1,
         "ikon": "🧩",
         "icerik_uretici": "bulmaca",
+    },
+    # ── Deyim / Atasözü / Tekerleme (FAZ 4) ──────────────────────
+    # Kaynak: db.deyim_atasozu havuzu (yönetici girer). İçerik AI ile üretilir;
+    # havuz öğeleri prompt'a enjekte edilir (egzersiz_motoru _DEYIM_TIPLERI).
+    "deyim_eslestirme": {
+        "ad": "Deyim-Atasözü Eşleştirme",
+        "aciklama": "Deyim/atasözünü doğru anlamıyla eşleştir.",
+        "sinif_min": 2,
+        "sinif_max": 8,
+        "kategori": "deyim",
+        "puanlama": "eslesme",
+        "soru_sayisi": 5,
+        "ikon": "🧩",
+    },
+    "deyim_bosluk": {
+        "ad": "Deyim Boşluk Doldurma",
+        "aciklama": "Cümledeki boşluğa uygun deyimi/atasözünü seç.",
+        "sinif_min": 3,
+        "sinif_max": 8,
+        "kategori": "deyim",
+        "puanlama": "secmeli",
+        "soru_sayisi": 5,
+        "ikon": "✏️",
+    },
+    "tekerleme_okuma": {
+        "ad": "Tekerleme Okuma",
+        "aciklama": "Tekerlemeyi akıcı ve hızlı bir şekilde oku.",
+        "sinif_min": 1,
+        "sinif_max": 5,
+        "kategori": "fonoloji",
+        "puanlama": "serbest",
+        "soru_sayisi": 1,
+        "ikon": "🎵",
     },
 }
 

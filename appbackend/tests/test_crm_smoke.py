@@ -68,7 +68,8 @@ async def run():
         student_id = r.json()["id"]
 
         # 3) Otomatik muhasebe: 2 ödeme kaydı (öğrenci alacak + öğretmen ücreti)
-        r = await ac.get("/api/payments")
+        # /payments artık admin/accountant ister (muhasebe rolü eklendi).
+        r = await ac.get("/api/payments", headers=H_admin)
         kayitlar = r.json()
         check(len(kayitlar) == 2, f"2 otomatik ödeme kaydı oluştu ({len(kayitlar)})")
         tipler = sorted(k["tip"] for k in kayitlar)
@@ -85,7 +86,7 @@ async def run():
         check(r.status_code == 200 and len(r.json()) == 1, "öğretmenin öğrenci listesi 1 kayıt")
 
         # 6) Öğrenci ödemesi ekle → yapilan_odeme artmalı
-        r = await ac.post("/api/payments", json={"tip": "ogrenci", "kisi_id": student_id, "miktar": 400})
+        r = await ac.post("/api/payments", headers=H_admin, json={"tip": "ogrenci", "kisi_id": student_id, "miktar": 400})
         check(r.status_code == 200, "öğrenci ödemesi eklendi")
         r = await ac.get(f"/api/students/{student_id}")
         check(r.json()["yapilan_odeme"] == 400, "öğrenci yapilan_odeme 400 oldu")
@@ -130,7 +131,7 @@ async def run():
         r = await ac.get(f"/api/teachers/{teacher_id}")
         check(r.json()["ogrenci_sayisi"] == 1, "öğretmen sayacı tekrar 1")
         # öğretmenin eklemesi mali kayıt üretmemeli (hâlâ 2 otomatik kayıt + 1 manuel = 3)
-        r = await ac.get("/api/payments")
+        r = await ac.get("/api/payments", headers=H_admin)
         check(len(r.json()) == 3, f"öğretmen ekleme yeni ödeme kaydı üretmedi ({len(r.json())})")
 
         # 11) Öğretmen /students listesinde mali alanlar gizli

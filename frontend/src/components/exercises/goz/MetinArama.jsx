@@ -2,10 +2,10 @@
 // Kullanıcı metni hızlıca tarayıp hedef kelimenin her kopyasına tıklar.
 // Hızlı tarama (skimming) ve seçici dikkat becerisini geliştirir.
 import React, { useEffect, useMemo, useState } from "react";
-import { EgzersizDuzen, Slider, Skor, TR_KELIMELER, rastgele, dogruSes, yanlisSes, useEgzersizOturum } from "./ortak";
+import { EgzersizDuzen, Slider, Skor, rastgele, dogruSes, yanlisSes, useEgzersizOturum, useKelimeHavuzu } from "./ortak";
 
-function metinUret(kelimeSayi, hedef, gecis) {
-  const dizi = Array.from({ length: kelimeSayi }, () => rastgele(TR_KELIMELER));
+function metinUret(kelimeSayi, hedef, gecis, havuz) {
+  const dizi = Array.from({ length: kelimeSayi }, () => rastgele(havuz));
   // Hedef kelimeyi rastgele konumlara serpiştir
   const konumlar = new Set();
   while (konumlar.size < gecis) konumlar.add(Math.floor(Math.random() * kelimeSayi));
@@ -20,14 +20,15 @@ export default function MetinArama({ onTamamla }) {
   const [tur, setTur] = useState(0);
   const [bulunan, setBulunan] = useState(new Set());
   const [skor, setSkor] = useState(0);
+  const havuz = useKelimeHavuzu();
 
   const { hedef, dizi, toplam } = useMemo(() => {
-    const h = rastgele(TR_KELIMELER);
+    const h = rastgele(havuz);
     const g = 3 + Math.floor(Math.random() * 4); // 3-6 kopya
-    const d = metinUret(uzunluk, h, g);
+    const d = metinUret(uzunluk, h, g, havuz);
     const t = d.filter((w) => w === h).length;
     return { hedef: h, dizi: d, toplam: t };
-  }, [uzunluk, tur]);
+  }, [uzunluk, tur, havuz]);
 
   useEffect(() => { setBulunan(new Set()); }, [tur, uzunluk]);
   useEffect(() => { if (!calisiyor) { setSkor(0); setTur(0); setBulunan(new Set()); } }, [calisiyor]);

@@ -1072,13 +1072,15 @@ SADECE JSON döndür:
                 {"id": icerik_id},
                 {"$set": {"durum": "yayinda", "ai_skor": skor, "ai_karar": karar, "ai_karar_tarihi": datetime.utcnow().isoformat()}}
             )
-        except: pass
+        except Exception as e:
+            logging.error(f"[ai_uretim] otomatik-onay durumu yazılamadı (icerik {icerik_id}): {e}")
     elif icerik_id:
         try:
             await db.gelisim_icerik.update_one(
                 {"id": icerik_id},
                 {"$set": {"ai_skor": skor, "ai_karar": karar, "ai_karar_tarihi": datetime.utcnow().isoformat()}}
             )
-        except: pass
+        except Exception as e:
+            logging.error(f"[ai_uretim] ai_skor/karar yazılamadı (icerik {icerik_id}): {e}")
 
     return result

@@ -382,6 +382,8 @@ async def timi_sessions(current_user=Depends(get_current_user)):
 
 @router.get("/timi/ogrenci/{ogrenci_id}")
 async def timi_ogrenci_gecmisi(ogrenci_id: str, current_user=Depends(get_current_user)):
+    if not _yetkili(current_user):
+        raise HTTPException(status_code=403, detail="Bu TIMI kaydına erişim yetkiniz yok")
     items = await db.timi_sonuclar.find(
         {"ogrenci_id": ogrenci_id, "durum": "tamamlandi"}
     ).sort("uygulama_tarihi", -1).to_list(length=None)
@@ -392,6 +394,8 @@ async def timi_ogrenci_gecmisi(ogrenci_id: str, current_user=Depends(get_current
 
 @router.get("/timi/{sonuc_id}")
 async def timi_sonuc_getir(sonuc_id: str, current_user=Depends(get_current_user)):
+    if not _yetkili(current_user):
+        raise HTTPException(status_code=403, detail="Bu TIMI sonucuna erişim yetkiniz yok")
     sonuc = await db.timi_sonuclar.find_one({"id": sonuc_id})
     if not sonuc:
         raise HTTPException(status_code=404, detail="TIMI sonucu bulunamadı")

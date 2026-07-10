@@ -3,14 +3,17 @@ import axios from "axios";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { IkonCoz } from "../../lib/ikonlar";
+import { useToast } from "../../hooks/use-toast";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 /**
  * KazananlarDialog — bir rozetin kazananlarını listeler; manuel ver / geri al.
- * Props: rozet {rol, kod, ad}, onKapat()
+ * Props: rozet {rol, kod, ad}
+ * (Kapanış parent'ın Dialog onOpenChange'i ile yönetilir.)
  */
-export default function KazananlarDialog({ rozet, onKapat }) {
+export default function KazananlarDialog({ rozet }) {
+  const { toast } = useToast();
   const [liste, setListe] = useState([]);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [yeniUser, setYeniUser] = useState("");
@@ -34,7 +37,10 @@ export default function KazananlarDialog({ rozet, onKapat }) {
       await axios.post(`${API}/rozet/${rozet.rol}/${rozet.kod}/ver`, { user_id: yeniUser.trim() });
       setYeniUser("");
       await yukle();
-    } catch (e) {}
+      toast({ title: "Rozet verildi" });
+    } catch (e) {
+      toast({ title: "Rozet verilemedi", description: e?.response?.data?.detail || "Bir hata oluştu", variant: "destructive" });
+    }
     setIslem(false);
   };
 
@@ -43,7 +49,10 @@ export default function KazananlarDialog({ rozet, onKapat }) {
     try {
       await axios.post(`${API}/rozet/${rozet.rol}/${rozet.kod}/geri-al`, { user_id });
       await yukle();
-    } catch (e) {}
+      toast({ title: "Rozet geri alındı" });
+    } catch (e) {
+      toast({ title: "Rozet geri alınamadı", description: e?.response?.data?.detail || "Bir hata oluştu", variant: "destructive" });
+    }
     setIslem(false);
   };
 

@@ -24,6 +24,10 @@
     "active": true
   },
   {
+    "name": "sinav",
+    "active": true
+  },
+  {
     "name": "ayarlar",
     "active": true
   },
@@ -161,6 +165,22 @@
   },
   {
     "name": "instagram_beslemesi",
+    "active": true
+  },
+  {
+    "name": "ek_paneller",
+    "active": true
+  },
+  {
+    "name": "deyim_atasozu",
+    "active": true
+  },
+  {
+    "name": "muhasebe",
+    "active": true
+  },
+  {
+    "name": "toplu_kayit",
     "active": true
   }
 ]

@@ -2,7 +2,7 @@
 // kolonda yukarıdan aşağıya iner. Kolonlar arası ritmik göz hareketiyle
 // okuma temposunu ve satır atlama becerisini geliştirir.
 import React, { useEffect, useMemo, useState } from "react";
-import { EgzersizDuzen, Slider, rastgele, TR_KELIMELER, useEgzersizOturum } from "./ortak";
+import { EgzersizDuzen, Slider, rastgele, useEgzersizOturum, useKelimeHavuzu } from "./ortak";
 
 const SATIR = 10; // her kolonda satır sayısı
 
@@ -12,11 +12,12 @@ export default function Kolonlar({ onTamamla }) {
   const [sure, setSure] = useState(40);
   const { calisiyor, kalan, baslat, durdur } = useEgzersizOturum({ sure, onTamamla });
   const [aktif, setAktif] = useState(0); // aktif hücre sırası (kolon-öncelikli)
+  const havuz = useKelimeHavuzu();
 
-  // Kelime tablosu (kolon değişince yenile)
+  // Kelime tablosu (kolon veya havuz değişince yenile)
   const tablo = useMemo(
-    () => Array.from({ length: kolon * SATIR }, () => rastgele(TR_KELIMELER)),
-    [kolon]
+    () => Array.from({ length: kolon * SATIR }, () => rastgele(havuz)),
+    [kolon, havuz]
   );
   const toplam = kolon * SATIR;
 

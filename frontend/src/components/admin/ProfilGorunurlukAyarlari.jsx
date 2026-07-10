@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import { Eye } from "lucide-react";
 
 /**
  * ProfilGorunurlukAyarlari — yönetici, öğretmen profil alanlarının kimler
@@ -70,33 +71,33 @@ export default function ProfilGorunurlukAyarlari({ apiBase }) {
     }
   };
 
-  if (yukleniyor) return <div className="text-center py-12 text-gray-400 text-sm">Yükleniyor…</div>;
-  if (!ayarlar) return <div className="text-center py-12 text-gray-400 text-sm">Ayarlar yüklenemedi.</div>;
+  if (yukleniyor) return <div className="text-center py-12 text-subtle text-sm">Yükleniyor…</div>;
+  if (!ayarlar) return <div className="text-center py-12 text-subtle text-sm">Ayarlar yüklenemedi.</div>;
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
+      <div className="bg-surface rounded-2xl shadow-sm border overflow-hidden">
         <div className="px-5 py-3 border-b bg-gray-50">
-          <h4 className="font-bold text-gray-800">👁️ Öğretmen Profil Görünürlüğü</h4>
-          <p className="text-xs text-gray-500 mt-0.5">Her alanın veli/öğrenci tarafında kimlere görüneceğini belirleyin.</p>
+          <h4 className="inline-flex items-center gap-1.5 font-bold text-content"><Eye className="h-4 w-4" />Öğretmen Profil Görünürlüğü</h4>
+          <p className="text-xs text-subtle mt-0.5">Her alanın veli/öğrenci tarafında kimlere görüneceğini belirleyin.</p>
         </div>
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-xs text-gray-400 border-b">
+            <tr className="text-left text-xs text-subtle border-b">
               <th className="px-5 py-2 font-semibold">Alan</th>
               <th className="px-5 py-2 font-semibold">Kim Görebilir?</th>
             </tr>
           </thead>
           <tbody>
             {Object.keys(ALAN_ETIKET).map((alan) => (
-              <tr key={alan} className="border-b border-gray-50 last:border-0">
-                <td className="px-5 py-2.5 text-gray-700">{ALAN_ETIKET[alan]}</td>
+              <tr key={alan} className="border-b border-line last:border-0">
+                <td className="px-5 py-2.5 text-content">{ALAN_ETIKET[alan]}</td>
                 <td className="px-5 py-2.5">
                   {alan === "bildirim_tercihleri" ? (
-                    <span className="text-xs text-gray-400 italic">(Sadece kendisi)</span>
+                    <span className="text-xs text-subtle italic">(Sadece kendisi)</span>
                   ) : (
                     <select value={ayarlar[alan] || "admin"} onChange={(e) => degis(alan, e.target.value)}
-                      className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm bg-white outline-none focus:border-indigo-400">
+                      className="px-3 py-1.5 rounded-lg border border-line text-sm bg-surface outline-none focus:border-indigo-400">
                       {SECENEKLER.map((s) => <option key={s.v} value={s.v}>{s.l}</option>)}
                     </select>
                   )}
@@ -108,8 +109,8 @@ export default function ProfilGorunurlukAyarlari({ apiBase }) {
       </div>
 
       <button onClick={kaydet} disabled={kaydediliyor}
-        className="px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60">
-        {kaydediliyor ? "Kaydediliyor…" : "💾 Kaydet"}
+        className="px-5 py-2.5 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary-hover disabled:opacity-60">
+        {kaydediliyor ? "Kaydediliyor…" : "Kaydet"}
       </button>
 
       {toast && (
