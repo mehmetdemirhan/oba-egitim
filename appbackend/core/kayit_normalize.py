@@ -140,7 +140,7 @@ def _kanonik_sec(uyeler: list[str], agirlik: dict | None = None) -> str:
 
 
 def ogretmen_kumele(ham_adlar: list[str], mevcut_ogretmenler: list[dict] | None = None,
-                    agirlik: dict | None = None) -> dict:
+                    agirlik: dict | None = None, elle_esles: dict | None = None) -> dict:
     """Ham öğretmen adı varyantlarını otomatik birleştirir (bariz aynı olanlar), gerçekten
     belirsiz olanları işaretler. Kurallar: (1) normalize aynı → birleş; (2) alt-küme tek
     süperkümeyle → birleş, çok süperküme → belirsiz; (3) diakritik eşitleme + kelime-başı
@@ -224,28 +224,49 @@ def ogretmen_kumele(ham_adlar: list[str], mevcut_ogretmenler: list[dict] | None 
             "tok": _fold_tokenset(f"{t.get('ad','')} {t.get('soyad','')}")} for t in mevcut_ogretmenler]
 
     kumeler = []
-    harita: dict = {}
-    for ki, (r, uyeler) in enumerate(kok_uyeler.items()):
+    for (r, uyeler) in kok_uyeler.items():
         kanonik = _kanonik_sec(uyeler, agirlik)
         ktok = _fold_tokenset(kanonik)
-        # Mevcut öğretmenle eşleşme (aynı / alt-küme / üst-küme)
         esles = [m for m in mev if m["tok"] and (m["tok"] == ktok or ktok <= m["tok"] or m["tok"] <= ktok)]
         mevcut_id = esles[0]["id"] if len(esles) == 1 else None
         belirsiz = (r in kok_belirsiz) or (len(esles) > 1)
         oneriler = list(dict.fromkeys(kok_belirsiz.get(r, []) + [m["ad"] for m in esles]))
-        # (3) Levenshtein≤1 komşuları öneri olarak ekle (otomatik birleştirme YOK)
         for m in mev:
             if m["id"] != mevcut_id and _tokens_yakin(ktok, m["tok"]) and m["ad"] not in oneriler:
                 oneriler.append(m["ad"])
-        kume = {"kume_id": ki, "kanonik": kanonik, "uyeler": sorted(set(uyeler)),
-                "mevcut_id": mevcut_id, "belirsiz": belirsiz, "oneriler": oneriler[:5]}
-        kumeler.append(kume)
-        info = {"kanonik": kanonik, "mevcut_id": mevcut_id, "belirsiz": belirsiz,
+        kumeler.append({"kanonik": kanonik, "uyeler": sorted(set(uyeler)),
+                        "mevcut_id": mevcut_id, "belirsiz": belirsiz, "oneriler": oneriler[:5]})
+
+    # Elle (admin) birleştirmeler: {kaynak_kanonik → hedef_kanonik VEYA teacher_id}.
+    # Kaynak kümenin üyeleri hedefe taşınır; belirsizlik temizlenir. (Otomatik kuralların
+    # üstünde; admin bariz-belirsizleri veya kuralın kaçırdığı typo'ları elle çözer.)
+    if elle_esles:
+        kanon_map = {k["kanonik"]: k for k in kumeler}
+        mev_id_ad = {m["id"]: m["ad"] for m in mev}
+        for kaynak, hedef in elle_esles.items():
+            sk = kanon_map.get(kaynak)
+            if not sk or sk.get("_silindi"):
+                continue
+            if hedef in mev_id_ad:                       # hedef = mevcut öğretmen id
+                sk["mevcut_id"] = hedef; sk["belirsiz"] = False; sk["kanonik"] = mev_id_ad[hedef]
+                continue
+            hk = kanon_map.get(hedef)
+            if hk and hk is not sk:
+                hk["uyeler"] = sorted(set(hk["uyeler"] + sk["uyeler"]))
+                hk["belirsiz"] = False
+                sk["_silindi"] = True
+        kumeler = [k for k in kumeler if not k.get("_silindi")]
+
+    # Haritayı (ham ad → küme bilgisi) son kümelerden kur.
+    harita: dict = {}
+    for ki, kume in enumerate(kumeler):
+        kume["kume_id"] = ki
+        info = {"kanonik": kume["kanonik"], "mevcut_id": kume["mevcut_id"], "belirsiz": kume["belirsiz"],
                 "oneriler": kume["oneriler"], "kume_id": ki,
                 "birlesen": kume["uyeler"] if len(kume["uyeler"]) > 1 else []}
-        for u in uyeler:  # u = kırpılmış ad
+        for u in kume["uyeler"]:
             harita[u] = info
-            for orij in strip_map.get(u, []):  # orijinal (kırpılmamış) varyantlar da
+            for orij in strip_map.get(u, []):
                 harita[orij] = info
     return {"harita": harita, "kumeler": kumeler}
 

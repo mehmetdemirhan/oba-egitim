@@ -78,6 +78,17 @@ export default function TopluKayit({ apiBase }) {
     } catch { /* sessiz */ }
   };
 
+  // Belirsiz/ayrı bir öğretmen kümesini başka bir kanonik öğretmene elle birleştir.
+  const ogretmenBirlestir = async (kaynakKanonik, hedefKanonik) => {
+    try {
+      await axios.put(`${apiBase}/toplu-kayit/taslak/${taslakId}`, { ogretmen_elle_esles: { [kaynakKanonik]: hedefKanonik } });
+      await taslakYukle(taslakId);
+      toast({ title: "Öğretmen birleştirildi", description: `${kaynakKanonik} → ${hedefKanonik}` });
+    } catch {
+      toast({ title: "Birleştirilemedi", variant: "destructive" });
+    }
+  };
+
   const uygula = async (dryRun) => {
     setMesgul(true);
     try {
@@ -237,8 +248,13 @@ export default function TopluKayit({ apiBase }) {
                           <Link2 className="h-3 w-3" />{birlesen.length} varyant birleşti
                         </span>
                       )}
-                      {s.ogretmen_oneri?.belirsiz && (
-                        <span className="text-[10px] text-amber-700" title={`Öneriler: ${(s.ogretmen_oneri.oneriler || []).join(", ")}`}>⚠ belirsiz — seçim gerekli</span>
+                      {s.ogretmen_oneri?.belirsiz && (s.ogretmen_oneri.oneriler || []).length > 0 && (
+                        <select defaultValue="" title="Bu öğretmen kümesini seçilen kişiye birleştir"
+                          onChange={(e) => e.target.value && ogretmenBirlestir(s.ogretmen_oneri.kanonik, e.target.value)}
+                          className="text-[10px] border border-amber-400 bg-amber-50 rounded px-1 py-0.5 w-fit">
+                          <option value="">⚠ birleştir…</option>
+                          {(s.ogretmen_oneri.oneriler || []).map((o) => <option key={o} value={o}>{o}</option>)}
+                        </select>
                       )}
                     </div>
                   </td>

@@ -213,6 +213,7 @@ async def toplu_kayit_yukle(dosya: UploadFile = File(...), sayfa: str = Form(Non
         "sinif_ucret": {},       # {"3": 2500, ...} opsiyonel
         "satirlar": satirlar,
         "ogretmen_kumeleri": kumele["kumeler"],
+        "ogretmen_elle_esles": {},
         "ozet": _ozet(satirlar),
         "yukleyen_id": current_user.get("id"),
         "yukleyen_ad": f"{current_user.get('ad','')} {current_user.get('soyad','')}".strip(),
@@ -257,19 +258,25 @@ async def toplu_kayit_taslak_guncelle(taslak_id: str, data: dict, current_user=D
     if isinstance(data.get("sinif_ucret"), dict):
         guncelle["sinif_ucret"] = {str(k): float(v) for k, v in data["sinif_ucret"].items()}
 
-    # Kolon eşleme değişti → ham satırlardan yeniden normalize et (gerçek yeniden-eşleme).
-    if isinstance(data.get("kolon_esleme"), dict):
-        kolon = {**t.get("kolon_esleme", {}), **{k: int(v) for k, v in data["kolon_esleme"].items() if v is not None}}
+    # Kolon eşleme VEYA elle öğretmen birleştirme değişti → ham satırlardan yeniden kümele.
+    kolon_degisti = isinstance(data.get("kolon_esleme"), dict)
+    elle_degisti = isinstance(data.get("ogretmen_elle_esles"), dict)
+    if kolon_degisti or elle_degisti:
+        kolon = {**t.get("kolon_esleme", {}),
+                 **({k: int(v) for k, v in data.get("kolon_esleme", {}).items() if v is not None} if kolon_degisti else {})}
+        elle = {**(t.get("ogretmen_elle_esles") or {}),
+                **(data.get("ogretmen_elle_esles") or {})}
         ogretmenler = await _ogretmen_listesi()
         ham_satirlar = t.get("ham_satirlar", [])
         from collections import Counter
         ham_ogr = [_hucre(s, kolon.get("ogretmen_ad")) for s in ham_satirlar]
         agirlik = dict(Counter(a.strip() for a in ham_ogr if a and a.strip()))
-        kumele = KN.ogretmen_kumele(ham_ogr, ogretmenler, agirlik)
+        kumele = KN.ogretmen_kumele(ham_ogr, ogretmenler, agirlik, elle)
         guncelle["satirlar"] = [_satir_isle(satir, kolon, kumele["harita"], i + 1) for i, satir in enumerate(ham_satirlar)]
         guncelle["ogretmen_kumeleri"] = kumele["kumeler"]
         guncelle["ozet"] = _ozet(guncelle["satirlar"])
         guncelle["kolon_esleme"] = kolon
+        guncelle["ogretmen_elle_esles"] = elle
 
     # Satır bazlı override'lar: [{satir_no, secili_ogretmen_id?, yeni_ogretmen_ad?, kuyruk?, atla?, norm:{...}}]
     if isinstance(data.get("satir_guncelle"), list):
