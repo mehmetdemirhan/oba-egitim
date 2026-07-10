@@ -25,6 +25,7 @@ import { ZorunluSifreDegistir, SifreDegistirButton } from "./components/SifreDeg
 import BildirimIzni from "./components/BildirimIzni";
 import { BildirimTercihleri } from "./components/BildirimTercihleri";
 import MebKelimeYonetimi from "./components/admin/MebKelimeYonetimi";
+import MuhasebePaneli from "./components/MuhasebePaneli";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
 import InstagramAyarlari from "./components/admin/InstagramAyarlari";
 import ExerciseStarter from "./components/ExerciseStarter";
@@ -50,7 +51,7 @@ const hataBildir = (toast, mesaj = "İşlem başarısız oldu. Lütfen tekrar de
 const LIG_ESIKLERI_FE = { bronz: 0, gumus: 200, altin: 500, elmas: 1000 };
 
 function roleLabel(role) {
-  const labels = { admin: "Yönetici", coordinator: "Koordinatör", teacher: "Öğretmen", student: "Öğrenci", parent: "Veli" };
+  const labels = { admin: "Yönetici", coordinator: "Koordinatör", teacher: "Öğretmen", student: "Öğrenci", parent: "Veli", accountant: "Muhasebe" };
   return labels[role] || role;
 }
 
@@ -110,7 +111,7 @@ function UserManagement({ teachers }) {
     catch (error) { toast({ title: "Hata", description: error.response?.data?.detail || "Hata oluştu", variant: "destructive" }); }
   };
 
-  const roleBadgeColor = { admin: "bg-red-100 text-red-700", coordinator: "bg-orange-100 text-orange-700", teacher: "bg-blue-100 text-primary", student: "bg-green-100 text-green-700", parent: "bg-purple-100 text-purple-700" };
+  const roleBadgeColor = { admin: "bg-red-100 text-red-700", coordinator: "bg-orange-100 text-orange-700", teacher: "bg-blue-100 text-primary", student: "bg-green-100 text-green-700", parent: "bg-purple-100 text-purple-700", accountant: "bg-amber-100 text-amber-700" };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -136,6 +137,7 @@ function UserManagement({ teachers }) {
                   <SelectItem value="teacher">Öğretmen</SelectItem>
                   <SelectItem value="student">Öğrenci</SelectItem>
                   <SelectItem value="parent">Veli</SelectItem>
+                  <SelectItem value="accountant">Muhasebe</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -206,6 +208,7 @@ function UserManagement({ teachers }) {
                     <SelectItem value="teacher">Öğretmen</SelectItem>
                     <SelectItem value="student">Öğrenci</SelectItem>
                     <SelectItem value="parent">Veli</SelectItem>
+                    <SelectItem value="accountant">Muhasebe</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -383,6 +386,9 @@ function AppContent() {
 
   // Öğretmen rolü → ayrı panel
   if (user.role === "teacher") return <OgretmenPaneli user={user} logout={logout} />;
+
+  // Muhasebe rolü → sade ödeme paneli (yönetim sekme çubuğunu HİÇ görmez)
+  if (user.role === "accountant") return <MuhasebePaneli user={user} logout={logout} />;
 
   // Admin + Koordinatör aynı yönetim arayüzünü görür (koordinatör muhasebe hariç)
   const adminVeyaKoord = user.role === "admin" || user.role === "coordinator";
