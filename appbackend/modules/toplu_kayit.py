@@ -23,10 +23,14 @@ import uuid
 import logging
 from datetime import datetime
 
+import re
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
+from fastapi.responses import StreamingResponse
 
 from core.db import db
-from core.auth import require_role, UserRole
+from core.auth import require_role, UserRole, hash_password
+from core.hesap import gecici_sifre_uret, ogretmen_kaydi_olustur
 from core import kayit_normalize as KN
 
 router = APIRouter()
@@ -241,3 +245,229 @@ async def toplu_kayit_taslak_guncelle(taslak_id: str, data: dict, current_user=D
         raise HTTPException(status_code=400, detail="Güncellenecek alan yok")
     await db.toplu_kayit_taslaklari.update_one({"id": taslak_id}, {"$set": guncelle})
     return {"ok": True, "ozet": guncelle.get("ozet", t.get("ozet"))}
+
+
+# ─────────────────────────── Uygulama (idempotent) ───────────────────────────
+def _slug(ad: str, soyad: str) -> str:
+    s = KN._ascii_fold(f"{ad} {soyad}").replace(" ", ".")
+    s = re.sub(r"[^a-z0-9.]", "", s).strip(".")
+    return s or "kullanici"
+
+
+async def _benzersiz_email(taban: str, kullanilan: set) -> str:
+    for i in range(0, 1000):
+        email = f"{taban}@toplu.oba" if i == 0 else f"{taban}{i}@toplu.oba"
+        if email not in kullanilan and not await db.users.find_one({"email": email}, {"_id": 1}):
+            kullanilan.add(email)
+            return email
+    email = f"{taban}.{uuid.uuid4().hex[:6]}@toplu.oba"
+    kullanilan.add(email)
+    return email
+
+
+def _kur_adi(n: int) -> str:
+    return f"Kur {n}"
+
+
+@router.post("/toplu-kayit/uygula/{taslak_id}")
+async def toplu_kayit_uygula(taslak_id: str, dry_run: bool = Query(False), current_user=Depends(_YAZMA)):
+    """Taslağı uygular: öğretmen/öğrenci/veli kullanıcıları + kur-alacak (idempotent).
+    dry_run=True → hiçbir şey yazmaz, yalnız raporu döner. Aynı dosya ikinci kez
+    uygulanırsa (telefon+ad+kur anahtarıyla) mükerrer OLUŞTURMAZ."""
+    t = await db.toplu_kayit_taslaklari.find_one({"id": taslak_id})
+    if not t:
+        raise HTTPException(status_code=404, detail="Taslak bulunamadı")
+    if t.get("durum") == "uygulandi" and not dry_run:
+        raise HTTPException(status_code=400, detail="Bu taslak zaten uygulanmış")
+
+    varsayilan = t.get("varsayilan_ucret")
+    sinif_ucret = t.get("sinif_ucret", {}) or {}
+    now = datetime.utcnow().isoformat()
+
+    rapor = {"okundu": 0, "ogretmen_olusturuldu": 0, "ogretmen_eslesti": 0,
+             "ogrenci_olusturuldu": 0, "ogrenci_eslesti": 0, "veli_olusturuldu": 0,
+             "veli_eslesti": 0, "kur_alacak": 0, "elle_kuyrugu": 0, "atlanan": []}
+    olusturulan = []          # {ad, soyad, rol, email, telefon, gecici_sifre}
+    kullanilan_email = set()
+    ogretmen_cache = {}       # ascii-ad → teacher_id
+    ogretmen_gorulen = set()  # sayım için (benzersiz teacher_id)
+    ogrenci_cache = {}        # (tel, ad, soyad) → student_id
+    veli_cache = {}           # telefon → parent_id
+    ogretmenler_liste = await _ogretmen_listesi()
+
+    async def _ogretmen_coz(satir):
+        """Dönüş: teacher_id | None."""
+        tid = satir.get("secili_ogretmen_id")
+        if tid:
+            if tid not in ogretmen_gorulen:
+                ogretmen_gorulen.add(tid); rapor["ogretmen_eslesti"] += 1
+            return tid
+        ham = satir.get("yeni_ogretmen_ad") or ""
+        if not ham.strip():
+            return None
+        anah = KN._ascii_fold(re.sub(r"\b(hoca(m)?|öğretmen(im)?)\b", "", KN.tr_kucuk(ham)).strip())
+        if anah in ogretmen_cache:
+            return ogretmen_cache[anah]
+        # Re-run idempotency: mevcut öğretmenlerle güçlü eşleşme?
+        es = KN.ogretmen_eslestir(ham, ogretmenler_liste)
+        if es["en_iyi"] and es["en_iyi"]["skor"] >= 0.9:
+            tid = es["en_iyi"]["id"]; ogretmen_cache[anah] = tid
+            if tid not in ogretmen_gorulen:
+                ogretmen_gorulen.add(tid); rapor["ogretmen_eslesti"] += 1
+            return tid
+        # Yeni öğretmen
+        tam = KN.normalize_ad(re.sub(r"\b(hoca(m)?|öğretmen(im)?)\b", "", KN.tr_kucuk(ham)).strip())
+        parca = tam.split(" ", 1); ad = parca[0] or "Öğretmen"; soyad = parca[1] if len(parca) > 1 else ""
+        if dry_run:
+            tid = "dry-" + uuid.uuid4().hex[:12]
+        else:
+            email = await _benzersiz_email(_slug(ad, soyad), kullanilan_email)
+            sifre = gecici_sifre_uret()
+            uid = str(uuid.uuid4())
+            udoc = {"id": uid, "ad": ad, "soyad": soyad, "email": email, "telefon": "",
+                    "role": "teacher", "password_hash": hash_password(sifre),
+                    "sifre_degistirme_zorunlu": True, "olusturma_tarihi": now, "kaynak": "toplu_kayit"}
+            await db.users.insert_one(udoc)
+            tid = await ogretmen_kaydi_olustur(udoc) or uid
+            ogretmenler_liste.append({"id": tid, "ad": ad, "soyad": soyad})
+            olusturulan.append({"ad": ad, "soyad": soyad, "rol": "teacher", "email": email, "telefon": "", "gecici_sifre": sifre})
+        ogretmen_cache[anah] = tid
+        rapor["ogretmen_olusturuldu"] += 1
+        return tid
+
+    for s in t["satirlar"]:
+        rapor["okundu"] += 1
+        n = s["norm"]
+        if s.get("atla"):
+            rapor["atlanan"].append({"satir_no": s["satir_no"], "sebep": "admin atladı"}); continue
+        if not n.get("ogrenci_gecerli") or not n.get("kurlar"):
+            rapor["elle_kuyrugu"] += 1
+            rapor["atlanan"].append({"satir_no": s["satir_no"], "ogrenci": f"{n.get('ogrenci_ad','')} {n.get('ogrenci_soyad','')}".strip(),
+                                     "sebep": n.get("ogrenci_sebep") or "kur/ad eksik"}); continue
+
+        teacher_id = await _ogretmen_coz(s)
+
+        # --- Öğrenci (idempotent: veli_tel + ad + soyad) ---
+        ogr_anah = (n.get("veli_telefon") or "", n["ogrenci_ad"], n["ogrenci_soyad"])
+        student_id = ogrenci_cache.get(ogr_anah)
+        if not student_id:
+            mevcut = await db.students.find_one(
+                {"veli_telefon": n.get("veli_telefon") or "", "ad": n["ogrenci_ad"], "soyad": n["ogrenci_soyad"]}, {"id": 1})
+            if mevcut:
+                student_id = mevcut["id"]; rapor["ogrenci_eslesti"] += 1
+            else:
+                student_id = "dry-" + uuid.uuid4().hex[:12] if dry_run else str(uuid.uuid4())
+                rapor["ogrenci_olusturuldu"] += 1
+                if not dry_run:
+                    sdoc = {"id": student_id, "ad": n["ogrenci_ad"], "soyad": n["ogrenci_soyad"],
+                            "sinif": str(n.get("sinif") or ""), "veli_ad": n.get("veli_ad", ""),
+                            "veli_soyad": n.get("veli_soyad", ""), "veli_telefon": n.get("veli_telefon") or "",
+                            "aldigi_egitim": "", "kur": str(n["kurlar"][0]) if n["kurlar"] else "",
+                            "yapilmasi_gereken_odeme": 0.0, "yapilan_odeme": 0.0, "ogretmene_yapilacak_odeme": 0.0,
+                            "ogretmen_id": teacher_id, "arsivli": False, "olusturma_tarihi": now, "kaynak": "toplu_kayit"}
+                    if n.get("egitim_notu"):
+                        sdoc["egitim_notu"] = n["egitim_notu"]   # yalnız eğitimci rollerinin göreceği alan
+                    await db.students.insert_one(sdoc)
+                    if teacher_id and not str(teacher_id).startswith("dry-"):
+                        await db.teachers.update_one({"id": teacher_id},
+                            {"$inc": {"ogrenci_sayisi": 1}, "$addToSet": {"atanan_ogrenciler": student_id}})
+                    email = await _benzersiz_email(_slug(n["ogrenci_ad"], n["ogrenci_soyad"]), kullanilan_email)
+                    sifre = gecici_sifre_uret()
+                    await db.users.insert_one({"id": str(uuid.uuid4()), "ad": n["ogrenci_ad"], "soyad": n["ogrenci_soyad"],
+                        "email": email, "telefon": "", "role": "student", "linked_id": student_id,
+                        "password_hash": hash_password(sifre), "sifre_degistirme_zorunlu": True,
+                        "olusturma_tarihi": now, "kaynak": "toplu_kayit"})
+                    olusturulan.append({"ad": n["ogrenci_ad"], "soyad": n["ogrenci_soyad"], "rol": "student", "email": email, "telefon": "", "gecici_sifre": sifre})
+            ogrenci_cache[ogr_anah] = student_id
+
+        # Eğitim/sağlık notu (yalnız eğitimci rollerinin gördüğü alan) — öğrenci yeni
+        # ya da önceki satırdan mevcut olsun, bu satırda not varsa uygula.
+        if n.get("egitim_notu") and not dry_run and not str(student_id).startswith("dry-"):
+            await db.students.update_one({"id": student_id}, {"$set": {"egitim_notu": n["egitim_notu"]}})
+
+        # --- Veli (parent user, idempotent: telefon) ---
+        tel = n.get("veli_telefon")
+        if tel and tel not in veli_cache:
+            mevcut_p = await db.users.find_one({"role": "parent", "telefon": tel}, {"id": 1})
+            if mevcut_p:
+                veli_cache[tel] = mevcut_p["id"]; rapor["veli_eslesti"] += 1
+            else:
+                rapor["veli_olusturuldu"] += 1
+                if dry_run:
+                    veli_cache[tel] = "dry-" + uuid.uuid4().hex[:12]
+                else:
+                    email = await _benzersiz_email(_slug(n.get("veli_ad", "veli"), n.get("veli_soyad", "")), kullanilan_email)
+                    sifre = gecici_sifre_uret()
+                    pid = str(uuid.uuid4())
+                    await db.users.insert_one({"id": pid, "ad": n.get("veli_ad") or "Veli", "soyad": n.get("veli_soyad", ""),
+                        "email": email, "telefon": tel, "role": "parent", "linked_id": student_id,
+                        "password_hash": hash_password(sifre), "sifre_degistirme_zorunlu": True,
+                        "olusturma_tarihi": now, "kaynak": "toplu_kayit"})
+                    olusturulan.append({"ad": n.get("veli_ad") or "Veli", "soyad": n.get("veli_soyad", ""), "rol": "parent", "email": email, "telefon": tel, "gecici_sifre": sifre})
+                    veli_cache[tel] = pid
+
+        # --- Kur alacakları (idempotent: ogrenci_id + kur_adi) ---
+        gercek_ogrenci = not str(student_id).startswith("dry-")
+        notlar = "; ".join([x for x in [n.get("aciklama"), n.get("taksit_notu")] if x])
+        for kn in n["kurlar"]:
+            kur_ad = _kur_adi(kn)
+            if gercek_ogrenci and await db.kur_ucretleri.find_one({"ogrenci_id": student_id, "kur_adi": kur_ad}, {"_id": 1}):
+                continue  # zaten var → idempotent
+            ucret = float(sinif_ucret.get(str(n.get("sinif")), varsayilan or 0) or 0)
+            iptal = (n.get("odeme_durumu") == "iptal")
+            tutar = 0.0 if iptal else ucret
+            rapor["kur_alacak"] += 1
+            if dry_run or not gercek_ogrenci:
+                continue
+            await db.kur_ucretleri.insert_one({"id": str(uuid.uuid4()), "ogrenci_id": student_id, "kur_adi": kur_ad,
+                "tutar": tutar, "baslangic_tarihi": n.get("kayit_tarihi"), "tarih": now,
+                "ekleyen_id": current_user.get("id"), "kaynak": "toplu_kayit"})
+            if tutar > 0:
+                inc = {"yapilmasi_gereken_odeme": tutar}
+                if n.get("odeme_durumu") in ("odendi", "tamamlandi"):
+                    inc["yapilan_odeme"] = tutar
+                await db.students.update_one({"id": student_id}, {"$inc": inc})
+            if notlar:
+                await db.students.update_one({"id": student_id}, {"$set": {"muhasebe_notu": notlar}})
+
+    if not dry_run:
+        await db.toplu_kayit_taslaklari.update_one({"id": taslak_id}, {"$set": {
+            "durum": "uygulandi", "rapor": rapor, "olusturulan_kullanicilar": olusturulan,
+            "uygulama_tarihi": now}})
+    return {"dry_run": dry_run, "rapor": rapor, "olusturulan_kullanici_sayisi": len(olusturulan)}
+
+
+# ─────────────────────────── Raporlar (xlsx) ───────────────────────────
+def _xlsx_yanit(wb, dosya_adi: str):
+    buf = io.BytesIO(); wb.save(buf); buf.seek(0)
+    return StreamingResponse(buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{dosya_adi}"'})
+
+
+@router.get("/toplu-kayit/rapor/{taslak_id}/sifreler.xlsx")
+async def rapor_sifreler(taslak_id: str, current_user=Depends(_YAZMA)):
+    """Oluşturulan kullanıcı adı + geçici şifre listesi (veli/öğrenciye dağıtım için)."""
+    t = await db.toplu_kayit_taslaklari.find_one({"id": taslak_id})
+    if not t:
+        raise HTTPException(status_code=404, detail="Taslak bulunamadı")
+    import openpyxl
+    wb = openpyxl.Workbook(); ws = wb.active; ws.title = "Sifreler"
+    ws.append(["Ad", "Soyad", "Rol", "Kullanici Adi (E-posta)", "Telefon", "Gecici Sifre"])
+    for u in t.get("olusturulan_kullanicilar", []):
+        ws.append([u.get("ad", ""), u.get("soyad", ""), u.get("rol", ""), u.get("email", ""), u.get("telefon", ""), u.get("gecici_sifre", "")])
+    return _xlsx_yanit(wb, f"sifreler_{taslak_id[:8]}.xlsx")
+
+
+@router.get("/toplu-kayit/rapor/{taslak_id}/hatalar.xlsx")
+async def rapor_hatalar(taslak_id: str, current_user=Depends(_YAZMA)):
+    """Atlanan / elle tamamlanacak satırların listesi (sebeplerle)."""
+    t = await db.toplu_kayit_taslaklari.find_one({"id": taslak_id})
+    if not t:
+        raise HTTPException(status_code=404, detail="Taslak bulunamadı")
+    import openpyxl
+    wb = openpyxl.Workbook(); ws = wb.active; ws.title = "Atlanan"
+    ws.append(["Satir No", "Ogrenci", "Sebep"])
+    for a in (t.get("rapor", {}) or {}).get("atlanan", []):
+        ws.append([a.get("satir_no", ""), a.get("ogrenci", ""), a.get("sebep", "")])
+    return _xlsx_yanit(wb, f"atlanan_{taslak_id[:8]}.xlsx")
