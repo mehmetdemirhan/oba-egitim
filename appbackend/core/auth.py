@@ -30,6 +30,7 @@ class UserRole(str, Enum):
     TEACHER = "teacher"
     STUDENT = "student"
     PARENT = "parent"
+    ACCOUNTANT = "accountant"
 
 
 # ── Parola hashleme & güvenlik şeması ──

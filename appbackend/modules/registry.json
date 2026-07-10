@@ -170,5 +170,9 @@
   {
     "name": "deyim_atasozu",
     "active": true
+  },
+  {
+    "name": "muhasebe",
+    "active": true
   }
 ]

@@ -494,7 +494,8 @@ async def delete_ders_icerik(ders_id: str, icerik_id: str, current_user=Depends(
     return {"message": "İçerik silindi"}
 
 @router.post("/payments", response_model=Payment)
-async def create_payment(payment_data: PaymentCreate):
+async def create_payment(payment_data: PaymentCreate,
+                         current_user=Depends(require_role(UserRole.ADMIN, UserRole.ACCOUNTANT))):
     payment = Payment(**payment_data.dict())
     await db.payments.insert_one(prepare_for_mongo(payment.dict()))
     if payment.tip == "ogrenci":
@@ -504,12 +505,13 @@ async def create_payment(payment_data: PaymentCreate):
     return payment
 
 @router.get("/payments", response_model=List[Payment])
-async def get_payments():
+async def get_payments(current_user=Depends(require_role(UserRole.ADMIN, UserRole.ACCOUNTANT))):
     payments = await db.payments.find().sort("tarih", -1).to_list(length=None)
     return [Payment(**parse_from_mongo(p)) for p in payments]
 
 @router.delete("/payments/{payment_id}")
-async def delete_payment(payment_id: str):
+async def delete_payment(payment_id: str,
+                         current_user=Depends(require_role(UserRole.ADMIN, UserRole.ACCOUNTANT))):
     payment = await db.payments.find_one({"id": payment_id})
     if not payment:
         raise HTTPException(status_code=404, detail="Ödeme bulunamadı")
