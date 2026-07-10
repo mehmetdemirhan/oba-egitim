@@ -25,6 +25,7 @@ import { ZorunluSifreDegistir, SifreDegistirButton } from "./components/SifreDeg
 import BildirimIzni from "./components/BildirimIzni";
 import { BildirimTercihleri } from "./components/BildirimTercihleri";
 import MebKelimeYonetimi from "./components/admin/MebKelimeYonetimi";
+import SinavYonetimi from "./components/admin/SinavYonetimi";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
 import InstagramAyarlari from "./components/admin/InstagramAyarlari";
 import ExerciseStarter from "./components/ExerciseStarter";
@@ -513,6 +514,7 @@ function AppContent() {
             {adminVeyaKoord && <TabsTrigger value="tema-yonetimi" className={tabClass}><Palette className="h-4 w-4 mr-2" />Tema</TabsTrigger>}
             {adminVeyaKoord && <TabsTrigger value="rozet-yonetimi" className={tabClass}><Medal className="h-4 w-4 mr-2" />Rozetler</TabsTrigger>}
             {adminVeyaKoord && <TabsTrigger value="meb-kelime" className={tabClass}><BookMarked className="h-4 w-4 mr-2" />MEB Kelimeleri</TabsTrigger>}
+            {adminVeyaKoord && <TabsTrigger value="sinav" className={tabClass}><ClipboardList className="h-4 w-4 mr-2" />Sınavlar</TabsTrigger>}
             <TabsTrigger value="ai-merkezi" className={tabClass}><Brain className="h-4 w-4 mr-2" />AI Merkezi</TabsTrigger>
           </TabsList>
           )}
@@ -542,6 +544,13 @@ function AppContent() {
           {adminVeyaKoord && (
             <TabsContent value="meb-kelime">
               <MebKelimeYonetimi apiBase={API} />
+            </TabsContent>
+          )}
+
+          {/* Sınav Soru Bankası */}
+          {adminVeyaKoord && (
+            <TabsContent value="sinav">
+              <SinavYonetimi apiBase={API} />
             </TabsContent>
           )}
 
