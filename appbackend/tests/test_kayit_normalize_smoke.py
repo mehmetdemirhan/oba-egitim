@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.kayit_normalize import (
     normalize_ad, ogretmen_eslestir, normalize_ogrenci_ad, normalize_sinif,
     normalize_kur, normalize_telefon, normalize_tarih, siniflandir_not,
+    ogretmen_kumele,
 )
 
 _gecen = _kalan = 0
@@ -75,6 +76,34 @@ def run():
     check(siniflandir_not("Disleksisi var")["odeme_durumu"] is None, "hassas bilgi muhasebeye YAZILMAZ")
     check(siniflandir_not("ramazandan sonra")["taksit_notu"] != "", "erteleme → taksit notu")
     check(siniflandir_not("veliyle görüşüldü")["aciklama"] == "veliyle görüşüldü", "serbest metin → açıklama")
+
+    # Öğretmen varyant birleştirme (kümeleme)
+    adlar = ["Kübra Uzunçayır", "Kübra uzunçayır", "Kübra Uzunçayır ", "kÜbra özdemir", "Kübra Özdemir",
+             "Jülide", "Jülide Beren", "Julide Beren Külahlı", "PERİHAN", "Perihan Kandemir",
+             "Tuba Yurduseven", "Tuba YURDUSEVEN", "Tuba Yıldırım", "Tuba", "seher hocam"]
+    r = ogretmen_kumele(adlar, [{"id": "s1", "ad": "Seher", "soyad": "Akbaş"}])
+    kmap = {k["kanonik"]: k for k in r["kumeler"]}
+
+    def kume_of(ham):
+        return r["harita"].get(ham, {}).get("kanonik")
+
+    # Kural 1: büyük/küçük harf + boşluk varyantları birleşir
+    check(kume_of("Kübra Uzunçayır") == kume_of("Kübra uzunçayır") == kume_of("Kübra Uzunçayır "),
+          "kural1: 'Kübra Uzunçayır' varyantları tek küme")
+    # Farklı soyad = farklı kişi
+    check(kume_of("Kübra Uzunçayır") != kume_of("Kübra Özdemir"), "Uzunçayır ≠ Özdemir (farklı kişi)")
+    # Kural 2: alt-küme zinciri tek kişi, kanonik en uzun
+    check(kume_of("Jülide") == kume_of("Jülide Beren") == kume_of("Julide Beren Külahlı"),
+          "kural2: Jülide zinciri tek küme")
+    check(kume_of("Jülide") == "Julide Beren Külahlı", "kanonik = en eksiksiz yazım")
+    check(kume_of("PERİHAN") == kume_of("Perihan Kandemir") == "Perihan Kandemir", "PERİHAN ⊂ Perihan Kandemir")
+    # Çelişki: 'Tuba' iki farklı soyada uyuyor → belirsiz, otomatik birleşME
+    check(r["harita"]["Tuba"]["belirsiz"] is True, "'Tuba' belirsiz (çoklu süperküme)")
+    check(kume_of("Tuba") != kume_of("Tuba Yurduseven") and kume_of("Tuba") != kume_of("Tuba Yıldırım"),
+          "'Tuba' otomatik birleşmedi")
+    check(kume_of("Tuba Yurduseven") == kume_of("Tuba YURDUSEVEN"), "'Tuba Yurduseven' harf varyantı birleşti")
+    # 'seher hocam' → mevcut öğretmenle eşleşir
+    check(r["harita"]["seher hocam"]["mevcut_id"] == "s1", "'seher hocam' → mevcut Seher Akbaş")
 
 
 if __name__ == "__main__":

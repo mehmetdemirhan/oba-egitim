@@ -98,9 +98,11 @@ async def _ogretmen_listesi() -> list[dict]:
     return docs
 
 
-def _satir_isle(satir: list, kolon: dict, ogretmenler: list[dict], satir_no: int) -> dict:
-    """Bir ham satırı normalize eder + kuyruk belirler. Çoklu kur = tek satır kaydı
-    ama kur listesi (uygulama her kur için ayrı alacak açar)."""
+def _satir_isle(satir: list, kolon: dict, ogretmen_harita: dict, satir_no: int) -> dict:
+    """Bir ham satırı normalize eder + kuyruk belirler. Öğretmen ataması, tüm dosya
+    üzerinden hesaplanan varyant-birleştirme haritasından (ogretmen_harita) gelir:
+    bariz aynı olan varyantlar tek kanonik öğretmene bağlanır (otomatik); yalnız
+    gerçekten belirsiz olanlar 'eşleştirme' kuyruğuna düşer. Çoklu kur = tek satır."""
     ham = {alan: _hucre(satir, idx) for alan, idx in kolon.items()}
 
     ogr = KN.normalize_ogrenci_ad(ham.get("ogrenci_ad", ""))
@@ -109,7 +111,20 @@ def _satir_isle(satir: list, kolon: dict, ogretmenler: list[dict], satir_no: int
     veli = KN.normalize_ad(ham.get("veli_ad", ""))
     veli_parca = veli.split(" ", 1)
     not_sinif = KN.siniflandir_not(ham.get("notlar", ""))
-    ot = KN.ogretmen_eslestir(ham.get("ogretmen_ad", ""), ogretmenler) if ham.get("ogretmen_ad") else {"oneriler": [], "en_iyi": None, "otomatik": False}
+
+    # Öğretmen: varyant-birleştirme kümesinden
+    ham_ogr = (ham.get("ogretmen_ad") or "").strip()
+    kume = ogretmen_harita.get(ham_ogr) if ham_ogr else None
+    if kume:
+        secili = kume["mevcut_id"]
+        belirsiz = kume["belirsiz"]
+        yeni_ad = "" if (secili or belirsiz) else kume["kanonik"]
+        oneriler = kume["oneriler"]
+        birlesen = kume.get("birlesen", [])
+        ogr_cozuldu = bool(secili or yeni_ad) and not belirsiz
+    else:
+        secili = None; belirsiz = bool(ham_ogr); yeni_ad = ""
+        oneriler = []; birlesen = []; ogr_cozuldu = False
 
     norm = {
         "kayit_tarihi": KN.normalize_tarih(ham.get("kayit_tarihi", "")),
@@ -126,10 +141,11 @@ def _satir_isle(satir: list, kolon: dict, ogretmenler: list[dict], satir_no: int
         "taksit_notu": not_sinif["taksit_notu"],
     }
 
-    # Kuyruk: öğrenci adı geçersiz → elle; öğretmen otomatik değil / telefon geçersiz → eşleştirme.
+    # Kuyruk: öğrenci adı geçersiz/kur yok → elle; öğretmen belirsiz VEYA telefon
+    # geçersiz → eşleştirme; öğretmen çözüldü (mevcut eşleşme ya da net kanonik) → temiz.
     if not ogr["gecerli"] or not kurlar:
         kuyruk = "elle"
-    elif not ot["otomatik"] or not tel["gecerli"]:
+    elif not ogr_cozuldu or not tel["gecerli"]:
         kuyruk = "eslestirme"
     else:
         kuyruk = "temiz"
@@ -138,9 +154,10 @@ def _satir_isle(satir: list, kolon: dict, ogretmenler: list[dict], satir_no: int
         "satir_no": satir_no,
         "ham": ham,
         "norm": norm,
-        "ogretmen_oneri": ot,
-        "secili_ogretmen_id": ot["en_iyi"]["id"] if ot["otomatik"] and ot["en_iyi"] else None,
-        "yeni_ogretmen_ad": ham.get("ogretmen_ad", "") if not ot["en_iyi"] else "",
+        "ogretmen_oneri": {"oneriler": oneriler, "belirsiz": belirsiz, "kanonik": kume["kanonik"] if kume else ""},
+        "ogretmen_birlesen": birlesen,   # birden çok varyant birleştiyse (UI rozeti)
+        "secili_ogretmen_id": secili,
+        "yeni_ogretmen_ad": yeni_ad,
         "kuyruk": kuyruk,
         "atla": False,   # admin bir satırı atlamak isterse
     }
@@ -176,7 +193,10 @@ async def toplu_kayit_yukle(dosya: UploadFile = File(...), sayfa: str = Form(Non
 
     # Boş olmayan satırları sakla (yeniden kolon-eşleme için ham liste de tutulur).
     ham_satirlar = [s for s in veri if any(str(c).strip() for c in s)]
-    satirlar = [_satir_isle(satir, kolon, ogretmenler, i + 1) for i, satir in enumerate(ham_satirlar)]
+    # Öğretmen varyant-birleştirme (tüm dosya üzerinden, bir kez).
+    ham_ogr_adlar = [_hucre(s, kolon.get("ogretmen_ad")) for s in ham_satirlar]
+    kumele = KN.ogretmen_kumele(ham_ogr_adlar, ogretmenler)
+    satirlar = [_satir_isle(satir, kolon, kumele["harita"], i + 1) for i, satir in enumerate(ham_satirlar)]
 
     taslak = {
         "id": str(uuid.uuid4()),
@@ -190,6 +210,7 @@ async def toplu_kayit_yukle(dosya: UploadFile = File(...), sayfa: str = Form(Non
         "varsayilan_ucret": None,
         "sinif_ucret": {},       # {"3": 2500, ...} opsiyonel
         "satirlar": satirlar,
+        "ogretmen_kumeleri": kumele["kumeler"],
         "ozet": _ozet(satirlar),
         "yukleyen_id": current_user.get("id"),
         "yukleyen_ad": f"{current_user.get('ad','')} {current_user.get('soyad','')}".strip(),
@@ -239,7 +260,10 @@ async def toplu_kayit_taslak_guncelle(taslak_id: str, data: dict, current_user=D
         kolon = {**t.get("kolon_esleme", {}), **{k: int(v) for k, v in data["kolon_esleme"].items() if v is not None}}
         ogretmenler = await _ogretmen_listesi()
         ham_satirlar = t.get("ham_satirlar", [])
-        guncelle["satirlar"] = [_satir_isle(satir, kolon, ogretmenler, i + 1) for i, satir in enumerate(ham_satirlar)]
+        ham_ogr = [_hucre(s, kolon.get("ogretmen_ad")) for s in ham_satirlar]
+        kumele = KN.ogretmen_kumele(ham_ogr, ogretmenler)
+        guncelle["satirlar"] = [_satir_isle(satir, kolon, kumele["harita"], i + 1) for i, satir in enumerate(ham_satirlar)]
+        guncelle["ogretmen_kumeleri"] = kumele["kumeler"]
         guncelle["ozet"] = _ozet(guncelle["satirlar"])
         guncelle["kolon_esleme"] = kolon
 

@@ -85,6 +85,138 @@ def ogretmen_eslestir(ham_ad: str, ogretmenler: list[dict], esik: float = 0.55) 
     return {"oneriler": oneriler[:5], "en_iyi": en_iyi, "otomatik": otomatik}
 
 
+# ─────────────────────────── Öğretmen VARYANT BİRLEŞTİRME (kümeleme) ───────────────────────────
+def _unvan_sil(ad: str) -> str:
+    s = re.sub(r"\b(hoca(m)?|öğretmen(im)?|ogretmen(im)?|hanım|bey)\b", "", tr_kucuk(ad))
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def _fold_tokenset(ad: str) -> frozenset:
+    """Ada unvan-temizliği + ascii-fold uygular, kelime kümesi döner (Türkçe duyarlı)."""
+    return frozenset(t for t in _ascii_fold(_unvan_sil(ad)).split() if t)
+
+
+def _lev(a: str, b: str) -> int:
+    """Basit Levenshtein (küçük stringler için); >1 gerekmediğinden 2 ile kısa devre."""
+    if a == b:
+        return 0
+    if abs(len(a) - len(b)) > 1:
+        return 2
+    onceki = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        simdi = [i]
+        for j, cb in enumerate(b, 1):
+            simdi.append(min(onceki[j] + 1, simdi[j - 1] + 1, onceki[j - 1] + (ca != cb)))
+        onceki = simdi
+    return onceki[-1]
+
+
+def _tokens_yakin(ta: frozenset, tb: frozenset) -> bool:
+    """İki token kümesi kelime başına ≤1 harf farkıyla eşleşiyor mu (aynı boyutta)."""
+    if len(ta) != len(tb) or not ta:
+        return False
+    kalan = set(tb)
+    for x in ta:
+        es = next((y for y in kalan if _lev(x, y) <= 1), None)
+        if es is None:
+            return False
+        kalan.discard(es)
+    return True
+
+
+def _kanonik_sec(uyeler: list[str]) -> str:
+    """Birleşen gruptan en eksiksiz (en çok kelime, sonra en uzun) yazımı kanonik yapar."""
+    en = max(uyeler, key=lambda a: (len(_fold_tokenset(a)), len(_unvan_sil(a))))
+    return normalize_ad(_unvan_sil(en))
+
+
+def ogretmen_kumele(ham_adlar: list[str], mevcut_ogretmenler: list[dict] | None = None) -> dict:
+    """Ham öğretmen adı varyantlarını otomatik birleştirir (bariz aynı olanlar), gerçekten
+    belirsiz olanları işaretler. Kurallar: (1) normalize aynı → birleş; (2) alt-küme tek
+    süperkümeyle → birleş, çok süperküme → belirsiz; (3) diakritik eşitleme + kelime-başı
+    Levenshtein≤1 → ÖNERİ (otomatik değil). Mevcut öğretmenlerle de aynı kural.
+
+    Dönüş: {harita: {ham_ad → {kanonik, mevcut_id, belirsiz, oneriler, kume_id}},
+            kumeler: [{kume_id, kanonik, uyeler, mevcut_id, belirsiz, oneriler}]}"""
+    mevcut_ogretmenler = mevcut_ogretmenler or []
+    # Orijinal (kırpılmamış) adları koru → harita hem orijinal hem kırpılmış anahtarla erişilir.
+    strip_map: dict = {}
+    for a in dict.fromkeys(ham_adlar):
+        if a and str(a).strip():
+            strip_map.setdefault(str(a).strip(), []).append(a)
+    adlar = list(strip_map.keys())
+    tok = {a: _fold_tokenset(a) for a in adlar}
+    adlar = [a for a in adlar if tok[a]]
+
+    # (1) Birebir-fold grupları → düğümler
+    fold_map: dict = {}
+    for a in adlar:
+        fold_map.setdefault(tok[a], []).append(a)
+    dugum_tok = list(fold_map.keys())
+    dugum_uye = [fold_map[t] for t in dugum_tok]
+    n = len(dugum_tok)
+
+    parent = list(range(n))
+    def bul(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]; x = parent[x]
+        return x
+    def birlestir(x, y):
+        parent[bul(x)] = bul(y)
+
+    belirsiz_secenek: dict = {}   # dugum_idx → [kanonik superset seçenekleri]
+    for i in sorted(range(n), key=lambda k: len(dugum_tok[k])):
+        ti = dugum_tok[i]
+        supersetler = [j for j in range(n) if j != i and ti < dugum_tok[j]]
+        if not supersetler:
+            continue
+        maksimal = [j for j in supersetler
+                    if not any(k != j and dugum_tok[j] < dugum_tok[k] for k in supersetler)]
+        if len(maksimal) == 1:
+            birlestir(i, maksimal[0])
+        else:
+            belirsiz_secenek[i] = [_kanonik_sec(dugum_uye[j]) for j in maksimal]
+
+    # Kümeleri topla
+    kok_uyeler: dict = {}
+    kok_belirsiz: dict = {}
+    for i in range(n):
+        r = bul(i)
+        kok_uyeler.setdefault(r, []).extend(dugum_uye[i])
+        if i in belirsiz_secenek:
+            kok_belirsiz.setdefault(r, []).extend(belirsiz_secenek[i])
+
+    # Mevcut öğretmen token'ları
+    mev = [{"id": t.get("id"), "ad": f"{t.get('ad','')} {t.get('soyad','')}".strip(),
+            "tok": _fold_tokenset(f"{t.get('ad','')} {t.get('soyad','')}")} for t in mevcut_ogretmenler]
+
+    kumeler = []
+    harita: dict = {}
+    for ki, (r, uyeler) in enumerate(kok_uyeler.items()):
+        kanonik = _kanonik_sec(uyeler)
+        ktok = _fold_tokenset(kanonik)
+        # Mevcut öğretmenle eşleşme (aynı / alt-küme / üst-küme)
+        esles = [m for m in mev if m["tok"] and (m["tok"] == ktok or ktok <= m["tok"] or m["tok"] <= ktok)]
+        mevcut_id = esles[0]["id"] if len(esles) == 1 else None
+        belirsiz = (r in kok_belirsiz) or (len(esles) > 1)
+        oneriler = list(dict.fromkeys(kok_belirsiz.get(r, []) + [m["ad"] for m in esles]))
+        # (3) Levenshtein≤1 komşuları öneri olarak ekle (otomatik birleştirme YOK)
+        for m in mev:
+            if m["id"] != mevcut_id and _tokens_yakin(ktok, m["tok"]) and m["ad"] not in oneriler:
+                oneriler.append(m["ad"])
+        kume = {"kume_id": ki, "kanonik": kanonik, "uyeler": sorted(set(uyeler)),
+                "mevcut_id": mevcut_id, "belirsiz": belirsiz, "oneriler": oneriler[:5]}
+        kumeler.append(kume)
+        info = {"kanonik": kanonik, "mevcut_id": mevcut_id, "belirsiz": belirsiz,
+                "oneriler": kume["oneriler"], "kume_id": ki,
+                "birlesen": kume["uyeler"] if len(kume["uyeler"]) > 1 else []}
+        for u in uyeler:  # u = kırpılmış ad
+            harita[u] = info
+            for orij in strip_map.get(u, []):  # orijinal (kırpılmamış) varyantlar da
+                harita[orij] = info
+    return {"harita": harita, "kumeler": kumeler}
+
+
 # ─────────────────────────── Öğrenci adı ───────────────────────────
 _YER_ADLARI = {"amerika", "ingiltere", "almanya", "fransa", "hollanda", "belcika", "avusturya"}
 

@@ -3,7 +3,7 @@ import axios from "axios";
 import { useToast } from "../../hooks/use-toast";
 import {
   Upload, FileSpreadsheet, CheckCircle2, AlertTriangle, PencilLine, Play,
-  Download, Users, GraduationCap, UserCog, Wallet, ChevronRight,
+  Download, Users, GraduationCap, UserCog, Wallet, ChevronRight, Link2,
 } from "lucide-react";
 
 /**
@@ -189,7 +189,8 @@ export default function TopluKayit({ apiBase }) {
           <tbody>
             {satirlar.map((s) => {
               const n = s.norm; const m = KUYRUK_ETIKET[s.kuyruk] || KUYRUK_ETIKET.elle;
-              const oneriIds = new Set((s.ogretmen_oneri?.oneriler || []).map((o) => o.id));
+              const oneriSet = new Set(s.ogretmen_oneri?.oneriler || []);   // kanonik ad string'leri
+              const birlesen = s.ogretmen_birlesen || [];
               return (
                 <tr key={s.satir_no} className={`border-b border-line ${s.atla ? "opacity-40" : ""}`}>
                   <td className="px-3 py-2 tabular-nums text-subtle">{s.satir_no}</td>
@@ -213,21 +214,33 @@ export default function TopluKayit({ apiBase }) {
                     <div className="text-content text-xs">{n.veli_ad} {n.veli_soyad}</div>
                     <div className={`text-[11px] tabular-nums ${n.veli_telefon_gecerli ? "text-subtle" : "text-red-500"}`}>{n.veli_telefon || "telefon yok"}</div>
                   </td>
-                  {/* Öğretmen seçimi */}
+                  {/* Öğretmen seçimi + varyant birleştirme rozeti */}
                   <td className="px-3 py-2">
-                    <select value={s.secili_ogretmen_id || (s.yeni_ogretmen_ad ? "yeni" : "")}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        if (v === "yeni") satirGuncelle(s.satir_no, { secili_ogretmen_id: null, yeni_ogretmen_ad: s.ham?.ogretmen_ad || s.yeni_ogretmen_ad });
-                        else satirGuncelle(s.satir_no, { secili_ogretmen_id: v || null, yeni_ogretmen_ad: "" });
-                      }}
-                      className="border border-line rounded-lg px-2 py-1 text-xs max-w-[160px]">
-                      <option value="">— seçin —</option>
-                      {s.yeni_ogretmen_ad && <option value="yeni">➕ Yeni: {s.yeni_ogretmen_ad}</option>}
-                      {ogretmenler.map((o) => (
-                        <option key={o.id} value={o.id}>{oneriIds.has(o.id) ? "★ " : ""}{o.ad}</option>
-                      ))}
-                    </select>
+                    <div className="flex flex-col gap-1">
+                      <select value={s.secili_ogretmen_id || (s.yeni_ogretmen_ad ? "yeni" : "")}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (v === "yeni") satirGuncelle(s.satir_no, { secili_ogretmen_id: null, yeni_ogretmen_ad: s.ogretmen_oneri?.kanonik || s.ham?.ogretmen_ad });
+                          else satirGuncelle(s.satir_no, { secili_ogretmen_id: v || null, yeni_ogretmen_ad: "" });
+                        }}
+                        className={`border rounded-lg px-2 py-1 text-xs max-w-[170px] ${s.ogretmen_oneri?.belirsiz ? "border-amber-400 bg-amber-50" : "border-line"}`}>
+                        <option value="">— seçin —</option>
+                        {s.yeni_ogretmen_ad && <option value="yeni">➕ Yeni: {s.yeni_ogretmen_ad}</option>}
+                        {(s.ogretmen_oneri?.belirsiz && s.ogretmen_oneri?.kanonik) && <option value="yeni">➕ Yeni: {s.ogretmen_oneri.kanonik}</option>}
+                        {ogretmenler.map((o) => (
+                          <option key={o.id} value={o.id}>{oneriSet.has(o.ad) ? "★ " : ""}{o.ad}</option>
+                        ))}
+                      </select>
+                      {birlesen.length > 1 && (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-50 rounded px-1.5 py-0.5 w-fit"
+                          title={`Birleştirilen varyantlar:\n${birlesen.join("\n")}`}>
+                          <Link2 className="h-3 w-3" />{birlesen.length} varyant birleşti
+                        </span>
+                      )}
+                      {s.ogretmen_oneri?.belirsiz && (
+                        <span className="text-[10px] text-amber-700" title={`Öneriler: ${(s.ogretmen_oneri.oneriler || []).join(", ")}`}>⚠ belirsiz — seçim gerekli</span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-3 py-2 text-xs">
                     {n.odeme_durumu && <span className="inline-block px-1.5 py-0.5 rounded bg-blue-50 text-primary mr-1">{n.odeme_durumu}</span>}
