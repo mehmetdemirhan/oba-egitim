@@ -27,6 +27,8 @@ import { BildirimTercihleri } from "./components/BildirimTercihleri";
 import MebKelimeYonetimi from "./components/admin/MebKelimeYonetimi";
 import MuhasebePaneli from "./components/MuhasebePaneli";
 import OdemeTablosu from "./components/OdemeTablosu";
+import SinavYonetimi from "./components/admin/SinavYonetimi";
+import SinavCozum from "./components/SinavCozum";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
 import InstagramAyarlari from "./components/admin/InstagramAyarlari";
 import ExerciseStarter from "./components/ExerciseStarter";
@@ -525,6 +527,7 @@ function AppContent() {
             {adminVeyaKoord && <TabsTrigger value="tema-yonetimi" className={tabClass}><Palette className="h-4 w-4 mr-2" />Tema</TabsTrigger>}
             {adminVeyaKoord && <TabsTrigger value="rozet-yonetimi" className={tabClass}><Medal className="h-4 w-4 mr-2" />Rozetler</TabsTrigger>}
             {adminVeyaKoord && <TabsTrigger value="meb-kelime" className={tabClass}><BookMarked className="h-4 w-4 mr-2" />MEB Kelimeleri</TabsTrigger>}
+            {adminVeyaKoord && <TabsTrigger value="sinav" className={tabClass}><ClipboardList className="h-4 w-4 mr-2" />Sınavlar</TabsTrigger>}
             <TabsTrigger value="ai-merkezi" className={tabClass}><Brain className="h-4 w-4 mr-2" />AI Merkezi</TabsTrigger>
           </TabsList>
           )}
@@ -554,6 +557,13 @@ function AppContent() {
           {adminVeyaKoord && (
             <TabsContent value="meb-kelime">
               <MebKelimeYonetimi apiBase={API} />
+            </TabsContent>
+          )}
+
+          {/* Sınav Soru Bankası */}
+          {adminVeyaKoord && (
+            <TabsContent value="sinav">
+              <SinavYonetimi apiBase={API} />
             </TabsContent>
           )}
 
@@ -5967,6 +5977,8 @@ function OgretmenPaneli({ user, logout }) {
 // ═══════════════════════════════════════════════
 
 function OgrenciPaneli({ user, logout }) {
+  const [sinavCozum, setSinavCozum] = useState(null);
+  const sinavBaslat = (odevId, gorevId) => setSinavCozum({ odevId, gorevId });
   const { toast } = useToast();
   const { isFullscreen } = useFullscreenExercise();
   const [profil, setProfil] = useState(null);
@@ -6644,6 +6656,7 @@ function OgrenciPaneli({ user, logout }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {sinavCozum && <SinavCozum apiBase={API} odevId={sinavCozum.odevId} gorevId={sinavCozum.gorevId} onClose={() => setSinavCozum(null)} onComplete={(gid) => { if (gid) gorevTamamla(gid); setSinavCozum(null); }} />}
       {/* Header — tam ekran egzersiz modunda gizlenir */}
       {!isFullscreen && (
       <div className="bg-surface border-b sticky top-0 z-30">
@@ -6901,7 +6914,7 @@ function OgrenciPaneli({ user, logout }) {
         {/* ═══ GÖREVLERİM ═══ */}
         {aktifSekme === "gorevler" && (<div className="space-y-3"><h2 className="text-lg font-bold">Görevlerim</h2>
           {bekleyenGorevler.length === 0 && tamamlananGorevler.length === 0 ? (<div className="text-center py-12"><div className="text-5xl mb-3">✅</div><p className="text-subtle">Tüm görevler tamamlandı!</p></div>) : (<>
-            {bekleyenGorevler.map(g => (<Card key={g.id} className="border border-line shadow-sm"><CardContent className="p-4 flex items-start justify-between gap-3"><div className="min-w-0"><div className="font-bold text-sm">{g.baslik}</div>{g.aciklama && <p className="text-xs text-subtle mt-1">{g.aciklama}</p>}<div className="text-xs text-subtle mt-1">{g.atayan_ad && `Atayan: ${g.atayan_ad}`}{g.son_tarih && ` • Son: ${new Date(g.son_tarih).toLocaleDateString('tr-TR')}`}</div>{g.film_link && <a href={g.film_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 block mt-1">🎬 Film Linki</a>}{g.makale_link && <a href={g.makale_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 block mt-1">📄 Makale</a>}</div><Button size="sm" className="bg-green-600 text-white text-xs shrink-0" onClick={() => gorevTamamla(g.id)}>Tamamla</Button></CardContent></Card>))}
+            {bekleyenGorevler.map(g => (<Card key={g.id} className="border border-line shadow-sm"><CardContent className="p-4 flex items-start justify-between gap-3"><div className="min-w-0"><div className="font-bold text-sm">{g.baslik}</div>{g.aciklama && <p className="text-xs text-subtle mt-1">{g.aciklama}</p>}<div className="text-xs text-subtle mt-1">{g.atayan_ad && `Atayan: ${g.atayan_ad}`}{g.son_tarih && ` • Son: ${new Date(g.son_tarih).toLocaleDateString('tr-TR')}`}</div>{g.film_link && <a href={g.film_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 block mt-1">🎬 Film Linki</a>}{g.makale_link && <a href={g.makale_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 block mt-1">📄 Makale</a>}</div>{g.tur === "sinav_odevi" ? <Button size="sm" className="bg-indigo-600 text-white text-xs shrink-0" onClick={() => sinavBaslat(g.icerik_id, g.id)}>Sınavı Başlat</Button> : <Button size="sm" className="bg-green-600 text-white text-xs shrink-0" onClick={() => gorevTamamla(g.id)}>Tamamla</Button>}</CardContent></Card>))}
             {tamamlananGorevler.length >0 && (<><h3 className="text-xs font-medium text-subtle mt-4">Tamamlanan ({tamamlananGorevler.length})</h3>{tamamlananGorevler.slice(0,5).map(g =>(<div key={g.id} className="bg-green-50 rounded-xl p-3 border border-green-100 opacity-60 text-sm">{g.baslik}</div>))}</>)}
           </>)}
         </div>)}
@@ -9665,6 +9678,12 @@ function GorevYonetimi({ user, students, teachers }) {
   const [kitapYukleniyor, setKitapYukleniyor] = useState(false);
   const [gelisimIcerikleri, setGelisimIcerikleri] = useState([]);
   const [icerikSecDialogu, setIcerikSecDialogu] = useState(false);
+  // Sınav ödevi seti (otomatik kriter)
+  const [sinavDersler, setSinavDersler] = useState([]);
+  const [sinavKriter, setSinavKriter] = useState({ ders: "", zorluk: "", soruSayisi: 10 });
+  const [sinavSetHazir, setSinavSetHazir] = useState(null);
+  const [sinavSetYukleniyor, setSinavSetYukleniyor] = useState(false);
+  const [sinavSonuc, setSinavSonuc] = useState(null); // öğretmen sonuç modalı
 
   const fetchAll = useCallback(async () => {
     try { const r = await axios.get(`${API}/gorevler`); setGorevler(r.data); } catch(e) {}
@@ -9677,9 +9696,9 @@ function GorevYonetimi({ user, students, teachers }) {
     try { const r = await axios.get(`${API}/gelisim/icerik`); const gd = Array.isArray(r.data) ? r.data : []; setGelisimIcerikleri(gd.filter(i => i.durum === "yayinda")); } catch(e) {}
   };
 
-  const turIcon = (tur) => ({ ozel: <FileText className="h-4 w-4"/>, film: <Film className="h-4 w-4"/>, kitap: <BookMarked className="h-4 w-4"/>, makale: <FileText className="h-4 w-4"/>, hizmetici: <GraduationCap className="h-4 w-4"/>, egzersiz: <Target className="h-4 w-4"/> }[tur] || <ClipboardList className="h-4 w-4"/>);
-  const turLabelGorev = (tur) => ({ ozel: "Özel Görev", film: "Film", kitap: "Kitap", makale: "Makale", hizmetici: "Hizmetiçi Eğitim", egzersiz: "Egzersiz" }[tur] || tur);
-  const turColorGorev = (tur) => ({ ozel: "bg-app text-subtle", film: "bg-purple-100 text-purple-600", kitap: "bg-green-100 text-green-600", makale: "bg-orange-100 text-orange-600", hizmetici: "bg-blue-100 text-primary", egzersiz: "bg-pink-100 text-pink-600" }[tur] || "bg-app text-subtle");
+  const turIcon = (tur) => ({ ozel: <FileText className="h-4 w-4"/>, film: <Film className="h-4 w-4"/>, kitap: <BookMarked className="h-4 w-4"/>, makale: <FileText className="h-4 w-4"/>, hizmetici: <GraduationCap className="h-4 w-4"/>, egzersiz: <Target className="h-4 w-4"/>, sinav_odevi: <ClipboardList className="h-4 w-4"/> }[tur] || <ClipboardList className="h-4 w-4"/>);
+  const turLabelGorev = (tur) => ({ ozel: "Özel Görev", film: "Film", kitap: "Kitap", makale: "Makale", hizmetici: "Hizmetiçi Eğitim", egzersiz: "Egzersiz", sinav_odevi: "Sınav" }[tur] || tur);
+  const turColorGorev = (tur) => ({ ozel: "bg-app text-subtle", film: "bg-purple-100 text-purple-600", kitap: "bg-green-100 text-green-600", makale: "bg-orange-100 text-orange-600", hizmetici: "bg-blue-100 text-primary", egzersiz: "bg-pink-100 text-pink-600", sinav_odevi: "bg-indigo-100 text-indigo-600" }[tur] || "bg-app text-subtle");
   const durumBadgeGorev = (d) => ({
     bekliyor: <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-100 text-amber-700 text-xs rounded-full font-medium"><Clock className="h-3 w-3" />Bekliyor</span>,
     devam_ediyor: <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-100 text-primary text-xs rounded-full font-medium"><RefreshCw className="h-3 w-3" />Devam Ediyor</span>,
@@ -9696,6 +9715,7 @@ function GorevYonetimi({ user, students, teachers }) {
   const gorevOlustur = async (e) => {
     e.preventDefault();
     if (seciliHedefler.length === 0) { toast({ title: "Uyarı", description: "En az bir kişi seçmelisiniz", variant: "destructive" }); return; }
+    if (form.tur === "sinav_odevi" && !form.icerik_id) { toast({ title: "Uyarı", description: "Önce sınav seti oluşturun", variant: "destructive" }); return; }
     try {
       if (seciliHedefler.length === 1) {
         await axios.post(`${API}/gorevler`, { ...form, hedef_id: seciliHedefler[0], hedef_tip: form.hedef_tip });
@@ -9703,7 +9723,7 @@ function GorevYonetimi({ user, students, teachers }) {
         await axios.post(`${API}/gorevler/toplu`, { hedef_idler: seciliHedefler, hedef_tip: form.hedef_tip, gorev: form });
       }
       toast({ title: "✅ Görev atandı", description: `${seciliHedefler.length} kişiye görev oluşturuldu` });
-      resetForm(); setSeciliHedefler([]); setGorunum("liste"); fetchAll();
+      resetForm(); setSeciliHedefler([]); setSinavSetHazir(null); setGorunum("liste"); fetchAll();
     } catch(e) { toast({ title: "Hata", description: e.response?.data?.detail || "Görev oluşturulamadı", variant: "destructive" }); }
   };
 
@@ -9736,6 +9756,31 @@ function GorevYonetimi({ user, students, teachers }) {
     setForm({ ...form, baslik: icerik.baslik, aciklama: icerik.aciklama, tur: icerik.tur, icerik_id: icerik.id, makale_link: icerik.makale_link || "", kitap_yazar: icerik.kitap_yazar || "", kitap_isbn: icerik.kitap_isbn || "", kitap_link: icerik.kitap_link || "", kitap_kapak: icerik.kitap_kapak || "" });
     setIcerikSecDialogu(false);
     toast({ title: `"${icerik.baslik}" içeriği görev olarak seçildi` });
+  };
+
+  // ── Sınav ödevi seti ──
+  useEffect(() => {
+    axios.get(`${API}/sinav/dersler`).then(r => setSinavDersler(r.data?.dersler || [])).catch(() => {});
+  }, []);
+  const sinavSetiOlustur = async () => {
+    if (!sinavKriter.ders) { toast({ title: "Ders seçin", variant: "destructive" }); return; }
+    setSinavSetYukleniyor(true);
+    try {
+      const r = await axios.post(`${API}/sinav/odev`, {
+        ad: form.baslik || "Sınav Ödevi",
+        otomatikKriter: { ders: sinavKriter.ders, zorluk: sinavKriter.zorluk || undefined, soruSayisi: Number(sinavKriter.soruSayisi) || 10 },
+      });
+      setSinavSetHazir({ odev_id: r.data.odev_id, soruSayisi: r.data.soruSayisi });
+      setForm(prev => ({ ...prev, tur: "sinav_odevi", icerik_id: r.data.odev_id, baslik: prev.baslik || r.data.ad }));
+      toast({ title: `✅ ${r.data.soruSayisi} soruluk set hazır` });
+    } catch (e) {
+      toast({ title: "Set oluşturulamadı", description: e?.response?.data?.detail || "", variant: "destructive" });
+    } finally { setSinavSetYukleniyor(false); }
+  };
+  const sinavSonucGetir = async (odevId) => {
+    if (!odevId) { toast({ title: "Bu görevde sınav bulunamadı", variant: "destructive" }); return; }
+    try { const r = await axios.get(`${API}/sinav/odev/${odevId}/sonuc`); setSinavSonuc(r.data); }
+    catch (e) { toast({ title: "Sonuç alınamadı", description: e?.response?.data?.detail || "", variant: "destructive" }); }
   };
 
   const [ogretmenUsers, setOgretmenUsers] = useState([]);
@@ -9818,7 +9863,7 @@ function GorevYonetimi({ user, students, teachers }) {
             <button type="button" onClick={() => { fetchGelisimIcerikleri(); setIcerikSecDialogu(true); }} className="text-xs text-primary hover:underline flex items-center gap-1"><BookOpen className="h-3 w-3" /> Mevcut içerikten seç</button></div></CardHeader>
             <CardContent className="space-y-4">
               <div><Label className="mb-2 block">Görev Türü</Label><div className="flex flex-wrap gap-2">
-                {[{v:"ozel",l:"Özel Görev"},{v:"hizmetici",l:"Hizmetiçi"},{v:"film",l:"Film"},{v:"kitap",l:"Kitap"},{v:"makale",l:"Makale"},{v:"egzersiz",l:"Egzersiz"}].map(t => (
+                {[{v:"ozel",l:"Özel Görev"},{v:"hizmetici",l:"Hizmetiçi"},{v:"film",l:"Film"},{v:"kitap",l:"Kitap"},{v:"makale",l:"Makale"},{v:"egzersiz",l:"Egzersiz"},{v:"sinav_odevi",l:"Sınav"}].map(t => (
                   <button key={t.v} type="button" onClick={() => setForm({...form, tur: t.v})}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${form.tur === t.v ? 'bg-primary text-white border-primary shadow' : 'bg-surface text-subtle border-line hover:border-primary'}`}>{t.l}</button>))}
               </div></div>
@@ -9837,6 +9882,32 @@ function GorevYonetimi({ user, students, teachers }) {
                 <div><Label>Yazar</Label><Input value={form.kitap_yazar} onChange={e => setForm({...form, kitap_yazar: e.target.value})} /></div></div>)}
 
               {form.tur === "makale" && (<div className="p-4 bg-app border border-line rounded-xl space-y-3"><div className="inline-flex items-center gap-1.5 font-semibold text-sm text-content"><FileText className="h-4 w-4" />Makale Linki</div><Input value={form.makale_link} onChange={e => setForm({...form, makale_link: e.target.value})} placeholder="https://..." /></div>)}
+              {form.tur === "sinav_odevi" && (
+                <div className="p-4 bg-app border border-line rounded-xl space-y-3">
+                  <div className="inline-flex items-center gap-1.5 font-semibold text-sm text-content"><ClipboardList className="h-4 w-4" />Sınav Seti (otomatik seçim)</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div><Label>Ders</Label>
+                      <select value={sinavKriter.ders} onChange={e => { setSinavKriter({ ...sinavKriter, ders: e.target.value }); setSinavSetHazir(null); }} className="w-full px-3 py-2 rounded-lg border border-line text-sm bg-surface">
+                        <option value="">Seçin…</option>
+                        {sinavDersler.map(d => <option key={d.key} value={d.key}>{d.ad}</option>)}
+                      </select>
+                    </div>
+                    <div><Label>Zorluk</Label>
+                      <select value={sinavKriter.zorluk} onChange={e => { setSinavKriter({ ...sinavKriter, zorluk: e.target.value }); setSinavSetHazir(null); }} className="w-full px-3 py-2 rounded-lg border border-line text-sm bg-surface">
+                        <option value="">Tümü</option><option value="kolay">kolay</option><option value="orta">orta</option><option value="zor">zor</option>
+                      </select>
+                    </div>
+                    <div><Label>Soru Sayısı</Label>
+                      <Input type="number" value={sinavKriter.soruSayisi} onChange={e => { setSinavKriter({ ...sinavKriter, soruSayisi: e.target.value }); setSinavSetHazir(null); }} />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={sinavSetiOlustur} disabled={sinavSetYukleniyor}>{sinavSetYukleniyor ? "Hazırlanıyor…" : "Seti Oluştur"}</Button>
+                    {sinavSetHazir && <span className="text-xs text-green-600 font-medium">✅ {sinavSetHazir.soruSayisi} soruluk set hazır</span>}
+                  </div>
+                  <div className="text-[11px] text-subtle">Yayındaki sorulardan rastgele seçilir. Seti oluşturduktan sonra aşağıdan öğrencileri seçip atayın.</div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -9914,6 +9985,7 @@ function GorevYonetimi({ user, students, teachers }) {
             </div></div>
             <div className="flex items-center gap-2 shrink-0">
               {durumBadgeGorev(g.durum)}
+              {g.tur === "sinav_odevi" && (g.atayan_id === user.id || user.role === "admin") && (<Button size="sm" variant="outline" className="text-xs" onClick={() => sinavSonucGetir(g.icerik_id)}>📊 Sonuç</Button>)}
               {g.durum === "bekliyor" && g.hedef_id === user.id && (<Button size="sm" variant="outline" className="text-xs" onClick={() => durumGuncelle(g.id, "devam_ediyor")}>Başla</Button>)}
               {(g.durum === "bekliyor" || g.durum === "devam_ediyor") && g.hedef_id === user.id && (
                 <Button size="sm" className="bg-green-600 text-white text-xs" onClick={() => { setTamamlamaDialogu(g); setTamamlamaNotu(""); }}>Tamamla</Button>)}
@@ -9921,6 +9993,51 @@ function GorevYonetimi({ user, students, teachers }) {
             </div>
           </div></CardContent></Card>))}
       </div>)}
+
+      {sinavSonuc && (
+        <div className="fixed inset-0 z-[80] bg-black/40 flex items-center justify-center p-4" onClick={() => setSinavSonuc(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[88vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-3 border-b flex items-center justify-between sticky top-0 bg-white rounded-t-2xl">
+              <div className="font-bold text-gray-800">📊 {sinavSonuc.ad || "Sınav"} — Sonuçlar</div>
+              <button onClick={() => setSinavSonuc(null)} className="text-gray-400 hover:text-gray-700 text-xl leading-none">✕</button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-indigo-50 rounded-xl p-3"><div className="text-2xl font-bold text-indigo-600">{sinavSonuc.cozenSayisi}</div><div className="text-[11px] text-indigo-500">çözen öğrenci</div></div>
+                <div className="bg-green-50 rounded-xl p-3"><div className="text-2xl font-bold text-green-600">{sinavSonuc.genel?.dogru ?? 0}/{sinavSonuc.genel?.toplam ?? 0}</div><div className="text-[11px] text-green-600">doğru / cevap</div></div>
+                <div className="bg-gray-50 rounded-xl p-3"><div className="text-2xl font-bold text-gray-700">{sinavSonuc.soruSayisi}</div><div className="text-[11px] text-gray-500">soru</div></div>
+              </div>
+              {sinavSonuc.ogrenciler?.length > 0 && (
+                <div>
+                  <div className="text-xs font-semibold text-gray-500 mb-2">Öğrenci Bazlı</div>
+                  <div className="space-y-1">
+                    {sinavSonuc.ogrenciler.map((o) => (
+                      <div key={o.ogrenciId} className="flex items-center justify-between text-sm px-3 py-1.5 rounded-lg bg-gray-50"><span className="text-gray-700">{o.ad}</span><span className="font-semibold text-gray-800">{o.dogru}/{o.toplam}</span></div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {sinavSonuc.konuBazli?.length > 0 && (
+                <div>
+                  <div className="text-xs font-semibold text-gray-500 mb-2">Konu Bazlı Kırılım <span className="text-gray-400">(zayıf alan üstte)</span></div>
+                  <div className="space-y-1.5">
+                    {sinavSonuc.konuBazli.map((k) => {
+                      const yuzde = k.toplam ? Math.round((k.dogru / k.toplam) * 100) : 0;
+                      return (
+                        <div key={k.konu}>
+                          <div className="flex justify-between text-xs text-gray-600"><span>{k.konu}</span><span>{k.dogru}/{k.toplam} (%{yuzde})</span></div>
+                          <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden"><div className={`h-full ${yuzde < 50 ? "bg-red-400" : yuzde < 75 ? "bg-amber-400" : "bg-green-500"}`} style={{ width: `${yuzde}%` }} /></div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {(!sinavSonuc.ogrenciler || sinavSonuc.ogrenciler.length === 0) && <div className="text-sm text-gray-400 text-center py-4">Henüz çözen öğrenci yok.</div>}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
