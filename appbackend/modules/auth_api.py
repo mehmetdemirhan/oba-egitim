@@ -6,14 +6,18 @@ NOT: `create_default_admin` startup hook'u `app`'e bağlı olduğu için server.
 """
 import uuid
 import random
-from datetime import datetime, timezone
+import hashlib
+import secrets
+import time
+from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Body
+from fastapi import APIRouter, Depends, HTTPException, status, Body, Request
 from pydantic import BaseModel
 
 from core.db import db
-from core.config import SIFRE_SIFIRLAMA_DEBUG
+from core.config import SMTP_ENABLED, FRONTEND_URL, SIFRE_RESET_TOKEN_DK
+from core.mail import send_email
 from core.auth import (
     UserRole, get_current_user, require_role,
     hash_password, verify_password, create_access_token,
@@ -148,32 +152,139 @@ async def get_me(current_user=Depends(get_current_user)):
         sifre_degistirme_zorunlu=bool(current_user.get("sifre_degistirme_zorunlu", False)),
     )
 
+# ── ŞİFRE SIFIRLAMA (e-posta + tek kullanımlık token) ─────────────────────
+# Güvenlik ilkeleri:
+#  * Geçici şifre/reset bilgisi ASLA yanıtta dönmez; şifre kimlik doğrulanmadan
+#    DEĞİŞTİRİLMEZ (yalnız geçerli token'lı reset ekranı değiştirir).
+#  * Yanıt her durumda NÖTR — hesap var/yok sızmaz (enumeration yok).
+#  * SMTP tanımlı değilse akış kapalı; kullanıcı yöneticisine yönlendirilir.
+#  * Rate limit (IP + hesap girdisi) — kaba kuvvet/spam sınırı.
+
+_rate_buckets: dict = {}  # in-memory sliding-window (tek-process; restart'ta sıfırlanır)
+NOTR_MESAJ = ("Eğer bu hesap sistemde kayıtlıysa, şifre sıfırlama bağlantısı "
+              "e-posta adresine gönderildi. Lütfen e-postanı kontrol et.")
+SMTP_KAPALI_MESAJ = ("Şifre sıfırlama e-postası şu an etkin değil. Lütfen şifre "
+                     "sıfırlama için yöneticinize başvurun.")
+
+
+def _rate_ok(key: str, max_n: int, window_sn: int) -> bool:
+    now = time.time()
+    arr = [t for t in _rate_buckets.get(key, []) if now - t < window_sn]
+    if len(arr) >= max_n:
+        _rate_buckets[key] = arr
+        return False
+    arr.append(now)
+    _rate_buckets[key] = arr
+    return True
+
+
+def _client_ip(request: Request) -> str:
+    xff = request.headers.get("x-forwarded-for", "")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else "bilinmiyor"
+
+
+def _token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _reset_email_html(ad: str, link: str) -> str:
+    return f"""\
+<div style="font-family:system-ui,Segoe UI,Arial,sans-serif;max-width:520px;margin:0 auto;color:#1f2937">
+  <h2 style="color:#4f46e5">OBA Eğitim — Şifre Sıfırlama</h2>
+  <p>Merhaba {ad},</p>
+  <p>Hesabın için şifre sıfırlama talebi aldık. Aşağıdaki butona tıklayarak yeni şifreni belirleyebilirsin:</p>
+  <p style="text-align:center;margin:28px 0">
+    <a href="{link}" style="background:#4f46e5;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-weight:600;display:inline-block">Şifremi Sıfırla</a>
+  </p>
+  <p style="font-size:13px;color:#6b7280">Bu bağlantı {SIFRE_RESET_TOKEN_DK} dakika geçerlidir ve yalnızca bir kez kullanılabilir.</p>
+  <p style="font-size:13px;color:#6b7280">Bu talebi sen yapmadıysan bu e-postayı yok sayabilirsin; şifren değişmez.</p>
+</div>"""
+
+
 @router.post("/auth/forgot-password")
-async def forgot_password(data: dict = Body(...)):
-    email_or_phone = data.get("email_or_phone", "").lower().strip()
+async def forgot_password(request: Request, data: dict = Body(...)):
+    email_or_phone = (data.get("email_or_phone") or data.get("email") or "").lower().strip()
+    ip = _client_ip(request)
+    # Rate limit: IP başına 5/15dk
+    if not _rate_ok(f"forgot:ip:{ip}", 5, 900):
+        raise HTTPException(status_code=429, detail="Çok fazla deneme. Lütfen biraz sonra tekrar deneyin.")
     if not email_or_phone:
         raise HTTPException(status_code=400, detail="E-posta veya telefon giriniz")
+    # Hesap girdisi başına 3/15dk — aşılırsa yine NÖTR yanıt (sızdırma yok)
+    if not _rate_ok(f"forgot:acc:{email_or_phone}", 3, 900):
+        return {"message": NOTR_MESAJ}
+
+    # SMTP kapalıysa akış kapalı — herkese aynı mesaj (hesap varlığı sızmaz)
+    if not SMTP_ENABLED:
+        return {"message": SMTP_KAPALI_MESAJ, "smtp_kapali": True}
+
+    # Kullanıcıyı bul; YOKSA da aynı nötr yanıt. Şifre ÜRETİLMEZ/DEĞİŞMEZ.
     user = await db.users.find_one({"email": email_or_phone})
     if not user:
         user = await db.users.find_one({"telefon": email_or_phone})
-    if not user:
-        raise HTTPException(status_code=404, detail="Bu bilgilerle kayıtlı kullanıcı bulunamadı")
-    # 6 haneli geçici şifre oluştur
-    gecici_sifre = str(random.randint(100000, 999999))
-    new_hash = hash_password(gecici_sifre)
-    await db.users.update_one({"id": user["id"]}, {"$set": {"password_hash": new_hash}})
-    # NOT: Gerçek uygulamada burada e-posta veya SMS gönderilir.
-    # Güvenlik: geçici şifre yalnızca lokal geliştirmede (SIFRE_SIFIRLAMA_DEBUG=1)
-    # yanıtta döner; prod varsayılanında SIZDIRILMAZ.
-    yanit = {
-        "message": "Geçici şifre oluşturuldu",
-        "kullanici": f"{user['ad']} {user['soyad']}",
-        "email": user.get("email", ""),
-        "telefon": user.get("telefon", ""),
-    }
-    if SIFRE_SIFIRLAMA_DEBUG:
-        yanit["gecici_sifre"] = gecici_sifre
-    return yanit
+    hedef_email = (user or {}).get("email", "")
+    if user and hedef_email:
+        raw = secrets.token_urlsafe(32)  # yüksek entropili; e-postada plaintext, DB'de yalnız hash
+        simdi = datetime.now(timezone.utc)
+        await db.sifre_reset_tokenlari.insert_one({
+            "id": str(uuid.uuid4()),
+            "user_id": user["id"],
+            "token_hash": _token_hash(raw),
+            "olusturma": simdi.isoformat(),
+            "gecerlilik": (simdi + timedelta(minutes=SIFRE_RESET_TOKEN_DK)).isoformat(),
+            "kullanildi": False,
+            "ip": ip,
+        })
+        link = f"{FRONTEND_URL}/sifre-sifirla?token={raw}"
+        ad = f"{user.get('ad', '')} {user.get('soyad', '')}".strip() or "Merhaba"
+        send_email(
+            hedef_email, "OBA Eğitim — Şifre Sıfırlama",
+            _reset_email_html(ad, link),
+            text=f"Şifreni sıfırlamak için: {link}  (Bağlantı {SIFRE_RESET_TOKEN_DK} dk geçerlidir.)",
+        )
+        # send_email False dönse bile (SMTP hatası) yanıt NÖTR kalır.
+    return {"message": NOTR_MESAJ}
+
+
+@router.get("/auth/reset-password/gecerli")
+async def reset_token_gecerli(token: str = ""):
+    """Reset ekranı, formu göstermeden önce token'ın geçerliliğini sorar."""
+    if not token:
+        return {"gecerli": False}
+    kayit = await db.sifre_reset_tokenlari.find_one({"token_hash": _token_hash(token), "kullanildi": False})
+    if not kayit:
+        return {"gecerli": False}
+    gecerli = datetime.now(timezone.utc) <= datetime.fromisoformat(kayit["gecerlilik"])
+    return {"gecerli": gecerli}
+
+
+@router.post("/auth/reset-password")
+async def reset_password(request: Request, data: dict = Body(...)):
+    ip = _client_ip(request)
+    if not _rate_ok(f"reset:ip:{ip}", 10, 900):
+        raise HTTPException(status_code=429, detail="Çok fazla deneme. Lütfen biraz sonra tekrar deneyin.")
+    token = (data.get("token") or "").strip()
+    yeni = data.get("yeni_sifre") or data.get("new_password") or ""
+    if not token:
+        raise HTTPException(status_code=400, detail="Geçersiz bağlantı.")
+    if len(yeni) < 6:
+        raise HTTPException(status_code=400, detail="Şifre en az 6 karakter olmalı.")
+    kayit = await db.sifre_reset_tokenlari.find_one({"token_hash": _token_hash(token), "kullanildi": False})
+    if not kayit:
+        raise HTTPException(status_code=400, detail="Sıfırlama bağlantısı geçersiz veya kullanılmış.")
+    if datetime.now(timezone.utc) > datetime.fromisoformat(kayit["gecerlilik"]):
+        raise HTTPException(status_code=400, detail="Sıfırlama bağlantısının süresi dolmuş.")
+    # Şifreyi güncelle, token'ı tüket, kullanıcının diğer aktif token'larını iptal et.
+    await db.users.update_one(
+        {"id": kayit["user_id"]},
+        {"$set": {"password_hash": hash_password(yeni), "sifre_degistirme_zorunlu": False}},
+    )
+    await db.sifre_reset_tokenlari.update_many(
+        {"user_id": kayit["user_id"], "kullanildi": False}, {"$set": {"kullanildi": True}}
+    )
+    return {"message": "Şifreniz güncellendi. Yeni şifrenizle giriş yapabilirsiniz."}
 
 @router.post("/auth/change-password")
 async def change_password(data: ChangePassword, current_user=Depends(get_current_user)):

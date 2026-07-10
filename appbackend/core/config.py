@@ -15,10 +15,20 @@ load_dotenv(ROOT_DIR / '.env')
 MONGO_URL = os.environ['MONGO_URL']
 DB_NAME = os.environ['DB_NAME']
 
-# ── Güvenlik / geliştirme bayrakları ──
-# Şifre sıfırlamada geçici şifreyi HTTP yanıtında GÖSTER (yalnızca lokal geliştirme).
-# Prod'da e-posta/SMS gönderimi olmadığından varsayılan KAPALI: şifre yanıtta dönmez.
-SIFRE_SIFIRLAMA_DEBUG = os.environ.get("SIFRE_SIFIRLAMA_DEBUG", "").lower() in ("1", "true", "yes", "on")
+# ── E-posta (SMTP) — şifre sıfırlama akışı ──
+# SMTP tanımlı DEĞİLSE e-posta ile şifre sıfırlama KAPALIDIR (admin kurtarma yolu kalır).
+# Geçici şifre/reset bilgisi ASLA HTTP yanıtında dönmez (güvenlik).
+SMTP_HOST = os.environ.get("SMTP_HOST", "")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USER = os.environ.get("SMTP_USER", "")
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+SMTP_FROM = os.environ.get("SMTP_FROM", "") or SMTP_USER or "noreply@oba.com"
+SMTP_TLS = os.environ.get("SMTP_TLS", "true").lower() in ("1", "true", "yes", "on")
+SMTP_ENABLED = bool(SMTP_HOST and SMTP_USER and SMTP_PASSWORD)
+# Reset linkinin işaret edeceği frontend kökü (e-postadaki bağlantı)
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "https://oba-egitim.vercel.app").rstrip("/")
+# Reset token geçerlilik süresi (dakika)
+SIFRE_RESET_TOKEN_DK = int(os.environ.get("SIFRE_RESET_TOKEN_DK", "30"))
 
 # ── Web Push (VAPID) — ders hatırlatma bildirimleri ──
 VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")

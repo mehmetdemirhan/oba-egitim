@@ -3,6 +3,7 @@ import "./App.css";
 import axios from "axios";
 import { useAuth } from "./context/AuthContext";
 import LoginPage from "./pages/LoginPage";
+import SifreSifirla from "./pages/SifreSifirla";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
@@ -365,7 +366,9 @@ function AppContent() {
   }, [user]);
 
   useEffect(() => {
-    if (user) fetchAll();
+    // Yalnızca admin/koordinatör yönetim verisini çeker (fetchAll admin-only uçlara
+    // vurur; diğer roller kendi panel bileşenlerini kullanır → gereksiz 403'ler önlenir)
+    if (user && (user.role === "admin" || user.role === "coordinator")) fetchAll();
   }, [user, fetchAll]);
 
   // ── KOŞULLU RETURN'LER HOOK'LARDAN SONRA ──
@@ -379,7 +382,12 @@ function AppContent() {
     );
   }
 
-  if (!user) return <LoginPage />;
+  if (!user) {
+    // E-postadaki reset linki: /sifre-sifirla?token=... → login olmadan yeni şifre ekranı
+    const _tok = new URLSearchParams(window.location.search).get("token");
+    if (window.location.pathname === "/sifre-sifirla" && _tok) return <SifreSifirla token={_tok} />;
+    return <LoginPage />;
+  }
 
   // İlk giriş: geçici şifreyle oluşturulan hesap, şifre değiştirmeden hiçbir modüle erişemez
   if (user.sifre_degistirme_zorunlu) return <ZorunluSifreDegistir />;
