@@ -176,6 +176,12 @@ class PaymentCreate(BaseModel):
     kisi_id: str
     miktar: float
     aciklama: Optional[str] = None
+    tarih: Optional[datetime] = None  # verilmezse sunucu "şimdi" kullanır
+
+class PaymentUpdate(BaseModel):
+    miktar: Optional[float] = None
+    aciklama: Optional[str] = None
+    tarih: Optional[datetime] = None
 
 class ExportData(BaseModel):
     ogretmenler: List[dict]
@@ -496,7 +502,8 @@ async def delete_ders_icerik(ders_id: str, icerik_id: str, current_user=Depends(
 @router.post("/payments", response_model=Payment)
 async def create_payment(payment_data: PaymentCreate,
                          current_user=Depends(require_role(UserRole.ADMIN, UserRole.ACCOUNTANT))):
-    payment = Payment(**payment_data.dict())
+    # None alanları düş: tarih verilmezse Payment modelinin varsayılanı (şimdi) kullanılır.
+    payment = Payment(**{k: v for k, v in payment_data.dict().items() if v is not None})
     await db.payments.insert_one(prepare_for_mongo(payment.dict()))
     if payment.tip == "ogrenci":
         await db.students.update_one({"id": payment.kisi_id}, {"$inc": {"yapilan_odeme": payment.miktar}})
@@ -521,6 +528,29 @@ async def delete_payment(payment_id: str,
         await db.teachers.update_one({"id": payment['kisi_id']}, {"$inc": {"yapilan_odeme": -payment['miktar']}})
     await db.payments.delete_one({"id": payment_id})
     return {"message": "Ödeme başarıyla silindi"}
+
+@router.put("/payments/{payment_id}", response_model=Payment)
+async def update_payment(payment_id: str, data: PaymentUpdate,
+                         current_user=Depends(require_role(UserRole.ADMIN, UserRole.ACCOUNTANT))):
+    """Ödeme düzeltme: miktar/açıklama/tarih güncellenir. Miktar değişirse kişi
+    bakiyesi (yapilan_odeme) fark kadar ayarlanır. tip/kisi_id değişmez."""
+    eski = await db.payments.find_one({"id": payment_id})
+    if not eski:
+        raise HTTPException(status_code=404, detail="Ödeme bulunamadı")
+    yeni_miktar = data.miktar if data.miktar is not None else eski.get("miktar", 0)
+    delta = float(yeni_miktar) - float(eski.get("miktar", 0))
+    if delta and eski.get("tip") == "ogrenci":
+        await db.students.update_one({"id": eski["kisi_id"]}, {"$inc": {"yapilan_odeme": delta}})
+    elif delta and eski.get("tip") == "ogretmen":
+        await db.teachers.update_one({"id": eski["kisi_id"]}, {"$inc": {"yapilan_odeme": delta}})
+    guncelle = {"miktar": float(yeni_miktar)}
+    if data.aciklama is not None:
+        guncelle["aciklama"] = data.aciklama
+    if data.tarih is not None:
+        guncelle["tarih"] = data.tarih.isoformat()
+    await db.payments.update_one({"id": payment_id}, {"$set": guncelle})
+    guncel = await db.payments.find_one({"id": payment_id})
+    return Payment(**parse_from_mongo(guncel))
 
 @router.get("/export", response_model=ExportData)
 async def get_export_data():
