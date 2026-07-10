@@ -105,11 +105,13 @@ async def run():
               "export tüm bölümleri içeriyor")
         check(len(e["ogrenciler"]) == 1 and len(e["ogretmenler"]) == 1, "export sayıları doğru")
 
-        # 9) Öğrenci sil → öğretmen sayacı geri düşmeli
-        r = await ac.delete(f"/api/students/{student_id}")
-        check(r.status_code == 200, "öğrenci silindi")
+        # 9) Öğrenci kaldır (soft-delete: verisi olduğu için pasife alınır) → aktif sayaç düşer
+        r = await ac.delete(f"/api/students/{student_id}", headers=H_admin)
+        check(r.status_code == 200 and r.json().get("mod") == "pasif", "öğrenci pasife alındı (soft-delete)")
+        r = await ac.get(f"/api/students/{student_id}")
+        check(r.status_code == 404 or r.json().get("arsivli") is True, "pasif öğrenci aktif listede yok")
         r = await ac.get(f"/api/teachers/{teacher_id}")
-        check(r.json()["ogrenci_sayisi"] == 0, "öğrenci silinince sayaç 0'a döndü")
+        check(r.json()["ogrenci_sayisi"] == 0, "pasife alınca aktif öğrenci sayacı 0")
 
         # 10) Öğretmen kendi öğrencisini ekler: teacher_id zorlanır, mali alanlar yok sayılır
         teacher_user_id = str(uuid.uuid4())
@@ -154,9 +156,9 @@ async def run():
         s = r.json()
         check(s["yapilmasi_gereken_odeme"] == 1200, "admin ödeme tutarını kaydetti (1200)")
         check(s["ogretmene_yapilacak_odeme"] == 400, "admin öğretmen payını kaydetti (400)")
-        # öğretmen toplam alacağı 400'e yükseldi (0 → 400)
+        # Soft-delete muhasebe alacağını KORUR: pasif öğrencinin 300 katkısı + Ela'nın 400 = 700.
         r = await ac.get(f"/api/teachers/{teacher_id}")
-        check(r.json()["yapilmasi_gereken_odeme"] == 400, "öğretmen toplam ödemesi 400'e güncellendi")
+        check(r.json()["yapilmasi_gereken_odeme"] == 700, "öğretmen alacağı 700 (pasif öğr. 300 korundu + Ela 400)")
         # muhasebe borç tutarı = yapilmasi_gereken_odeme - yapilan_odeme = 1200
         check(max(0, s["yapilmasi_gereken_odeme"] - s["yapilan_odeme"]) == 1200, "öğrenci borç tutarı 1200")
 

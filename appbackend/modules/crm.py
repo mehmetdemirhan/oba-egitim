@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from core.db import db, prepare_for_mongo, parse_from_mongo
 from core.auth import get_current_user, require_role, UserRole, TeacherLevel, hash_password
+from core.audit import islem_kaydet, islem_listele
 from core.hesap import gecici_sifre_uret, OGRETMEN_ROLLERI
 
 router = APIRouter()
@@ -258,7 +259,7 @@ async def get_teacher_students(teacher_id: str):
     teacher = await db.teachers.find_one({"id": teacher_id})
     if not teacher:
         raise HTTPException(status_code=404, detail="Öğretmen bulunamadı")
-    students = await db.students.find({"ogretmen_id": teacher_id}).to_list(length=None)
+    students = await db.students.find({"ogretmen_id": teacher_id, "arsivli": {"$ne": True}}).to_list(length=None)
     return [Student(**parse_from_mongo(s)) for s in students]
 
 @router.put("/teachers/{teacher_id}", response_model=Teacher)
@@ -331,8 +332,9 @@ async def create_student(student_data: StudentCreate, current_user=Depends(get_c
     return student
 
 @router.get("/students")
-async def get_students(current_user=Depends(get_current_user)):
-    students = await db.students.find().to_list(length=None)
+async def get_students(dahil_arsiv: bool = False, current_user=Depends(get_current_user)):
+    sorgu = {} if dahil_arsiv else {"arsivli": {"$ne": True}}
+    students = await db.students.find(sorgu).to_list(length=None)
     sonuc = [Student(**parse_from_mongo(s)).dict() for s in students]
     # Öğretmen + Koordinatör mali alanları görmemeli (muhasebe yalnızca admin'e ait).
     if current_user.get("role") in ("teacher", "coordinator"):
@@ -348,6 +350,21 @@ async def get_student(student_id: str):
         raise HTTPException(status_code=404, detail="Öğrenci bulunamadı")
     return Student(**parse_from_mongo(student))
 
+def _ogretmen_id(current_user: dict) -> str:
+    return current_user.get("linked_id") or current_user.get("id")
+
+
+def _ogrenci_sahiplik_kontrol(current_user: dict, student: dict):
+    """Öğretmen yalnız KENDİ öğrencisine dokunabilir; admin/koordinatör herkese.
+    Başka öğretmenin öğrencisine erişim → 403."""
+    rol = current_user.get("role")
+    if rol in ("admin", "coordinator"):
+        return
+    if rol == "teacher" and student.get("ogretmen_id") == _ogretmen_id(current_user):
+        return
+    raise HTTPException(status_code=403, detail="Bu öğrenci üzerinde yetkiniz yok")
+
+
 @router.put("/students/{student_id}", response_model=Student)
 async def update_student(student_id: str, student_update: StudentUpdate, current_user=Depends(get_current_user)):
     update_data = student_update.dict(exclude_unset=True)
@@ -361,6 +378,7 @@ async def update_student(student_id: str, student_update: StudentUpdate, current
     old_student = await db.students.find_one({"id": student_id})
     if not old_student:
         raise HTTPException(status_code=404, detail="Öğrenci bulunamadı")
+    _ogrenci_sahiplik_kontrol(current_user, old_student)
     old_teacher_id = old_student.get('ogretmen_id')
     # ogretmen_id kısmi güncellemede gönderilmemişse mevcut atama korunur;
     # aksi halde None değeri "öğretmeni kaldır" olarak yanlış yorumlanırdı.
@@ -389,24 +407,71 @@ async def update_student(student_id: str, student_update: StudentUpdate, current
             await db.teachers.update_one({"id": new_teacher_id}, {"$inc": {"ogrenci_sayisi": 1, "yapilmasi_gereken_odeme": new_payment}, "$addToSet": {"atanan_ogrenciler": student_id}})
     elif old_teacher_id and old_payment != new_payment:
         await db.teachers.update_one({"id": old_teacher_id}, {"$inc": {"yapilmasi_gereken_odeme": new_payment - old_payment}})
+    # Audit: değişen her alanı işlem kaydına yaz (öğrenci düzenleme izi).
+    for alan, yeni_deger in update_data.items():
+        eski_deger = old_student.get(alan)
+        if eski_deger != yeni_deger:
+            await islem_kaydet(current_user, "ogrenci", "duzenle", "ogrenci", student_id, alan, eski_deger, yeni_deger)
     student = await db.students.find_one({"id": student_id})
     return Student(**parse_from_mongo(student))
 
+
+async def _ogrenci_veri_var_mi(student_id: str) -> bool:
+    """Öğrencinin geçmiş/mali verisi (ödeme, kur ücreti, okuma/egzersiz) var mı?
+    Varsa gerçek silme yerine pasife alınır (muhasebe/geçmiş kopmasın)."""
+    for koleksiyon, alan in [(db.payments, "kisi_id"), (db.kur_ucretleri, "ogrenci_id"),
+                             (db.reading_logs, "ogrenci_id"), (db.egzersiz_oturumlari, "ogrenci_id"),
+                             (db.kur_atlamalari, "ogrenci_id")]:
+        try:
+            if await koleksiyon.find_one({alan: student_id}, {"_id": 1}):
+                return True
+        except Exception:
+            continue
+    return False
+
+
 @router.delete("/students/{student_id}")
-async def delete_student(student_id: str):
+async def delete_student(student_id: str, kalici: bool = False, current_user=Depends(get_current_user)):
+    """Öğrenci kaldırma. Varsayılan: SOFT-DELETE (arsivli=true) — muhasebe alacakları ve
+    geçmiş veriler korunur. `kalici=true` VE öğrencinin hiç verisi yoksa (yanlış ekleme)
+    gerçek silme yapılır. Öğretmen yalnız kendi öğrencisini kaldırabilir."""
     student = await db.students.find_one({"id": student_id})
     if not student:
         raise HTTPException(status_code=404, detail="Öğrenci bulunamadı")
-    if student.get('ogretmen_id'):
-        teacher = await db.teachers.find_one({"id": student['ogretmen_id']})
-        if teacher:
+    _ogrenci_sahiplik_kontrol(current_user, student)
+    veri_var = await _ogrenci_veri_var_mi(student_id)
+
+    if kalici and not veri_var:
+        # Gerçek silme (yalnız verisi olmayan yanlış eklemede). Öğretmen bakiye/sayaç geri al.
+        if student.get('ogretmen_id'):
             await db.teachers.update_one(
                 {"id": student['ogretmen_id']},
                 {"$inc": {"ogrenci_sayisi": -1, "yapilmasi_gereken_odeme": -student.get('ogretmene_yapilacak_odeme', 0)},
-                 "$pull": {"atanan_ogrenciler": student_id}}
-            )
-    await db.students.delete_one({"id": student_id})
-    return {"message": "Öğrenci başarıyla silindi"}
+                 "$pull": {"atanan_ogrenciler": student_id}})
+        await db.students.delete_one({"id": student_id})
+        await islem_kaydet(current_user, "ogrenci", "sil_kalici", "ogrenci", student_id,
+                           "kayit", f"{student.get('ad','')} {student.get('soyad','')}".strip(), None)
+        return {"message": "Öğrenci kalıcı olarak silindi", "mod": "kalici"}
+
+    # Soft-delete: pasife al. Mali kayıtlar/bakiye KORUNUR; aktif rosterden çıkar.
+    await db.students.update_one({"id": student_id}, {"$set": {"arsivli": True}})
+    if student.get('ogretmen_id'):
+        await db.teachers.update_one({"id": student['ogretmen_id']},
+                                     {"$inc": {"ogrenci_sayisi": -1}, "$pull": {"atanan_ogrenciler": student_id}})
+    await islem_kaydet(current_user, "ogrenci", "kaldir", "ogrenci", student_id, "arsivli", False, True)
+    return {"message": "Öğrenci pasife alındı (geçmiş korundu)", "mod": "pasif", "veri_var": veri_var}
+
+
+@router.get("/islem-log")
+async def islem_log_listesi(modul: str | None = None, hedef_id: str | None = None,
+                            kullanici_id: str | None = None, hedef_tip: str | None = None,
+                            limit: int = 200,
+                            current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+    """Yönetici salt-okunur İşlem Kayıtları (audit izi). modul/hedef_id/kullanici_id/
+    hedef_tip ile filtrelenir; yeni→eski sırada döner."""
+    kayitlar = await islem_listele(modul=modul, hedef_id=hedef_id, kullanici_id=kullanici_id,
+                                   hedef_tip=hedef_tip, limit=limit)
+    return {"kayitlar": kayitlar}
 
 @router.post("/courses", response_model=Course)
 async def create_course(course_data: CourseCreate):

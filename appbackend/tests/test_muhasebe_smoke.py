@@ -144,8 +144,8 @@ async def run():
               "kur_ucretleri listesinde yeni kayıt var")
 
         # 6d) Audit log düştü mü
-        log_say = await server.db.muhasebe_log.count_documents({"hedef_id": sid})
-        check(log_say >= 3, f"muhasebe_log kayıtları düştü ({log_say})")
+        log_say = await server.db.islem_log.count_documents({"hedef_id": sid, "modul": "muhasebe"})
+        check(log_say >= 3, f"islem_log (modül=muhasebe) kayıtları düştü ({log_say})")
         r = await ac.get(f"/api/muhasebe/log?hedef_id={sid}", headers=H_admin)
         check(r.status_code == 200 and len(r.json().get("kayitlar", [])) >= 3, "admin log okuyabiliyor")
         r = await ac.get("/api/muhasebe/log", headers=H_acc)

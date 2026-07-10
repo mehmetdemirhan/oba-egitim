@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from core.db import db
 from core.auth import require_role, UserRole
+from core.audit import islem_kaydet, islem_listele
 
 router = APIRouter()
 
@@ -35,21 +36,10 @@ _KOLEKSIYON = {"ogrenci": "students", "ogretmen": "teachers"}
 
 
 async def _log(user: dict, hedef_tip: str, hedef_id: str, alan: str, eski, yeni):
-    """Hafif audit: finansal/kişi alanı değişikliğini db.muhasebe_log'a yazar."""
-    try:
-        await db.muhasebe_log.insert_one({
-            "id": str(uuid.uuid4()),
-            "kullanici_id": user.get("id"),
-            "kullanici_rol": user.get("role"),
-            "tarih": datetime.utcnow().isoformat(),
-            "hedef_tip": hedef_tip,
-            "hedef_id": hedef_id,
-            "alan": alan,
-            "eski": eski,
-            "yeni": yeni,
-        })
-    except Exception as ex:
-        logging.warning(f"[muhasebe_log] yazılamadı: {ex}")
+    """Finansal/kişi alanı değişikliğini genel işlem kaydına (core.audit → db.islem_log)
+    yazar. Modül 'muhasebe' etiketiyle birleşik İşlem Kayıtları görünümünde toplanır."""
+    islem = "kur_ucreti_ekle" if alan == "kur_ucreti_ekle" else "duzenle"
+    await islem_kaydet(user, "muhasebe", islem, hedef_tip, hedef_id, alan, eski, yeni)
 
 
 def _num(v) -> float:
@@ -230,8 +220,6 @@ async def kur_ucretleri_listesi(ogrenci_id: str, current_user=Depends(_ERISIM)):
 @router.get("/muhasebe/log")
 async def muhasebe_log_listesi(hedef_id: str | None = None, limit: int = 100,
                                current_user=Depends(require_role(UserRole.ADMIN))):
-    """Değişiklik izi (yalnız admin). hedef_id verilirse o kişiye filtrelenir."""
-    sorgu = {"hedef_id": hedef_id} if hedef_id else {}
-    docs = await db.muhasebe_log.find(sorgu, {"_id": 0}).sort("tarih", -1) \
-        .to_list(length=min(limit, 500))
-    return {"kayitlar": docs}
+    """Muhasebe değişiklik izi (yalnız admin). Birleşik islem_log'dan modül=muhasebe."""
+    kayitlar = await islem_listele(modul="muhasebe", hedef_id=hedef_id, limit=min(limit, 500))
+    return {"kayitlar": kayitlar}
