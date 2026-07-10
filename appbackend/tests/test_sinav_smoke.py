@@ -34,6 +34,7 @@ from modules.sinav_parser import parse_sinav_pdf  # noqa: E402
 
 PDF_YOL = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "a_2026_sozel.pdf")
 MOCK_ADMIN = {"id": "admin-test", "role": "admin", "ad": "Test", "soyad": "Yönetici"}
+MOCK_STUDENT = {"id": "stud-user", "linked_id": "stud-1", "role": "student", "ad": "Öğrenci", "soyad": "Test"}
 
 _gecti = 0
 _kaldi = 0
@@ -122,14 +123,52 @@ async def faz2_api():
     await db.client.drop_database("oba_test_sinav_smoke")
 
 
+async def faz3_ogrenci():
+    print("\n== FAZ 3: Öğrenci çözüm akışı (izole test DB) ==")
+    if not os.path.exists(PDF_YOL):
+        print("  [ATLA] örnek PDF yok")
+        return
+    await db.client.drop_database("oba_test_sinav_smoke")
+    uf = UploadFile(io.BytesIO(open(PDF_YOL, "rb").read()), filename="a_2026_sozel.pdf")
+    r1 = await sinav.sinav_yukle(dosya=uf, sinavTuru="LGS", yil=2026, sinifSeviyesi=8, current_user=MOCK_ADMIN)
+    grup = r1["grup_id"]
+    await sinav.sinav_grup_yayinla(grup_id=grup, current_user=MOCK_ADMIN)
+
+    ro = await sinav.sinav_odev_olustur(
+        data={"ad": "Türkçe Denemesi", "otomatikKriter": {"ders": "turkce", "soruSayisi": 5}},
+        current_user=MOCK_ADMIN,
+    )
+    kontrol(0 < ro["soruSayisi"] <= 5, f"odev {ro['soruSayisi']} soru (≤5)")
+    odev_id = ro["odev_id"]
+
+    rs = await sinav.sinav_odev_sorular(odev_id=odev_id, current_user=MOCK_STUDENT)
+    kontrol(len(rs["sorular"]) == ro["soruSayisi"], f"öğrenci soruları geldi ({len(rs['sorular'])})")
+    kontrol(all("dogruCevap" not in s and "cozumTaktigi" not in s for s in rs["sorular"]), "cevap/taktik SIZMIYOR")
+
+    ilk = rs["sorular"][0]
+    rc = await sinav.sinav_cevap_ver(
+        data={"odevId": odev_id, "soruId": ilk["id"], "verilenCevap": "A"}, current_user=MOCK_STUDENT)
+    kontrol(isinstance(rc["dogruMu"], bool), "cevap sonrası dogruMu bool")
+    kontrol(rc["dogruCevap"] in ("A", "B", "C", "D"), f"cevap sonrası doğru cevap döndü ({rc['dogruCevap']})")
+    kontrol("cozumTaktigi" in rc, "cevap sonrası cozumTaktigi alanı var")
+
+    await sinav.sinav_cevap_ver(
+        data={"odevId": odev_id, "soruId": ilk["id"], "verilenCevap": "B"}, current_user=MOCK_STUDENT)
+    say = await db.sinav_cevaplari.count_documents({"odevId": odev_id, "ogrenciId": "stud-1", "soruId": ilk["id"]})
+    kontrol(say == 1, f"tekrar cevap tek kayıt (upsert) — bulunan {say}")
+
+    await db.client.drop_database("oba_test_sinav_smoke")
+
+
 async def main():
     await faz1_parser()
     try:
         await faz2_api()
+        await faz3_ogrenci()
     except Exception as ex:
         global _kaldi
         _kaldi += 1
-        print(f"  [KALDI] FAZ 2 istisna: {ex}")
+        print(f"  [KALDI] FAZ 2/3 istisna: {ex}")
         try:
             await db.client.drop_database("oba_test_sinav_smoke")
         except Exception:

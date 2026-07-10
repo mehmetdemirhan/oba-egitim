@@ -470,3 +470,73 @@ async def sinav_odev_ozet(odev_id: str, current_user=Depends(get_current_user)):
     if not o:
         raise HTTPException(status_code=404, detail="Sınav ödevi bulunamadı.")
     return o
+
+
+# ── 7) ÖĞRENCİ: ÇÖZÜM ARAYÜZÜ ─────────────────────────────────────────────
+def _ogrenci_id(u: dict) -> str:
+    """Öğrenci user hesabı → students kaydı (linked_id) veya kendi id'si."""
+    return u.get("linked_id") or u.get("id")
+
+
+@router.get("/sinav/odev/{odev_id}/sorular")
+async def sinav_odev_sorular(odev_id: str, current_user=Depends(get_current_user)):
+    """Öğrenci çözümü için ödev sorularını döner — DOĞRU CEVAP/TAKTİK SIZDIRMAZ.
+
+    Cevap ve çözüm taktiği yalnızca /sinav/cevap yanıtında (cevaplandıktan sonra)
+    verilir; böylece önceden 'gözetleme' engellenir.
+    """
+    o = await db.sinav_odevleri.find_one({"id": odev_id}, {"_id": 0})
+    if not o:
+        raise HTTPException(status_code=404, detail="Sınav ödevi bulunamadı.")
+    idler = o.get("soruIds") or []
+    proj = {"_id": 0, "soruBolgeGorseli_b64": 0, "dogruCevap": 0, "cozumTaktigi": 0}
+    docs = await db.sinav_sorulari.find({"id": {"$in": idler}}, proj).to_list(length=None)
+    sirali = {d["id"]: d for d in docs}
+    sorular = []
+    for sid in idler:  # ödevdeki sırayı koru
+        d = sirali.get(sid)
+        if d:
+            d["gorselVar"] = True
+            sorular.append(d)
+    # öğrencinin daha önce verdiği cevaplar (kaldığı yerden devam / tekrar)
+    ogr = _ogrenci_id(current_user)
+    onceki = await db.sinav_cevaplari.find(
+        {"odevId": odev_id, "ogrenciId": ogr}, {"_id": 0, "soruId": 1, "verilenCevap": 1, "dogruMu": 1}
+    ).to_list(length=None)
+    return {"odev": {"id": o["id"], "ad": o.get("ad"), "soruSayisi": len(sorular)},
+            "sorular": sorular, "verilenler": onceki}
+
+
+@router.post("/sinav/cevap")
+async def sinav_cevap_ver(data: dict, current_user=Depends(get_current_user)):
+    """Öğrenci cevabı kaydeder ve ANINDA doğru cevap + çözüm taktiği döner.
+
+    Body: {odevId, soruId, verilenCevap: A-D, harcananSure?}
+    """
+    odev_id = data.get("odevId")
+    soru_id = data.get("soruId")
+    verilen = data.get("verilenCevap")
+    if verilen not in ("A", "B", "C", "D"):
+        raise HTTPException(status_code=400, detail="verilenCevap A/B/C/D olmalı.")
+    odev = await db.sinav_odevleri.find_one({"id": odev_id}, {"_id": 0, "soruIds": 1})
+    if not odev or soru_id not in (odev.get("soruIds") or []):
+        raise HTTPException(status_code=404, detail="Soru bu ödevde bulunamadı.")
+    soru = await db.sinav_sorulari.find_one({"id": soru_id}, {"_id": 0, "dogruCevap": 1, "cozumTaktigi": 1})
+    if not soru:
+        raise HTTPException(status_code=404, detail="Soru bulunamadı.")
+
+    dogru = soru.get("dogruCevap")
+    dogru_mu = (verilen == dogru)
+    ogr = _ogrenci_id(current_user)
+    now = datetime.now(timezone.utc).isoformat()
+    # (odev, öğrenci, soru) tekil — tekrar cevaplama günceller
+    await db.sinav_cevaplari.update_one(
+        {"odevId": odev_id, "ogrenciId": ogr, "soruId": soru_id},
+        {"$set": {
+            "verilenCevap": verilen, "dogruMu": dogru_mu,
+            "harcananSure": data.get("harcananSure"), "cevaplanmaTarihi": now,
+        }, "$setOnInsert": {"id": str(uuid.uuid4())}},
+        upsert=True,
+    )
+    await db.sinav_sorulari.update_one({"id": soru_id}, {"$inc": {"kullanim_sayisi": 1}})
+    return {"dogruMu": dogru_mu, "dogruCevap": dogru, "cozumTaktigi": soru.get("cozumTaktigi") or ""}

@@ -26,6 +26,7 @@ import BildirimIzni from "./components/BildirimIzni";
 import { BildirimTercihleri } from "./components/BildirimTercihleri";
 import MebKelimeYonetimi from "./components/admin/MebKelimeYonetimi";
 import SinavYonetimi from "./components/admin/SinavYonetimi";
+import SinavCozum from "./components/SinavCozum";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
 import InstagramAyarlari from "./components/admin/InstagramAyarlari";
 import ExerciseStarter from "./components/ExerciseStarter";
@@ -6116,6 +6117,8 @@ function OgretmenPaneli({ user, logout }) {
 // ═══════════════════════════════════════════════
 
 function OgrenciPaneli({ user, logout }) {
+  const [sinavCozum, setSinavCozum] = useState(null);
+  const sinavBaslat = (odevId, gorevId) => setSinavCozum({ odevId, gorevId });
   const { toast } = useToast();
   const { isFullscreen } = useFullscreenExercise();
   const [profil, setProfil] = useState(null);
@@ -6793,6 +6796,7 @@ function OgrenciPaneli({ user, logout }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {sinavCozum && <SinavCozum apiBase={API} odevId={sinavCozum.odevId} gorevId={sinavCozum.gorevId} onClose={() => setSinavCozum(null)} onComplete={(gid) => { if (gid) gorevTamamla(gid); setSinavCozum(null); }} />}
       {/* Header — tam ekran egzersiz modunda gizlenir */}
       {!isFullscreen && (
       <div className="bg-surface border-b sticky top-0 z-30">
@@ -7050,7 +7054,7 @@ function OgrenciPaneli({ user, logout }) {
         {/* ═══ GÖREVLERİM ═══ */}
         {aktifSekme === "gorevler" && (<div className="space-y-3"><h2 className="text-lg font-bold">Görevlerim</h2>
           {bekleyenGorevler.length === 0 && tamamlananGorevler.length === 0 ? (<div className="text-center py-12"><div className="text-5xl mb-3">✅</div><p className="text-subtle">Tüm görevler tamamlandı!</p></div>) : (<>
-            {bekleyenGorevler.map(g => (<Card key={g.id} className="border border-line shadow-sm"><CardContent className="p-4 flex items-start justify-between gap-3"><div className="min-w-0"><div className="font-bold text-sm">{g.baslik}</div>{g.aciklama && <p className="text-xs text-subtle mt-1">{g.aciklama}</p>}<div className="text-xs text-subtle mt-1">{g.atayan_ad && `Atayan: ${g.atayan_ad}`}{g.son_tarih && ` • Son: ${new Date(g.son_tarih).toLocaleDateString('tr-TR')}`}</div>{g.film_link && <a href={g.film_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 block mt-1">🎬 Film Linki</a>}{g.makale_link && <a href={g.makale_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 block mt-1">📄 Makale</a>}</div><Button size="sm" className="bg-green-600 text-white text-xs shrink-0" onClick={() => gorevTamamla(g.id)}>Tamamla</Button></CardContent></Card>))}
+            {bekleyenGorevler.map(g => (<Card key={g.id} className="border border-line shadow-sm"><CardContent className="p-4 flex items-start justify-between gap-3"><div className="min-w-0"><div className="font-bold text-sm">{g.baslik}</div>{g.aciklama && <p className="text-xs text-subtle mt-1">{g.aciklama}</p>}<div className="text-xs text-subtle mt-1">{g.atayan_ad && `Atayan: ${g.atayan_ad}`}{g.son_tarih && ` • Son: ${new Date(g.son_tarih).toLocaleDateString('tr-TR')}`}</div>{g.film_link && <a href={g.film_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 block mt-1">🎬 Film Linki</a>}{g.makale_link && <a href={g.makale_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 block mt-1">📄 Makale</a>}</div>{g.tur === "sinav_odevi" ? <Button size="sm" className="bg-indigo-600 text-white text-xs shrink-0" onClick={() => sinavBaslat(g.icerik_id, g.id)}>Sınavı Başlat</Button> : <Button size="sm" className="bg-green-600 text-white text-xs shrink-0" onClick={() => gorevTamamla(g.id)}>Tamamla</Button>}</CardContent></Card>))}
             {tamamlananGorevler.length >0 && (<><h3 className="text-xs font-medium text-subtle mt-4">Tamamlanan ({tamamlananGorevler.length})</h3>{tamamlananGorevler.slice(0,5).map(g =>(<div key={g.id} className="bg-green-50 rounded-xl p-3 border border-green-100 opacity-60 text-sm">{g.baslik}</div>))}</>)}
           </>)}
         </div>)}
