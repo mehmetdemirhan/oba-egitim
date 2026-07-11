@@ -56,7 +56,9 @@ async def get_dashboard_stats():
         if has_students:
             total_teacher_debt += max(0, t.get('yapilmasi_gereken_odeme', 0) - t.get('yapilan_odeme', 0))
     current_month_start = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    monthly_payments = await db.payments.find({"tarih": {"$gte": current_month_start.isoformat()}}).to_list(length=None)
+    # Bu ayki TAHSİLAT = yalnız öğrenci (veliden alınan) ödemeleri, brüt (öğretmene
+    # yapılan ödemeler tahsilat değildir). Kart etiketi "Bu Ay Tahsilat" ile uyumlu.
+    monthly_payments = await db.payments.find({"tarih": {"$gte": current_month_start.isoformat()}, "tip": "ogrenci"}).to_list(length=None)
     monthly_total = sum(p.get('miktar', 0) for p in monthly_payments)
     # Öğrenci-bazlı aylık metrikler (koordinatör dashboard'u)
     bu_ay_yeni_kayit = await db.students.count_documents({"olusturma_tarihi": {"$gte": current_month_start.isoformat()}})

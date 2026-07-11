@@ -641,9 +641,9 @@ function AppContent() {
                   <BekleyenlerKarti bekleyenler={bekleyenler} onRefresh={fetchAll} onTabChange={setActiveTab} />
                 )}
 
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-                  <Card className="border border-line shadow-sm bg-surface cursor-pointer hover:border-primary/40 transition-colors lg:col-span-2" onClick={() => setActiveTab("students")}>
-                    <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-subtle">Öğrenci</p><p className="text-4xl font-bold text-content tabular-nums mt-1">{dashboardStats.toplam_ogrenci}</p></div><div className="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center"><Users className="h-6 w-6 text-green-600" /></div></div></CardContent>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <Card className="border border-line shadow-sm bg-surface cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setActiveTab("students")}>
+                    <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-subtle">Öğrenci</p><p className="text-3xl font-bold text-content tabular-nums mt-1">{dashboardStats.toplam_ogrenci}</p></div><div className="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center"><Users className="h-6 w-6 text-green-600" /></div></div></CardContent>
                   </Card>
                   <Card className="border border-line shadow-sm bg-surface cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setActiveTab("teachers")}>
                     <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-subtle">Öğretmen</p><p className="text-3xl font-bold text-content tabular-nums mt-1">{dashboardStats.toplam_ogretmen}</p></div><div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center"><UserCheck className="h-6 w-6 text-primary" /></div></div></CardContent>
@@ -657,7 +657,7 @@ function AppContent() {
                   </Card>
                   ) : (
                   <Card className="border border-line shadow-sm bg-surface cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setActiveTab("payments")}>
-                    <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-subtle">Bu Ay</p><p className="text-2xl font-bold text-content tabular-nums mt-1">{formatCurrency(dashboardStats.bu_ay_odenen_toplam)}</p></div><div className="w-12 h-12 bg-purple-100 rounded-2xl flex items-center justify-center"><Calendar className="h-6 w-6 text-purple-600" /></div></div></CardContent>
+                    <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-subtle">Bu Ay Tahsilat</p><p className="text-3xl font-bold text-content tabular-nums mt-1">{formatCurrency(dashboardStats.bu_ay_odenen_toplam)}</p></div><div className="w-12 h-12 bg-purple-100 rounded-2xl flex items-center justify-center"><Calendar className="h-6 w-6 text-purple-600" /></div></div></CardContent>
                   </Card>
                   )}
                 </div>
