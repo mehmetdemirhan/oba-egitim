@@ -299,6 +299,7 @@ function AppContent() {
   const [students, setStudents] = useState([]);
   const [muhasebeKisiler, setMuhasebeKisiler] = useState({ ogrenciler: [], ogretmenler: [] });
   const [muhasebeOzet, setMuhasebeOzet] = useState(null);
+  const [muhasebeBorclu, setMuhasebeBorclu] = useState(false);
   const [courses, setCourses] = useState([]);
   const [payments, setPayments] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
@@ -1160,7 +1161,17 @@ function AppContent() {
           {/* Payments */}
           <TabsContent value="payments">
             {/* Özet Kartları */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+              <button type="button" onClick={() => setMuhasebeBorclu(true)} className="text-left">
+                <Card className="border border-line shadow-sm bg-gradient-to-br from-amber-50 to-orange-100 hover:ring-2 hover:ring-amber-300 transition-all h-full">
+                  <CardContent className="p-5 text-center">
+                    <div className="text-sm text-amber-700 font-medium mb-2">⚠️ Alınmayan Ödeme</div>
+                    <div className="text-3xl font-bold tabular-nums text-amber-700">{muhasebeOzet?.alinmayan?.sayi ?? 0}</div>
+                    <div className="border-t border-amber-200 my-2"></div>
+                    <div className="text-xs text-subtle tabular-nums">{formatCurrency(muhasebeOzet?.alinmayan?.toplam_kalan ?? 0)} kalan • tıkla-filtrele</div>
+                  </CardContent>
+                </Card>
+              </button>
               <Card className="border border-line shadow-sm bg-gradient-to-br from-green-50 to-emerald-100">
                 <CardContent className="p-5 text-center">
                   <div className="text-sm text-green-700 font-medium mb-2">📥 Öğrenci Ödemeleri</div>
@@ -1212,7 +1223,8 @@ function AppContent() {
             <div className="space-y-6">
               <div>
                 <h3 className="text-base font-semibold text-content mb-2">Öğrenci Ödemeleri</h3>
-                <OdemeTablosu tip="ogrenci" kisiler={muhasebeKisiler.ogrenciler} payments={payments} apiBase={API} onDegisim={muhasebeYenile} />
+                <OdemeTablosu tip="ogrenci" kisiler={muhasebeKisiler.ogrenciler} payments={payments} apiBase={API} onDegisim={muhasebeYenile}
+                  sadeceBorclu={muhasebeBorclu} onBorcluTemizle={() => setMuhasebeBorclu(false)} />
               </div>
               <div>
                 <h3 className="text-base font-semibold text-content mb-2">Öğretmen Ödemeleri</h3>

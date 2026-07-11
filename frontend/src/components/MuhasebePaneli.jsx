@@ -3,7 +3,7 @@ import axios from "axios";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { useToast } from "../hooks/use-toast";
-import { Wallet, TrendingUp, TrendingDown, Clock, LogOut, GraduationCap, Users, Receipt, PiggyBank } from "lucide-react";
+import { Wallet, TrendingUp, TrendingDown, Clock, LogOut, GraduationCap, Users, Receipt, PiggyBank, AlertTriangle } from "lucide-react";
 import OdemeTablosu from "./OdemeTablosu";
 import MuhasebeAyarlari from "./admin/MuhasebeAyarlari";
 import OgretmenDonemOdeme from "./admin/OgretmenDonemOdeme";
@@ -44,6 +44,7 @@ export default function MuhasebePaneli({ user, logout }) {
   const [kisiler, setKisiler] = useState({ ogrenciler: [], ogretmenler: [] });
   const [payments, setPayments] = useState([]);
   const [sekme, setSekme] = useState("ogrenci");
+  const [sadeceBorclu, setSadeceBorclu] = useState(false);
 
   const veriYukle = useCallback(async () => {
     try {
@@ -90,7 +91,16 @@ export default function MuhasebePaneli({ user, logout }) {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
-        <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-3">
+          <button type="button" onClick={() => { setSadeceBorclu(true); setSekme("ogrenci"); }} className="text-left">
+            <Card className="border border-line shadow-sm hover:ring-2 hover:ring-amber-300 transition-all h-full">
+              <CardContent className="p-4 border-l-4 border-l-amber-500 rounded-l-none">
+                <div className="flex items-center gap-1.5 text-xs text-subtle mb-1"><AlertTriangle className="h-4 w-4 text-amber-600" />Alınmayan Ödeme</div>
+                <div className="text-2xl font-bold tabular-nums text-amber-600">{ozet?.alinmayan?.sayi ?? 0}</div>
+                <div className="text-[11px] text-subtle tabular-nums">{formatTL(ozet?.alinmayan?.toplam_kalan ?? 0)} kalan</div>
+              </CardContent>
+            </Card>
+          </button>
           <KpiKart Ikon={TrendingUp} etiket="Beklenen Tahsilat" tutar={ogr.beklenen} vurgu="blue" />
           <KpiKart Ikon={Wallet} etiket="Tahsil Edilen (brüt)" tutar={ogr.tahsil_edilen} vurgu="green" />
           <KpiKart Ikon={Receipt} etiket={`Toplam Vergi (%${ozet?.vergi?.oran ?? 15})`} tutar={ozet?.vergi?.toplam_vergi} vurgu="red" />
@@ -105,7 +115,8 @@ export default function MuhasebePaneli({ user, logout }) {
           {tabButon("ogretmen", "Öğretmen Ödemeleri", Users)}
         </div>
 
-        <OdemeTablosu tip={sekme} kisiler={liste} payments={payments} apiBase={API} onDegisim={veriYukle} />
+        <OdemeTablosu tip={sekme} kisiler={liste} payments={payments} apiBase={API} onDegisim={veriYukle}
+          sadeceBorclu={sekme === "ogrenci" && sadeceBorclu} onBorcluTemizle={() => setSadeceBorclu(false)} />
 
         {/* Öğretmen sekmesinde dönem bazlı ödeme (ayın 15'i) */}
         {sekme === "ogretmen" && <OgretmenDonemOdeme apiBase={API} />}

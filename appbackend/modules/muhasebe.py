@@ -84,6 +84,28 @@ def _kur_gizli(satir: dict) -> bool:
     return satir.get("durum") == "tamamlandi" and _num(satir.get("kalan")) <= 0.01
 
 
+async def _alinmayan_ozet() -> dict:
+    """İŞ 4 — Alınmayan ödeme: ödenen < beklenen (kalan>0) olan GÖRÜNÜR kur/alacak
+    kayıtlarının sayısı + toplam kalan. Gizli (tamamlanmış+ödenmiş) kayıtlar sayılmaz."""
+    kur_map = {}
+    async for k in db.kur_ucretleri.find({}, {"_id": 0}):
+        kur_map.setdefault(k.get("ogrenci_id"), []).append(k)
+    for _oid in kur_map:
+        kur_map[_oid].sort(key=lambda k: str(k.get("baslangic_tarihi") or k.get("tarih") or ""))
+    sayi, toplam = 0, 0.0
+    async for s in db.students.find({}, {"_id": 0, "id": 1, "yapilmasi_gereken_odeme": 1, "yapilan_odeme": 1}):
+        kurlar = kur_map.get(s.get("id")) or []
+        if kurlar:
+            for d in _kur_dagilimi(kurlar, _num(s.get("yapilan_odeme"))):
+                if not _kur_gizli(d) and d["kalan"] > 0.01:
+                    sayi += 1; toplam += d["kalan"]
+        else:
+            kalan = max(0.0, _num(s.get("yapilmasi_gereken_odeme")) - _num(s.get("yapilan_odeme")))
+            if kalan > 0.01:
+                sayi += 1; toplam += kalan
+    return {"sayi": sayi, "toplam_kalan": round(toplam, 2)}
+
+
 @router.get("/muhasebe/kisiler")
 async def muhasebe_kisiler(current_user=Depends(_ERISIM)):
     """Ödeme kaydı/tablosu için kişi listesi — CRM detayı OLMADAN, sadece ad-soyad
@@ -237,6 +259,7 @@ async def muhasebe_ozet(current_user=Depends(_ERISIM)):
             "net_tahsilat": net_tahsilat,
         },
         "kasa_net": kasa_net,
+        "alinmayan": await _alinmayan_ozet(),
     }
 
 

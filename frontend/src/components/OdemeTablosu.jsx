@@ -72,7 +72,7 @@ function EditableCell({ value, kind = "text", format, align = "left", editable =
   );
 }
 
-export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisim }) {
+export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisim, sadeceBorclu = false, onBorcluTemizle }) {
   const { toast } = useToast();
   const [arama, setArama] = useState("");
   const [acik, setAcik] = useState(null);
@@ -82,11 +82,13 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
   const ogrenciMi = tip === "ogrenci";
 
   const filtreli = useMemo(() => {
+    let liste = kisiler;
+    if (sadeceBorclu) liste = liste.filter((k) => Number(k.kalan || 0) > 0);  // İŞ 4 — alınmayan
     const q = arama.trim().toLocaleLowerCase("tr");
-    if (!q) return kisiler;
-    return kisiler.filter((k) =>
+    if (!q) return liste;
+    return liste.filter((k) =>
       `${k.ad} ${k.soyad} ${k.veli_ad || ""} ${k.veli_soyad || ""} ${k.kur || ""} ${k.sinif || ""}`.toLocaleLowerCase("tr").includes(q));
-  }, [kisiler, arama]);
+  }, [kisiler, arama, sadeceBorclu]);
 
   // Ödemeler kişi (öğrenci/öğretmen) bazında — kur satırları aynı kisi_id'yi paylaşır
   const kisiOdemeleri = useCallback(
@@ -163,6 +165,21 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
           className="pl-9 pr-3 py-1.5 text-sm border border-line rounded-lg bg-surface w-full focus:outline-none focus:ring-2 focus:ring-primary" />
       </div>
 
+      {/* İŞ 3 — renk lejantı (öğrenci ödemeleri) */}
+      {ogrenciMi && (
+        <div className="flex items-center gap-4 text-xs text-subtle">
+          <span className="inline-flex items-center gap-1.5"><span className="inline-block w-3.5 h-3.5 rounded bg-purple-50 border border-purple-200" />Mor: yeni 1. kur</span>
+          <span className="inline-flex items-center gap-1.5"><span className="inline-block w-3.5 h-3.5 rounded bg-emerald-50 border border-emerald-200" />Yeşil: üst kur (kur atlayan / üstten kayıt)</span>
+        </div>
+      )}
+
+      {sadeceBorclu && (
+        <div className="flex items-center gap-2 text-xs">
+          <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 px-2 py-1 rounded-full font-medium">Filtre: yalnız alınmayan ödemeler ({filtreli.length})</span>
+          {onBorcluTemizle && <button onClick={onBorcluTemizle} className="text-primary hover:underline">Temizle</button>}
+        </div>
+      )}
+
       <div className="border border-line rounded-2xl shadow-sm overflow-x-auto bg-surface">
         <table className="w-full text-sm">
           <thead>
@@ -199,9 +216,12 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
             {filtreli.map((k) => {
               const acikMi = acik === k.id;
               const odemeler = kisiOdemeleri(k.kisi_id);
+              // İŞ 3 — satır renklendirme: kur 1 = mor (yeni), kur >1 = yeşil (üst kur)
+              const kurNo = ogrenciMi ? parseInt(String(k.kur || "").replace(/\D/g, ""), 10) : NaN;
+              const satirRenk = kurNo === 1 ? "bg-purple-50" : kurNo > 1 ? "bg-emerald-50" : "";
               return (
                 <React.Fragment key={k.id}>
-                  <tr className="border-b border-line">
+                  <tr className={`border-b border-line ${satirRenk}`}>
                     <td className="px-3 py-2">
                       <button onClick={() => { setAcik(acikMi ? null : k.id); setKurForm({ kur_adi: "", tutar: "", baslangic_tarihi: "" }); }}
                         className="text-subtle hover:text-content" aria-label="Detay">
