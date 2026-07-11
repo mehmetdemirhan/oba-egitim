@@ -72,7 +72,7 @@ function EditableCell({ value, kind = "text", format, align = "left", editable =
   );
 }
 
-export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisim, sadeceBorclu = false, onBorcluTemizle }) {
+export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisim, sadeceBorclu = false, onBorcluTemizle, odakKisiId = "", onOdakTemizle }) {
   const { toast } = useToast();
   const [arama, setArama] = useState("");
   const [acik, setAcik] = useState(null);
@@ -83,12 +83,13 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
 
   const filtreli = useMemo(() => {
     let liste = kisiler;
+    if (odakKisiId) liste = liste.filter((k) => k.kisi_id === odakKisiId);  // bildirimden gelen öğrenci odağı
     if (sadeceBorclu) liste = liste.filter((k) => Number(k.kalan || 0) > 0);  // İŞ 4 — alınmayan
     const q = arama.trim().toLocaleLowerCase("tr");
     if (!q) return liste;
     return liste.filter((k) =>
       `${k.ad} ${k.soyad} ${k.veli_ad || ""} ${k.veli_soyad || ""} ${k.kur || ""} ${k.sinif || ""}`.toLocaleLowerCase("tr").includes(q));
-  }, [kisiler, arama, sadeceBorclu]);
+  }, [kisiler, arama, sadeceBorclu, odakKisiId]);
 
   // Ödemeler kişi (öğrenci/öğretmen) bazında — kur satırları aynı kisi_id'yi paylaşır
   const kisiOdemeleri = useCallback(
@@ -177,6 +178,13 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
         <div className="flex items-center gap-2 text-xs">
           <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 px-2 py-1 rounded-full font-medium">Filtre: yalnız alınmayan ödemeler ({filtreli.length})</span>
           {onBorcluTemizle && <button onClick={onBorcluTemizle} className="text-primary hover:underline">Temizle</button>}
+        </div>
+      )}
+
+      {odakKisiId && (
+        <div className="flex items-center gap-2 text-xs">
+          <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-medium">Filtre: bildirimdeki öğrenci ({filtreli.length} satır)</span>
+          {onOdakTemizle && <button onClick={onOdakTemizle} className="text-primary hover:underline">Temizle</button>}
         </div>
       )}
 
