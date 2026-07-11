@@ -28,10 +28,13 @@ import { BildirimTercihleri } from "./components/BildirimTercihleri";
 import MebKelimeYonetimi from "./components/admin/MebKelimeYonetimi";
 import MuhasebePaneli from "./components/MuhasebePaneli";
 import OdemeTablosu from "./components/OdemeTablosu";
+import OgretmenDetayOzet from "./components/admin/OgretmenDetayOzet";
 import TopluKayit from "./components/admin/TopluKayit";
 import EgitimTurleriYonetimi from "./components/admin/EgitimTurleriYonetimi";
 import IslemKayitlari from "./components/admin/IslemKayitlari";
 import MuhasebeAyarlari from "./components/admin/MuhasebeAyarlari";
+import OgretmenDonemOdeme from "./components/admin/OgretmenDonemOdeme";
+import GecikenKurlar from "./components/admin/GecikenKurlar";
 import SinavYonetimi from "./components/admin/SinavYonetimi";
 import SinavCozum from "./components/SinavCozum";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
@@ -297,6 +300,7 @@ function AppContent() {
   const [students, setStudents] = useState([]);
   const [muhasebeKisiler, setMuhasebeKisiler] = useState({ ogrenciler: [], ogretmenler: [] });
   const [muhasebeOzet, setMuhasebeOzet] = useState(null);
+  const [muhasebeBorclu, setMuhasebeBorclu] = useState(false);
   const [courses, setCourses] = useState([]);
   const [payments, setPayments] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
@@ -615,6 +619,9 @@ function AppContent() {
                   </div>
                 )}
 
+                {/* İŞ 2 — Geciken Kurlar (5 haftayı aşan aktif kurlar) */}
+                <GecikenKurlar apiBase={API} />
+
                 {/* Riskli öğrenciler uyarısı */}
                 {ogrenciRiskler.filter(r => r.risk_seviye === "yuksek").length > 0 && (
                   <Card className="border border-line shadow-sm border-l-4 border-l-red-500">
@@ -639,9 +646,9 @@ function AppContent() {
                   <BekleyenlerKarti bekleyenler={bekleyenler} onRefresh={fetchAll} onTabChange={setActiveTab} />
                 )}
 
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-                  <Card className="border border-line shadow-sm bg-surface cursor-pointer hover:border-primary/40 transition-colors lg:col-span-2" onClick={() => setActiveTab("students")}>
-                    <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-subtle">Öğrenci</p><p className="text-4xl font-bold text-content tabular-nums mt-1">{dashboardStats.toplam_ogrenci}</p></div><div className="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center"><Users className="h-6 w-6 text-green-600" /></div></div></CardContent>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <Card className="border border-line shadow-sm bg-surface cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setActiveTab("students")}>
+                    <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-subtle">Öğrenci</p><p className="text-3xl font-bold text-content tabular-nums mt-1">{dashboardStats.toplam_ogrenci}</p></div><div className="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center"><Users className="h-6 w-6 text-green-600" /></div></div></CardContent>
                   </Card>
                   <Card className="border border-line shadow-sm bg-surface cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setActiveTab("teachers")}>
                     <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-subtle">Öğretmen</p><p className="text-3xl font-bold text-content tabular-nums mt-1">{dashboardStats.toplam_ogretmen}</p></div><div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center"><UserCheck className="h-6 w-6 text-primary" /></div></div></CardContent>
@@ -655,7 +662,7 @@ function AppContent() {
                   </Card>
                   ) : (
                   <Card className="border border-line shadow-sm bg-surface cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setActiveTab("payments")}>
-                    <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-subtle">Bu Ay</p><p className="text-2xl font-bold text-content tabular-nums mt-1">{formatCurrency(dashboardStats.bu_ay_odenen_toplam)}</p></div><div className="w-12 h-12 bg-purple-100 rounded-2xl flex items-center justify-center"><Calendar className="h-6 w-6 text-purple-600" /></div></div></CardContent>
+                    <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-subtle">Bu Ay Tahsilat</p><p className="text-3xl font-bold text-content tabular-nums mt-1">{formatCurrency(dashboardStats.bu_ay_odenen_toplam)}</p></div><div className="w-12 h-12 bg-purple-100 rounded-2xl flex items-center justify-center"><Calendar className="h-6 w-6 text-purple-600" /></div></div></CardContent>
                   </Card>
                   )}
                 </div>
@@ -808,51 +815,54 @@ function AppContent() {
                           const ogretmenOdemeleri = payments.filter(p => p.tip === 'ogretmen' && p.kisi_id === t.id);
                           const toplamOdenen = ogretmenOdemeleri.reduce((sum, p) => sum + (p.miktar || 0), 0);
                           const kalanAlacak = Math.max(0, (t.yapilmasi_gereken_odeme || 0) - toplamOdenen);
-                          return (
-                          <div className="border-t border-line bg-app p-4 space-y-4">
-                            {/* Ödeme Özeti - koordinatörden gizle */}
-                            {user.role !== "coordinator" && (
-                            <div className="grid grid-cols-3 gap-3">
-                              <div className="bg-surface rounded-xl p-3 border border-line text-center">
-                                <div className="text-xs text-subtle mb-1">Yapılacak Ödeme</div>
-                                <div className="font-bold text-orange-600">₺{(t.yapilmasi_gereken_odeme || 0).toLocaleString('tr-TR')}</div>
+                          const finansal = (
+                            <div className="space-y-4">
+                              {/* Ödeme Özeti - koordinatörden gizle */}
+                              {user.role !== "coordinator" && (
+                              <div className="grid grid-cols-3 gap-3">
+                                <div className="bg-surface rounded-xl p-3 border border-line text-center">
+                                  <div className="text-xs text-subtle mb-1">Yapılacak Ödeme</div>
+                                  <div className="font-bold text-orange-600 tabular-nums">₺{(t.yapilmasi_gereken_odeme || 0).toLocaleString('tr-TR')}</div>
+                                </div>
+                                <div className="bg-surface rounded-xl p-3 border border-line text-center">
+                                  <div className="text-xs text-subtle mb-1">Toplam Ödenen</div>
+                                  <div className="font-bold text-green-600 tabular-nums">₺{toplamOdenen.toLocaleString('tr-TR')}</div>
+                                </div>
+                                <div className="bg-surface rounded-xl p-3 border border-line text-center">
+                                  <div className="text-xs text-subtle mb-1">Kalan Alacak</div>
+                                  <div className={`font-bold tabular-nums ${kalanAlacak > 0 ? 'text-red-600' : 'text-green-600'}`}>₺{kalanAlacak.toLocaleString('tr-TR')}</div>
+                                </div>
                               </div>
-                              <div className="bg-surface rounded-xl p-3 border border-line text-center">
-                                <div className="text-xs text-subtle mb-1">Toplam Ödenen</div>
-                                <div className="font-bold text-green-600">₺{toplamOdenen.toLocaleString('tr-TR')}</div>
-                              </div>
-                              <div className="bg-surface rounded-xl p-3 border border-line text-center">
-                                <div className="text-xs text-subtle mb-1">Kalan Alacak</div>
-                                <div className={`font-bold ${kalanAlacak > 0 ? 'text-red-600' : 'text-green-600'}`}>₺{kalanAlacak.toLocaleString('tr-TR')}</div>
-                              </div>
-                            </div>
-                            )}
-                            {/* Ödeme Geçmişi */}
-                            {ogretmenOdemeleri.length > 0 && (
-                              <div>
-                                <div className="text-xs font-semibold text-subtle mb-2">📤 Ödeme Geçmişi</div>
-                                {ogretmenOdemeleri.slice(0,5).map(p => (
-                                  <div key={p.id} className="flex justify-between items-center bg-surface p-2 rounded-lg border border-line mb-1 text-sm">
-                                    <span className="text-subtle">{formatDate(p.tarih)}</span>
-                                    <span className="text-content">{p.aciklama || '—'}</span>
-                                    <span className="font-semibold text-green-600">₺{(p.miktar||0).toLocaleString('tr-TR')}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            {/* Öğrenci Listesi */}
-                            {teacherStudents[t.id] && teacherStudents[t.id].length > 0 && (
+                              )}
+                              {/* Ödeme Geçmişi */}
+                              {ogretmenOdemeleri.length > 0 && (
+                                <div>
+                                  <div className="text-xs font-semibold text-subtle mb-2">📤 Ödeme Geçmişi</div>
+                                  {ogretmenOdemeleri.slice(0,5).map(p => (
+                                    <div key={p.id} className="flex justify-between items-center bg-surface p-2 rounded-lg border border-line mb-1 text-sm">
+                                      <span className="text-subtle">{formatDate(p.tarih)}</span>
+                                      <span className="text-content">{p.aciklama || '—'}</span>
+                                      <span className="font-semibold text-green-600 tabular-nums">₺{(p.miktar||0).toLocaleString('tr-TR')}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {/* Öğrenci Listesi — "Kur: 1 • 7" yerine açık gösterim */}
                               <div>
                                 <div className="text-xs font-semibold text-subtle mb-2">👨‍🎓 Öğrenciler</div>
-                                {teacherStudents[t.id].map(s => (
-                                  <div key={s.id} className="bg-surface p-2 rounded-lg border border-line mb-1 flex justify-between text-sm">
+                                {(teacherStudents[t.id] && teacherStudents[t.id].length > 0) ? teacherStudents[t.id].map(s => (
+                                  <div key={s.id} className="bg-surface p-2 rounded-lg border border-line mb-1 flex justify-between items-center text-sm">
                                     <span className="font-medium">{s.ad} {s.soyad}</span>
-                                    <span className="text-subtle">Kur: {s.kur} • {s.sinif}</span>
+                                    <span className="text-subtle text-xs">{s.kur ? `${s.kur}. kur` : "Kur —"} • {s.sinif ? `${s.sinif}. sınıf` : "Sınıf —"}</span>
                                   </div>
-                                ))}
+                                )) : <div className="text-sm text-subtle">Atanmış aktif öğrenci yok.</div>}
                               </div>
-                            )}
-                          </div>
+                            </div>
+                          );
+                          return (
+                            <div className="border-t border-line bg-app p-4">
+                              <OgretmenDetayOzet teacher={t} apiBase={API} rol={user.role} finansal={finansal} />
+                            </div>
                           );
                         })()}
                       </div>
@@ -1155,7 +1165,17 @@ function AppContent() {
           {/* Payments */}
           <TabsContent value="payments">
             {/* Özet Kartları */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+              <button type="button" onClick={() => setMuhasebeBorclu(true)} className="text-left">
+                <Card className="border border-line shadow-sm bg-gradient-to-br from-amber-50 to-orange-100 hover:ring-2 hover:ring-amber-300 transition-all h-full">
+                  <CardContent className="p-5 text-center">
+                    <div className="text-sm text-amber-700 font-medium mb-2">⚠️ Alınmayan Ödeme</div>
+                    <div className="text-3xl font-bold tabular-nums text-amber-700">{muhasebeOzet?.alinmayan?.sayi ?? 0}</div>
+                    <div className="border-t border-amber-200 my-2"></div>
+                    <div className="text-xs text-subtle tabular-nums">{formatCurrency(muhasebeOzet?.alinmayan?.toplam_kalan ?? 0)} kalan • tıkla-filtrele</div>
+                  </CardContent>
+                </Card>
+              </button>
               <Card className="border border-line shadow-sm bg-gradient-to-br from-green-50 to-emerald-100">
                 <CardContent className="p-5 text-center">
                   <div className="text-sm text-green-700 font-medium mb-2">📥 Öğrenci Ödemeleri</div>
@@ -1202,17 +1222,22 @@ function AppContent() {
               </Card>
             </div>
 
+            {/* İŞ 2 — Geciken Kurlar (5 haftayı aşan aktif kurlar) */}
+            <div className="mb-6"><GecikenKurlar apiBase={API} /></div>
+
             {/* Öğrenci & Öğretmen ödeme tabloları — MuhasebePaneli ile PAYLAŞILAN
                 Excel-benzeri satır içi düzenlenebilir bileşen (OdemeTablosu). */}
             <div className="space-y-6">
               <div>
                 <h3 className="text-base font-semibold text-content mb-2">Öğrenci Ödemeleri</h3>
-                <OdemeTablosu tip="ogrenci" kisiler={muhasebeKisiler.ogrenciler} payments={payments} apiBase={API} onDegisim={muhasebeYenile} />
+                <OdemeTablosu tip="ogrenci" kisiler={muhasebeKisiler.ogrenciler} payments={payments} apiBase={API} onDegisim={muhasebeYenile}
+                  sadeceBorclu={muhasebeBorclu} onBorcluTemizle={() => setMuhasebeBorclu(false)} />
               </div>
               <div>
                 <h3 className="text-base font-semibold text-content mb-2">Öğretmen Ödemeleri</h3>
                 <OdemeTablosu tip="ogretmen" kisiler={muhasebeKisiler.ogretmenler} payments={payments} apiBase={API} onDegisim={muhasebeYenile} />
               </div>
+              <OgretmenDonemOdeme apiBase={API} />
             </div>
 
             {/* Muhasebe Ayarları — Vergi Oranı + Kur Ücretleri (admin + accountant) */}
@@ -1438,11 +1463,19 @@ function BildirimZili({ user }) {
   const [okunmamis, setOkunmamis] = useState(0);
   const [acik, setAcik] = useState(false);
   const [ayarAcik, setAyarAcik] = useState(false);
+  const [muhOzet, setMuhOzet] = useState(null); // admin/accountant: alınmayan + geciken özeti
+  const muhasebeci = user?.role === "admin" || user?.role === "accountant";
 
   const fetchBildirimler = useCallback(async () => {
     try { const r = await axios.get(`${API}/bildirimler`); setBildirimler(Array.isArray(r.data) ? r.data.slice(0, 20) : []); } catch(e) {}
     try { const r = await axios.get(`${API}/bildirimler/okunmamis`); setOkunmamis(r.data?.sayi || 0); } catch(e) {}
-  }, []);
+    if (user?.role === "admin" || user?.role === "accountant") {
+      try {
+        const [o, g] = await Promise.all([axios.get(`${API}/muhasebe/ozet`), axios.get(`${API}/muhasebe/geciken-kurlar`)]);
+        setMuhOzet({ alinmayan: o.data?.alinmayan?.sayi || 0, geciken: g.data?.sayi || 0 });
+      } catch(e) {}
+    }
+  }, [user]);
 
   useEffect(() => { fetchBildirimler(); const iv = setInterval(fetchBildirimler, 30000); return () => clearInterval(iv); }, [fetchBildirimler]);
 
@@ -1487,6 +1520,12 @@ function BildirimZili({ user }) {
                   className="px-1.5 py-1 rounded-md text-subtle hover:bg-gray-200 transition-colors" aria-label="Kapat"><XCircle className="h-4 w-4" /></button>
               </div>
             </div>
+            {!ayarAcik && muhasebeci && muhOzet && (muhOzet.alinmayan > 0 || muhOzet.geciken > 0) && (
+              <div className="px-3 py-2 border-b border-gray-100 bg-amber-50/60 flex flex-wrap items-center gap-3 text-xs">
+                {muhOzet.geciken > 0 && <span className="inline-flex items-center gap-1 text-amber-800 font-medium"><AlertTriangle className="h-3.5 w-3.5" />{muhOzet.geciken} geciken kur</span>}
+                {muhOzet.alinmayan > 0 && <span className="inline-flex items-center gap-1 text-amber-800 font-medium">💸 {muhOzet.alinmayan} alınmayan ödeme</span>}
+              </div>
+            )}
             {ayarAcik ? (
               <div className="p-3 overflow-y-auto"><BildirimTercihleri /></div>
             ) : bildirimler.length === 0 ? (

@@ -74,6 +74,14 @@ export default function MuhasebeAyarlari({ apiBase }) {
         <div className="border-t border-line p-4 space-y-8">
           <VergiOraniEditor apiBase={apiBase} />
           <KurUcretleriYonetimi apiBase={apiBase} />
+          <KurUcretleriYonetimi
+            apiBase={apiBase}
+            baslik="Öğretmen Payları"
+            aciklama="Kur tamamlanınca öğretmene ödenecek pay (dönem/ayın 15'i ödemesinde uygulanır). Eğitim türü için özel pay girilmezse genel varsayılan kullanılır."
+            ayarTip="ogretmen_paylari"
+            putYol="muhasebe/ayarlar/ogretmen-paylari"
+            kolonBaslik="Öğretmen Payı (₺)"
+          />
         </div>
       )}
     </div>

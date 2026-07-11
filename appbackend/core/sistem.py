@@ -202,6 +202,30 @@ async def get_kur_ucreti(egitim_turu: str = None) -> float:
         return 0.0
 
 
+# ── Öğretmen payı (kur tamamlanınca öğretmene ödenecek pay) ──
+# Kur ücretlerine PARALEL: genel varsayılan + eğitim türü bazlı. Dönem bazlı öğretmen
+# ödemesinde (ayın 15'i) tamamlanan her kur için bu pay hesaplanır.
+# Generic /muhasebe/ayarlar üzerinden saklanır: {"genel": 500, "turler": {...}}
+OGRETMEN_PAYLARI_DEFAULT = {"genel": 0, "turler": {}}
+
+
+async def get_ogretmen_paylari_ayarlari():
+    doc = await db.sistem_ayarlari.find_one({"tip": "ogretmen_paylari"})
+    return doc.get("degerler", OGRETMEN_PAYLARI_DEFAULT) if doc else OGRETMEN_PAYLARI_DEFAULT
+
+
+async def get_ogretmen_payi(egitim_turu: str = None) -> float:
+    """Eğitim türü bazlı öğretmen payı; tanımsızsa genel varsayılan (0)."""
+    try:
+        ayar = await get_ogretmen_paylari_ayarlari()
+        turler = ayar.get("turler", {}) or {}
+        if egitim_turu and egitim_turu in turler and turler[egitim_turu] not in (None, ""):
+            return round(float(turler[egitim_turu]), 2)
+        return round(float(ayar.get("genel", 0) or 0), 2)
+    except Exception:
+        return 0.0
+
+
 # ── Kutulu Okuma egzersizi ayarları ──
 # kutu_basi_kelime: bir kutuda kaç kelime gösterilsin (genel varsayılan; egzersiz
 # ayar çekmecesinden her açılışta 1/2/3 olarak değiştirilebilir).

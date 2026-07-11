@@ -73,6 +73,11 @@ async def run():
         check(oz["toplam"]["beklenen"] == 2500.0 and oz["toplam"]["odenen"] == 1000.0 and oz["toplam"]["kalan"] == 1500.0,
               "kur-ozet toplamları doğru (2500/1000/1500)")
 
+        # ── İŞ 4) Alınmayan ödeme sayacı (ozet): görünür kalan>0 kayıtlar ──
+        o2 = (await ac.get("/api/muhasebe/ozet", headers=H_acc)).json()
+        check(o2.get("alinmayan", {}).get("sayi") == 1, f"alınmayan sayacı=1 (yalnız kur2 borçlu) — {o2.get('alinmayan')}")
+        check(o2.get("alinmayan", {}).get("toplam_kalan") == 1500.0, "alınmayan toplam kalan=1500")
+
         # ── B) kur1 BORÇLU kalırsa (tam ödenmemiş) → listede KALIR ──
         await server.db.students.update_one({"id": sid}, {"$set": {"yapilan_odeme": 500.0}})  # kur1 yarı ödendi
         r = await ac.get("/api/muhasebe/kisiler", headers=H_acc)
@@ -80,6 +85,10 @@ async def run():
         check(any(x.get("kur") == "1" for x in rows), "tamamlanmış ama BORÇLU kur (1) listede KALIYOR")
         k1row = next((x for x in rows if x.get("kur") == "1"), None)
         check(k1row and k1row["kalan"] == 500.0, f"kur1 kalan borç 500 gösteriliyor ({k1row and k1row['kalan']})")
+        # Alınmayan sayacı artık 2 kayıt (kur1 500 + kur2 1500 = 2000)
+        o3 = (await ac.get("/api/muhasebe/ozet", headers=H_acc)).json()
+        check(o3.get("alinmayan", {}).get("sayi") == 2 and o3.get("alinmayan", {}).get("toplam_kalan") == 2000.0,
+              f"alınmayan sayacı=2, toplam=2000 — {o3.get('alinmayan')}")
 
     await server.client.drop_database(TEST_DB)
 

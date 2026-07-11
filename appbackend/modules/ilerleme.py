@@ -39,6 +39,7 @@ from core.rozet_helpers import (
 )
 from core.rozet_motor import rozet_degerlendir, rozet_tetikle
 from core.ai import _gemini_call, call_claude, _mock_bilgi_tabani_response, get_ogrenci_ai_verileri
+from core.audit import islem_listele
 
 router = APIRouter()
 
@@ -287,9 +288,12 @@ async def _ogrenci_puan_tablosu(current_user) -> dict:
     return {"rol": "ogrenci", "toplam": len(liste), "siralama": liste}
 
 
-async def _ogretmen_puan_tablosu(current_user) -> dict:
+async def _ogretmen_puan_tablosu(current_user, hedef_id=None) -> dict:
     """role=teacher olanları puana göre sıralar; İSİM/SIRA LİSTESİ DÖNMEZ.
-    Sadece kendi konumun + isimsiz agrega istatistikler + motivasyon mesajı."""
+    Sadece hedef konumun + isimsiz agrega istatistikler + motivasyon mesajı.
+    hedef_id verilirse o öğretmenin (users.id) konumu döner (admin detay-özeti);
+    yoksa çağıran kullanıcının (self)."""
+    hedef = hedef_id if hedef_id else (current_user.get("id") if current_user else None)
     # Rozet ödül puanı haritası (birlesik endpoint'iyle aynı puanlama)
     rozet_puan_map = await rozet_puan_haritasi()
 
@@ -348,12 +352,12 @@ async def _ogretmen_puan_tablosu(current_user) -> dict:
         }
         toplam = sum(kirilim.values())
         puanlar.append({"id": u["id"], "toplam": toplam})
-        if u["id"] == current_user.get("id"):
+        if u["id"] == hedef:
             benim_kirilim = kirilim
     puanlar.sort(key=lambda x: x["toplam"], reverse=True)
 
     M = len(puanlar)
-    benim_id = current_user.get("id")
+    benim_id = hedef
     benim_sira = None
     benim_puan = 0
     for i, p in enumerate(puanlar):
@@ -424,6 +428,108 @@ async def get_puan_tablosu_rol(rol: str, current_user=Depends(get_current_user))
     if hedef == "student":
         return await _ogrenci_puan_tablosu(current_user)
     return await _ogretmen_puan_tablosu(current_user)
+
+
+@router.get("/teachers/{teacher_id}/detay-ozet")
+async def ogretmen_detay_ozet(teacher_id: str, current_user=Depends(get_current_user)):
+    """Admin/koordinatör: bir öğretmenin GELİŞİM + AKTİVİTE + SON İŞLEMLER özeti
+    (yalnız mevcut verilerden; finansal kısım frontend'de payments'tan gelir).
+    Detay açılınca lazy çağrılır. teacher_id = teachers.id; login user.id köprüyle çözülür.
+    """
+    if current_user.get("role", "") not in ("admin", "coordinator"):
+        raise HTTPException(status_code=403, detail="Bu özet yalnızca yönetici/koordinatör içindir.")
+
+    ogr = await db.teachers.find_one({"id": teacher_id}, {"_id": 0})
+    if not ogr:
+        raise HTTPException(status_code=404, detail="Öğretmen bulunamadı")
+    # teachers.id → users.id köprüsü (rozet/görev/TIMI/işlem-log users.id ile bağlı)
+    u = await db.users.find_one(
+        {"$or": [{"linked_id": teacher_id}, {"id": ogr.get("user_id")}]},
+        {"_id": 0, "id": 1},
+    )
+    user_id = (u or {}).get("id") or ogr.get("user_id")
+
+    # ── GELİŞİM: XP / sıra / kırılım + rozetler ──
+    gelisim = {"toplam_xp": 0, "sira": None, "toplam_ogretmen": 0, "ortalama_xp": 0,
+               "kirilim": {}, "motivasyon_mesaji": "", "rozetler": [], "rozet_sayisi": 0, "toplam_rozet": 0}
+    if user_id:
+        try:
+            pt = await _ogretmen_puan_tablosu(None, hedef_id=user_id)
+            gelisim["toplam_xp"] = pt.get("kullanicinin_puani", 0)
+            gelisim["sira"] = pt.get("kullanicinin_sirasi")
+            gelisim["toplam_ogretmen"] = pt.get("toplam_ogretmen", 0)
+            gelisim["ortalama_xp"] = (pt.get("istatistikler") or {}).get("ortalama_puan_ogretmen", 0)
+            gelisim["kirilim"] = pt.get("puan_kirilim", {})
+            gelisim["motivasyon_mesaji"] = pt.get("motivasyon_mesaji", "")
+        except Exception as ex:
+            logging.warning(f"[detay-ozet] puan hatası: {ex}")
+    try:
+        rozet_tanim = {r["kod"]: r for r in (await get_ogretmen_rozetleri())}
+        kazanilan = await db.kazanilan_rozetler.find({"kullanici_id": user_id}, {"_id": 0}).to_list(length=300) if user_id else []
+        rozetler = []
+        for kz in kazanilan:
+            t = rozet_tanim.get(kz.get("rozet_kodu"))
+            if t:
+                rozetler.append({"kod": t["kod"], "ad": t.get("ad"),
+                                 "ikon": t.get("ikon") or t.get("emoji") or "🎖️",
+                                 "kategori": t.get("kategori"), "kazanma_tarihi": kz.get("kazanma_tarihi")})
+        rozetler.sort(key=lambda r: str(r.get("kazanma_tarihi") or ""), reverse=True)
+        gelisim["rozetler"] = rozetler
+        gelisim["rozet_sayisi"] = len(rozetler)
+        gelisim["toplam_rozet"] = len(rozet_tanim)
+    except Exception as ex:
+        logging.warning(f"[detay-ozet] rozet hatası: {ex}")
+
+    # ── AKTİVİTE ──
+    aktivite = {}
+    try:
+        ogrenciler = await db.students.find({"ogretmen_id": teacher_id}, {"_id": 0, "kur": 1, "arsivli": 1}).to_list(length=2000)
+        aktif = [s for s in ogrenciler if not s.get("arsivli")]
+        kur_say = {}
+        for s in aktif:
+            k = str(s.get("kur") if s.get("kur") not in (None, "") else "—")
+            kur_say[k] = kur_say.get(k, 0) + 1
+        aktivite["ogrenci"] = {"aktif": len(aktif), "pasif": len(ogrenciler) - len(aktif), "toplam": len(ogrenciler)}
+        aktivite["kur_dagilimi"] = sorted([{"kur": k, "sayi": v} for k, v in kur_say.items()], key=lambda x: str(x["kur"]))
+    except Exception:
+        aktivite["ogrenci"] = {"aktif": 0, "pasif": 0, "toplam": 0}
+        aktivite["kur_dagilimi"] = []
+    try:
+        gorevler = await db.gorevler.find({"atayan_id": user_id}, {"_id": 0, "baslik": 1, "durum": 1, "olusturma_tarihi": 1}) \
+            .sort("olusturma_tarihi", -1).to_list(length=500) if user_id else []
+        tamamlanan = sum(1 for g in gorevler if g.get("durum") == "tamamlandi")
+        aktivite["gorev"] = {"atanan": len(gorevler), "tamamlanan": tamamlanan,
+                             "oran": round(tamamlanan / len(gorevler) * 100) if gorevler else 0,
+                             "son": [{"baslik": g.get("baslik"), "durum": g.get("durum"), "tarih": g.get("olusturma_tarihi")} for g in gorevler[:5]]}
+    except Exception:
+        aktivite["gorev"] = {"atanan": 0, "tamamlanan": 0, "oran": 0, "son": []}
+    try:
+        aktivite["ders"] = {"aktif_seri": await db.ders_serileri.count_documents({"ogretmen_id": teacher_id, "durum": "aktif"})}
+    except Exception:
+        aktivite["ders"] = {"aktif_seri": 0}
+    try:
+        aktivite["timi"] = {
+            "toplam": await db.timi_sonuclar.count_documents({"ogretmen_id": user_id}) if user_id else 0,
+            "tamamlanan": await db.timi_sonuclar.count_documents({"ogretmen_id": user_id, "durum": "tamamlandi"}) if user_id else 0,
+        }
+    except Exception:
+        aktivite["timi"] = {"toplam": 0, "tamamlanan": 0}
+
+    # ── SON İŞLEMLER (audit) ──
+    son_islemler = []
+    if user_id:
+        try:
+            son_islemler = await islem_listele(kullanici_id=user_id, limit=20)
+        except Exception:
+            son_islemler = []
+
+    return {
+        "ogretmen": {"id": ogr.get("id"), "ad": ogr.get("ad"), "soyad": ogr.get("soyad"),
+                     "brans": ogr.get("brans"), "seviye": ogr.get("seviye")},
+        "gelisim": gelisim,
+        "aktivite": aktivite,
+        "son_islemler": son_islemler,
+    }
 
 
 @router.get("/ogretmen/basarilarim")

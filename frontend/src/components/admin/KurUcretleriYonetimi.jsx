@@ -4,13 +4,19 @@ import { useToast } from "../../hooks/use-toast";
 import { Wallet, Save } from "lucide-react";
 
 /**
- * KurUcretleriYonetimi — yönetici: kur geçişinde açılan yeni alacağın VARSAYILAN
- * tutarı. Eğitim türü bazlı tanımlanabilir; tanımsız türde "genel" varsayılan
- * kullanılır. Öğretmen kur geçişi yaptığında bu tutar otomatik uygulanır (öğretmen
- * tutar görmez). Muhasebe satır içi düzenlemeyle özel indirim uygulayabilir.
- * Generic /ayarlar/kur_ucretleri (degerler: {genel, turler}). Props: apiBase.
+ * KurUcretleriYonetimi — genel+eğitim türü bazlı ₺ ayar editörü. Varsayılan olarak
+ * KUR ÜCRETLERİ'ni yönetir; props ile ÖĞRETMEN PAYI gibi aynı {genel, turler} şeklini
+ * paylaşan başka ayarlar için de kullanılır (kopya YOK). Kaydetme muhasebe ucundan
+ * (admin + accountant). Props: apiBase + opsiyonel baslik/aciklama/ayarTip/putYol/kolon.
  */
-export default function KurUcretleriYonetimi({ apiBase }) {
+export default function KurUcretleriYonetimi({
+  apiBase,
+  baslik = "Kur Ücretleri",
+  aciklama = "Kur geçişinde açılan yeni alacağın varsayılan tutarı. Eğitim türü için özel tutar girilmezse genel varsayılan kullanılır. Öğretmen bu tutarı görmez; muhasebe sonradan düzeltebilir.",
+  ayarTip = "kur_ucretleri",
+  putYol = "muhasebe/ayarlar/kur-ucretleri",
+  kolonBaslik = "Kur Ücreti (₺)",
+}) {
   const { toast } = useToast();
   const [genel, setGenel] = useState("");
   const [turUcret, setTurUcret] = useState({}); // {turAd: tutar}
@@ -20,7 +26,7 @@ export default function KurUcretleriYonetimi({ apiBase }) {
   const yukle = useCallback(async () => {
     try {
       const [a, t] = await Promise.all([
-        axios.get(`${apiBase}/ayarlar/kur_ucretleri`),
+        axios.get(`${apiBase}/ayarlar/${ayarTip}`),
         axios.get(`${apiBase}/egitim-turleri`),
       ]);
       const d = a.data?.degerler || {};
@@ -28,9 +34,9 @@ export default function KurUcretleriYonetimi({ apiBase }) {
       setTurUcret(d.turler || {});
       setTurler((t.data?.turler || []).map((x) => x.ad));
     } catch {
-      toast({ title: "Kur ücretleri yüklenemedi", variant: "destructive" });
+      toast({ title: `${baslik} yüklenemedi`, variant: "destructive" });
     }
-  }, [apiBase, toast]);
+  }, [apiBase, ayarTip, baslik, toast]);
 
   useEffect(() => { yukle(); }, [yukle]);
 
@@ -44,8 +50,8 @@ export default function KurUcretleriYonetimi({ apiBase }) {
       }
       const degerler = { genel: parseFloat(genel) || 0, turler: turler_temiz };
       // Muhasebe ucu: admin + accountant düzenleyebilir (generic /ayarlar admin-only).
-      await axios.put(`${apiBase}/muhasebe/ayarlar/kur-ucretleri`, { degerler });
-      toast({ title: "Kur ücretleri kaydedildi" });
+      await axios.put(`${apiBase}/${putYol}`, { degerler });
+      toast({ title: `${baslik} kaydedildi` });
       yukle();
     } catch (e) {
       toast({ title: "Kaydedilemedi", description: e?.response?.data?.detail || "", variant: "destructive" });
@@ -57,8 +63,8 @@ export default function KurUcretleriYonetimi({ apiBase }) {
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-lg font-bold text-content flex items-center gap-2"><Wallet className="h-5 w-5" />Kur Ücretleri</h3>
-        <p className="text-sm text-subtle">Kur geçişinde açılan yeni alacağın varsayılan tutarı. Eğitim türü için özel tutar girilmezse genel varsayılan kullanılır. Öğretmen bu tutarı görmez; muhasebe sonradan düzeltebilir.</p>
+        <h3 className="text-lg font-bold text-content flex items-center gap-2"><Wallet className="h-5 w-5" />{baslik}</h3>
+        <p className="text-sm text-subtle">{aciklama}</p>
       </div>
 
       <div className="bg-surface border border-line rounded-2xl p-4 shadow-sm space-y-4">
@@ -75,7 +81,7 @@ export default function KurUcretleriYonetimi({ apiBase }) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-xs text-subtle border-b border-line bg-app">
-                  <th className="px-3 py-2">Eğitim Türü</th><th className="px-3 py-2 w-40">Kur Ücreti (₺)</th>
+                  <th className="px-3 py-2">Eğitim Türü</th><th className="px-3 py-2 w-40">{kolonBaslik}</th>
                 </tr>
               </thead>
               <tbody>
