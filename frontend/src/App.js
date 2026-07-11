@@ -31,6 +31,7 @@ import OdemeTablosu from "./components/OdemeTablosu";
 import TopluKayit from "./components/admin/TopluKayit";
 import EgitimTurleriYonetimi from "./components/admin/EgitimTurleriYonetimi";
 import IslemKayitlari from "./components/admin/IslemKayitlari";
+import KurUcretleriYonetimi from "./components/admin/KurUcretleriYonetimi";
 import SinavYonetimi from "./components/admin/SinavYonetimi";
 import SinavCozum from "./components/SinavCozum";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
@@ -1300,6 +1301,7 @@ function AppContent() {
               <div className="space-y-6">
                 <SistemAyarlari user={user} />
                 <EgitimTurleriYonetimi apiBase={API} />
+                <KurUcretleriYonetimi apiBase={API} />
                 <IslemKayitlari apiBase={API} />
               </div>
             </TabsContent>
@@ -4979,6 +4981,34 @@ function OgretmenPaneli({ user, logout }) {
   const [kullanicilar, setKullanicilar] = useState([]);
   const [seciliOgrenci, setSeciliOgrenci] = useState(null);
   const [ogrenciDetay, setOgrenciDetay] = useState(null);
+  // Kur geçişi (öğretmen tetikler → muhasebeye otomatik yansır; tutar görünmez)
+  const [kurGecisAcik, setKurGecisAcik] = useState(false);
+  const [kurGecisNo, setKurGecisNo] = useState("");
+  const [kurGecisTarih, setKurGecisTarih] = useState("");
+  const [kurGecisYukleniyor, setKurGecisYukleniyor] = useState(false);
+  const kurGecisAc = () => {
+    const mevcut = parseInt(String(seciliOgrenci?.kur || "").replace(/\D/g, ""), 10);
+    setKurGecisNo(String((isNaN(mevcut) ? 0 : mevcut) + 1));
+    setKurGecisTarih(new Date().toISOString().slice(0, 10));
+    setKurGecisAcik(true);
+  };
+  const kurGecisYap = async () => {
+    if (!seciliOgrenci?.id) return;
+    const no = parseInt(kurGecisNo, 10);
+    if (isNaN(no) || no <= 0) { toast({ title: "Geçerli bir kur numarası girin", variant: "destructive" }); return; }
+    setKurGecisYukleniyor(true);
+    try {
+      const r = await axios.post(`${API}/students/${seciliOgrenci.id}/kur-gecis`, { kur_no: no, baslangic_tarihi: kurGecisTarih || undefined });
+      toast({ title: `${r.data?.yeni_kur}. kura geçirildi`, description: "Muhasebeye alacak kaydı otomatik oluşturuldu." });
+      setKurGecisAcik(false);
+      setSeciliOgrenci({ ...seciliOgrenci, kur: String(r.data?.yeni_kur) });
+      fetchAll();
+    } catch (err) {
+      hataBildir(toast, err.response?.data?.detail || "Kur geçişi yapılamadı");
+    } finally {
+      setKurGecisYukleniyor(false);
+    }
+  };
   // AI Koçluk state'leri
   const [aiRapor, setAiRapor] = useState(null);
   const [aiYukleniyor, setAiYukleniyor] = useState(false);
@@ -5143,8 +5173,41 @@ function OgretmenPaneli({ user, logout }) {
       <div className="min-h-screen bg-app">
         <div className="bg-surface border-b sticky top-0 z-30"><div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="outline" size="sm" onClick={() => setAktifSekme("ogrencilerim")}>← Geri</Button>
-          <div><div className="font-bold">{seciliOgrenci.ad} {seciliOgrenci.soyad}</div><div className="text-xs text-subtle">{seciliOgrenci.sinif}. sınıf • {seciliOgrenci.kur || "Kur yok"}</div></div>
+          <div><div className="font-bold">{seciliOgrenci.ad} {seciliOgrenci.soyad}</div><div className="text-xs text-subtle">{seciliOgrenci.sinif}. sınıf • {seciliOgrenci.kur ? `${seciliOgrenci.kur}. kur` : "Kur yok"}</div></div>
+          <Button size="sm" onClick={kurGecisAc} className="ml-auto bg-primary hover:bg-primary-hover text-white">
+            <GraduationCap className="h-4 w-4 mr-1.5" />Yeni Kura Geçir
+          </Button>
         </div></div>
+
+        {/* Kur geçişi diyaloğu — öğretmen tetikler, tutar GÖRÜNMEZ */}
+        <Dialog open={kurGecisAcik} onOpenChange={setKurGecisAcik}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2"><GraduationCap className="h-5 w-5" />Yeni Kura Geçir</DialogTitle>
+              <DialogDescription>
+                {seciliOgrenci.ad} {seciliOgrenci.soyad} bir üst kura geçirilecek. Ücret/alacak kaydı
+                muhasebe tarafında <b>otomatik</b> oluşur — tutarı yönetici belirler.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <Label>Kur Numarası</Label>
+                <Input type="number" min="1" value={kurGecisNo} onChange={(e) => setKurGecisNo(e.target.value)} />
+                <p className="text-xs text-subtle mt-1">Otomatik önerildi (mevcut kur +1); gerekirse değiştirin.</p>
+              </div>
+              <div>
+                <Label>Başlangıç Tarihi</Label>
+                <Input type="date" value={kurGecisTarih} onChange={(e) => setKurGecisTarih(e.target.value)} />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setKurGecisAcik(false)} disabled={kurGecisYukleniyor}>İptal</Button>
+              <Button onClick={kurGecisYap} disabled={kurGecisYukleniyor} className="bg-primary hover:bg-primary-hover text-white">
+                {kurGecisYukleniyor ? "İşleniyor…" : "Onayla ve Geçir"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
         <div className="max-w-4xl mx-auto p-4 space-y-4">
           {d ? (<>
             {/* Risk + İstatistik */}
