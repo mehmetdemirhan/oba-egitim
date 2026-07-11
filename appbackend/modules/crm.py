@@ -15,7 +15,7 @@ from core.db import db, prepare_for_mongo, parse_from_mongo
 from core.auth import get_current_user, require_role, UserRole, TeacherLevel, hash_password
 from core.audit import islem_kaydet, islem_listele
 from core.hesap import gecici_sifre_uret, OGRETMEN_ROLLERI
-from core.sistem import get_vergi_orani
+from core.sistem import get_vergi_orani, get_kur_ucreti
 
 router = APIRouter()
 
@@ -469,6 +469,98 @@ async def delete_student(student_id: str, kalici: bool = False, current_user=Dep
                                      {"$inc": {"ogrenci_sayisi": -1}, "$pull": {"atanan_ogrenciler": student_id}})
     await islem_kaydet(current_user, "ogrenci", "kaldir", "ogrenci", student_id, "arsivli", False, True)
     return {"message": "Öğrenci pasife alındı (geçmiş korundu)", "mod": "pasif", "veri_var": veri_var}
+
+
+class KurGecisRequest(BaseModel):
+    kur_no: Optional[int] = None            # verilmezse mevcut kur +1
+    baslangic_tarihi: Optional[str] = None  # yeni kurun başlangıcı (ISO/serbest)
+
+
+@router.post("/students/{student_id}/kur-gecis")
+async def kur_gecis(student_id: str, req: KurGecisRequest, current_user=Depends(get_current_user)):
+    """Öğretmen (veya admin/koordinatör) öğrenciyi bir üst kura geçirir — PEDAGOJİK
+    işlem. Finansal kayıt OTOMATİK oluşur; öğretmen tutar görmez/girmez:
+
+    - Sahiplik: öğretmen yalnız kendi öğrencisini geçirebilir (aksi 403).
+    - Mükerrer koruma: aynı öğrenci + aynı kur no ile ikinci kayıt açılamaz (409).
+    - Önceki açık kur kaydı "tamamlandi" işaretlenir (kalan borç satırı tabloda
+      açık/tarihçe kalır — borç yeni kura TAŞINMAZ, kaybolmaz da).
+    - Yeni kur için beklenen tutar = Ayarlar'daki kur ücreti (eğitim türü bazlı,
+      yoksa genel varsayılan). Vergi oranı kayda snapshot'lanır (tahsilatta uygulanır).
+    - Muhasebeye yeni alacak satırı (db.kur_ucretleri + öğrenci beklenen $inc).
+    - admin + accountant'a bildirim; işlem audit'e düşer.
+    Öğretmene dönen yanıtta TUTAR YOKTUR (muhasebe/admin panelinde görünür)."""
+    rol = current_user.get("role")
+    if rol not in ("admin", "coordinator", "teacher"):
+        raise HTTPException(status_code=403, detail="Bu işlem için yetkiniz yok")
+    student = await db.students.find_one({"id": student_id})
+    if not student:
+        raise HTTPException(status_code=404, detail="Öğrenci bulunamadı")
+    _ogrenci_sahiplik_kontrol(current_user, student)
+
+    # Yeni kur numarası: verilmezse mevcut +1
+    mevcut_kur = student.get("kur")
+    try:
+        mevcut_no = int(str(mevcut_kur).strip() or 0)
+    except (TypeError, ValueError):
+        mevcut_no = 0
+    yeni_no = req.kur_no if req.kur_no else mevcut_no + 1
+    if not yeni_no or yeni_no <= 0:
+        raise HTTPException(status_code=422, detail="Geçerli bir kur numarası gerekli")
+    yeni_kur_adi = str(yeni_no)
+
+    # Mükerrer koruma: aynı öğrenci + aynı kur no (iptal edilmemiş) zaten varsa engelle
+    var = await db.kur_ucretleri.find_one(
+        {"ogrenci_id": student_id, "kur_adi": yeni_kur_adi, "durum": {"$ne": "iptal"}})
+    if var:
+        raise HTTPException(status_code=409, detail=f"Bu öğrenci için {yeni_no}. kur zaten açılmış")
+
+    # Tutar Ayarlar'dan (eğitim türü bazlı) — öğretmen görmez/girmez
+    egitim_turu = student.get("aldigi_egitim")
+    tutar = await get_kur_ucreti(egitim_turu)
+    vergi_orani = await get_vergi_orani()
+
+    # Önceki açık kur(lar)ı tamamlandı işaretle (satır tabloda kalır)
+    await db.kur_ucretleri.update_many(
+        {"ogrenci_id": student_id, "durum": {"$in": [None, "acik"]}},
+        {"$set": {"durum": "tamamlandi"}})
+
+    # Yeni alacak satırı
+    kayit = {
+        "id": str(uuid.uuid4()),
+        "ogrenci_id": student_id,
+        "kur_adi": yeni_kur_adi,
+        "tutar": tutar,
+        "baslangic_tarihi": (req.baslangic_tarihi or "").strip() or None,
+        "tarih": datetime.now(timezone.utc).isoformat(),
+        "ekleyen_id": current_user.get("id"),
+        "ekleyen_rol": rol,
+        "egitim_turu": egitim_turu,
+        "vergi_orani": vergi_orani,
+        "durum": "acik",
+    }
+    await db.kur_ucretleri.insert_one(kayit)
+    await db.students.update_one(
+        {"id": student_id},
+        {"$set": {"kur": yeni_kur_adi}, "$inc": {"yapilmasi_gereken_odeme": tutar}})
+
+    # Audit
+    await islem_kaydet(current_user, "ogrenci", "kur_gecis", "ogrenci", student_id,
+                       "kur", mevcut_kur, yeni_kur_adi)
+
+    # Bildirim: admin + accountant (fonksiyon-içi import — yükleme sırası bağımsız)
+    try:
+        from modules.bildirim import bildirim_olustur
+        ad = f"{student.get('ad', '')} {student.get('soyad', '')}".strip()
+        icerik = f"{ad} {yeni_no}. kura geçirildi, ₺{tutar:.0f} alacak oluştu."
+        async for u in db.users.find({"role": {"$in": ["admin", "accountant"]}}, {"_id": 0, "id": 1}):
+            if u.get("id"):
+                await bildirim_olustur(u["id"], "kur_gecisi", icerik, student_id)
+    except Exception as ex:
+        logging.warning(f"[kur_gecis] bildirim hatası: {ex}")
+
+    # Öğretmene TUTAR dönmez
+    return {"ok": True, "yeni_kur": yeni_no, "mesaj": f"{yeni_no}. kura geçirildi"}
 
 
 @router.get("/islem-log")

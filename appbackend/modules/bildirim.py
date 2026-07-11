@@ -35,6 +35,7 @@ BILDIRIM_TURLERI = {
     "lig_yukseldi":     {"baslik": "🏆 Lig Yükselme", "oncelik": "normal", "kategori": "ogrenci", "onem": "bilgi", "cooldown_saat": 0},
     "haftalik_ozet":    {"baslik": "📊 Haftalık Özet", "oncelik": "normal", "kategori": "ogretmen", "onem": "dusuk", "cooldown_saat": 24},
     "ders_degisiklik":  {"baslik": "📅 Ders Değişikliği", "oncelik": "yuksek", "kategori": "veli", "onem": "orta", "cooldown_saat": 0},
+    "kur_gecisi":       {"baslik": "🎓 Kur Geçişi — Yeni Alacak", "oncelik": "yuksek", "kategori": "ogretmen", "onem": "orta", "cooldown_saat": 0},
 }
 
 VARSAYILAN_TERCIH = {"ogrenci": True, "ogretmen": True, "veli": True}

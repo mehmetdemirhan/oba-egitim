@@ -177,6 +177,31 @@ async def get_vergi_orani() -> float:
         return 15.0
 
 
+# ── Kur ücretleri (varsayılan alacak tutarları) ──
+# Kur geçişinde açılan yeni alacak satırının beklenen tutarı buradan gelir.
+# Eğitim türü bazlı tanımlanabilir; tanımsız türde "genel" varsayılan kullanılır.
+# Değer generic /ayarlar/kur_ucretleri ile "degerler" altında saklanır:
+#   {"genel": 1000, "turler": {"Hızlı Okuma": 1500, ...}}
+KUR_UCRETLERI_DEFAULT = {"genel": 0, "turler": {}}
+
+
+async def get_kur_ucretleri_ayarlari():
+    doc = await db.sistem_ayarlari.find_one({"tip": "kur_ucretleri"})
+    return doc.get("degerler", KUR_UCRETLERI_DEFAULT) if doc else KUR_UCRETLERI_DEFAULT
+
+
+async def get_kur_ucreti(egitim_turu: str = None) -> float:
+    """Eğitim türü bazlı varsayılan kur ücreti; tanımsızsa genel varsayılan (0)."""
+    try:
+        ayar = await get_kur_ucretleri_ayarlari()
+        turler = ayar.get("turler", {}) or {}
+        if egitim_turu and egitim_turu in turler and turler[egitim_turu] not in (None, ""):
+            return round(float(turler[egitim_turu]), 2)
+        return round(float(ayar.get("genel", 0) or 0), 2)
+    except Exception:
+        return 0.0
+
+
 # ── Kutulu Okuma egzersizi ayarları ──
 # kutu_basi_kelime: bir kutuda kaç kelime gösterilsin (genel varsayılan; egzersiz
 # ayar çekmecesinden her açılışta 1/2/3 olarak değiştirilebilir).
