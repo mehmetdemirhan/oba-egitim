@@ -13,14 +13,17 @@ toplamı değil kişi bakiyeleri esas alınır. Ödeme geçmişi için /payments
 """
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from core.db import db
 from core.auth import require_role, UserRole
 from core.audit import islem_kaydet, islem_listele
-from core.sistem import get_vergi_orani, VERGI_AYARLARI_DEFAULT, KUR_UCRETLERI_DEFAULT
+from core.sistem import (
+    get_vergi_orani, get_ogretmen_payi,
+    VERGI_AYARLARI_DEFAULT, KUR_UCRETLERI_DEFAULT, OGRETMEN_PAYLARI_DEFAULT,
+)
 
 router = APIRouter()
 
@@ -374,6 +377,10 @@ async def kur_ucreti_guncelle(kur_id: str, data: dict, current_user=Depends(_ERI
             raise HTTPException(status_code=422, detail="Tutar negatif olamaz")
         delta = round(yeni_tutar - _num(kayit.get("tutar")), 2)
         guncelle["tutar"] = yeni_tutar
+    # Tamamlanma tarihi (dönem hesabı için) — admin/muhasebeci eksik/yanlış tarihi düzeltebilir
+    if "tamamlanma_tarihi" in data:
+        t = data.get("tamamlanma_tarihi")
+        guncelle["tamamlanma_tarihi"] = str(t).strip() if t else None
     if not guncelle:
         raise HTTPException(status_code=400, detail="Güncellenecek alan yok")
     await db.kur_ucretleri.update_one({"id": kur_id}, {"$set": guncelle})
@@ -398,14 +405,39 @@ async def muhasebe_log_listesi(hedef_id: str | None = None, limit: int = 100,
 # kararımıza uygun olarak muhasebeci de düzenleyebilir. Depolama aynı sistem_ayarlari.
 
 
+def _normalize_genel_turler(degerler: dict) -> dict:
+    """{genel, turler} ayarını doğrular/temizler: genel>=0, tür değerleri >0 olanlar
+    kalır. kur ücretleri ve öğretmen payları AYNI şekli paylaşır."""
+    if not isinstance(degerler, dict):
+        raise HTTPException(status_code=422, detail="degerler nesnesi gerekli")
+    try:
+        genel = round(float(degerler.get("genel", 0) or 0), 2)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="Genel değer sayısal olmalı")
+    if genel < 0:
+        raise HTTPException(status_code=422, detail="Genel değer negatif olamaz")
+    turler = {}
+    for ad, v in (degerler.get("turler", {}) or {}).items():
+        try:
+            n = round(float(v), 2)
+        except (TypeError, ValueError):
+            continue
+        if n > 0:
+            turler[str(ad)] = n
+    return {"genel": genel, "turler": turler}
+
+
 @router.get("/muhasebe/ayarlar")
 async def muhasebe_ayarlar_getir(current_user=Depends(_ERISIM)):
-    """Muhasebe ayarları — admin + accountant okur (vergi oranı + kur ücretleri)."""
+    """Muhasebe ayarları — admin + accountant okur (vergi oranı + kur ücretleri +
+    öğretmen payları)."""
     v = await db.sistem_ayarlari.find_one({"tip": "vergi_ayarlari"})
     k = await db.sistem_ayarlari.find_one({"tip": "kur_ucretleri"})
+    o = await db.sistem_ayarlari.find_one({"tip": "ogretmen_paylari"})
     return {
         "vergi_ayarlari": (v.get("degerler") if v else None) or VERGI_AYARLARI_DEFAULT,
         "kur_ucretleri": (k.get("degerler") if k else None) or KUR_UCRETLERI_DEFAULT,
+        "ogretmen_paylari": (o.get("degerler") if o else None) or OGRETMEN_PAYLARI_DEFAULT,
     }
 
 
@@ -435,24 +467,7 @@ async def muhasebe_vergi_guncelle(data: dict, current_user=Depends(_ERISIM)):
 @router.put("/muhasebe/ayarlar/kur-ucretleri")
 async def muhasebe_kur_ucretleri_guncelle(data: dict, current_user=Depends(_ERISIM)):
     """Kur ücretleri (genel + eğitim türü bazlı) günceller (admin + accountant)."""
-    degerler = data.get("degerler")
-    if not isinstance(degerler, dict):
-        raise HTTPException(status_code=422, detail="degerler nesnesi gerekli")
-    try:
-        genel = round(float(degerler.get("genel", 0) or 0), 2)
-    except (TypeError, ValueError):
-        raise HTTPException(status_code=422, detail="Genel ücret sayısal olmalı")
-    if genel < 0:
-        raise HTTPException(status_code=422, detail="Genel ücret negatif olamaz")
-    turler = {}
-    for ad, v in (degerler.get("turler", {}) or {}).items():
-        try:
-            n = round(float(v), 2)
-        except (TypeError, ValueError):
-            continue
-        if n > 0:
-            turler[str(ad)] = n
-    temiz = {"genel": genel, "turler": turler}
+    temiz = _normalize_genel_turler(data.get("degerler"))
     await db.sistem_ayarlari.update_one(
         {"tip": "kur_ucretleri"},
         {"$set": {"tip": "kur_ucretleri", "degerler": temiz,
@@ -460,5 +475,159 @@ async def muhasebe_kur_ucretleri_guncelle(data: dict, current_user=Depends(_ERIS
                   "guncelleyen": current_user.get("ad", "")}},
         upsert=True)
     await islem_kaydet(current_user, "muhasebe", "ayar_kur_ucreti", "ayar", "kur_ucretleri",
-                       "kur_ucretleri", None, f"genel={genel}₺, {len(turler)} tür özel")
+                       "kur_ucretleri", None, f"genel={temiz['genel']}₺, {len(temiz['turler'])} tür özel")
     return {"ok": True, "degerler": temiz}
+
+
+@router.put("/muhasebe/ayarlar/ogretmen-paylari")
+async def muhasebe_ogretmen_paylari_guncelle(data: dict, current_user=Depends(_ERISIM)):
+    """Öğretmen payları (genel + eğitim türü bazlı) günceller (admin + accountant).
+    Dönem bazlı öğretmen ödemesinde tamamlanan her kur için bu pay uygulanır."""
+    temiz = _normalize_genel_turler(data.get("degerler"))
+    await db.sistem_ayarlari.update_one(
+        {"tip": "ogretmen_paylari"},
+        {"$set": {"tip": "ogretmen_paylari", "degerler": temiz,
+                  "guncelleme_tarihi": datetime.utcnow().isoformat(),
+                  "guncelleyen": current_user.get("ad", "")}},
+        upsert=True)
+    await islem_kaydet(current_user, "muhasebe", "ayar_ogretmen_payi", "ayar", "ogretmen_paylari",
+                       "ogretmen_paylari", None, f"genel={temiz['genel']}₺, {len(temiz['turler'])} tür özel")
+    return {"ok": True, "degerler": temiz}
+
+
+# ── Dönem bazlı öğretmen ödemesi (ayın 15'i) — admin + accountant ──
+# Ödeme dönemi: önceki ayın 15'i (HARİÇ) → bu ayın 15'i (DAHİL). Bir kur döneme
+# girmek için TAMAMLANMIŞ (durum=tamamlandi + tamamlanma_tarihi dönem içi) ve daha
+# önce ödenmemiş olmalı (odendi_donem boş). Öğretmen payı ayardan hesaplanır.
+
+def _tarih_gun(s):
+    try:
+        return datetime.strptime(str(s)[:10], "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return None
+
+
+def _donem_araligi(donem: str):
+    """donem 'YYYY-MM-15' → (baslangic_haric_date, bitis_dahil_date). Dönem = önceki
+    ayın 15'i (hariç) → bu ayın 15'i (dahil)."""
+    from datetime import date as _date
+    try:
+        y, m = int(donem[:4]), int(donem[5:7])
+        bitis = _date(y, m, 15)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="Geçersiz dönem (YYYY-MM-15 bekleniyor)")
+    oy, om = (y - 1, 12) if m == 1 else (y, m - 1)
+    from datetime import date as _date2
+    baslangic = _date2(oy, om, 15)
+    return baslangic, bitis
+
+
+def _donem_icinde(tamamlanma_tarihi, baslangic, bitis) -> bool:
+    """baslangic (hariç) < tamamlanma <= bitis (dahil)."""
+    d = _tarih_gun(tamamlanma_tarihi)
+    return bool(d) and baslangic < d <= bitis
+
+
+def _guncel_donem() -> str:
+    """İçinde bulunulan ödeme dönemi (bir sonraki/bu ayın 15'i)."""
+    b = datetime.now(timezone.utc).date()
+    if b.day <= 15:
+        return f"{b.year:04d}-{b.month:02d}-15"
+    y, m = (b.year + 1, 1) if b.month == 12 else (b.year, b.month + 1)
+    return f"{y:04d}-{m:02d}-15"
+
+
+async def _donem_kalemleri(donem: str, ogretmen_id: str = None):
+    """Döneme giren, ödenmemiş, tamamlanmış kurları öğretmen bazında gruplar.
+    ogretmen_id verilirse yalnız o öğretmen. get_ogretmen_payi ile pay hesaplanır."""
+    baslangic, bitis = _donem_araligi(donem)
+    ogretmen_ad, ogrenci = {}, {}
+    async for t in db.teachers.find({}, {"_id": 0, "id": 1, "ad": 1, "soyad": 1}):
+        ogretmen_ad[t.get("id")] = f"{t.get('ad', '')} {t.get('soyad', '')}".strip()
+    oq = {"ogretmen_id": ogretmen_id} if ogretmen_id else {}
+    async for s in db.students.find(oq, {"_id": 0, "id": 1, "ad": 1, "soyad": 1, "ogretmen_id": 1, "aldigi_egitim": 1}):
+        ogrenci[s.get("id")] = s
+    gruplar = {}
+    if not ogrenci:
+        return gruplar
+    async for k in db.kur_ucretleri.find(
+            {"ogrenci_id": {"$in": list(ogrenci)}, "durum": "tamamlandi"}, {"_id": 0}):
+        if k.get("odendi_donem"):
+            continue
+        if not _donem_icinde(k.get("tamamlanma_tarihi"), baslangic, bitis):
+            continue
+        s = ogrenci.get(k.get("ogrenci_id")) or {}
+        oid = s.get("ogretmen_id")
+        if not oid:
+            continue
+        pay = await get_ogretmen_payi(k.get("egitim_turu") or s.get("aldigi_egitim"))
+        g = gruplar.setdefault(oid, {"ogretmen_id": oid, "ogretmen_ad": ogretmen_ad.get(oid, ""),
+                                     "kurlar": [], "toplam": 0.0})
+        g["kurlar"].append({
+            "kur_ucreti_id": k.get("id"),
+            "ogrenci_id": k.get("ogrenci_id"),
+            "ogrenci_ad": f"{s.get('ad', '')} {s.get('soyad', '')}".strip(),
+            "kur": k.get("kur_adi", ""),
+            "egitim_turu": k.get("egitim_turu") or s.get("aldigi_egitim", ""),
+            "tamamlanma_tarihi": k.get("tamamlanma_tarihi"),
+            "pay": pay,
+        })
+        g["toplam"] = round(g["toplam"] + pay, 2)
+    return gruplar
+
+
+@router.get("/muhasebe/ogretmen-donem")
+async def ogretmen_donem_getir(donem: str = None, current_user=Depends(_ERISIM)):
+    """Dönemde tamamlanan kurlardan öğretmen bazında ödenecek liste + toplam.
+    donem verilmezse içinde bulunulan dönem (ayın 15'i)."""
+    donem = donem or _guncel_donem()
+    baslangic, bitis = _donem_araligi(donem)
+    gruplar = await _donem_kalemleri(donem)
+    return {"donem": donem,
+            "araligi": {"baslangic_haric": str(baslangic), "bitis_dahil": str(bitis)},
+            "ogretmenler": list(gruplar.values())}
+
+
+@router.post("/muhasebe/ogretmen-donem/ode")
+async def ogretmen_donem_ode(data: dict, current_user=Depends(_ERISIM)):
+    """Bir öğretmenin dönem ödemesini KAYDET. İdempotent: aynı öğretmen+dönem iki kez
+    ödenemez (409); ödenen kurlar 'odendi_donem' ile mühürlenir → başka döneme giremez."""
+    ogretmen_id = data.get("ogretmen_id")
+    donem = data.get("donem") or _guncel_donem()
+    if not ogretmen_id:
+        raise HTTPException(status_code=422, detail="ogretmen_id gerekli")
+    varmi = await db.ogretmen_donem_odemeleri.find_one({"ogretmen_id": ogretmen_id, "donem": donem})
+    if varmi:
+        raise HTTPException(status_code=409, detail="Bu öğretmen için bu dönem zaten ödendi")
+    gruplar = await _donem_kalemleri(donem, ogretmen_id=ogretmen_id)
+    grup = gruplar.get(ogretmen_id)
+    if not grup or not grup["kurlar"]:
+        raise HTTPException(status_code=400, detail="Bu dönemde ödenecek tamamlanmış kur yok")
+    kur_ids = [c["kur_ucreti_id"] for c in grup["kurlar"] if c.get("kur_ucreti_id")]
+    toplam = grup["toplam"]
+    kayit = {
+        "id": str(uuid.uuid4()),
+        "ogretmen_id": ogretmen_id,
+        "ogretmen_ad": grup["ogretmen_ad"],
+        "donem": donem,
+        "kur_ids": kur_ids,
+        "kalemler": grup["kurlar"],
+        "toplam": toplam,
+        "tarih": datetime.now(timezone.utc).isoformat(),
+        "odeyen_id": current_user.get("id"),
+    }
+    await db.ogretmen_donem_odemeleri.insert_one(kayit)
+    # Kurları döneme mühürle (idempotency) + mevcut bakiye katmanına yansıt
+    await db.kur_ucretleri.update_many({"id": {"$in": kur_ids}}, {"$set": {"odendi_donem": donem}})
+    await db.teachers.update_one({"id": ogretmen_id}, {"$inc": {"yapilan_odeme": toplam}})
+    await islem_kaydet(current_user, "muhasebe", "ogretmen_donem_ode", "ogretmen", ogretmen_id,
+                       "donem", None, f"{donem}: ₺{toplam} ({len(kur_ids)} kur)")
+    return {"ok": True, "donem": donem, "toplam": toplam, "kur_sayisi": len(kur_ids)}
+
+
+@router.get("/muhasebe/ogretmen-donem/gecmis")
+async def ogretmen_donem_gecmis(ogretmen_id: str = None, limit: int = 100, current_user=Depends(_ERISIM)):
+    """Geçmiş dönem ödemeleri (en yeni önce)."""
+    q = {"ogretmen_id": ogretmen_id} if ogretmen_id else {}
+    docs = await db.ogretmen_donem_odemeleri.find(q, {"_id": 0}).sort("tarih", -1).to_list(length=min(limit, 500))
+    return {"odemeler": docs}

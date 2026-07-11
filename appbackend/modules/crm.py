@@ -520,10 +520,12 @@ async def kur_gecis(student_id: str, req: KurGecisRequest, current_user=Depends(
     tutar = await get_kur_ucreti(egitim_turu)
     vergi_orani = await get_vergi_orani()
 
-    # Önceki açık kur(lar)ı tamamlandı işaretle (satır tabloda kalır)
+    # Önceki açık kur(lar)ı tamamlandı işaretle + tamamlanma tarihi (dönem hesabı için).
+    # Satır tabloda kalır; tamamlanma_tarihi öğretmen dönem ödemesinde kullanılır.
+    tamamlanma = datetime.now(timezone.utc).isoformat()
     await db.kur_ucretleri.update_many(
         {"ogrenci_id": student_id, "durum": {"$in": [None, "acik"]}},
-        {"$set": {"durum": "tamamlandi"}})
+        {"$set": {"durum": "tamamlandi", "tamamlanma_tarihi": tamamlanma}})
 
     # Yeni alacak satırı
     kayit = {

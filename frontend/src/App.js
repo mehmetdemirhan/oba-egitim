@@ -33,6 +33,7 @@ import TopluKayit from "./components/admin/TopluKayit";
 import EgitimTurleriYonetimi from "./components/admin/EgitimTurleriYonetimi";
 import IslemKayitlari from "./components/admin/IslemKayitlari";
 import MuhasebeAyarlari from "./components/admin/MuhasebeAyarlari";
+import OgretmenDonemOdeme from "./components/admin/OgretmenDonemOdeme";
 import SinavYonetimi from "./components/admin/SinavYonetimi";
 import SinavCozum from "./components/SinavCozum";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
@@ -1217,6 +1218,7 @@ function AppContent() {
                 <h3 className="text-base font-semibold text-content mb-2">Öğretmen Ödemeleri</h3>
                 <OdemeTablosu tip="ogretmen" kisiler={muhasebeKisiler.ogretmenler} payments={payments} apiBase={API} onDegisim={muhasebeYenile} />
               </div>
+              <OgretmenDonemOdeme apiBase={API} />
             </div>
 
             {/* Muhasebe Ayarları — Vergi Oranı + Kur Ücretleri (admin + accountant) */}

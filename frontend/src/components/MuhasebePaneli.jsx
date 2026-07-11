@@ -6,6 +6,7 @@ import { useToast } from "../hooks/use-toast";
 import { Wallet, TrendingUp, TrendingDown, Clock, LogOut, GraduationCap, Users, Receipt, PiggyBank } from "lucide-react";
 import OdemeTablosu from "./OdemeTablosu";
 import MuhasebeAyarlari from "./admin/MuhasebeAyarlari";
+import OgretmenDonemOdeme from "./admin/OgretmenDonemOdeme";
 
 /**
  * MuhasebePaneli — "accountant" rolüne özel SADE ödeme paneli.
@@ -105,6 +106,9 @@ export default function MuhasebePaneli({ user, logout }) {
         </div>
 
         <OdemeTablosu tip={sekme} kisiler={liste} payments={payments} apiBase={API} onDegisim={veriYukle} />
+
+        {/* Öğretmen sekmesinde dönem bazlı ödeme (ayın 15'i) */}
+        {sekme === "ogretmen" && <OgretmenDonemOdeme apiBase={API} />}
 
         {/* Muhasebe Ayarları — muhasebeci de vergi oranı + kur ücretlerini düzenler */}
         <MuhasebeAyarlari apiBase={API} />
