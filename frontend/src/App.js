@@ -1155,7 +1155,7 @@ function AppContent() {
           {/* Payments */}
           <TabsContent value="payments">
             {/* Özet Kartları */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <Card className="border border-line shadow-sm bg-gradient-to-br from-green-50 to-emerald-100">
                 <CardContent className="p-5 text-center">
                   <div className="text-sm text-green-700 font-medium mb-2">📥 Öğrenci Ödemeleri</div>
@@ -1178,6 +1178,17 @@ function AppContent() {
                   <div className="text-xs text-red-600 mt-1">{payments.filter(p => p.tip === 'ogretmen').length} ödeme</div>
                 </CardContent>
               </Card>
+              <Card className="border border-line shadow-sm bg-gradient-to-br from-amber-50 to-red-100">
+                <CardContent className="p-5 text-center">
+                  <div className="text-sm text-red-700 font-medium mb-2">🧾 Toplam Vergi (%{muhasebeOzet?.vergi?.oran ?? 15})</div>
+                  <div className="text-xs text-subtle mb-1">Öğrenci tahsilatlarından kesilen</div>
+                  <div className="text-3xl font-bold tabular-nums text-red-700">
+                    {formatCurrency(muhasebeOzet?.vergi?.toplam_vergi ?? 0)}
+                  </div>
+                  <div className="border-t border-red-200 my-2"></div>
+                  <div className="text-xs text-subtle tabular-nums">Net Tahsilat: <span className="font-semibold text-content">{formatCurrency(muhasebeOzet?.vergi?.net_tahsilat ?? 0)}</span></div>
+                </CardContent>
+              </Card>
               <Card className="border border-line shadow-sm bg-gradient-to-br from-blue-50 to-indigo-100">
                 <CardContent className="p-5 text-center">
                   <div className="text-sm text-primary font-medium mb-2">🏦 Net Kasa Bakiyesi</div>
@@ -1186,7 +1197,7 @@ function AppContent() {
                     {formatCurrency(muhasebeOzet?.kasa_net ?? 0)}
                   </div>
                   <div className="border-t border-blue-200 my-2"></div>
-                  <div className="text-xs text-subtle tabular-nums">Toplam Vergi (%{muhasebeOzet?.vergi?.oran ?? 15}): <span className="font-semibold text-red-600">{formatCurrency(muhasebeOzet?.vergi?.toplam_vergi ?? 0)}</span></div>
+                  <div className="text-xs text-subtle tabular-nums">Brüt Tahsilat: <span className="font-semibold text-content">{formatCurrency(muhasebeOzet?.vergi?.brut_tahsilat ?? 0)}</span></div>
                 </CardContent>
               </Card>
             </div>
