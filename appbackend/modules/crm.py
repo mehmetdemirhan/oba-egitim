@@ -15,6 +15,7 @@ from core.db import db, prepare_for_mongo, parse_from_mongo
 from core.auth import get_current_user, require_role, UserRole, TeacherLevel, hash_password
 from core.audit import islem_kaydet, islem_listele
 from core.hesap import gecici_sifre_uret, OGRETMEN_ROLLERI
+from core.sistem import get_vergi_orani
 
 router = APIRouter()
 
@@ -171,6 +172,13 @@ class Payment(BaseModel):
     miktar: float
     aciklama: Optional[str] = None
     tarih: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    # Vergi: yalnız öğrenci tahsilatlarında dolar; oran tahsilat anındaki ayardan
+    # SABİTLENİR (sonradan oran değişse eski kayıt kendi oranıyla kalır).
+    brut: Optional[float] = None
+    vergi_orani: Optional[float] = None
+    vergi: Optional[float] = None
+    net: Optional[float] = None
+    kur_ucreti_id: Optional[str] = None  # İŞ 3 — bu tahsilat hangi kur kaydına ait
 
 class PaymentCreate(BaseModel):
     tip: str
@@ -178,6 +186,7 @@ class PaymentCreate(BaseModel):
     miktar: float
     aciklama: Optional[str] = None
     tarih: Optional[datetime] = None  # verilmezse sunucu "şimdi" kullanır
+    kur_ucreti_id: Optional[str] = None  # verilmezse öğrencinin aktif kuruna atfedilir
 
 class PaymentUpdate(BaseModel):
     miktar: Optional[float] = None
@@ -569,12 +578,21 @@ async def create_payment(payment_data: PaymentCreate,
                          current_user=Depends(require_role(UserRole.ADMIN, UserRole.ACCOUNTANT))):
     # None alanları düş: tarih verilmezse Payment modelinin varsayılanı (şimdi) kullanılır.
     payment = Payment(**{k: v for k, v in payment_data.dict().items() if v is not None})
-    await db.payments.insert_one(prepare_for_mongo(payment.dict()))
+    doc = payment.dict()
+    if payment.tip == "ogrenci":
+        # İŞ 1 — Vergi: oranı tahsilat anındaki ayardan SABİTLE (sonradan değişse eski kayıt korunur)
+        orani = await get_vergi_orani()
+        m = round(float(payment.miktar), 2)
+        doc["brut"] = m
+        doc["vergi_orani"] = orani
+        doc["vergi"] = round(m * orani / 100.0, 2)
+        doc["net"] = round(m - doc["vergi"], 2)
+    await db.payments.insert_one(prepare_for_mongo({**doc}))
     if payment.tip == "ogrenci":
         await db.students.update_one({"id": payment.kisi_id}, {"$inc": {"yapilan_odeme": payment.miktar}})
     elif payment.tip == "ogretmen":
         await db.teachers.update_one({"id": payment.kisi_id}, {"$inc": {"yapilan_odeme": payment.miktar}})
-    return payment
+    return Payment(**doc)
 
 @router.get("/payments", response_model=List[Payment])
 async def get_payments(current_user=Depends(require_role(UserRole.ADMIN, UserRole.ACCOUNTANT))):
@@ -609,6 +627,13 @@ async def update_payment(payment_id: str, data: PaymentUpdate,
     elif delta and eski.get("tip") == "ogretmen":
         await db.teachers.update_one({"id": eski["kisi_id"]}, {"$inc": {"yapilan_odeme": delta}})
     guncelle = {"miktar": float(yeni_miktar)}
+    if eski.get("tip") == "ogrenci":
+        # Vergiyi kaydın KENDİ oranıyla yeniden hesapla (oran yoksa güncel oranı sabitle)
+        orani = float(eski.get("vergi_orani") if eski.get("vergi_orani") is not None else await get_vergi_orani())
+        guncelle["brut"] = round(float(yeni_miktar), 2)
+        guncelle["vergi_orani"] = orani
+        guncelle["vergi"] = round(float(yeni_miktar) * orani / 100.0, 2)
+        guncelle["net"] = round(float(yeni_miktar) - guncelle["vergi"], 2)
     if data.aciklama is not None:
         guncelle["aciklama"] = data.aciklama
     if data.tarih is not None:
@@ -635,5 +660,6 @@ async def get_export_data():
             person = await db.students.find_one({"id": p.get('kisi_id')})
         else:
             person = await db.teachers.find_one({"id": p.get('kisi_id')})
-        payment_export.append({"Tarih": p.get('tarih',''), "Tip": 'Öğrenci' if p.get('tip') == 'ogrenci' else 'Öğretmen', "Kişi": f"{person.get('ad','')} {person.get('soyad','')}" if person else 'Bilinmiyor', "Miktar": p.get('miktar',0), "Açıklama": p.get('aciklama','')})
+        _ogr = p.get('tip') == 'ogrenci'
+        payment_export.append({"Tarih": p.get('tarih',''), "Tip": 'Öğrenci' if _ogr else 'Öğretmen', "Kişi": f"{person.get('ad','')} {person.get('soyad','')}" if person else 'Bilinmiyor', "Miktar": p.get('miktar',0), "Brüt": p.get('brut', p.get('miktar',0)) if _ogr else '', "Vergi Oranı (%)": p.get('vergi_orani','') if _ogr else '', "Vergi": p.get('vergi','') if _ogr else '', "Net": p.get('net','') if _ogr else '', "Açıklama": p.get('aciklama','')})
     return ExportData(ogretmenler=teacher_export, ogrenciler=student_export, kurslar=course_export, odemeler=payment_export)

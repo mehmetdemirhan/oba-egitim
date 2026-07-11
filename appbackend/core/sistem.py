@@ -156,6 +156,27 @@ async def get_puan_ayarlari():
     return VARSAYILAN_PUANLAR
 
 
+# ── Vergi ayarları (velilerden alınan tahsilatlara devlet vergisi kesintisi) ──
+# Oran YÜZDE olarak tutulur (15 = %15). Admin generic /ayarlar/vergi_ayarlari ile
+# değiştirir; değer "degerler" altında saklanır (generic PUT deseni).
+VERGI_AYARLARI_DEFAULT = {"vergi_orani": 15}
+
+
+async def get_vergi_ayarlari():
+    doc = await db.sistem_ayarlari.find_one({"tip": "vergi_ayarlari"})
+    if doc:
+        return doc.get("degerler", VERGI_AYARLARI_DEFAULT)
+    return VERGI_AYARLARI_DEFAULT
+
+
+async def get_vergi_orani() -> float:
+    """Güncel vergi oranını yüzde olarak döndürür (varsayılan 15)."""
+    try:
+        return float((await get_vergi_ayarlari()).get("vergi_orani", 15))
+    except Exception:
+        return 15.0
+
+
 # ── Kutulu Okuma egzersizi ayarları ──
 # kutu_basi_kelime: bir kutuda kaç kelime gösterilsin (genel varsayılan; egzersiz
 # ayar çekmecesinden her açılışta 1/2/3 olarak değiştirilebilir).

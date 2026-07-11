@@ -20,6 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from core.db import db
 from core.auth import require_role, UserRole
 from core.audit import islem_kaydet, islem_listele
+from core.sistem import get_vergi_orani
 
 router = APIRouter()
 
@@ -27,7 +28,7 @@ _ERISIM = require_role(UserRole.ADMIN, UserRole.ACCOUNTANT)
 
 # Satır içi düzenlemede izin verilen alanlar (whitelist) — tip bazlı.
 _DUZENLENEBILIR = {
-    "ogrenci": {"ad", "soyad", "veli_ad", "veli_soyad", "veli_telefon",
+    "ogrenci": {"ad", "soyad", "veli_ad", "veli_soyad", "veli_telefon", "sinif", "kur",
                 "yapilmasi_gereken_odeme", "yapilan_odeme", "muhasebe_notu"},
     "ogretmen": {"ad", "soyad", "yapilmasi_gereken_odeme", "yapilan_odeme", "muhasebe_notu"},
 }
@@ -53,43 +54,93 @@ def _num(v) -> float:
 async def muhasebe_kisiler(current_user=Depends(_ERISIM)):
     """Ödeme kaydı/tablosu için kişi listesi — CRM detayı OLMADAN, sadece ad-soyad
     ve ödeme alanları döner."""
+    # Öğretmen ad haritası (İŞ 2 "Öğretmeni" sütunu) — N+1'den kaçın
+    ogretmen_ad = {}
+    try:
+        async for t in db.teachers.find({}, {"_id": 0, "id": 1, "ad": 1, "soyad": 1}):
+            ogretmen_ad[t.get("id")] = f"{t.get('ad','')} {t.get('soyad','')}".strip()
+    except Exception:
+        pass
+
+    # Kur ücretleri öğrenci bazında, tarih ARTAN (FIFO — eski kur önce) — İŞ 3
+    kur_map = {}
+    try:
+        async for k in db.kur_ucretleri.find({}, {"_id": 0}):
+            kur_map.setdefault(k.get("ogrenci_id"), []).append(k)
+    except Exception:
+        pass
+    for _oid in kur_map:
+        kur_map[_oid].sort(key=lambda k: str(k.get("baslangic_tarihi") or k.get("tarih") or ""))
+
     ogrenciler = []
     try:
         async for s in db.students.find({}, {
-            "_id": 0, "id": 1, "ad": 1, "soyad": 1,
+            "_id": 0, "id": 1, "ad": 1, "soyad": 1, "sinif": 1, "kur": 1,
             "veli_ad": 1, "veli_soyad": 1, "veli_telefon": 1, "muhasebe_notu": 1,
+            "ogretmen_id": 1, "olusturma_tarihi": 1,
             "yapilmasi_gereken_odeme": 1, "yapilan_odeme": 1, "ogretmene_yapilacak_odeme": 1,
         }):
-            gereken = _num(s.get("yapilmasi_gereken_odeme"))
-            yapilan = _num(s.get("yapilan_odeme"))
-            ogrenciler.append({
-                "id": s.get("id"),
-                "ad": s.get("ad", ""),
-                "soyad": s.get("soyad", ""),
-                "veli_ad": s.get("veli_ad", ""),
-                "veli_soyad": s.get("veli_soyad", ""),
+            ortak = {
+                "kisi_id": s.get("id"),  # PATCH hedefi (öğrenci alanları)
+                "ad": s.get("ad", ""), "soyad": s.get("soyad", ""),
+                "sinif": s.get("sinif", ""),
+                "veli_ad": s.get("veli_ad", ""), "veli_soyad": s.get("veli_soyad", ""),
                 "veli_telefon": s.get("veli_telefon", ""),
                 "muhasebe_notu": s.get("muhasebe_notu", ""),
-                "yapilmasi_gereken_odeme": gereken,
-                "yapilan_odeme": yapilan,
-                "kalan": max(0.0, gereken - yapilan),
+                "ogretmen_ad": ogretmen_ad.get(s.get("ogretmen_id"), ""),
                 "ogretmene_yapilacak_odeme": _num(s.get("ogretmene_yapilacak_odeme")),
-            })
+            }
+            kurlar = kur_map.get(s.get("id")) or []
+            if kurlar:
+                havuz = _num(s.get("yapilan_odeme"))  # FIFO havuzu = toplam ödeme
+                satirlar = []
+                for k in kurlar:
+                    tutar = _num(k.get("tutar"))
+                    odenen_k = min(havuz, tutar)
+                    havuz -= odenen_k
+                    satirlar.append({
+                        **ortak,
+                        "id": k.get("id"),  # satır kimliği = kur kaydı (React key)
+                        "kur_ucreti_id": k.get("id"),
+                        "kur": k.get("kur_adi", ""),
+                        "kayit_zamani": k.get("baslangic_tarihi") or k.get("tarih") or s.get("olusturma_tarihi") or "",
+                        "yapilmasi_gereken_odeme": round(tutar, 2),
+                        "yapilan_odeme": round(odenen_k, 2),
+                        "kalan": round(max(0.0, tutar - odenen_k), 2),
+                    })
+                if havuz > 0 and satirlar:  # fazla ödeme → son kur satırına
+                    satirlar[-1]["yapilan_odeme"] = round(satirlar[-1]["yapilan_odeme"] + havuz, 2)
+                    satirlar[-1]["kalan"] = round(max(0.0, satirlar[-1]["yapilmasi_gereken_odeme"] - satirlar[-1]["yapilan_odeme"]), 2)
+                ogrenciler.extend(satirlar)
+            else:
+                # Kur kaydı olmayan öğrenci → tek satır (güncel kur + toplam bakiye)
+                gereken = _num(s.get("yapilmasi_gereken_odeme"))
+                yapilan = _num(s.get("yapilan_odeme"))
+                ogrenciler.append({
+                    **ortak,
+                    "id": s.get("id"),
+                    "kur_ucreti_id": None,
+                    "kur": s.get("kur", ""),
+                    "kayit_zamani": s.get("olusturma_tarihi") or "",
+                    "yapilmasi_gereken_odeme": round(gereken, 2),
+                    "yapilan_odeme": round(yapilan, 2),
+                    "kalan": round(max(0.0, gereken - yapilan), 2),
+                })
     except Exception as ex:
         logging.warning(f"[muhasebe] öğrenci listesi hatası: {ex}")
 
     ogretmenler = []
     try:
         async for t in db.teachers.find({}, {
-            "_id": 0, "id": 1, "ad": 1, "soyad": 1, "muhasebe_notu": 1,
+            "_id": 0, "id": 1, "ad": 1, "soyad": 1, "muhasebe_notu": 1, "telefon": 1,
             "yapilmasi_gereken_odeme": 1, "yapilan_odeme": 1,
         }):
             gereken = _num(t.get("yapilmasi_gereken_odeme"))
             yapilan = _num(t.get("yapilan_odeme"))
             ogretmenler.append({
-                "id": t.get("id"),
-                "ad": t.get("ad", ""),
-                "soyad": t.get("soyad", ""),
+                "id": t.get("id"), "kisi_id": t.get("id"),
+                "ad": t.get("ad", ""), "soyad": t.get("soyad", ""),
+                "telefon": t.get("telefon", ""),
                 "muhasebe_notu": t.get("muhasebe_notu", ""),
                 "yapilmasi_gereken_odeme": gereken,
                 "yapilan_odeme": yapilan,
@@ -122,6 +173,22 @@ async def muhasebe_ozet(current_user=Depends(_ERISIM)):
     except Exception as ex:
         logging.warning(f"[muhasebe] öğretmen özet hatası: {ex}")
 
+    # İŞ 1 — Vergi: öğrenci tahsilat işlemlerinin vergisi (kayıtta saklı; eski
+    # kayıt vergisiz ise güncel oranla türetilir).
+    guncel_oran = await get_vergi_orani()
+    toplam_vergi = 0.0
+    try:
+        async for p in db.payments.find({"tip": "ogrenci"}, {"_id": 0, "miktar": 1, "vergi": 1}):
+            if p.get("vergi") is not None:
+                toplam_vergi += _num(p.get("vergi"))
+            else:
+                toplam_vergi += round(_num(p.get("miktar")) * guncel_oran / 100.0, 2)
+    except Exception as ex:
+        logging.warning(f"[muhasebe] vergi özet hatası: {ex}")
+    toplam_vergi = round(toplam_vergi, 2)
+    net_tahsilat = round(ogr_tahsil - toplam_vergi, 2)
+    kasa_net = round(net_tahsilat - ogt_odenen, 2)
+
     return {
         "ogrenci": {
             "beklenen": round(ogr_beklenen, 2),
@@ -133,6 +200,13 @@ async def muhasebe_ozet(current_user=Depends(_ERISIM)):
             "odenen": round(ogt_odenen, 2),
             "kalan": round(max(0.0, ogt_odenecek - ogt_odenen), 2),
         },
+        "vergi": {
+            "oran": guncel_oran,
+            "toplam_vergi": toplam_vergi,
+            "brut_tahsilat": round(ogr_tahsil, 2),
+            "net_tahsilat": net_tahsilat,
+        },
+        "kasa_net": kasa_net,
     }
 
 
@@ -215,6 +289,39 @@ async def kur_ucretleri_listesi(ogrenci_id: str, current_user=Depends(_ERISIM)):
     docs = await db.kur_ucretleri.find({"ogrenci_id": ogrenci_id}, {"_id": 0}) \
         .sort("tarih", -1).to_list(length=500)
     return {"ogeler": docs}
+
+
+@router.patch("/muhasebe/kur-ucreti/{kur_id}")
+async def kur_ucreti_guncelle(kur_id: str, data: dict, current_user=Depends(_ERISIM)):
+    """Kur kaydını satır içi düzenler: kur_adi ve/veya tutar (Beklenen). Tutar
+    değişirse öğrencinin beklenen toplamı (yapilmasi_gereken_odeme) delta kadar
+    güncellenir — beklenenin tek kaynağı invariant'ı korunur."""
+    kayit = await db.kur_ucretleri.find_one({"id": kur_id})
+    if not kayit:
+        raise HTTPException(status_code=404, detail="Kur kaydı bulunamadı")
+    guncelle, delta = {}, 0.0
+    if data.get("kur_adi") is not None:
+        yeni_ad = str(data.get("kur_adi", "")).strip()
+        if yeni_ad:
+            guncelle["kur_adi"] = yeni_ad
+    if data.get("tutar") is not None:
+        try:
+            yeni_tutar = round(float(data.get("tutar")), 2)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=422, detail="Tutar sayısal olmalı")
+        if yeni_tutar < 0:
+            raise HTTPException(status_code=422, detail="Tutar negatif olamaz")
+        delta = round(yeni_tutar - _num(kayit.get("tutar")), 2)
+        guncelle["tutar"] = yeni_tutar
+    if not guncelle:
+        raise HTTPException(status_code=400, detail="Güncellenecek alan yok")
+    await db.kur_ucretleri.update_one({"id": kur_id}, {"$set": guncelle})
+    if delta:
+        await db.students.update_one({"id": kayit.get("ogrenci_id")},
+                                     {"$inc": {"yapilmasi_gereken_odeme": delta}})
+    await _log(current_user, "ogrenci", kayit.get("ogrenci_id"), "kur_ucreti_guncelle",
+               _num(kayit.get("tutar")), guncelle.get("tutar", _num(kayit.get("tutar"))))
+    return {"ok": True, "guncellenen": list(guncelle.keys()), "delta": delta}
 
 
 @router.get("/muhasebe/log")
