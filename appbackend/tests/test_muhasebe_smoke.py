@@ -89,8 +89,10 @@ async def run():
         check(ogr is not None and ogr.get("veli_ad") == "Ayşe" and ogr.get("yapilmasi_gereken_odeme") == 1000.0,
               "kişiler veli + ödeme alanlarını içeriyor")
         # 3b) eğitim/CRM verisi SIZMAZ
-        check(ogr is not None and "aldigi_egitim" not in ogr and "sinif" not in ogr and "notlar" not in ogr,
-              "kişiler yanıtı eğitim/CRM verisi (aldigi_egitim/sinif/notlar) sızdırmıyor")
+        # sinif/kur artık muhasebe sütunlarında GÖSTERİLİR (vergi/tam-sütun özelliği);
+        # eğitim verisi (aldigi_egitim) ve serbest not (notlar) hâlâ sızmamalı.
+        check(ogr is not None and "aldigi_egitim" not in ogr and "notlar" not in ogr,
+              "kişiler yanıtı eğitim verisi (aldigi_egitim/notlar) sızdırmıyor")
 
         # 4) accountant POST /payments (tarih ile) → bakiye artar
         r = await ac.post("/api/payments", headers=H_acc, json={
@@ -127,9 +129,10 @@ async def run():
         # negatif para reddedilir
         r = await ac.patch(f"/api/muhasebe/kisi/ogrenci/{sid}", headers=H_acc, json={"yapilan_odeme": -10})
         check(r.status_code == 422, f"negatif para 422 ({r.status_code})")
-        # whitelist dışı alan yok sayılır (sinif düzenlenemez)
-        r = await ac.patch(f"/api/muhasebe/kisi/ogrenci/{sid}", headers=H_acc, json={"sinif": "99"})
-        check(r.status_code == 400, "whitelist dışı alan (sinif) reddedildi")
+        # whitelist dışı alan yok sayılır (aldigi_egitim muhasebeden düzenlenemez;
+        # sinif/kur artık düzenlenebilir — vergi/tam-sütun özelliği).
+        r = await ac.patch(f"/api/muhasebe/kisi/ogrenci/{sid}", headers=H_acc, json={"aldigi_egitim": "X"})
+        check(r.status_code == 400, "whitelist dışı alan (aldigi_egitim) reddedildi")
 
         # 6c) Kur ücreti ekleme → beklenen toplam artar + kur_ucretleri kaydı
         before = (await server.db.students.find_one({"id": sid}))["yapilmasi_gereken_odeme"]
@@ -144,8 +147,8 @@ async def run():
               "kur_ucretleri listesinde yeni kayıt var")
 
         # 6d) Audit log düştü mü
-        log_say = await server.db.muhasebe_log.count_documents({"hedef_id": sid})
-        check(log_say >= 3, f"muhasebe_log kayıtları düştü ({log_say})")
+        log_say = await server.db.islem_log.count_documents({"hedef_id": sid, "modul": "muhasebe"})
+        check(log_say >= 3, f"islem_log (modül=muhasebe) kayıtları düştü ({log_say})")
         r = await ac.get(f"/api/muhasebe/log?hedef_id={sid}", headers=H_admin)
         check(r.status_code == 200 and len(r.json().get("kayitlar", [])) >= 3, "admin log okuyabiliyor")
         r = await ac.get("/api/muhasebe/log", headers=H_acc)

@@ -3,7 +3,7 @@ import axios from "axios";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { useToast } from "../hooks/use-toast";
-import { Wallet, TrendingUp, TrendingDown, Clock, LogOut, GraduationCap, Users } from "lucide-react";
+import { Wallet, TrendingUp, TrendingDown, Clock, LogOut, GraduationCap, Users, Receipt, PiggyBank } from "lucide-react";
 import OdemeTablosu from "./OdemeTablosu";
 
 /**
@@ -22,6 +22,7 @@ function KpiKart({ Ikon, etiket, tutar, vurgu }) {
     green: ["border-l-emerald-500", "text-emerald-600"],
     amber: ["border-l-amber-500", "text-amber-600"],
     slate: ["border-l-slate-400", "text-slate-600"],
+    red: ["border-l-red-500", "text-red-600"],
   }[vurgu] || ["border-l-slate-400", "text-slate-600"];
   return (
     <Card className="border border-line shadow-sm">
@@ -87,12 +88,14 @@ export default function MuhasebePaneli({ user, logout }) {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
           <KpiKart Ikon={TrendingUp} etiket="Beklenen Tahsilat" tutar={ogr.beklenen} vurgu="blue" />
-          <KpiKart Ikon={Wallet} etiket="Tahsil Edilen" tutar={ogr.tahsil_edilen} vurgu="green" />
+          <KpiKart Ikon={Wallet} etiket="Tahsil Edilen (brüt)" tutar={ogr.tahsil_edilen} vurgu="green" />
+          <KpiKart Ikon={Receipt} etiket={`Toplam Vergi (%${ozet?.vergi?.oran ?? 15})`} tutar={ozet?.vergi?.toplam_vergi} vurgu="red" />
           <KpiKart Ikon={Clock} etiket="Bekleyen Tahsilat" tutar={ogr.bekleyen} vurgu="amber" />
           <KpiKart Ikon={TrendingDown} etiket="Öğretmene Ödenecek" tutar={ogt.odenecek} vurgu="slate" />
           <KpiKart Ikon={Wallet} etiket="Öğretmene Ödenen" tutar={ogt.odenen} vurgu="green" />
+          <KpiKart Ikon={PiggyBank} etiket="Net Kasa (vergi düşülmüş)" tutar={ozet?.kasa_net} vurgu="green" />
         </div>
 
         <div className="flex gap-2">
