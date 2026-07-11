@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useToast } from "../hooks/use-toast";
+import { kurRenkSinifi } from "../utils/kurSiniflandirma";
 import {
   ChevronDown, ChevronRight, Plus, Trash2, AlertTriangle, Search,
 } from "lucide-react";
@@ -224,9 +225,8 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
             {filtreli.map((k) => {
               const acikMi = acik === k.id;
               const odemeler = kisiOdemeleri(k.kisi_id);
-              // İŞ 3 — satır renklendirme: kur 1 = mor (yeni), kur >1 = yeşil (üst kur)
-              const kurNo = ogrenciMi ? parseInt(String(k.kur || "").replace(/\D/g, ""), 10) : NaN;
-              const satirRenk = kurNo === 1 ? "bg-purple-50" : kurNo > 1 ? "bg-emerald-50" : "";
+              // İŞ 3 — satır renklendirme KUR NUMARASINA göre: kur 1 = mor (yeni), kur >1 = yeşil (üst kur)
+              const satirRenk = ogrenciMi ? kurRenkSinifi(k.kur) : "";
               return (
                 <React.Fragment key={k.id}>
                   <tr className={`border-b border-line ${satirRenk}`}>

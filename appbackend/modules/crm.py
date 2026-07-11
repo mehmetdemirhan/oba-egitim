@@ -3,7 +3,9 @@
 server.py'dan birebir taşındı. Modeller, yollar, yanıt modelleri ve davranış
 değişmedi. TeacherLevel core/auth'tan gelir.
 """
+import asyncio
 import logging
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -289,6 +291,64 @@ async def delete_teacher(teacher_id: str):
         raise HTTPException(status_code=404, detail="Öğretmen bulunamadı")
     return {"message": "Öğretmen başarıyla silindi"}
 
+def _kur_no(kur):
+    """'Kur 3' / '3' / 3 → 3; boş/çözülemez → None."""
+    try:
+        s = re.sub(r"\D", "", str(kur if kur is not None else ""))
+        return int(s) if s else None
+    except Exception:
+        return None
+
+
+async def kur_atlama_xp_kaydet(student: dict, yeni_kur, eski_kur="", kaynak="ust_kur", tarih=None):
+    """Kur>1 girişi/atlaması için öğretmen XP kaydı (db.kur_atlamalari).
+
+    Sınıflandırma KUR NUMARASINA göre: kur<=1 → yeni kayıt (kayıt yazılmaz),
+    kur>1 → üst kur/kur atlama (öğretmene XP).
+
+    - İdempotent: aynı öğrenci + aynı kur no için XP'ye sayılan (kaynak!=manuel)
+      kayıt zaten varsa yeniden yazmaz → öğrenci+kur başına TEK XP.
+    - ogretmen_id = students.ogretmen_id (teachers.id); XP tablosu (_ogr_id=linked_id)
+      ve rozet motoru (_ogretmen_metrikleri linked_id çözer) bununla eşler.
+    - kaynak != 'manuel' → +kur_basi XP (varsayılan 7) TÜRETİLİR (özel yol yok).
+    - Öğretmenin users.id'siyle rozet_tetikle (seviye/rozet otomatik).
+    Döner: yeni kayıt oluşturulduysa True.
+    """
+    ogretmen_tid = student.get("ogretmen_id")
+    kur_no = _kur_no(yeni_kur)
+    if not ogretmen_tid or kur_no is None or kur_no <= 1:
+        return False  # öğretmensiz veya kur<=1 (yeni kayıt) → kur atlama değil
+    # İdempotent: bu öğrenci+kur için XP'ye sayılan kayıt var mı?
+    async for k in db.kur_atlamalari.find(
+            {"ogrenci_id": student["id"], "kaynak": {"$ne": "manuel"}},
+            {"_id": 0, "yeni_kur": 1, "yeni_kur_no": 1}):
+        n = k.get("yeni_kur_no")
+        if n is None:
+            n = _kur_no(k.get("yeni_kur"))
+        if n == kur_no:
+            return False  # zaten işlenmiş — mükerrer XP yok
+    await db.kur_atlamalari.insert_one({
+        "id": str(uuid.uuid4()),
+        "ogrenci_id": student["id"],
+        "ogretmen_id": ogretmen_tid,
+        "eski_kur": str(eski_kur or ""),
+        "yeni_kur": str(yeni_kur),
+        "yeni_kur_no": kur_no,
+        "kaynak": kaynak,  # != "manuel" → XP'ye sayılır
+        "tarih": tarih or datetime.now(timezone.utc).isoformat(),
+    })
+    # Rozet motoru: öğretmenin users.id'siyle tetikle (fire-and-forget; yükleme
+    # sırası bağımsız olsun diye fonksiyon-içi import).
+    try:
+        from core.rozet_motor import rozet_tetikle
+        tuser = await db.users.find_one({"linked_id": ogretmen_tid}, {"_id": 0, "id": 1})
+        if tuser and tuser.get("id"):
+            asyncio.create_task(rozet_tetikle(tuser["id"], "kur_atlama"))
+    except Exception as ex:
+        logging.warning(f"[kur_atlama_xp] rozet tetikleme hatası: {ex}")
+    return True
+
+
 @router.post("/students", response_model=Student)
 async def create_student(student_data: StudentCreate, current_user=Depends(get_current_user)):
     rol = current_user.get("role")
@@ -338,6 +398,9 @@ async def create_student(student_data: StudentCreate, current_user=Depends(get_c
             "tarih": datetime.now(timezone.utc).isoformat(),
         }
         await db.payments.insert_one(ogretmen_kaydi)
+    # ★ Kur>1 ile DOĞRUDAN kayıt = üst kur girişi → öğretmene kur-atlama XP'si
+    #   (idempotent; kur<=1 ise no-op). "Yeni Kura Geçir" ile aynı XP kuralı.
+    await kur_atlama_xp_kaydet(student.dict(), student.kur, eski_kur="", kaynak="ust_kur_kayit")
     return student
 
 @router.get("/students")
@@ -545,6 +608,10 @@ async def kur_gecis(student_id: str, req: KurGecisRequest, current_user=Depends(
     await db.students.update_one(
         {"id": student_id},
         {"$set": {"kur": yeni_kur_adi}, "$inc": {"yapilmasi_gereken_odeme": tutar}})
+
+    # ★ Kur atlama = öğretmene kur-atlama XP'si + rozet (idempotent). ogretmen_id
+    #   öğrencinin kendi öğretmeni (teachers.id); işlemi kim tetiklerse XP ona gider.
+    await kur_atlama_xp_kaydet(student, yeni_kur_adi, eski_kur=mevcut_kur, kaynak="kur_gecis")
 
     # Audit
     await islem_kaydet(current_user, "ogrenci", "kur_gecis", "ogrenci", student_id,
