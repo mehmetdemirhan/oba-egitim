@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useToast } from "../hooks/use-toast";
+import { kurRenkSinifi } from "../utils/kurSiniflandirma";
 import {
   ChevronDown, ChevronRight, Plus, Trash2, AlertTriangle, Search,
 } from "lucide-react";
@@ -72,7 +73,7 @@ function EditableCell({ value, kind = "text", format, align = "left", editable =
   );
 }
 
-export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisim, sadeceBorclu = false, onBorcluTemizle }) {
+export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisim, sadeceBorclu = false, onBorcluTemizle, odakKisiId = "", onOdakTemizle }) {
   const { toast } = useToast();
   const [arama, setArama] = useState("");
   const [acik, setAcik] = useState(null);
@@ -83,12 +84,13 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
 
   const filtreli = useMemo(() => {
     let liste = kisiler;
+    if (odakKisiId) liste = liste.filter((k) => k.kisi_id === odakKisiId);  // bildirimden gelen öğrenci odağı
     if (sadeceBorclu) liste = liste.filter((k) => Number(k.kalan || 0) > 0);  // İŞ 4 — alınmayan
     const q = arama.trim().toLocaleLowerCase("tr");
     if (!q) return liste;
     return liste.filter((k) =>
       `${k.ad} ${k.soyad} ${k.veli_ad || ""} ${k.veli_soyad || ""} ${k.kur || ""} ${k.sinif || ""}`.toLocaleLowerCase("tr").includes(q));
-  }, [kisiler, arama, sadeceBorclu]);
+  }, [kisiler, arama, sadeceBorclu, odakKisiId]);
 
   // Ödemeler kişi (öğrenci/öğretmen) bazında — kur satırları aynı kisi_id'yi paylaşır
   const kisiOdemeleri = useCallback(
@@ -180,6 +182,13 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
         </div>
       )}
 
+      {odakKisiId && (
+        <div className="flex items-center gap-2 text-xs">
+          <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-medium">Filtre: bildirimdeki öğrenci ({filtreli.length} satır)</span>
+          {onOdakTemizle && <button onClick={onOdakTemizle} className="text-primary hover:underline">Temizle</button>}
+        </div>
+      )}
+
       <div className="border border-line rounded-2xl shadow-sm overflow-x-auto bg-surface">
         <table className="w-full text-sm">
           <thead>
@@ -216,9 +225,8 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
             {filtreli.map((k) => {
               const acikMi = acik === k.id;
               const odemeler = kisiOdemeleri(k.kisi_id);
-              // İŞ 3 — satır renklendirme: kur 1 = mor (yeni), kur >1 = yeşil (üst kur)
-              const kurNo = ogrenciMi ? parseInt(String(k.kur || "").replace(/\D/g, ""), 10) : NaN;
-              const satirRenk = kurNo === 1 ? "bg-purple-50" : kurNo > 1 ? "bg-emerald-50" : "";
+              // İŞ 3 — satır renklendirme KUR NUMARASINA göre: kur 1 = mor (yeni), kur >1 = yeşil (üst kur)
+              const satirRenk = ogrenciMi ? kurRenkSinifi(k.kur) : "";
               return (
                 <React.Fragment key={k.id}>
                   <tr className={`border-b border-line ${satirRenk}`}>

@@ -2,6 +2,7 @@
 
 server.py'dan birebir taşındı. Yollar, yanıt modelleri ve davranış değişmedi.
 """
+import re
 from datetime import datetime, timezone, timedelta
 from typing import List
 
@@ -14,6 +15,15 @@ from core.auth import require_role, UserRole
 router = APIRouter()
 
 
+def _kur_no(kur):
+    """'Kur 3'/'3'/3 → 3; boş/çözülemez → None. Sınıflandırma kur NUMARASINA göre."""
+    try:
+        s = re.sub(r"\D", "", str(kur if kur is not None else ""))
+        return int(s) if s else None
+    except Exception:
+        return None
+
+
 class DashboardStats(BaseModel):
     toplam_ogretmen: int
     toplam_ogrenci: int
@@ -24,7 +34,8 @@ class DashboardStats(BaseModel):
     # Koordinatör dashboard'u için öğrenci-bazlı metrikler (additive; admin
     # görünümü bunları kullanmaz). "kur atlayan" hem öğretmen akışını hem elle
     # düzenlemeyi kapsar (tüm kur_atlamalari).
-    bu_ay_yeni_kayit: int = 0
+    bu_ay_yeni_kayit: int = 0       # yalnız kur==1 (gerçek yeni kayıt)
+    bu_ay_ust_kur: int = 0          # kur>1 ile doğrudan giren (üst kur girişi)
     bu_ay_kur_atlayan: int = 0
 
 class WeeklyStats(BaseModel):
@@ -61,7 +72,11 @@ async def get_dashboard_stats():
     monthly_payments = await db.payments.find({"tarih": {"$gte": current_month_start.isoformat()}, "tip": "ogrenci"}).to_list(length=None)
     monthly_total = sum(p.get('miktar', 0) for p in monthly_payments)
     # Öğrenci-bazlı aylık metrikler (koordinatör dashboard'u)
-    bu_ay_yeni_kayit = await db.students.count_documents({"olusturma_tarihi": {"$gte": current_month_start.isoformat()}})
+    # Yeni kayıt = KUR==1; kur>1 ile giren "üst kur girişi" sayılır (yeni öğrenci DEĞİL).
+    bu_ay_kayitlar = await db.students.find(
+        {"olusturma_tarihi": {"$gte": current_month_start.isoformat()}}, {"_id": 0, "kur": 1}).to_list(length=None)
+    bu_ay_yeni_kayit = sum(1 for s in bu_ay_kayitlar if (_kur_no(s.get("kur")) or 1) == 1)
+    bu_ay_ust_kur = sum(1 for s in bu_ay_kayitlar if (_kur_no(s.get("kur")) or 1) > 1)
     bu_ay_kur_atlayan = await db.kur_atlamalari.count_documents({"tarih": {"$gte": current_month_start.isoformat()}})
     return DashboardStats(
         toplam_ogretmen=teacher_count,
@@ -71,6 +86,7 @@ async def get_dashboard_stats():
         toplam_ogretmen_borc=total_teacher_debt,
         bu_ay_odenen_toplam=monthly_total,
         bu_ay_yeni_kayit=bu_ay_yeni_kayit,
+        bu_ay_ust_kur=bu_ay_ust_kur,
         bu_ay_kur_atlayan=bu_ay_kur_atlayan,
     )
 
@@ -115,7 +131,7 @@ async def get_weekly_stats():
         payments_this_week = await db.payments.find({"tarih": {"$gte": week_start.isoformat(), "$lt": week_end.isoformat()}}).to_list(length=None)
         stats.append(WeeklyStats(
             hafta=f"{week_start.strftime('%d/%m')} - {week_end.strftime('%d/%m')}",
-            yeni_ogrenciler=len(students_this_week),
+            yeni_ogrenciler=sum(1 for s in students_this_week if (_kur_no(s.get("kur")) or 1) == 1),  # kur==1
             odemeler=sum(p.get('miktar', 0) for p in payments_this_week),
             gelir=sum(s.get('yapilmasi_gereken_odeme', 0) for s in students_this_week)
         ))
@@ -141,7 +157,7 @@ async def get_monthly_stats():
         kur_atlayan = await db.kur_atlamalari.count_documents({"tarih": {"$gte": month_start.isoformat(), "$lt": month_end.isoformat()}})
         stats.append(MonthlyStats(
             ay=month_start.strftime('%B %Y'),
-            yeni_ogrenciler=len(students_this_month),
+            yeni_ogrenciler=sum(1 for s in students_this_month if (_kur_no(s.get("kur")) or 1) == 1),  # kur==1
             odemeler=sum(p.get('miktar', 0) for p in payments_this_month),
             gelir=sum(s.get('yapilmasi_gereken_odeme', 0) for s in students_this_month),
             toplam_borc=sum(max(0, s.get('yapilmasi_gereken_odeme', 0) - s.get('yapilan_odeme', 0)) for s in students_total),

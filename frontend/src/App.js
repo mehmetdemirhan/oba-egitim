@@ -29,6 +29,7 @@ import MebKelimeYonetimi from "./components/admin/MebKelimeYonetimi";
 import MuhasebePaneli from "./components/MuhasebePaneli";
 import OdemeTablosu from "./components/OdemeTablosu";
 import OgretmenDetayOzet from "./components/admin/OgretmenDetayOzet";
+import { bildirimYonlendir } from "./utils/bildirimYonlendirme";
 import TopluKayit from "./components/admin/TopluKayit";
 import EgitimTurleriYonetimi from "./components/admin/EgitimTurleriYonetimi";
 import IslemKayitlari from "./components/admin/IslemKayitlari";
@@ -301,6 +302,7 @@ function AppContent() {
   const [muhasebeKisiler, setMuhasebeKisiler] = useState({ ogrenciler: [], ogretmenler: [] });
   const [muhasebeOzet, setMuhasebeOzet] = useState(null);
   const [muhasebeBorclu, setMuhasebeBorclu] = useState(false);
+  const [muhasebeOdakKisi, setMuhasebeOdakKisi] = useState("");  // bildirimden gelen öğrenci odağı
   const [courses, setCourses] = useState([]);
   const [payments, setPayments] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
@@ -520,7 +522,7 @@ function AppContent() {
                 <div className="text-sm font-medium text-content">{user.ad} {user.soyad}</div>
                 <div className="text-xs text-subtle">{roleLabel(user.role)}</div>
               </div>
-              <BildirimZili user={user} />
+              <BildirimZili user={user} onNavigate={(sekme, b) => { if (sekme === "payments") setMuhasebeOdakKisi(b?.ilgili_id || ""); setActiveTab(sekme); }} />
               <Button onClick={exportToExcel} disabled={loadingAction} className="bg-green-600 hover:bg-green-700 text-white"><Download className="h-4 w-4 mr-2" />Excel</Button>
               <ThemeToggle /><SifreDegistirButton />
               <Button variant="outline" size="sm" onClick={logout} className="flex items-center gap-2"><LogOut className="h-4 w-4" />Çıkış</Button>
@@ -1231,7 +1233,8 @@ function AppContent() {
               <div>
                 <h3 className="text-base font-semibold text-content mb-2">Öğrenci Ödemeleri</h3>
                 <OdemeTablosu tip="ogrenci" kisiler={muhasebeKisiler.ogrenciler} payments={payments} apiBase={API} onDegisim={muhasebeYenile}
-                  sadeceBorclu={muhasebeBorclu} onBorcluTemizle={() => setMuhasebeBorclu(false)} />
+                  sadeceBorclu={muhasebeBorclu} onBorcluTemizle={() => setMuhasebeBorclu(false)}
+                  odakKisiId={muhasebeOdakKisi} onOdakTemizle={() => setMuhasebeOdakKisi("")} />
               </div>
               <div>
                 <h3 className="text-base font-semibold text-content mb-2">Öğretmen Ödemeleri</h3>
@@ -1457,7 +1460,7 @@ function AppContent() {
 // BİLDİRİM ZİLİ — Tüm paneller için ortak
 // ═══════════════════════════════════════════════
 
-function BildirimZili({ user }) {
+function BildirimZili({ user, onNavigate }) {
   const { toast } = useToast();
   const [bildirimler, setBildirimler] = useState([]);
   const [okunmamis, setOkunmamis] = useState(0);
@@ -1487,8 +1490,30 @@ function BildirimZili({ user }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [acik]);
 
-  const oku = async (id) => { try { await axios.put(`${API}/bildirimler/${id}/okundu`); fetchBildirimler(); } catch(e) {} };
-  const tumunuOku = async () => { try { await axios.put(`${API}/bildirimler/tumunu-oku`); fetchBildirimler(); } catch(e) {} };
+  // Optimistic: anında UI güncelle (sayaç + okundu), sonra sunucuyla senkronize et.
+  const oku = async (id) => {
+    setOkunmamis(n => Math.max(0, n - 1));
+    setBildirimler(bs => bs.map(b => b.id === id ? { ...b, okundu: true } : b));
+    try { await axios.put(`${API}/bildirimler/${id}/okundu`); } catch(e) {}
+    fetchBildirimler();
+  };
+  const tumunuOku = async () => {
+    setOkunmamis(0);                                              // zil sayacı anında sıfır
+    setBildirimler(bs => bs.map(b => ({ ...b, okundu: true })));   // hepsi anında okundu
+    try { await axios.put(`${API}/bildirimler/tumunu-oku`); }
+    catch(e) { toast && toast({ title: "Bildirimler okunamadı", description: "Lütfen tekrar deneyin.", variant: "destructive" }); }
+    fetchBildirimler();                                            // panel AÇIK kalır
+  };
+  // Bildirime tıklama: okundu işaretle + (rol-uygun eşleme varsa) ilgili yere git & paneli kapat.
+  const bildirimTikla = (b) => {
+    if (!b.okundu) oku(b.id);
+    const y = bildirimYonlendir(b.tur, user?.role);
+    if (y && onNavigate) {
+      setAcik(false); setAyarAcik(false);   // yönlendirmede panel kapanır
+      onNavigate(y.sekme, b);
+    }
+    // Eşlemesi yoksa: yalnız okundu, panel açık kalır (kullanıcının yeri bozulmaz).
+  };
 
   const turIkon = { rapor_tamamlandi: "📋", gorev_atandi: "📌", gorev_tamamlandi: "✅", gorev_hatirlatma: "⏰", streak_kirildi: "🔥", streak_tebrik: "🎉", kur_atladi: "🎓", mesaj_geldi: "✉️", rozet_kazandi: "🏅", risk_yuksek: "🚨", anket_hatirlatma: "⭐", lig_yukseldi: "🏆", haftalik_ozet: "📊" };
   // Önem: soft ikon dairesi + rozet rengi (kırmızı/turuncu/mavi/gri)
@@ -1533,7 +1558,7 @@ function BildirimZili({ user }) {
             ) : (
               <div className="overflow-y-auto flex-1">
                 {bildirimler.map(b => (
-                  <div key={b.id} onClick={() => !b.okundu && oku(b.id)}
+                  <div key={b.id} onClick={() => bildirimTikla(b)}
                     className={`px-3 py-2.5 border-b border-gray-50 cursor-pointer hover:bg-gray-50 transition-colors ${!b.okundu ? 'bg-blue-50/40' : ''}`}>
                     <div className="flex items-start gap-2.5">
                       <span className={`mt-0.5 w-9 h-9 rounded-full flex items-center justify-center text-base shrink-0 ${ONEM_BG[b.onem_seviyesi] || "bg-gray-100"}`}>{turIkon[b.tur] || "🔔"}</span>
@@ -5447,7 +5472,14 @@ function OgretmenPaneli({ user, logout }) {
             <div><div className="font-bold text-content">{user.ad} {user.soyad}</div><div className="text-xs text-subtle">Öğretmen • {ogrenciler.length} öğrenci</div></div>
           </div>
           <div className="flex items-center gap-2">
-            <BildirimZili user={user} />
+            <BildirimZili user={user} onNavigate={(sekme, b) => {
+              if (sekme === "ogrenci-detay") {
+                const ogr = (ogrenciler || []).find(o => o.id === b?.ilgili_id);
+                if (ogr) { ogrenciDetayCek(ogr); return; }
+                setAktifSekme("ogrencilerim"); return;
+              }
+              setAktifSekme(sekme);
+            }} />
             <ThemeToggle /><SifreDegistirButton />
             <Button variant="outline" size="sm" onClick={logout}><LogOut className="h-3 w-3 mr-1" />Çıkış</Button>
           </div>
@@ -6886,7 +6918,7 @@ function OgrenciPaneli({ user, logout }) {
           </div>
           <div className="flex items-center gap-2">
             <div className="text-center"><div className="text-lg font-bold text-orange-600">{seviyeEmoji} Sv.{seviye}</div></div>
-            <BildirimZili user={user} />
+            <BildirimZili user={user} onNavigate={(sekme) => setAktifSekme(sekme)} />
             <Button variant="outline" size="sm" onClick={logout} className="text-xs"><LogOut className="h-3 w-3 mr-1" />Çıkış</Button>
           </div>
         </div>
@@ -8288,7 +8320,7 @@ function VeliPaneli({ user, logout }) {
             <div><div className="font-bold text-content text-sm">{user.ad} {user.soyad}</div><div className="text-xs text-subtle">Veli Paneli</div></div>
           </div>
           <div className="flex items-center gap-2">
-            <BildirimZili user={user} />
+            <BildirimZili user={user} onNavigate={(sekme) => setAktifSekme(sekme)} />
             <ThemeToggle /><SifreDegistirButton />
             <Button variant="outline" size="sm" onClick={logout} className="text-xs"><LogOut className="h-3 w-3 mr-1" />Çıkış</Button>
           </div>
