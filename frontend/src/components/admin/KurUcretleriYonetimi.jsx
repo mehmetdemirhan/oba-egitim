@@ -43,7 +43,8 @@ export default function KurUcretleriYonetimi({ apiBase }) {
         if (!isNaN(n) && n > 0) turler_temiz[ad] = Math.round(n * 100) / 100;
       }
       const degerler = { genel: parseFloat(genel) || 0, turler: turler_temiz };
-      await axios.put(`${apiBase}/ayarlar/kur_ucretleri`, { degerler });
+      // Muhasebe ucu: admin + accountant düzenleyebilir (generic /ayarlar admin-only).
+      await axios.put(`${apiBase}/muhasebe/ayarlar/kur-ucretleri`, { degerler });
       toast({ title: "Kur ücretleri kaydedildi" });
       yukle();
     } catch (e) {

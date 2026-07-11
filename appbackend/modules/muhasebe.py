@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from core.db import db
 from core.auth import require_role, UserRole
 from core.audit import islem_kaydet, islem_listele
-from core.sistem import get_vergi_orani
+from core.sistem import get_vergi_orani, VERGI_AYARLARI_DEFAULT, KUR_UCRETLERI_DEFAULT
 
 router = APIRouter()
 
@@ -330,3 +330,74 @@ async def muhasebe_log_listesi(hedef_id: str | None = None, limit: int = 100,
     """Muhasebe değişiklik izi (yalnız admin). Birleşik islem_log'dan modül=muhasebe."""
     kayitlar = await islem_listele(modul="muhasebe", hedef_id=hedef_id, limit=min(limit, 500))
     return {"kayitlar": kayitlar}
+
+
+# ── Muhasebe Ayarları (vergi oranı + kur ücretleri) — admin + accountant ──
+# Bu ayarlar generic /ayarlar/{tip} (admin-only) yerine BURADAN yönetilir; tam-yetki
+# kararımıza uygun olarak muhasebeci de düzenleyebilir. Depolama aynı sistem_ayarlari.
+
+
+@router.get("/muhasebe/ayarlar")
+async def muhasebe_ayarlar_getir(current_user=Depends(_ERISIM)):
+    """Muhasebe ayarları — admin + accountant okur (vergi oranı + kur ücretleri)."""
+    v = await db.sistem_ayarlari.find_one({"tip": "vergi_ayarlari"})
+    k = await db.sistem_ayarlari.find_one({"tip": "kur_ucretleri"})
+    return {
+        "vergi_ayarlari": (v.get("degerler") if v else None) or VERGI_AYARLARI_DEFAULT,
+        "kur_ucretleri": (k.get("degerler") if k else None) or KUR_UCRETLERI_DEFAULT,
+    }
+
+
+@router.put("/muhasebe/ayarlar/vergi")
+async def muhasebe_vergi_guncelle(data: dict, current_user=Depends(_ERISIM)):
+    """Vergi oranını günceller (admin + accountant). Oran yüzde [0-100]."""
+    try:
+        oran = round(float(data.get("vergi_orani")), 2)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="Vergi oranı sayısal olmalı")
+    if oran < 0 or oran > 100:
+        raise HTTPException(status_code=422, detail="Vergi oranı 0-100 arasında olmalı")
+    eski = await db.sistem_ayarlari.find_one({"tip": "vergi_ayarlari"})
+    eski_oran = (eski.get("degerler", {}) if eski else {}).get(
+        "vergi_orani", VERGI_AYARLARI_DEFAULT.get("vergi_orani"))
+    await db.sistem_ayarlari.update_one(
+        {"tip": "vergi_ayarlari"},
+        {"$set": {"tip": "vergi_ayarlari", "degerler": {"vergi_orani": oran},
+                  "guncelleme_tarihi": datetime.utcnow().isoformat(),
+                  "guncelleyen": current_user.get("ad", "")}},
+        upsert=True)
+    await islem_kaydet(current_user, "muhasebe", "ayar_vergi", "ayar", "vergi_ayarlari",
+                       "vergi_orani", eski_oran, oran)
+    return {"ok": True, "vergi_orani": oran}
+
+
+@router.put("/muhasebe/ayarlar/kur-ucretleri")
+async def muhasebe_kur_ucretleri_guncelle(data: dict, current_user=Depends(_ERISIM)):
+    """Kur ücretleri (genel + eğitim türü bazlı) günceller (admin + accountant)."""
+    degerler = data.get("degerler")
+    if not isinstance(degerler, dict):
+        raise HTTPException(status_code=422, detail="degerler nesnesi gerekli")
+    try:
+        genel = round(float(degerler.get("genel", 0) or 0), 2)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="Genel ücret sayısal olmalı")
+    if genel < 0:
+        raise HTTPException(status_code=422, detail="Genel ücret negatif olamaz")
+    turler = {}
+    for ad, v in (degerler.get("turler", {}) or {}).items():
+        try:
+            n = round(float(v), 2)
+        except (TypeError, ValueError):
+            continue
+        if n > 0:
+            turler[str(ad)] = n
+    temiz = {"genel": genel, "turler": turler}
+    await db.sistem_ayarlari.update_one(
+        {"tip": "kur_ucretleri"},
+        {"$set": {"tip": "kur_ucretleri", "degerler": temiz,
+                  "guncelleme_tarihi": datetime.utcnow().isoformat(),
+                  "guncelleyen": current_user.get("ad", "")}},
+        upsert=True)
+    await islem_kaydet(current_user, "muhasebe", "ayar_kur_ucreti", "ayar", "kur_ucretleri",
+                       "kur_ucretleri", None, f"genel={genel}₺, {len(turler)} tür özel")
+    return {"ok": True, "degerler": temiz}

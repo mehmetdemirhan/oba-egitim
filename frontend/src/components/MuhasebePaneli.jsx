@@ -5,6 +5,7 @@ import { Button } from "./ui/button";
 import { useToast } from "../hooks/use-toast";
 import { Wallet, TrendingUp, TrendingDown, Clock, LogOut, GraduationCap, Users, Receipt, PiggyBank } from "lucide-react";
 import OdemeTablosu from "./OdemeTablosu";
+import MuhasebeAyarlari from "./admin/MuhasebeAyarlari";
 
 /**
  * MuhasebePaneli — "accountant" rolüne özel SADE ödeme paneli.
@@ -104,6 +105,9 @@ export default function MuhasebePaneli({ user, logout }) {
         </div>
 
         <OdemeTablosu tip={sekme} kisiler={liste} payments={payments} apiBase={API} onDegisim={veriYukle} />
+
+        {/* Muhasebe Ayarları — muhasebeci de vergi oranı + kur ücretlerini düzenler */}
+        <MuhasebeAyarlari apiBase={API} />
       </main>
     </div>
   );
