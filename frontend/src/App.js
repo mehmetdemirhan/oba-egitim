@@ -28,6 +28,7 @@ import { BildirimTercihleri } from "./components/BildirimTercihleri";
 import MebKelimeYonetimi from "./components/admin/MebKelimeYonetimi";
 import MuhasebePaneli from "./components/MuhasebePaneli";
 import OdemeTablosu from "./components/OdemeTablosu";
+import OgretmenDetayOzet from "./components/admin/OgretmenDetayOzet";
 import TopluKayit from "./components/admin/TopluKayit";
 import EgitimTurleriYonetimi from "./components/admin/EgitimTurleriYonetimi";
 import IslemKayitlari from "./components/admin/IslemKayitlari";
@@ -808,51 +809,54 @@ function AppContent() {
                           const ogretmenOdemeleri = payments.filter(p => p.tip === 'ogretmen' && p.kisi_id === t.id);
                           const toplamOdenen = ogretmenOdemeleri.reduce((sum, p) => sum + (p.miktar || 0), 0);
                           const kalanAlacak = Math.max(0, (t.yapilmasi_gereken_odeme || 0) - toplamOdenen);
-                          return (
-                          <div className="border-t border-line bg-app p-4 space-y-4">
-                            {/* Ödeme Özeti - koordinatörden gizle */}
-                            {user.role !== "coordinator" && (
-                            <div className="grid grid-cols-3 gap-3">
-                              <div className="bg-surface rounded-xl p-3 border border-line text-center">
-                                <div className="text-xs text-subtle mb-1">Yapılacak Ödeme</div>
-                                <div className="font-bold text-orange-600">₺{(t.yapilmasi_gereken_odeme || 0).toLocaleString('tr-TR')}</div>
+                          const finansal = (
+                            <div className="space-y-4">
+                              {/* Ödeme Özeti - koordinatörden gizle */}
+                              {user.role !== "coordinator" && (
+                              <div className="grid grid-cols-3 gap-3">
+                                <div className="bg-surface rounded-xl p-3 border border-line text-center">
+                                  <div className="text-xs text-subtle mb-1">Yapılacak Ödeme</div>
+                                  <div className="font-bold text-orange-600 tabular-nums">₺{(t.yapilmasi_gereken_odeme || 0).toLocaleString('tr-TR')}</div>
+                                </div>
+                                <div className="bg-surface rounded-xl p-3 border border-line text-center">
+                                  <div className="text-xs text-subtle mb-1">Toplam Ödenen</div>
+                                  <div className="font-bold text-green-600 tabular-nums">₺{toplamOdenen.toLocaleString('tr-TR')}</div>
+                                </div>
+                                <div className="bg-surface rounded-xl p-3 border border-line text-center">
+                                  <div className="text-xs text-subtle mb-1">Kalan Alacak</div>
+                                  <div className={`font-bold tabular-nums ${kalanAlacak > 0 ? 'text-red-600' : 'text-green-600'}`}>₺{kalanAlacak.toLocaleString('tr-TR')}</div>
+                                </div>
                               </div>
-                              <div className="bg-surface rounded-xl p-3 border border-line text-center">
-                                <div className="text-xs text-subtle mb-1">Toplam Ödenen</div>
-                                <div className="font-bold text-green-600">₺{toplamOdenen.toLocaleString('tr-TR')}</div>
-                              </div>
-                              <div className="bg-surface rounded-xl p-3 border border-line text-center">
-                                <div className="text-xs text-subtle mb-1">Kalan Alacak</div>
-                                <div className={`font-bold ${kalanAlacak > 0 ? 'text-red-600' : 'text-green-600'}`}>₺{kalanAlacak.toLocaleString('tr-TR')}</div>
-                              </div>
-                            </div>
-                            )}
-                            {/* Ödeme Geçmişi */}
-                            {ogretmenOdemeleri.length > 0 && (
-                              <div>
-                                <div className="text-xs font-semibold text-subtle mb-2">📤 Ödeme Geçmişi</div>
-                                {ogretmenOdemeleri.slice(0,5).map(p => (
-                                  <div key={p.id} className="flex justify-between items-center bg-surface p-2 rounded-lg border border-line mb-1 text-sm">
-                                    <span className="text-subtle">{formatDate(p.tarih)}</span>
-                                    <span className="text-content">{p.aciklama || '—'}</span>
-                                    <span className="font-semibold text-green-600">₺{(p.miktar||0).toLocaleString('tr-TR')}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            {/* Öğrenci Listesi */}
-                            {teacherStudents[t.id] && teacherStudents[t.id].length > 0 && (
+                              )}
+                              {/* Ödeme Geçmişi */}
+                              {ogretmenOdemeleri.length > 0 && (
+                                <div>
+                                  <div className="text-xs font-semibold text-subtle mb-2">📤 Ödeme Geçmişi</div>
+                                  {ogretmenOdemeleri.slice(0,5).map(p => (
+                                    <div key={p.id} className="flex justify-between items-center bg-surface p-2 rounded-lg border border-line mb-1 text-sm">
+                                      <span className="text-subtle">{formatDate(p.tarih)}</span>
+                                      <span className="text-content">{p.aciklama || '—'}</span>
+                                      <span className="font-semibold text-green-600 tabular-nums">₺{(p.miktar||0).toLocaleString('tr-TR')}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {/* Öğrenci Listesi — "Kur: 1 • 7" yerine açık gösterim */}
                               <div>
                                 <div className="text-xs font-semibold text-subtle mb-2">👨‍🎓 Öğrenciler</div>
-                                {teacherStudents[t.id].map(s => (
-                                  <div key={s.id} className="bg-surface p-2 rounded-lg border border-line mb-1 flex justify-between text-sm">
+                                {(teacherStudents[t.id] && teacherStudents[t.id].length > 0) ? teacherStudents[t.id].map(s => (
+                                  <div key={s.id} className="bg-surface p-2 rounded-lg border border-line mb-1 flex justify-between items-center text-sm">
                                     <span className="font-medium">{s.ad} {s.soyad}</span>
-                                    <span className="text-subtle">Kur: {s.kur} • {s.sinif}</span>
+                                    <span className="text-subtle text-xs">{s.kur ? `${s.kur}. kur` : "Kur —"} • {s.sinif ? `${s.sinif}. sınıf` : "Sınıf —"}</span>
                                   </div>
-                                ))}
+                                )) : <div className="text-sm text-subtle">Atanmış aktif öğrenci yok.</div>}
                               </div>
-                            )}
-                          </div>
+                            </div>
+                          );
+                          return (
+                            <div className="border-t border-line bg-app p-4">
+                              <OgretmenDetayOzet teacher={t} apiBase={API} rol={user.role} finansal={finansal} />
+                            </div>
                           );
                         })()}
                       </div>
