@@ -29,6 +29,8 @@ import MebKelimeYonetimi from "./components/admin/MebKelimeYonetimi";
 import MuhasebePaneli from "./components/MuhasebePaneli";
 import OdemeTablosu from "./components/OdemeTablosu";
 import TopluKayit from "./components/admin/TopluKayit";
+import EgitimTurleriYonetimi from "./components/admin/EgitimTurleriYonetimi";
+import IslemKayitlari from "./components/admin/IslemKayitlari";
 import SinavYonetimi from "./components/admin/SinavYonetimi";
 import SinavCozum from "./components/SinavCozum";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
@@ -320,7 +322,8 @@ function AppContent() {
   const [yeniDersForm, setYeniDersForm] = useState(null);
   const [yeniIcerikForm, setYeniIcerikForm] = useState(null);
 
-  const availableCourses = ["Okuma Becerileri Temel", "Okuma Becerileri İleri", "Hızlı Okuma", "Anlama Becerileri", "Yazım Kuralları", "Dikkat Geliştirme", "Kelime Dağarcığı", "Metin Analizi"];
+  // Eğitim türleri artık dinamik (yönetici yönetir); varsayılan liste yalnız yüklenene kadar fallback.
+  const [availableCourses, setAvailableCourses] = useState(["Okuma Becerileri Temel", "Okuma Becerileri İleri", "Hızlı Okuma", "Anlama Becerileri", "Yazım Kuralları", "Dikkat Geliştirme", "Kelime Dağarcığı", "Metin Analizi"]);
   const availableClasses = ["1","2","3","4","5","6","7","8","9"];
 
   const fetchAll = useCallback(async () => {
@@ -333,6 +336,7 @@ function AppContent() {
     try { const r = await axios.get(`${API}/courses`); setCourses(Array.isArray(r.data) ? r.data : []); } catch(e) {}
     try { const r = await axios.get(`${API}/payments`); setPayments(Array.isArray(r.data) ? r.data : []); } catch(e) {}
     try { const r = await axios.get(`${API}/muhasebe/kisiler`); setMuhasebeKisiler(r.data || { ogrenciler: [], ogretmenler: [] }); } catch(e) {}
+    try { const r = await axios.get(`${API}/egitim-turleri`); if (r.data?.turler?.length) setAvailableCourses(r.data.turler.map(t => t.ad)); } catch(e) {}
     try { const r = await axios.get(`${API}/risk-skor/toplu`); setOgrenciRiskler(Array.isArray(r.data) ? r.data : []); } catch(e) { setOgrenciRiskler([]); }
   }, []);
 
@@ -1290,7 +1294,11 @@ function AppContent() {
           {/* Ayarlar - Sadece Admin */}
           {adminVeyaKoord && (
             <TabsContent value="ayarlar">
-              <SistemAyarlari user={user} />
+              <div className="space-y-6">
+                <SistemAyarlari user={user} />
+                <EgitimTurleriYonetimi apiBase={API} />
+                <IslemKayitlari apiBase={API} />
+              </div>
             </TabsContent>
           )}
 
@@ -1418,6 +1426,14 @@ function BildirimZili({ user }) {
 
   useEffect(() => { fetchBildirimler(); const iv = setInterval(fetchBildirimler, 30000); return () => clearInterval(iv); }, [fetchBildirimler]);
 
+  // Mobil: ESC / geri ile kapansın (dışa-tıkla zaten var).
+  useEffect(() => {
+    if (!acik) return;
+    const onKey = (e) => { if (e.key === "Escape") { setAcik(false); setAyarAcik(false); } };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [acik]);
+
   const oku = async (id) => { try { await axios.put(`${API}/bildirimler/${id}/okundu`); fetchBildirimler(); } catch(e) {} };
   const tumunuOku = async () => { try { await axios.put(`${API}/bildirimler/tumunu-oku`); fetchBildirimler(); } catch(e) {} };
 
@@ -1439,13 +1455,16 @@ function BildirimZili({ user }) {
       {acik && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => { setAcik(false); setAyarAcik(false); }} />
-          <div className="absolute right-0 top-12 w-80 sm:w-96 bg-surface rounded-2xl shadow-2xl border z-50 max-h-[75vh] flex flex-col overflow-hidden">
+          {/* Mobil: alttan/kenar boşluklu tam-genişlik panel; sm+: sağa yaslı 384px dropdown. */}
+          <div className="fixed left-2 right-2 top-16 sm:absolute sm:left-auto sm:right-0 sm:top-12 sm:w-96 max-w-[calc(100vw-1rem)] bg-surface rounded-2xl shadow-2xl border z-50 max-h-[75vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-3 py-2.5 border-b bg-gray-50/60">
               <span className="font-bold text-sm text-gray-900">{ayarAcik ? "Bildirim Ayarları" : `Bildirimler${okunmamis > 0 ? ` · ${okunmamisEtiket}` : ""}`}</span>
               <div className="flex items-center gap-2">
                 {!ayarAcik && okunmamis > 0 && <button onClick={tumunuOku} className="text-[11px] text-primary hover:underline">Tümünü oku</button>}
                 <button onClick={() => setAyarAcik(a => !a)} title="Bildirim Ayarları"
                   className={`px-1.5 py-1 rounded-md text-sm hover:bg-gray-200 transition-colors ${ayarAcik ? "bg-gray-200" : ""}`}>⚙️</button>
+                <button onClick={() => { setAcik(false); setAyarAcik(false); }} title="Kapat"
+                  className="px-1.5 py-1 rounded-md text-subtle hover:bg-gray-200 transition-colors" aria-label="Kapat"><XCircle className="h-4 w-4" /></button>
               </div>
             </div>
             {ayarAcik ? (
@@ -4977,6 +4996,13 @@ function OgretmenPaneli({ user, logout }) {
   const [seciliRozet, setSeciliRozet] = useState(null);
   const [anketDetayAcik, setAnketDetayAcik] = useState(false);
   const [seciliKategori, setSeciliKategori] = useState(null);
+  // Öğrenci düzenle / kaldır
+  const [duzenleAcik, setDuzenleAcik] = useState(false);
+  const [duzenleForm, setDuzenleForm] = useState(null);
+  const [silOgrenci, setSilOgrenci] = useState(null);
+  const duzenleAc = (s) => { setDuzenleForm({ id: s.id, ad: s.ad || "", soyad: s.soyad || "", sinif: String(s.sinif || ""), veli_ad: s.veli_ad || "", veli_soyad: s.veli_soyad || "", veli_telefon: s.veli_telefon || "", aldigi_egitim: s.aldigi_egitim || "", kur: s.kur || "" }); setDuzenleAcik(true); };
+  const ogrenciDuzenleKaydet = async (e) => { e.preventDefault(); try { const { id, ...v } = duzenleForm; await axios.put(`${API}/students/${id}`, v); toast({ title: "Öğrenci güncellendi" }); setDuzenleAcik(false); fetchAll(); } catch (err) { hataBildir(toast, err.response?.data?.detail || "Güncellenemedi"); } };
+  const ogrenciKaldir = async () => { try { const r = await axios.delete(`${API}/students/${silOgrenci.id}`); toast({ title: r.data?.mod === "kalici" ? "Öğrenci silindi" : "Öğrenci pasife alındı", description: r.data?.mod === "pasif" ? "Geçmiş/muhasebe verileri korundu." : "" }); setSilOgrenci(null); fetchAll(); } catch (err) { hataBildir(toast, err.response?.data?.detail || "Kaldırılamadı"); } };
   // Hedef sistemi
   const [hedefler, setHedefler] = useState([]);
   const [hedefEkleAcik, setHedefEkleAcik] = useState(false);
@@ -4990,7 +5016,8 @@ function OgretmenPaneli({ user, logout }) {
   const [yeniOgrenciAcik, setYeniOgrenciAcik] = useState(false);
   const [yeniOgrenciForm, setYeniOgrenciForm] = useState(yeniOgrenciBos);
   const [yeniOgrenciYukleniyor, setYeniOgrenciYukleniyor] = useState(false);
-  const egitimSecenekleri = ["Okuma Becerileri Temel", "Okuma Becerileri İleri", "Hızlı Okuma", "Anlama Becerileri", "Yazım Kuralları", "Dikkat Geliştirme", "Kelime Dağarcığı", "Metin Analizi"];
+  const [egitimSecenekleri, setEgitimSecenekleri] = useState(["Okuma Becerileri Temel", "Okuma Becerileri İleri", "Hızlı Okuma", "Anlama Becerileri", "Yazım Kuralları", "Dikkat Geliştirme", "Kelime Dağarcığı", "Metin Analizi"]);
+  useEffect(() => { axios.get(`${API}/egitim-turleri`).then(r => { if (r.data?.turler?.length) setEgitimSecenekleri(r.data.turler.map(t => t.ad)); }).catch(() => {}); }, []);
 
   const ogretmenId = user.linked_id || user.id;
 
@@ -5866,6 +5893,8 @@ function OgretmenPaneli({ user, logout }) {
                 </div>
                 <div className="flex items-center gap-3 text-xs text-subtle">
                   {risk && (<><span title="Streak">{risk.streak > 0 ? `🔥${risk.streak}` : "—"}</span><span title="7 gün">{risk.dakika_7}dk/7g</span><span title="XP" className="text-orange-600 font-medium">{risk.toplam_xp} XP</span></>)}
+                  <button onClick={(e) => { e.stopPropagation(); duzenleAc(s); }} title="Düzenle" className="text-slate-400 hover:text-primary p-1"><Edit2 className="h-4 w-4" /></button>
+                  <button onClick={(e) => { e.stopPropagation(); setSilOgrenci(s); }} title="Kaldır" className="text-slate-400 hover:text-red-600 p-1"><Trash2 className="h-4 w-4" /></button>
                   <ChevronRight className="h-4 w-4 text-gray-300" />
                 </div>
               </CardContent>
@@ -5908,6 +5937,60 @@ function OgretmenPaneli({ user, logout }) {
                   <Button type="submit" disabled={yeniOgrenciYukleniyor} className="bg-primary text-white">{yeniOgrenciYukleniyor ? "Ekleniyor..." : "Ekle"}</Button>
                 </div>
               </form>
+            </DialogContent>
+          </Dialog>
+
+          {/* Öğrenci Düzenle Modalı */}
+          <Dialog open={duzenleAcik} onOpenChange={setDuzenleAcik}>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2"><Edit2 className="h-5 w-5" />Öğrenci Düzenle</DialogTitle>
+                <DialogDescription>Ad, sınıf ve veli bilgilerini güncelleyin. Ödeme yönetici tarafından düzenlenir.</DialogDescription>
+              </DialogHeader>
+              {duzenleForm && (
+              <form onSubmit={ogrenciDuzenleKaydet} className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div><Label>Ad</Label><Input value={duzenleForm.ad} onChange={e => setDuzenleForm({...duzenleForm, ad: e.target.value})} required /></div>
+                  <div><Label>Soyad</Label><Input value={duzenleForm.soyad} onChange={e => setDuzenleForm({...duzenleForm, soyad: e.target.value})} required /></div>
+                </div>
+                <div><Label>Sınıf</Label>
+                  <Select value={duzenleForm.sinif} onValueChange={v => setDuzenleForm({...duzenleForm, sinif: v})}>
+                    <SelectTrigger><SelectValue placeholder="Seçin" /></SelectTrigger>
+                    <SelectContent>{["1","2","3","4","5","6","7","8"].map(c => <SelectItem key={c} value={c}>{c}. Sınıf</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><Label>Veli Adı</Label><Input value={duzenleForm.veli_ad} onChange={e => setDuzenleForm({...duzenleForm, veli_ad: e.target.value})} /></div>
+                  <div><Label>Veli Soyadı</Label><Input value={duzenleForm.veli_soyad} onChange={e => setDuzenleForm({...duzenleForm, veli_soyad: e.target.value})} /></div>
+                </div>
+                <div><Label>Veli Telefon</Label><Input value={duzenleForm.veli_telefon} onChange={e => setDuzenleForm({...duzenleForm, veli_telefon: e.target.value})} placeholder="05xx xxx xx xx" /></div>
+                <div><Label>Eğitim</Label>
+                  <Select value={duzenleForm.aldigi_egitim} onValueChange={v => setDuzenleForm({...duzenleForm, aldigi_egitim: v})}>
+                    <SelectTrigger><SelectValue placeholder="Seçin" /></SelectTrigger>
+                    <SelectContent>{egitimSecenekleri.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div><Label>Kur</Label><Input value={duzenleForm.kur} onChange={e => setDuzenleForm({...duzenleForm, kur: e.target.value})} placeholder="Ör: 1" /></div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button type="button" variant="outline" onClick={() => setDuzenleAcik(false)}>İptal</Button>
+                  <Button type="submit" className="bg-primary text-white">Kaydet</Button>
+                </div>
+              </form>
+              )}
+            </DialogContent>
+          </Dialog>
+
+          {/* Öğrenci Kaldırma Onayı */}
+          <Dialog open={!!silOgrenci} onOpenChange={(o) => !o && setSilOgrenci(null)}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-red-600"><AlertTriangle className="h-5 w-5" />Öğrenciyi Kaldır</DialogTitle>
+                <DialogDescription>{silOgrenci ? `${silOgrenci.ad} ${silOgrenci.soyad} listenizden kaldırılacak. Ödeme/geçmiş verisi varsa kayıt PASİFE alınır (muhasebe korunur); geçmişi olmayan yanlış eklemeler tamamen silinir.` : ""}</DialogDescription>
+              </DialogHeader>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="ghost" onClick={() => setSilOgrenci(null)}>Vazgeç</Button>
+                <Button onClick={ogrenciKaldir} className="bg-red-600 hover:bg-red-700 text-white">Kaldır</Button>
+              </div>
             </DialogContent>
           </Dialog>
         </>)}
