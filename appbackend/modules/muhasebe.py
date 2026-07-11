@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from core.db import db
 from core.auth import require_role, UserRole
 from core.audit import islem_kaydet, islem_listele
-from core.sistem import get_vergi_orani
+from core.sistem import get_vergi_orani, VERGI_AYARLARI_DEFAULT, KUR_UCRETLERI_DEFAULT
 
 router = APIRouter()
 
@@ -48,6 +48,37 @@ def _num(v) -> float:
         return float(v or 0)
     except (TypeError, ValueError):
         return 0.0
+
+
+def _kur_dagilimi(kurlar: list, toplam_odeme: float) -> list:
+    """FIFO: öğrencinin toplam ödemesini kur kayıtlarına (tarih ARTAN) dağıtır.
+    Her kur için tutar/odenen/kalan/durum döndürür; fazla ödeme son kur satırına
+    eklenir. kisiler listesi ve öğrenci kur-özeti bu tek kaynaktan beslenir."""
+    havuz = toplam_odeme
+    satirlar = []
+    for k in kurlar:
+        tutar = _num(k.get("tutar"))
+        odenen_k = min(havuz, tutar)
+        havuz -= odenen_k
+        satirlar.append({
+            "kur_ucreti_id": k.get("id"),
+            "kur": k.get("kur_adi", ""),
+            "kayit_zamani": k.get("baslangic_tarihi") or k.get("tarih") or "",
+            "durum": k.get("durum"),
+            "yapilmasi_gereken_odeme": round(tutar, 2),
+            "yapilan_odeme": round(odenen_k, 2),
+            "kalan": round(max(0.0, tutar - odenen_k), 2),
+        })
+    if havuz > 0 and satirlar:  # fazla ödeme → son kur satırına
+        satirlar[-1]["yapilan_odeme"] = round(satirlar[-1]["yapilan_odeme"] + havuz, 2)
+        satirlar[-1]["kalan"] = round(max(0.0, satirlar[-1]["yapilmasi_gereken_odeme"] - satirlar[-1]["yapilan_odeme"]), 2)
+    return satirlar
+
+
+def _kur_gizli(satir: dict) -> bool:
+    """Ana muhasebe listesinde gizlenecek kur: geçilmiş (tamamlandi) VE tam ödenmiş.
+    Detay/özet görünümünde yine de gösterilir (tarihçe)."""
+    return satir.get("durum") == "tamamlandi" and _num(satir.get("kalan")) <= 0.01
 
 
 @router.get("/muhasebe/kisiler")
@@ -92,26 +123,22 @@ async def muhasebe_kisiler(current_user=Depends(_ERISIM)):
             }
             kurlar = kur_map.get(s.get("id")) or []
             if kurlar:
-                havuz = _num(s.get("yapilan_odeme"))  # FIFO havuzu = toplam ödeme
-                satirlar = []
-                for k in kurlar:
-                    tutar = _num(k.get("tutar"))
-                    odenen_k = min(havuz, tutar)
-                    havuz -= odenen_k
-                    satirlar.append({
+                # FIFO dağılımı (paylaşımlı helper) → satırlar; geçilmiş VE tam ödenmiş
+                # kur ana listede GİZLENİR (öğrenci detayında yine görünür).
+                for d in _kur_dagilimi(kurlar, _num(s.get("yapilan_odeme"))):
+                    if _kur_gizli(d):
+                        continue
+                    ogrenciler.append({
                         **ortak,
-                        "id": k.get("id"),  # satır kimliği = kur kaydı (React key)
-                        "kur_ucreti_id": k.get("id"),
-                        "kur": k.get("kur_adi", ""),
-                        "kayit_zamani": k.get("baslangic_tarihi") or k.get("tarih") or s.get("olusturma_tarihi") or "",
-                        "yapilmasi_gereken_odeme": round(tutar, 2),
-                        "yapilan_odeme": round(odenen_k, 2),
-                        "kalan": round(max(0.0, tutar - odenen_k), 2),
+                        "id": d["kur_ucreti_id"],  # satır kimliği = kur kaydı (React key)
+                        "kur_ucreti_id": d["kur_ucreti_id"],
+                        "kur": d["kur"],
+                        "kayit_zamani": d["kayit_zamani"] or s.get("olusturma_tarihi") or "",
+                        "durum": d["durum"],
+                        "yapilmasi_gereken_odeme": d["yapilmasi_gereken_odeme"],
+                        "yapilan_odeme": d["yapilan_odeme"],
+                        "kalan": d["kalan"],
                     })
-                if havuz > 0 and satirlar:  # fazla ödeme → son kur satırına
-                    satirlar[-1]["yapilan_odeme"] = round(satirlar[-1]["yapilan_odeme"] + havuz, 2)
-                    satirlar[-1]["kalan"] = round(max(0.0, satirlar[-1]["yapilmasi_gereken_odeme"] - satirlar[-1]["yapilan_odeme"]), 2)
-                ogrenciler.extend(satirlar)
             else:
                 # Kur kaydı olmayan öğrenci → tek satır (güncel kur + toplam bakiye)
                 gereken = _num(s.get("yapilmasi_gereken_odeme"))
@@ -291,6 +318,40 @@ async def kur_ucretleri_listesi(ogrenci_id: str, current_user=Depends(_ERISIM)):
     return {"ogeler": docs}
 
 
+@router.get("/muhasebe/ogrenci/{ogrenci_id}/kur-ozet")
+async def muhasebe_ogrenci_kur_ozet(ogrenci_id: str, current_user=Depends(_ERISIM)):
+    """Öğrencinin TÜM kurları (ana listede gizlenen tamamlanmış+ödenmişler DAHİL) —
+    tutar/ödenen/kalan/durum + toplamlar. Öğrenci satırına tıklayınca toplu görünüm."""
+    s = await db.students.find_one({"id": ogrenci_id})
+    if not s:
+        raise HTTPException(status_code=404, detail="Öğrenci bulunamadı")
+    kurlar = await db.kur_ucretleri.find({"ogrenci_id": ogrenci_id}, {"_id": 0}).to_list(length=500)
+    kurlar.sort(key=lambda k: str(k.get("baslangic_tarihi") or k.get("tarih") or ""))
+    dagilim = _kur_dagilimi(kurlar, _num(s.get("yapilan_odeme")))
+    if not dagilim:
+        # Kur kaydı yoksa öğrenci toplamından tek kalem
+        gereken = _num(s.get("yapilmasi_gereken_odeme"))
+        yapilan = _num(s.get("yapilan_odeme"))
+        dagilim = [{
+            "kur_ucreti_id": None, "kur": s.get("kur", ""),
+            "kayit_zamani": s.get("olusturma_tarihi") or "", "durum": None,
+            "yapilmasi_gereken_odeme": round(gereken, 2),
+            "yapilan_odeme": round(yapilan, 2),
+            "kalan": round(max(0.0, gereken - yapilan), 2),
+        }]
+    for d in dagilim:
+        d["gizli"] = _kur_gizli(d)  # ana listede gizlenmiş mi (bilgi amaçlı)
+    beklenen = round(sum(d["yapilmasi_gereken_odeme"] for d in dagilim), 2)
+    odenen = round(sum(d["yapilan_odeme"] for d in dagilim), 2)
+    return {
+        "ogrenci": {"id": ogrenci_id, "ad": s.get("ad", ""), "soyad": s.get("soyad", ""),
+                    "kur": s.get("kur", "")},
+        "kurlar": dagilim,
+        "toplam": {"beklenen": beklenen, "odenen": odenen,
+                   "kalan": round(max(0.0, beklenen - odenen), 2)},
+    }
+
+
 @router.patch("/muhasebe/kur-ucreti/{kur_id}")
 async def kur_ucreti_guncelle(kur_id: str, data: dict, current_user=Depends(_ERISIM)):
     """Kur kaydını satır içi düzenler: kur_adi ve/veya tutar (Beklenen). Tutar
@@ -330,3 +391,74 @@ async def muhasebe_log_listesi(hedef_id: str | None = None, limit: int = 100,
     """Muhasebe değişiklik izi (yalnız admin). Birleşik islem_log'dan modül=muhasebe."""
     kayitlar = await islem_listele(modul="muhasebe", hedef_id=hedef_id, limit=min(limit, 500))
     return {"kayitlar": kayitlar}
+
+
+# ── Muhasebe Ayarları (vergi oranı + kur ücretleri) — admin + accountant ──
+# Bu ayarlar generic /ayarlar/{tip} (admin-only) yerine BURADAN yönetilir; tam-yetki
+# kararımıza uygun olarak muhasebeci de düzenleyebilir. Depolama aynı sistem_ayarlari.
+
+
+@router.get("/muhasebe/ayarlar")
+async def muhasebe_ayarlar_getir(current_user=Depends(_ERISIM)):
+    """Muhasebe ayarları — admin + accountant okur (vergi oranı + kur ücretleri)."""
+    v = await db.sistem_ayarlari.find_one({"tip": "vergi_ayarlari"})
+    k = await db.sistem_ayarlari.find_one({"tip": "kur_ucretleri"})
+    return {
+        "vergi_ayarlari": (v.get("degerler") if v else None) or VERGI_AYARLARI_DEFAULT,
+        "kur_ucretleri": (k.get("degerler") if k else None) or KUR_UCRETLERI_DEFAULT,
+    }
+
+
+@router.put("/muhasebe/ayarlar/vergi")
+async def muhasebe_vergi_guncelle(data: dict, current_user=Depends(_ERISIM)):
+    """Vergi oranını günceller (admin + accountant). Oran yüzde [0-100]."""
+    try:
+        oran = round(float(data.get("vergi_orani")), 2)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="Vergi oranı sayısal olmalı")
+    if oran < 0 or oran > 100:
+        raise HTTPException(status_code=422, detail="Vergi oranı 0-100 arasında olmalı")
+    eski = await db.sistem_ayarlari.find_one({"tip": "vergi_ayarlari"})
+    eski_oran = (eski.get("degerler", {}) if eski else {}).get(
+        "vergi_orani", VERGI_AYARLARI_DEFAULT.get("vergi_orani"))
+    await db.sistem_ayarlari.update_one(
+        {"tip": "vergi_ayarlari"},
+        {"$set": {"tip": "vergi_ayarlari", "degerler": {"vergi_orani": oran},
+                  "guncelleme_tarihi": datetime.utcnow().isoformat(),
+                  "guncelleyen": current_user.get("ad", "")}},
+        upsert=True)
+    await islem_kaydet(current_user, "muhasebe", "ayar_vergi", "ayar", "vergi_ayarlari",
+                       "vergi_orani", eski_oran, oran)
+    return {"ok": True, "vergi_orani": oran}
+
+
+@router.put("/muhasebe/ayarlar/kur-ucretleri")
+async def muhasebe_kur_ucretleri_guncelle(data: dict, current_user=Depends(_ERISIM)):
+    """Kur ücretleri (genel + eğitim türü bazlı) günceller (admin + accountant)."""
+    degerler = data.get("degerler")
+    if not isinstance(degerler, dict):
+        raise HTTPException(status_code=422, detail="degerler nesnesi gerekli")
+    try:
+        genel = round(float(degerler.get("genel", 0) or 0), 2)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="Genel ücret sayısal olmalı")
+    if genel < 0:
+        raise HTTPException(status_code=422, detail="Genel ücret negatif olamaz")
+    turler = {}
+    for ad, v in (degerler.get("turler", {}) or {}).items():
+        try:
+            n = round(float(v), 2)
+        except (TypeError, ValueError):
+            continue
+        if n > 0:
+            turler[str(ad)] = n
+    temiz = {"genel": genel, "turler": turler}
+    await db.sistem_ayarlari.update_one(
+        {"tip": "kur_ucretleri"},
+        {"$set": {"tip": "kur_ucretleri", "degerler": temiz,
+                  "guncelleme_tarihi": datetime.utcnow().isoformat(),
+                  "guncelleyen": current_user.get("ad", "")}},
+        upsert=True)
+    await islem_kaydet(current_user, "muhasebe", "ayar_kur_ucreti", "ayar", "kur_ucretleri",
+                       "kur_ucretleri", None, f"genel={genel}₺, {len(turler)} tür özel")
+    return {"ok": True, "degerler": temiz}

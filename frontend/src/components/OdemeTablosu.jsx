@@ -95,6 +95,20 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
     [payments, tip]
   );
 
+  // Öğrenci kur özeti — açılan satırda TÜM kurlar (ana listede gizlenenler dahil)
+  const [kurOzet, setKurOzet] = useState({}); // {kisi_id: {kurlar, toplam}}
+  const kurOzetCek = useCallback(async (kisiId) => {
+    try {
+      const r = await axios.get(`${apiBase}/muhasebe/ogrenci/${kisiId}/kur-ozet`);
+      setKurOzet((s) => ({ ...s, [kisiId]: r.data }));
+    } catch { /* sessiz */ }
+  }, [apiBase]);
+  // Satır açılınca/ödeme değişince açık satırın kur özetini tazele (öğrenci)
+  useEffect(() => {
+    const row = kisiler.find((k) => k.id === acik);
+    if (ogrenciMi && row?.kisi_id) kurOzetCek(row.kisi_id);
+  }, [acik, payments, kisiler, ogrenciMi, kurOzetCek]);
+
   const req = async (fn, hataBaslik = "Kaydedilemedi") => {
     try { await fn(); onDegisim?.(); return true; }
     catch (e) { toast({ title: hataBaslik, description: e?.response?.data?.detail || "", variant: "destructive" }); return false; }
@@ -235,6 +249,58 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
                   {acikMi && (
                     <tr className="bg-app/40">
                       <td colSpan={kolonSayisi} className="px-4 py-3 space-y-4">
+                        {/* Kur Geçmişi — TÜM kurlar (ana listede gizlenen tamamlanmış+ödenmiş dahil) */}
+                        {ogrenciMi && (() => {
+                          const oz = kurOzet[k.kisi_id];
+                          const kurlar = oz?.kurlar || [];
+                          return (
+                            <div>
+                              <div className="text-xs font-medium text-subtle mb-2">Kur Geçmişi ({kurlar.length}) — aldığı kurlar, ödenen ve kalan</div>
+                              <div className="border border-line rounded-lg overflow-x-auto bg-surface">
+                                <table className="w-full text-xs">
+                                  <thead>
+                                    <tr className="text-left text-subtle border-b border-line bg-app">
+                                      <th className="px-2 py-1.5">Kur</th>
+                                      <th className="px-2 py-1.5">Başlangıç</th>
+                                      <th className="px-2 py-1.5 text-right">Beklenen</th>
+                                      <th className="px-2 py-1.5 text-right">Ödenen</th>
+                                      <th className="px-2 py-1.5 text-right">Kalan</th>
+                                      <th className="px-2 py-1.5">Durum</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {kurlar.length === 0 && <tr><td colSpan={6} className="px-2 py-2 text-subtle">Yükleniyor…</td></tr>}
+                                    {kurlar.map((c, i) => (
+                                      <tr key={c.kur_ucreti_id || i} className={`border-b border-line last:border-0 ${c.gizli ? "opacity-60" : ""}`}>
+                                        <td className="px-2 py-1.5 font-medium text-content">{c.kur || "—"}</td>
+                                        <td className="px-2 py-1.5 text-subtle whitespace-nowrap">{formatTarih(c.kayit_zamani)}</td>
+                                        <td className="px-2 py-1.5 text-right tabular-nums">{formatTL(c.yapilmasi_gereken_odeme)}</td>
+                                        <td className="px-2 py-1.5 text-right tabular-nums text-emerald-600">{formatTL(c.yapilan_odeme)}</td>
+                                        <td className={`px-2 py-1.5 text-right tabular-nums ${c.kalan > 0 ? "text-amber-600 font-medium" : "text-subtle"}`}>{formatTL(c.kalan)}</td>
+                                        <td className="px-2 py-1.5 whitespace-nowrap">
+                                          {c.durum === "tamamlandi"
+                                            ? <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">Tamamlandı</span>
+                                            : <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">Aktif</span>}
+                                          {c.gizli && <span className="text-[10px] text-subtle ml-1">(listede gizli)</span>}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                    {oz?.toplam && (
+                                      <tr className="bg-app font-semibold">
+                                        <td className="px-2 py-1.5" colSpan={2}>Toplam</td>
+                                        <td className="px-2 py-1.5 text-right tabular-nums">{formatTL(oz.toplam.beklenen)}</td>
+                                        <td className="px-2 py-1.5 text-right tabular-nums text-emerald-600">{formatTL(oz.toplam.odenen)}</td>
+                                        <td className={`px-2 py-1.5 text-right tabular-nums ${oz.toplam.kalan > 0 ? "text-amber-600" : "text-subtle"}`}>{formatTL(oz.toplam.kalan)}</td>
+                                        <td></td>
+                                      </tr>
+                                    )}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          );
+                        })()}
+
                         {/* Ödeme geçmişi (kişi bazında — vergi bilgisiyle) */}
                         <div>
                           <div className="flex items-center justify-between mb-2">

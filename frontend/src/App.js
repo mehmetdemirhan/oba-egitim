@@ -31,7 +31,7 @@ import OdemeTablosu from "./components/OdemeTablosu";
 import TopluKayit from "./components/admin/TopluKayit";
 import EgitimTurleriYonetimi from "./components/admin/EgitimTurleriYonetimi";
 import IslemKayitlari from "./components/admin/IslemKayitlari";
-import KurUcretleriYonetimi from "./components/admin/KurUcretleriYonetimi";
+import MuhasebeAyarlari from "./components/admin/MuhasebeAyarlari";
 import SinavYonetimi from "./components/admin/SinavYonetimi";
 import SinavCozum from "./components/SinavCozum";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
@@ -1215,6 +1215,11 @@ function AppContent() {
               </div>
             </div>
 
+            {/* Muhasebe Ayarları — Vergi Oranı + Kur Ücretleri (admin + accountant) */}
+            <div className="mt-6">
+              <MuhasebeAyarlari apiBase={API} />
+            </div>
+
             {/* Aylık Özet Tablosu */}
             <Card className="border border-line shadow-sm mt-6">
               <CardHeader className="pb-3">
@@ -1312,7 +1317,6 @@ function AppContent() {
               <div className="space-y-6">
                 <SistemAyarlari user={user} />
                 <EgitimTurleriYonetimi apiBase={API} />
-                <KurUcretleriYonetimi apiBase={API} />
                 <IslemKayitlari apiBase={API} />
               </div>
             </TabsContent>
