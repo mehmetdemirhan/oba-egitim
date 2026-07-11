@@ -36,6 +36,7 @@ import IslemKayitlari from "./components/admin/IslemKayitlari";
 import MuhasebeAyarlari from "./components/admin/MuhasebeAyarlari";
 import OgretmenDonemOdeme from "./components/admin/OgretmenDonemOdeme";
 import GecikenKurlar from "./components/admin/GecikenKurlar";
+import DashboardAnalitik from "./components/admin/DashboardAnalitik";
 import SinavYonetimi from "./components/admin/SinavYonetimi";
 import SinavCozum from "./components/SinavCozum";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
@@ -302,6 +303,7 @@ function AppContent() {
   const [muhasebeKisiler, setMuhasebeKisiler] = useState({ ogrenciler: [], ogretmenler: [] });
   const [muhasebeOzet, setMuhasebeOzet] = useState(null);
   const [muhasebeBorclu, setMuhasebeBorclu] = useState(false);
+  const [muhasebeYasKovasi, setMuhasebeYasKovasi] = useState(null); // yaşlandırma kovası filtresi
   const [muhasebeOdakKisi, setMuhasebeOdakKisi] = useState("");  // bildirimden gelen öğrenci odağı
   const [courses, setCourses] = useState([]);
   const [payments, setPayments] = useState([]);
@@ -685,11 +687,14 @@ function AppContent() {
                     <CardHeader><CardTitle>Yeni Kayıt vs Kur Atlayan (Bu Ay)</CardTitle></CardHeader>
                     <CardContent><div className="h-64" role="img" aria-label="Bu ay yeni kayıt ve kur atlayan öğrenci dağılımı"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={pieDataKoord} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value" nameKey="name" stroke="#fff" strokeWidth={2}>{pieDataKoord.map((e,i) => <Cell key={i} fill={e.color} />)}</Pie><Tooltip formatter={(v,n) => [`${v} öğrenci`, n]} /><Legend verticalAlign="bottom" height={28} iconType="circle" /></PieChart></ResponsiveContainer></div></CardContent>
                   </Card>
-                  <Card className="border border-line shadow-sm">
-                    <CardHeader><CardTitle>Aylık Kur Atlayan Öğrenci</CardTitle></CardHeader>
-                    <CardContent><div className="h-64" role="img" aria-label="Aylık kur atlayan öğrenci ve yeni kayıt grafiği"><ResponsiveContainer width="100%" height="100%"><BarChart data={monthlyStats}><CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" /><XAxis dataKey="ay" /><YAxis allowDecimals={false} /><Tooltip /><Legend iconType="circle" /><Bar dataKey="yeni_ogrenciler" fill="#3b82f6" name="Yeni Kayıt" /><Bar dataKey="kur_atlayan" fill="#059669" name="Kur Atlayan" /></BarChart></ResponsiveContainer></div></CardContent>
-                  </Card>
+                  {/* "Aylık Kur Atlayan Öğrenci" grafiği kaldırıldı — Kur Yenileme Hunisi
+                      + aylık yenileme trendi (DashboardAnalitik) bunu kapsıyor. */}
                 </div>
+
+                {/* Admin analitik: kur yenileme hunisi + nakit akışı/yaşlandırma + öğretmen perf */}
+                <DashboardAnalitik apiBase={API}
+                  onYaslandirmaSec={(kova) => { setMuhasebeYasKovasi(kova); setActiveTab("payments"); }}
+                  onOgretmenSec={() => setActiveTab("teachers")} />
 
                 {/* Öğretmen Rozet + Veli Anket Özeti */}
                 {adminAnketOzet.length > 0 && (
@@ -1234,6 +1239,7 @@ function AppContent() {
                 <h3 className="text-base font-semibold text-content mb-2">Öğrenci Ödemeleri</h3>
                 <OdemeTablosu tip="ogrenci" kisiler={muhasebeKisiler.ogrenciler} payments={payments} apiBase={API} onDegisim={muhasebeYenile}
                   sadeceBorclu={muhasebeBorclu} onBorcluTemizle={() => setMuhasebeBorclu(false)}
+                  yasKovasi={muhasebeYasKovasi} onYasTemizle={() => setMuhasebeYasKovasi(null)}
                   odakKisiId={muhasebeOdakKisi} onOdakTemizle={() => setMuhasebeOdakKisi("")} />
               </div>
               <div>

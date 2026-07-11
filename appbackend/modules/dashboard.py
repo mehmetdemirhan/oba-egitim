@@ -3,7 +3,7 @@
 server.py'dan birebir taşındı. Yollar, yanıt modelleri ve davranış değişmedi.
 """
 import re
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 from typing import List
 
 from fastapi import APIRouter, Depends
@@ -164,3 +164,240 @@ async def get_monthly_stats():
             kur_atlayan=kur_atlayan,
         ))
     return list(reversed(stats))
+
+
+# ── Admin analitik: kur yenileme hunisi + nakit akışı/yaşlandırma + öğretmen perf ──
+# TEK sorgu-partisi: tüm koleksiyonlar bir kez okunur, hesap bellekte (N+1 yok).
+# Finansal içerik → yalnız admin. iptal kur kayıtları hesaba katılmaz.
+def _gunf(s):
+    try:
+        return datetime.strptime(str(s)[:10], "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return None
+
+
+def _numf(v) -> float:
+    try:
+        return float(v or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+@router.get("/dashboard/analitik")
+async def dashboard_analitik(current_user=Depends(require_role(UserRole.ADMIN))):
+    """Kur yenileme hunisi + aylık nakit akışı + alacak yaşlandırma + öğretmen
+    performansı. Mevcut verilerden; tek geçiş."""
+    from modules.muhasebe import _kur_dagilimi, _kur_gizli  # FIFO tek kaynak (runtime import)
+
+    bugun = datetime.now(timezone.utc).date()
+
+    students = await db.students.find({}, {
+        "_id": 0, "id": 1, "ogretmen_id": 1, "arsivli": 1, "aldigi_egitim": 1,
+        "yapilmasi_gereken_odeme": 1, "yapilan_odeme": 1, "olusturma_tarihi": 1}).to_list(length=None)
+    teachers = await db.teachers.find({}, {"_id": 0, "id": 1, "ad": 1, "soyad": 1}).to_list(length=None)
+    kurlar = await db.kur_ucretleri.find({"durum": {"$ne": "iptal"}}, {
+        "_id": 0, "ogrenci_id": 1, "kur_adi": 1, "durum": 1, "tamamlanma_tarihi": 1,
+        "baslangic_tarihi": 1, "tarih": 1, "tutar": 1, "odendi_donem": 1, "egitim_turu": 1}).to_list(length=None)
+    payments = await db.payments.find({}, {"_id": 0, "tip": 1, "miktar": 1, "vergi": 1, "tarih": 1}).to_list(length=None)
+    donem_odemeleri = await db.ogretmen_donem_odemeleri.find({}, {"_id": 0, "toplam": 1, "tarih": 1}).to_list(length=None)
+    anketler = await db.veli_anketleri.find({}, {"_id": 0, "ogretmen_id": 1, "yanitlar": 1}).to_list(length=None)
+    paylar_ayar = ((await db.sistem_ayarlari.find_one({"tip": "ogretmen_paylari"})) or {}).get("degerler", {}) or {}
+
+    def pay(et):
+        turler = paylar_ayar.get("turler", {}) or {}
+        if et and et in turler and turler[et] not in (None, ""):
+            return _numf(turler[et])
+        return _numf(paylar_ayar.get("genel", 0))
+
+    # Son 12 ay anahtarları (eski→yeni)
+    aylar = []
+    yy, mm = bugun.year, bugun.month
+    for _ in range(12):
+        aylar.append(f"{yy:04d}-{mm:02d}")
+        mm -= 1
+        if mm < 1:
+            mm = 12; yy -= 1
+    aylar.reverse()
+
+    # Öğrenci bazında kur kayıtları (tarih artan)
+    kur_by_ogr = {}
+    for k in kurlar:
+        kur_by_ogr.setdefault(k.get("ogrenci_id"), []).append(k)
+    for oid in kur_by_ogr:
+        kur_by_ogr[oid].sort(key=lambda k: str(k.get("baslangic_tarihi") or k.get("tarih") or ""))
+
+    # Seviye kümesi + tamamlanma tarihleri
+    seviyeler, tamamlanan = {}, {}
+    for oid, ks in kur_by_ogr.items():
+        lv, comp = set(), {}
+        for k in ks:
+            n = _kur_no(k.get("kur_adi"))
+            if n is None:
+                continue
+            lv.add(n)
+            if k.get("durum") == "tamamlandi" and k.get("tamamlanma_tarihi"):
+                d = _gunf(k["tamamlanma_tarihi"])
+                if d:
+                    comp[n] = d
+        seviyeler[oid] = lv
+        tamamlanan[oid] = comp
+
+    # 1a) Huni
+    maxlv = max((max(lv) for lv in seviyeler.values() if lv), default=0)
+    huni = []
+    for N in range(1, maxlv + 1):
+        tamamlayan = gecen = beklemede = 0
+        for oid, comp in tamamlanan.items():
+            if N in comp:
+                tamamlayan += 1
+                if (N + 1) in seviyeler[oid]:
+                    gecen += 1
+                elif (bugun - comp[N]).days < 30:
+                    beklemede += 1
+        if tamamlayan == 0:
+            continue
+        payda = tamamlayan - beklemede
+        huni.append({"kur": N, "tamamlayan": tamamlayan, "gecen": gecen, "beklemede": beklemede,
+                     "oran": round(gecen * 100 / payda, 1) if payda > 0 else None})
+
+    # 1b) Aylık yenileme trendi
+    yt = {a: {"tamamlanan": 0, "gecen": 0, "beklemede": 0} for a in aylar}
+    for oid, comp in tamamlanan.items():
+        for N, d in comp.items():
+            key = f"{d.year:04d}-{d.month:02d}"
+            if key not in yt:
+                continue
+            yt[key]["tamamlanan"] += 1
+            if (N + 1) in seviyeler[oid]:
+                yt[key]["gecen"] += 1
+            elif (bugun - d).days < 30:
+                yt[key]["beklemede"] += 1
+    yenileme_trend = []
+    for a in aylar:
+        t = yt[a]
+        payda = t["tamamlanan"] - t["beklemede"]
+        yenileme_trend.append({"ay": a, **t, "oran": round(t["gecen"] * 100 / payda, 1) if payda > 0 else None})
+
+    # 2a) Aylık nakit akışı
+    nk = {a: {"tahsilat": 0.0, "vergi": 0.0, "ogretmen_odeme": 0.0} for a in aylar}
+    for p in payments:
+        d = _gunf(p.get("tarih"))
+        if not d:
+            continue
+        key = f"{d.year:04d}-{d.month:02d}"
+        if key not in nk:
+            continue
+        if p.get("tip") == "ogrenci":
+            nk[key]["tahsilat"] += _numf(p.get("miktar"))
+            nk[key]["vergi"] += _numf(p.get("vergi"))
+        elif p.get("tip") == "ogretmen":
+            nk[key]["ogretmen_odeme"] += _numf(p.get("miktar"))
+    for od in donem_odemeleri:
+        d = _gunf(od.get("tarih"))
+        if d and f"{d.year:04d}-{d.month:02d}" in nk:
+            nk[f"{d.year:04d}-{d.month:02d}"]["ogretmen_odeme"] += _numf(od.get("toplam"))
+    nakit_akisi = []
+    for a in aylar:
+        n = nk[a]
+        nakit_akisi.append({"ay": a, "tahsilat": round(n["tahsilat"], 2), "vergi": round(n["vergi"], 2),
+                            "ogretmen_odeme": round(n["ogretmen_odeme"], 2),
+                            "net": round(n["tahsilat"] - n["vergi"] - n["ogretmen_odeme"], 2)})
+
+    # 2b) Alacak yaşlandırma (yaş = kur başlangıç tarihinden bugüne)
+    yas = {"0-30": {"sayi": 0, "toplam": 0.0}, "31-60": {"sayi": 0, "toplam": 0.0}, "60+": {"sayi": 0, "toplam": 0.0}}
+
+    def _kova(gun):
+        return "0-30" if gun <= 30 else "31-60" if gun <= 60 else "60+"
+
+    for s in students:
+        ks = kur_by_ogr.get(s["id"]) or []
+        if ks:
+            for drow in _kur_dagilimi(ks, _numf(s.get("yapilan_odeme"))):
+                if _kur_gizli(drow) or drow["kalan"] <= 0.01:
+                    continue
+                bas = _gunf(drow.get("kayit_zamani"))
+                k = _kova((bugun - bas).days if bas else 0)
+                yas[k]["sayi"] += 1
+                yas[k]["toplam"] += drow["kalan"]
+        else:
+            kalan = max(0.0, _numf(s.get("yapilmasi_gereken_odeme")) - _numf(s.get("yapilan_odeme")))
+            if kalan > 0.01:
+                bas = _gunf(s.get("olusturma_tarihi"))
+                k = _kova((bugun - bas).days if bas else 0)
+                yas[k]["sayi"] += 1
+                yas[k]["toplam"] += kalan
+    for k in yas:
+        yas[k]["toplam"] = round(yas[k]["toplam"], 2)
+
+    # Güncel dönem sınırları (öğretmen bu dönem hakedişi)
+    if bugun.day <= 15:
+        dy, dm = bugun.year, bugun.month
+    else:
+        dy, dm = (bugun.year + 1, 1) if bugun.month == 12 else (bugun.year, bugun.month + 1)
+    donem_bitis = date(dy, dm, 15)
+    oy, om = (dy - 1, 12) if dm == 1 else (dy, dm - 1)
+    donem_bas = date(oy, om, 15)
+
+    # 3) Öğretmen performansı
+    anket_puan = {}
+    for a in anketler:
+        for y in (a.get("yanitlar") or []):
+            if y.get("puan") is not None:
+                anket_puan.setdefault(a.get("ogretmen_id"), []).append(_numf(y["puan"]))
+    ogr_ogrenciler = {}
+    for s in students:
+        if s.get("ogretmen_id"):
+            ogr_ogrenciler.setdefault(s["ogretmen_id"], []).append(s)
+
+    performans = []
+    for t in teachers:
+        tid = t["id"]
+        ogrs = ogr_ogrenciler.get(tid, [])
+        aktif = sum(1 for s in ogrs if not s.get("arsivli"))
+        sureler, geciken = [], 0
+        tam_say = gec_say = bek_say = 0
+        hakedis = 0.0
+        for s in ogrs:
+            slv = seviyeler.get(s["id"], set())
+            for k in (kur_by_ogr.get(s["id"]) or []):
+                n = _kur_no(k.get("kur_adi"))
+                durum = k.get("durum")
+                bas = _gunf(k.get("baslangic_tarihi") or k.get("tarih"))
+                if durum == "tamamlandi" and k.get("tamamlanma_tarihi"):
+                    tam = _gunf(k["tamamlanma_tarihi"])
+                    if bas and tam:
+                        sureler.append((tam - bas).days)
+                    if n is not None:
+                        tam_say += 1
+                        if (n + 1) in slv:
+                            gec_say += 1
+                        elif tam and (bugun - tam).days < 30:
+                            bek_say += 1
+                        if tam and donem_bas < tam <= donem_bitis and not k.get("odendi_donem"):
+                            hakedis += pay(k.get("egitim_turu") or s.get("aldigi_egitim"))
+                elif durum in (None, "acik") and bas and (bugun - bas).days > 35:
+                    geciken += 1
+        payda_yen = tam_say - bek_say
+        puanlar = anket_puan.get(tid, [])
+        performans.append({
+            "ogretmen_id": tid, "ad": f"{t.get('ad', '')} {t.get('soyad', '')}".strip(),
+            "aktif_ogrenci": aktif,
+            "ort_tamamlama_gun": round(sum(sureler) / len(sureler), 1) if sureler else None,
+            "geciken_kur": geciken,
+            "tamamlanan_kur": tam_say,
+            "yenileme_orani": (None if tam_say < 3 else (round(gec_say * 100 / payda_yen, 1) if payda_yen > 0 else None)),
+            "yenileme_yetersiz": tam_say < 3,
+            "memnuniyet": round(sum(puanlar) / len(puanlar), 2) if puanlar else None,
+            "donem_hakedis": round(hakedis, 2),
+        })
+    performans.sort(key=lambda x: -x["aktif_ogrenci"])
+
+    return {
+        "huni": huni,
+        "yenileme_trend": yenileme_trend,
+        "nakit_akisi": nakit_akisi,
+        "yaslandirma": yas,
+        "yaslandirma_tanim": "Yaş = kur başlangıç tarihinden bugüne (gün).",
+        "ogretmen_performans": performans,
+        "guncel_donem": f"{dy:04d}-{dm:02d}-15",
+    }

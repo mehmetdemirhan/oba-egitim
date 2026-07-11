@@ -1,0 +1,178 @@
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import axios from "axios";
+import {
+  ResponsiveContainer, ComposedChart, Bar, Line, LineChart, XAxis, YAxis,
+  CartesianGrid, Tooltip, Legend,
+} from "recharts";
+import { Filter, TrendingUp, Users, ChevronDown, ChevronRight, ArrowUp, ArrowDown } from "lucide-react";
+
+/**
+ * DashboardAnalitik — admin: kur yenileme hunisi + nakit akışı/alacak yaşlandırma +
+ * öğretmen performans tablosu. Tek uçtan (/dashboard/analitik) beslenir. Bölümler
+ * daraltılabilir. Props: apiBase, onYaslandirmaSec(kova), onOgretmenSec(id).
+ */
+const AY_KISA = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
+const formatTL = (v) => new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(Number(v || 0));
+const ayEtiket = (ym) => { if (!ym) return ""; const [y, m] = ym.split("-"); return `${AY_KISA[parseInt(m, 10) - 1]} ${y.slice(2)}`; };
+
+function Bolum({ baslik, ikon: Ikon, children, varsayilanAcik = true }) {
+  const [acik, setAcik] = useState(varsayilanAcik);
+  return (
+    <div className="border border-line rounded-2xl bg-surface shadow-sm overflow-hidden">
+      <button onClick={() => setAcik(!acik)} className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-app transition-colors">
+        <span className="font-bold text-content flex items-center gap-2">{Ikon && <Ikon className="h-5 w-5 text-primary" />}{baslik}</span>
+        {acik ? <ChevronDown className="h-5 w-5 text-subtle" /> : <ChevronRight className="h-5 w-5 text-subtle" />}
+      </button>
+      {acik && <div className="border-t border-line p-4">{children}</div>}
+    </div>
+  );
+}
+
+export default function DashboardAnalitik({ apiBase, onYaslandirmaSec, onOgretmenSec }) {
+  const [veri, setVeri] = useState(null);
+  const [siralama, setSiralama] = useState({ alan: "aktif_ogrenci", yon: "desc" });
+
+  const yukle = useCallback(async () => {
+    try { const r = await axios.get(`${apiBase}/dashboard/analitik`); setVeri(r.data); } catch { /* yetkisiz/sessiz */ }
+  }, [apiBase]);
+  useEffect(() => { yukle(); }, [yukle]);
+
+  const perf = useMemo(() => {
+    const liste = [...(veri?.ogretmen_performans || [])];
+    const { alan, yon } = siralama;
+    liste.sort((a, b) => {
+      const av = a[alan] ?? -Infinity, bv = b[alan] ?? -Infinity;
+      if (av === bv) return 0;
+      return (yon === "asc" ? 1 : -1) * (av > bv ? 1 : -1);
+    });
+    return liste;
+  }, [veri, siralama]);
+
+  if (!veri) return null;
+  const sirala = (alan) => setSiralama((s) => ({ alan, yon: s.alan === alan && s.yon === "desc" ? "asc" : "desc" }));
+  const okIcon = (alan) => siralama.alan !== alan ? null : (siralama.yon === "desc" ? <ArrowDown className="h-3 w-3 inline" /> : <ArrowUp className="h-3 w-3 inline" />);
+
+  const nakit = (veri.nakit_akisi || []).map((n) => ({ ...n, ayK: ayEtiket(n.ay) }));
+  const trend = (veri.yenileme_trend || []).map((n) => ({ ...n, ayK: ayEtiket(n.ay) }));
+  const huni = veri.huni || [];
+  const enFazla = Math.max(1, ...huni.map((h) => h.tamamlayan));
+  const yas = veri.yaslandirma || {};
+  const KOVA = [["0-30", "0-30 gün", "bg-emerald-50 border-emerald-200 text-emerald-700"],
+                ["31-60", "31-60 gün", "bg-amber-50 border-amber-200 text-amber-700"],
+                ["60+", "60+ gün", "bg-red-50 border-red-200 text-red-700"]];
+
+  return (
+    <div className="space-y-6">
+      {/* 1. Kur Yenileme Hunisi */}
+      <Bolum baslik="Kur Yenileme Hunisi" ikon={Filter}>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            {huni.length === 0 ? <div className="text-sm text-subtle">Veri yok.</div> : huni.map((h, i) => (
+              <div key={h.kur}>
+                <div className="flex items-center justify-between text-xs mb-0.5">
+                  <span className="text-content font-medium">{h.kur}. kuru tamamlayan</span>
+                  <span className="text-subtle tabular-nums">{h.tamamlayan} öğrenci{h.beklemede > 0 && <span className="text-amber-600"> • beklemede: {h.beklemede}</span>}</span>
+                </div>
+                <div className="h-7 bg-app rounded-lg overflow-hidden relative">
+                  <div className="h-full bg-primary/80 rounded-lg flex items-center px-2" style={{ width: `${Math.max(8, (h.tamamlayan / enFazla) * 100)}%` }}>
+                    <span className="text-[11px] text-white font-semibold tabular-nums">{h.tamamlayan}</span>
+                  </div>
+                </div>
+                {i < huni.length - 1 && (
+                  <div className="flex items-center gap-1 text-[11px] text-emerald-700 pl-2 mt-0.5">
+                    <TrendingUp className="h-3 w-3" />{h.kur}→{h.kur + 1}: {h.oran != null ? `%${h.oran}` : "—"} <span className="text-subtle">({h.gecen} geçti)</span>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          <div>
+            <div className="text-xs text-subtle mb-1">Aylık yenileme oranı (%) — beklemede penceresi paydadan düşülür</div>
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={trend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="ayK" fontSize={11} /><YAxis domain={[0, 100]} fontSize={11} unit="%" />
+                  <Tooltip formatter={(v, n) => n === "oran" ? [`%${v}`, "Yenileme"] : [v, n]} />
+                  <Line type="monotone" dataKey="oran" stroke="#059669" strokeWidth={2} name="Yenileme %" connectNulls dot={{ r: 2 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      </Bolum>
+
+      {/* 2. Nakit Akışı + Yaşlandırma */}
+      <Bolum baslik="Nakit Akışı & Alacak Yaşlandırma" ikon={TrendingUp}>
+        <div className="text-xs text-subtle mb-1">Son 12 ay — çubuklar: tahsilat/vergi/öğretmen ödemesi, çizgi: NET (tahsilat − vergi − ödeme)</div>
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={nakit}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis dataKey="ayK" fontSize={11} /><YAxis fontSize={11} />
+              <Tooltip formatter={(v, n) => [formatTL(v), n]} />
+              <Legend iconType="circle" />
+              <Bar dataKey="tahsilat" fill="#3b82f6" name="Tahsilat" />
+              <Bar dataKey="vergi" fill="#ef4444" name="Vergi" />
+              <Bar dataKey="ogretmen_odeme" fill="#f59e0b" name="Öğretmen Ödemesi" />
+              <Line type="monotone" dataKey="net" stroke="#059669" strokeWidth={2.5} name="Net" dot={{ r: 2 }} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="mt-4">
+          <div className="text-xs text-subtle mb-2" title={veri.yaslandirma_tanim}>Alacak Yaşlandırma — {veri.yaslandirma_tanim} (kovaya tıkla → tabloyu filtrele)</div>
+          <div className="grid grid-cols-3 gap-3">
+            {KOVA.map(([k, etiket, renk]) => (
+              <button key={k} onClick={() => onYaslandirmaSec && onYaslandirmaSec(k)}
+                className={`border rounded-xl p-3 text-left hover:ring-2 hover:ring-offset-1 transition-all ${renk}`}>
+                <div className="text-xs font-medium">{etiket}</div>
+                <div className="text-xl font-bold tabular-nums">{yas[k]?.sayi ?? 0}</div>
+                <div className="text-[11px] tabular-nums opacity-80">{formatTL(yas[k]?.toplam ?? 0)}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </Bolum>
+
+      {/* 3. Öğretmen Performans Tablosu */}
+      <Bolum baslik="Öğretmen Performans Tablosu" ikon={Users}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs text-subtle border-b border-line bg-app">
+                <th className="px-3 py-2 cursor-pointer" onClick={() => sirala("ad")}>Öğretmen {okIcon("ad")}</th>
+                <th className="px-3 py-2 text-right cursor-pointer" onClick={() => sirala("aktif_ogrenci")}>Aktif Öğr. {okIcon("aktif_ogrenci")}</th>
+                <th className="px-3 py-2 text-right cursor-pointer" onClick={() => sirala("ort_tamamlama_gun")}>Ort. Süre {okIcon("ort_tamamlama_gun")}</th>
+                <th className="px-3 py-2 text-right cursor-pointer" onClick={() => sirala("geciken_kur")}>Geciken {okIcon("geciken_kur")}</th>
+                <th className="px-3 py-2 text-right cursor-pointer" onClick={() => sirala("yenileme_orani")}>Yenileme {okIcon("yenileme_orani")}</th>
+                <th className="px-3 py-2 text-right cursor-pointer" onClick={() => sirala("memnuniyet")}>Memnuniyet {okIcon("memnuniyet")}</th>
+                <th className="px-3 py-2 text-right cursor-pointer" onClick={() => sirala("donem_hakedis")}>Bu Dönem {okIcon("donem_hakedis")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {perf.length === 0 && <tr><td colSpan={7} className="px-3 py-6 text-center text-subtle">Öğretmen yok.</td></tr>}
+              {perf.map((p) => {
+                const sureAsim = p.ort_tamamlama_gun != null && p.ort_tamamlama_gun > 35;
+                return (
+                  <tr key={p.ogretmen_id} onClick={() => onOgretmenSec && onOgretmenSec(p.ogretmen_id)}
+                    className="border-b border-line last:border-0 cursor-pointer hover:bg-app">
+                    <td className="px-3 py-2 text-content font-medium">{p.ad}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{p.aktif_ogrenci}</td>
+                    <td className={`px-3 py-2 text-right tabular-nums ${sureAsim ? (p.ort_tamamlama_gun > 42 ? "text-red-600 font-semibold" : "text-amber-600 font-medium") : ""}`}>
+                      {p.ort_tamamlama_gun != null ? `${p.ort_tamamlama_gun} g` : "—"}
+                    </td>
+                    <td className={`px-3 py-2 text-right tabular-nums ${p.geciken_kur > 0 ? "text-amber-700 font-medium" : "text-subtle"}`}>{p.geciken_kur}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{p.yenileme_yetersiz ? <span className="text-[10px] text-subtle">yetersiz veri</span> : (p.yenileme_orani != null ? `%${p.yenileme_orani}` : "—")}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{p.memnuniyet != null ? p.memnuniyet.toFixed(2) : "—"}</td>
+                    <td className="px-3 py-2 text-right tabular-nums font-medium">{formatTL(p.donem_hakedis)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p className="text-[11px] text-subtle mt-2">Ort. süre 35 günü aşarsa amber, 42+ kırmızı. Satıra tıkla → öğretmen detayı.</p>
+      </Bolum>
+    </div>
+  );
+}
