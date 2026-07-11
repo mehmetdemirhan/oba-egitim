@@ -33,7 +33,7 @@ from core.sistem import (
     XP_TABLOSU_DEFAULT, LIG_ESIKLERI_DEFAULT, LIG_SIRA,
     OGRETMEN_ROZETLERI_DEFAULT, OGRENCI_ROZETLERI_DEFAULT, ANKET_SORULARI_DEFAULT,
     OZELLIK_TANIMLARI, get_ozellik_ayarlari, OGRETMEN_PUAN_AGIRLIKLARI_DEFAULT,
-    KUTULU_OKUMA_DEFAULT, VERGI_AYARLARI_DEFAULT,
+    KUTULU_OKUMA_DEFAULT, VERGI_AYARLARI_DEFAULT, KUR_UCRETLERI_DEFAULT,
 )
 from core.ai import _gemini_call, call_claude, _mock_bilgi_tabani_response, get_ogrenci_ai_verileri
 
@@ -106,6 +106,7 @@ async def get_ayar(tip: str, current_user=Depends(get_current_user)):
         "ogretmen_puan_agirliklari": OGRETMEN_PUAN_AGIRLIKLARI_DEFAULT,
         "kutulu_okuma": KUTULU_OKUMA_DEFAULT,
         "vergi_ayarlari": VERGI_AYARLARI_DEFAULT,
+        "kur_ucretleri": KUR_UCRETLERI_DEFAULT,
     }
     return {"tip": tip, "degerler": defaults.get(tip, {})}
 
