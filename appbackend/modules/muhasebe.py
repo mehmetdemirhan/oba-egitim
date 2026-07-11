@@ -50,6 +50,37 @@ def _num(v) -> float:
         return 0.0
 
 
+def _kur_dagilimi(kurlar: list, toplam_odeme: float) -> list:
+    """FIFO: öğrencinin toplam ödemesini kur kayıtlarına (tarih ARTAN) dağıtır.
+    Her kur için tutar/odenen/kalan/durum döndürür; fazla ödeme son kur satırına
+    eklenir. kisiler listesi ve öğrenci kur-özeti bu tek kaynaktan beslenir."""
+    havuz = toplam_odeme
+    satirlar = []
+    for k in kurlar:
+        tutar = _num(k.get("tutar"))
+        odenen_k = min(havuz, tutar)
+        havuz -= odenen_k
+        satirlar.append({
+            "kur_ucreti_id": k.get("id"),
+            "kur": k.get("kur_adi", ""),
+            "kayit_zamani": k.get("baslangic_tarihi") or k.get("tarih") or "",
+            "durum": k.get("durum"),
+            "yapilmasi_gereken_odeme": round(tutar, 2),
+            "yapilan_odeme": round(odenen_k, 2),
+            "kalan": round(max(0.0, tutar - odenen_k), 2),
+        })
+    if havuz > 0 and satirlar:  # fazla ödeme → son kur satırına
+        satirlar[-1]["yapilan_odeme"] = round(satirlar[-1]["yapilan_odeme"] + havuz, 2)
+        satirlar[-1]["kalan"] = round(max(0.0, satirlar[-1]["yapilmasi_gereken_odeme"] - satirlar[-1]["yapilan_odeme"]), 2)
+    return satirlar
+
+
+def _kur_gizli(satir: dict) -> bool:
+    """Ana muhasebe listesinde gizlenecek kur: geçilmiş (tamamlandi) VE tam ödenmiş.
+    Detay/özet görünümünde yine de gösterilir (tarihçe)."""
+    return satir.get("durum") == "tamamlandi" and _num(satir.get("kalan")) <= 0.01
+
+
 @router.get("/muhasebe/kisiler")
 async def muhasebe_kisiler(current_user=Depends(_ERISIM)):
     """Ödeme kaydı/tablosu için kişi listesi — CRM detayı OLMADAN, sadece ad-soyad
@@ -92,26 +123,22 @@ async def muhasebe_kisiler(current_user=Depends(_ERISIM)):
             }
             kurlar = kur_map.get(s.get("id")) or []
             if kurlar:
-                havuz = _num(s.get("yapilan_odeme"))  # FIFO havuzu = toplam ödeme
-                satirlar = []
-                for k in kurlar:
-                    tutar = _num(k.get("tutar"))
-                    odenen_k = min(havuz, tutar)
-                    havuz -= odenen_k
-                    satirlar.append({
+                # FIFO dağılımı (paylaşımlı helper) → satırlar; geçilmiş VE tam ödenmiş
+                # kur ana listede GİZLENİR (öğrenci detayında yine görünür).
+                for d in _kur_dagilimi(kurlar, _num(s.get("yapilan_odeme"))):
+                    if _kur_gizli(d):
+                        continue
+                    ogrenciler.append({
                         **ortak,
-                        "id": k.get("id"),  # satır kimliği = kur kaydı (React key)
-                        "kur_ucreti_id": k.get("id"),
-                        "kur": k.get("kur_adi", ""),
-                        "kayit_zamani": k.get("baslangic_tarihi") or k.get("tarih") or s.get("olusturma_tarihi") or "",
-                        "yapilmasi_gereken_odeme": round(tutar, 2),
-                        "yapilan_odeme": round(odenen_k, 2),
-                        "kalan": round(max(0.0, tutar - odenen_k), 2),
+                        "id": d["kur_ucreti_id"],  # satır kimliği = kur kaydı (React key)
+                        "kur_ucreti_id": d["kur_ucreti_id"],
+                        "kur": d["kur"],
+                        "kayit_zamani": d["kayit_zamani"] or s.get("olusturma_tarihi") or "",
+                        "durum": d["durum"],
+                        "yapilmasi_gereken_odeme": d["yapilmasi_gereken_odeme"],
+                        "yapilan_odeme": d["yapilan_odeme"],
+                        "kalan": d["kalan"],
                     })
-                if havuz > 0 and satirlar:  # fazla ödeme → son kur satırına
-                    satirlar[-1]["yapilan_odeme"] = round(satirlar[-1]["yapilan_odeme"] + havuz, 2)
-                    satirlar[-1]["kalan"] = round(max(0.0, satirlar[-1]["yapilmasi_gereken_odeme"] - satirlar[-1]["yapilan_odeme"]), 2)
-                ogrenciler.extend(satirlar)
             else:
                 # Kur kaydı olmayan öğrenci → tek satır (güncel kur + toplam bakiye)
                 gereken = _num(s.get("yapilmasi_gereken_odeme"))
@@ -289,6 +316,40 @@ async def kur_ucretleri_listesi(ogrenci_id: str, current_user=Depends(_ERISIM)):
     docs = await db.kur_ucretleri.find({"ogrenci_id": ogrenci_id}, {"_id": 0}) \
         .sort("tarih", -1).to_list(length=500)
     return {"ogeler": docs}
+
+
+@router.get("/muhasebe/ogrenci/{ogrenci_id}/kur-ozet")
+async def muhasebe_ogrenci_kur_ozet(ogrenci_id: str, current_user=Depends(_ERISIM)):
+    """Öğrencinin TÜM kurları (ana listede gizlenen tamamlanmış+ödenmişler DAHİL) —
+    tutar/ödenen/kalan/durum + toplamlar. Öğrenci satırına tıklayınca toplu görünüm."""
+    s = await db.students.find_one({"id": ogrenci_id})
+    if not s:
+        raise HTTPException(status_code=404, detail="Öğrenci bulunamadı")
+    kurlar = await db.kur_ucretleri.find({"ogrenci_id": ogrenci_id}, {"_id": 0}).to_list(length=500)
+    kurlar.sort(key=lambda k: str(k.get("baslangic_tarihi") or k.get("tarih") or ""))
+    dagilim = _kur_dagilimi(kurlar, _num(s.get("yapilan_odeme")))
+    if not dagilim:
+        # Kur kaydı yoksa öğrenci toplamından tek kalem
+        gereken = _num(s.get("yapilmasi_gereken_odeme"))
+        yapilan = _num(s.get("yapilan_odeme"))
+        dagilim = [{
+            "kur_ucreti_id": None, "kur": s.get("kur", ""),
+            "kayit_zamani": s.get("olusturma_tarihi") or "", "durum": None,
+            "yapilmasi_gereken_odeme": round(gereken, 2),
+            "yapilan_odeme": round(yapilan, 2),
+            "kalan": round(max(0.0, gereken - yapilan), 2),
+        }]
+    for d in dagilim:
+        d["gizli"] = _kur_gizli(d)  # ana listede gizlenmiş mi (bilgi amaçlı)
+    beklenen = round(sum(d["yapilmasi_gereken_odeme"] for d in dagilim), 2)
+    odenen = round(sum(d["yapilan_odeme"] for d in dagilim), 2)
+    return {
+        "ogrenci": {"id": ogrenci_id, "ad": s.get("ad", ""), "soyad": s.get("soyad", ""),
+                    "kur": s.get("kur", "")},
+        "kurlar": dagilim,
+        "toplam": {"beklenen": beklenen, "odenen": odenen,
+                   "kalan": round(max(0.0, beklenen - odenen), 2)},
+    }
 
 
 @router.patch("/muhasebe/kur-ucreti/{kur_id}")
