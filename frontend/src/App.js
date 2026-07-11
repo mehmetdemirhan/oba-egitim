@@ -34,6 +34,7 @@ import EgitimTurleriYonetimi from "./components/admin/EgitimTurleriYonetimi";
 import IslemKayitlari from "./components/admin/IslemKayitlari";
 import MuhasebeAyarlari from "./components/admin/MuhasebeAyarlari";
 import OgretmenDonemOdeme from "./components/admin/OgretmenDonemOdeme";
+import GecikenKurlar from "./components/admin/GecikenKurlar";
 import SinavYonetimi from "./components/admin/SinavYonetimi";
 import SinavCozum from "./components/SinavCozum";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
@@ -617,6 +618,9 @@ function AppContent() {
                     </div>
                   </div>
                 )}
+
+                {/* İŞ 2 — Geciken Kurlar (5 haftayı aşan aktif kurlar) */}
+                <GecikenKurlar apiBase={API} />
 
                 {/* Riskli öğrenciler uyarısı */}
                 {ogrenciRiskler.filter(r => r.risk_seviye === "yuksek").length > 0 && (
@@ -1218,6 +1222,9 @@ function AppContent() {
               </Card>
             </div>
 
+            {/* İŞ 2 — Geciken Kurlar (5 haftayı aşan aktif kurlar) */}
+            <div className="mb-6"><GecikenKurlar apiBase={API} /></div>
+
             {/* Öğrenci & Öğretmen ödeme tabloları — MuhasebePaneli ile PAYLAŞILAN
                 Excel-benzeri satır içi düzenlenebilir bileşen (OdemeTablosu). */}
             <div className="space-y-6">
@@ -1456,11 +1463,19 @@ function BildirimZili({ user }) {
   const [okunmamis, setOkunmamis] = useState(0);
   const [acik, setAcik] = useState(false);
   const [ayarAcik, setAyarAcik] = useState(false);
+  const [muhOzet, setMuhOzet] = useState(null); // admin/accountant: alınmayan + geciken özeti
+  const muhasebeci = user?.role === "admin" || user?.role === "accountant";
 
   const fetchBildirimler = useCallback(async () => {
     try { const r = await axios.get(`${API}/bildirimler`); setBildirimler(Array.isArray(r.data) ? r.data.slice(0, 20) : []); } catch(e) {}
     try { const r = await axios.get(`${API}/bildirimler/okunmamis`); setOkunmamis(r.data?.sayi || 0); } catch(e) {}
-  }, []);
+    if (user?.role === "admin" || user?.role === "accountant") {
+      try {
+        const [o, g] = await Promise.all([axios.get(`${API}/muhasebe/ozet`), axios.get(`${API}/muhasebe/geciken-kurlar`)]);
+        setMuhOzet({ alinmayan: o.data?.alinmayan?.sayi || 0, geciken: g.data?.sayi || 0 });
+      } catch(e) {}
+    }
+  }, [user]);
 
   useEffect(() => { fetchBildirimler(); const iv = setInterval(fetchBildirimler, 30000); return () => clearInterval(iv); }, [fetchBildirimler]);
 
@@ -1505,6 +1520,12 @@ function BildirimZili({ user }) {
                   className="px-1.5 py-1 rounded-md text-subtle hover:bg-gray-200 transition-colors" aria-label="Kapat"><XCircle className="h-4 w-4" /></button>
               </div>
             </div>
+            {!ayarAcik && muhasebeci && muhOzet && (muhOzet.alinmayan > 0 || muhOzet.geciken > 0) && (
+              <div className="px-3 py-2 border-b border-gray-100 bg-amber-50/60 flex flex-wrap items-center gap-3 text-xs">
+                {muhOzet.geciken > 0 && <span className="inline-flex items-center gap-1 text-amber-800 font-medium"><AlertTriangle className="h-3.5 w-3.5" />{muhOzet.geciken} geciken kur</span>}
+                {muhOzet.alinmayan > 0 && <span className="inline-flex items-center gap-1 text-amber-800 font-medium">💸 {muhOzet.alinmayan} alınmayan ödeme</span>}
+              </div>
+            )}
             {ayarAcik ? (
               <div className="p-3 overflow-y-auto"><BildirimTercihleri /></div>
             ) : bildirimler.length === 0 ? (

@@ -7,6 +7,7 @@ import { Wallet, TrendingUp, TrendingDown, Clock, LogOut, GraduationCap, Users, 
 import OdemeTablosu from "./OdemeTablosu";
 import MuhasebeAyarlari from "./admin/MuhasebeAyarlari";
 import OgretmenDonemOdeme from "./admin/OgretmenDonemOdeme";
+import GecikenKurlar from "./admin/GecikenKurlar";
 
 /**
  * MuhasebePaneli — "accountant" rolüne özel SADE ödeme paneli.
@@ -109,6 +110,8 @@ export default function MuhasebePaneli({ user, logout }) {
           <KpiKart Ikon={Wallet} etiket="Öğretmene Ödenen" tutar={ogt.odenen} vurgu="green" />
           <KpiKart Ikon={PiggyBank} etiket="Net Kasa (vergi düşülmüş)" tutar={ozet?.kasa_net} vurgu="green" />
         </div>
+
+        <GecikenKurlar apiBase={API} />
 
         <div className="flex gap-2">
           {tabButon("ogrenci", "Öğrenci Ödemeleri", GraduationCap)}

@@ -209,6 +209,10 @@ async def muhasebe_ozet(current_user=Depends(_ERISIM)):
     """KPI özeti — kişi bakiyelerinden hesaplanır.
     Öğrenci: beklenen tahsilat / tahsil edilen / bekleyen.
     Öğretmen: ödenecek / ödenen / kalan."""
+    try:
+        await _geciken_kur_kontrol()  # muhasebe görüntülenince throttle'lı gecikme taraması
+    except Exception as ex:
+        logging.warning(f"[muhasebe] gecikme kontrol hatası: {ex}")
     ogr_beklenen = ogr_tahsil = 0.0
     try:
         async for s in db.students.find({}, {"_id": 0, "yapilmasi_gereken_odeme": 1, "yapilan_odeme": 1}):
@@ -654,3 +658,91 @@ async def ogretmen_donem_gecmis(ogretmen_id: str = None, limit: int = 100, curre
     q = {"ogretmen_id": ogretmen_id} if ogretmen_id else {}
     docs = await db.ogretmen_donem_odemeleri.find(q, {"_id": 0}).sort("tarih", -1).to_list(length=min(limit, 500))
     return {"odemeler": docs}
+
+
+# ── İŞ 2: Kur süresi gecikme uyarısı ──
+# 12 derslik kur en geç 5 haftada (35 gün) bitmeli. Aktif kur eşiği aşarsa öğretmen +
+# admin + accountant'a bildirim. Spam koruması: kur başına son_uyari_tarihi; hâlâ
+# açıksa haftada bir hatırlatma. Scheduler yok → ilk-istek/görüntüleme tetikli
+# (günlük throttle). Migration gerekmez; alanlar ilk taramada oluşur.
+GECIKME_ESIK_GUN = 35
+GECIKME_HATIRLATMA_GUN = 7
+
+
+async def _geciken_kur_listesi():
+    """Aktif (durum acik/None) + başlangıcı 35 günü aşan kurlar."""
+    bugun = datetime.now(timezone.utc).date()
+    ogrenci = {}
+    async for s in db.students.find({"arsivli": {"$ne": True}},
+                                    {"_id": 0, "id": 1, "ad": 1, "soyad": 1, "ogretmen_id": 1}):
+        ogrenci[s["id"]] = s
+    sonuc = []
+    async for k in db.kur_ucretleri.find({"durum": {"$in": [None, "acik"]}}, {"_id": 0}):
+        bas = _tarih_gun(k.get("baslangic_tarihi") or k.get("tarih"))
+        if not bas:
+            continue
+        gun = (bugun - bas).days
+        if gun <= GECIKME_ESIK_GUN:
+            continue
+        s = ogrenci.get(k.get("ogrenci_id"))
+        if not s:
+            continue
+        sonuc.append({
+            "kur_ucreti_id": k.get("id"), "ogrenci_id": k.get("ogrenci_id"),
+            "ogrenci_ad": f"{s.get('ad', '')} {s.get('soyad', '')}".strip(),
+            "ogretmen_id": s.get("ogretmen_id"), "kur": k.get("kur_adi", ""),
+            "baslangic": str(bas), "gun": gun, "son_uyari_tarihi": k.get("son_uyari_tarihi"),
+        })
+    return sonuc
+
+
+async def _geciken_kur_kontrol(zorla: bool = False):
+    """Throttle'lı tarama: eşik aşan + uyarı zamanı gelen kurlar için öğretmen +
+    admin + accountant bildirimi; son_uyari_tarihi ile haftalık hatırlatma."""
+    simdi = datetime.now(timezone.utc)
+    if not zorla:
+        son = await db.sistem_ayarlari.find_one({"tip": "gecikme_son_kontrol"})
+        if son and son.get("zaman"):
+            try:
+                if (simdi - datetime.fromisoformat(son["zaman"])).total_seconds() < 20 * 3600:
+                    return
+            except (TypeError, ValueError):
+                pass
+    await db.sistem_ayarlari.update_one({"tip": "gecikme_son_kontrol"},
+                                        {"$set": {"tip": "gecikme_son_kontrol", "zaman": simdi.isoformat()}}, upsert=True)
+    try:
+        from modules.bildirim import bildirim_olustur
+    except Exception:
+        return
+    ortak = []
+    async for u in db.users.find({"role": {"$in": ["admin", "accountant"]}}, {"_id": 0, "id": 1}):
+        if u.get("id"):
+            ortak.append(u["id"])
+    for g in await _geciken_kur_listesi():
+        su = _tarih_gun(g.get("son_uyari_tarihi"))
+        if su and (simdi.date() - su).days < GECIKME_HATIRLATMA_GUN:
+            continue  # haftalık cooldown
+        icerik = (f"{g['ogrenci_ad']} öğrencisinin {g['kur']}. kuru 5 haftayı aştı "
+                  f"(başlangıç: {g['baslangic']}, {g['gun']} gün).")
+        alicilar = set(ortak)
+        if g.get("ogretmen_id"):
+            tu = await db.users.find_one({"linked_id": g["ogretmen_id"], "role": "teacher"}, {"_id": 0, "id": 1})
+            if tu and tu.get("id"):
+                alicilar.add(tu["id"])
+        for aid in alicilar:
+            try:
+                await bildirim_olustur(aid, "kur_gecikme", icerik, g["kur_ucreti_id"])
+            except Exception:
+                pass
+        await db.kur_ucretleri.update_one({"id": g["kur_ucreti_id"]},
+                                          {"$set": {"son_uyari_tarihi": simdi.isoformat()}})
+
+
+@router.get("/muhasebe/geciken-kurlar")
+async def geciken_kurlar(current_user=Depends(_ERISIM)):
+    """35 günü aşan aktif kurlar (Geciken Kurlar sayacı/listesi). Görüntülenince
+    throttle'lı bildirim taraması da tetiklenir (scheduler yok → ilk-istek tetikli)."""
+    await _geciken_kur_kontrol()
+    liste = await _geciken_kur_listesi()
+    liste.sort(key=lambda x: -x["gun"])
+    return {"sayi": len(liste), "kurlar": liste}
