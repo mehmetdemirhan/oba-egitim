@@ -295,6 +295,7 @@ function AppContent() {
   const [teachers, setTeachers] = useState([]);
   const [students, setStudents] = useState([]);
   const [muhasebeKisiler, setMuhasebeKisiler] = useState({ ogrenciler: [], ogretmenler: [] });
+  const [muhasebeOzet, setMuhasebeOzet] = useState(null);
   const [courses, setCourses] = useState([]);
   const [payments, setPayments] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
@@ -336,6 +337,7 @@ function AppContent() {
     try { const r = await axios.get(`${API}/courses`); setCourses(Array.isArray(r.data) ? r.data : []); } catch(e) {}
     try { const r = await axios.get(`${API}/payments`); setPayments(Array.isArray(r.data) ? r.data : []); } catch(e) {}
     try { const r = await axios.get(`${API}/muhasebe/kisiler`); setMuhasebeKisiler(r.data || { ogrenciler: [], ogretmenler: [] }); } catch(e) {}
+    try { const r = await axios.get(`${API}/muhasebe/ozet`); setMuhasebeOzet(r.data || null); } catch(e) {}
     try { const r = await axios.get(`${API}/egitim-turleri`); if (r.data?.turler?.length) setAvailableCourses(r.data.turler.map(t => t.ad)); } catch(e) {}
     try { const r = await axios.get(`${API}/risk-skor/toplu`); setOgrenciRiskler(Array.isArray(r.data) ? r.data : []); } catch(e) { setOgrenciRiskler([]); }
   }, []);
@@ -419,7 +421,8 @@ function AppContent() {
   const fetchMuhasebeKisiler = async () => { try { const r = await axios.get(`${API}/muhasebe/kisiler`); setMuhasebeKisiler(r.data || { ogrenciler: [], ogretmenler: [] }); } catch(e) {} };
   const fetchDashboard = async () => { try { const r = await axios.get(`${API}/dashboard`); setDashboardStats(r.data); } catch(e) {} };
   // OdemeTablosu satır içi düzenlemesi sonrası muhasebe verilerini + KPI kaynaklarını tazele.
-  const muhasebeYenile = () => { fetchMuhasebeKisiler(); fetchPayments(); fetchStudents(); fetchTeachers(); fetchDashboard(); };
+  const fetchMuhasebeOzet = async () => { try { const r = await axios.get(`${API}/muhasebe/ozet`); setMuhasebeOzet(r.data || null); } catch(e) {} };
+  const muhasebeYenile = () => { fetchMuhasebeKisiler(); fetchMuhasebeOzet(); fetchPayments(); fetchStudents(); fetchTeachers(); fetchDashboard(); };
   const fetchTeacherStudents = async (id) => { try { const r = await axios.get(`${API}/teachers/${id}/students`); setTeacherStudents(p => ({...p, [id]: r.data})); } catch(e) {} };
 
   const toggleTeacherExpansion = (id) => {
@@ -1176,13 +1179,13 @@ function AppContent() {
               </Card>
               <Card className="border border-line shadow-sm bg-gradient-to-br from-blue-50 to-indigo-100">
                 <CardContent className="p-5 text-center">
-                  <div className="text-sm text-primary font-medium mb-2">🏦 Kasa Bakiyesi</div>
-                  <div className="text-xs text-subtle mb-1">Alınan − Ödenen</div>
-                  <div className={`text-3xl font-bold ${(payments.filter(p => p.tip === 'ogrenci').reduce((s, p) => s + (p.miktar || 0), 0) - payments.filter(p => p.tip === 'ogretmen').reduce((s, p) => s + (p.miktar || 0), 0)) >= 0 ? 'text-primary' : 'text-red-700'}`}>
-                    {formatCurrency(payments.filter(p => p.tip === 'ogrenci').reduce((s, p) => s + (p.miktar || 0), 0) - payments.filter(p => p.tip === 'ogretmen').reduce((s, p) => s + (p.miktar || 0), 0))}
+                  <div className="text-sm text-primary font-medium mb-2">🏦 Net Kasa Bakiyesi</div>
+                  <div className="text-xs text-subtle mb-1">Vergi düşülmüş (tahsilat − vergi − öğretmen)</div>
+                  <div className={`text-3xl font-bold tabular-nums ${(muhasebeOzet?.kasa_net ?? 0) >= 0 ? 'text-primary' : 'text-red-700'}`}>
+                    {formatCurrency(muhasebeOzet?.kasa_net ?? 0)}
                   </div>
                   <div className="border-t border-blue-200 my-2"></div>
-                  <div className="text-xs text-subtle">Kasada kalan para</div>
+                  <div className="text-xs text-subtle tabular-nums">Toplam Vergi (%{muhasebeOzet?.vergi?.oran ?? 15}): <span className="font-semibold text-red-600">{formatCurrency(muhasebeOzet?.vergi?.toplam_vergi ?? 0)}</span></div>
                 </CardContent>
               </Card>
             </div>
