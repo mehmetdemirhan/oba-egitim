@@ -99,9 +99,16 @@ NETGSM_IYS_FILTER = os.environ.get("NETGSM_IYS_FILTER", "")
 NETGSM_PARTNER_CODE = os.environ.get("NETGSM_PARTNER_CODE", "")
 NETGSM_ENABLED = bool(NETGSM_USERNAME and NETGSM_PASSWORD and NETGSM_HEADER)
 
-# FAZ 2 — WhatsApp Cloud API (iskelet; henüz AKTİF DEĞİL, şablon+webhook sonra).
+# FAZ 2 — WhatsApp Cloud API (şablon gönderimi + durum webhook'u).
+# Kimlik bilgileri (WHATSAPP_TOKEN + WHATSAPP_PHONE_ID) env'de DOLU olunca kanal
+# otomatik AÇILIR (WHATSAPP_ENABLED); boşken UI'da "kurulmadı" görünür.
 WHATSAPP_TOKEN = os.environ.get("WHATSAPP_TOKEN", "")
 WHATSAPP_PHONE_ID = os.environ.get("WHATSAPP_PHONE_ID", "")
 WHATSAPP_BASE_URL = os.environ.get("WHATSAPP_BASE_URL", "https://graph.facebook.com/v20.0").rstrip("/")
 WHATSAPP_BIRIM_UCRET = float(os.environ.get("WHATSAPP_BIRIM_UCRET", "0.35"))
+# Şablon varsayılanları: şablon kaydı wa_sablon_adi/wa_dil vermezse bunlar kullanılır.
+WHATSAPP_DEFAULT_TEMPLATE = os.environ.get("WHATSAPP_DEFAULT_TEMPLATE", "bilgilendirme")
+WHATSAPP_DEFAULT_LANG = os.environ.get("WHATSAPP_DEFAULT_LANG", "tr")
+# Webhook doğrulama token'ı (Meta panelinde girilen "Verify Token" ile aynı olmalı).
+WHATSAPP_WEBHOOK_VERIFY_TOKEN = os.environ.get("WHATSAPP_WEBHOOK_VERIFY_TOKEN", "")
 WHATSAPP_ENABLED = bool(WHATSAPP_TOKEN and WHATSAPP_PHONE_ID)

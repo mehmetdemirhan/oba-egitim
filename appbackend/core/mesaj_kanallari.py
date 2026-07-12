@@ -3,7 +3,8 @@
 MesajKanali arayüzü: `kurulu`, `gonder(telefon, metin)`, `durum_sorgula(id)`.
 Uygulamalar:
   - NetgsmSMS       (FAZ 1 — TR SMS, REST). Kimlik env'den (NETGSM_*).
-  - WhatsAppCloudAPI(FAZ 2 — iskelet; henüz aktif değil).
+  - WhatsAppCloudAPI(FAZ 2 — şablon gönderimi + durum webhook'u). Kimlik env'den
+                    (WHATSAPP_*); boşken kurulu=False (UI'da "kurulmadı").
 
 Kanal kimliği env'de TANIMLI değilse `kurulu=False` → gönderim yapılmaz, UI'da
 "kurulmadı" görünür. `KANALLAR` registry'si testte MOCK ile değiştirilebilir
@@ -18,6 +19,8 @@ from core.config import (
     NETGSM_USERNAME, NETGSM_PASSWORD, NETGSM_HEADER, NETGSM_BASE_URL, NETGSM_ENABLED,
     NETGSM_IYS_FILTER, NETGSM_PARTNER_CODE,
     SMS_BIRIM_UCRET, WHATSAPP_ENABLED, WHATSAPP_BIRIM_UCRET,
+    WHATSAPP_TOKEN, WHATSAPP_PHONE_ID, WHATSAPP_BASE_URL,
+    WHATSAPP_DEFAULT_TEMPLATE, WHATSAPP_DEFAULT_LANG,
 )
 
 
@@ -45,7 +48,9 @@ class MesajKanali:
     def kurulu(self) -> bool:
         return False
 
-    async def gonder(self, telefon: str, metin: str, tur: str = "hizmet") -> KanalSonuc:
+    async def gonder(self, telefon: str, metin: str, tur: str = "hizmet", meta: dict = None) -> KanalSonuc:
+        """meta (opsiyonel): kanala özel ek bilgi (WhatsApp şablon adı/dil/parametreler).
+        SMS gibi düz-metin kanalları meta'yı yok sayar."""
         raise NotImplementedError
 
     async def durum_sorgula(self, saglayici_id: str) -> str:
@@ -64,7 +69,7 @@ class NetgsmSMS(MesajKanali):
     def kurulu(self) -> bool:
         return NETGSM_ENABLED
 
-    async def gonder(self, telefon: str, metin: str, tur: str = "hizmet") -> KanalSonuc:
+    async def gonder(self, telefon: str, metin: str, tur: str = "hizmet", meta: dict = None) -> KanalSonuc:
         if not self.kurulu:
             return KanalSonuc(False, hata="SMS kanalı kurulmadı (NETGSM_* env eksik)")
         no = tr_gsm_no(telefon)
@@ -109,8 +114,10 @@ class NetgsmSMS(MesajKanali):
 
 
 class WhatsAppCloudAPI(MesajKanali):
-    """WhatsApp Cloud API (FAZ 2 — İSKELET). Henüz aktif değil; şablon mesaj +
-    webhook durum takibi sonraki fazda. Kurulu olsa bile gönderim reddeder."""
+    """WhatsApp Cloud API (FAZ 2). ONAYLI ŞABLON mesajı gönderir
+    (graph.facebook.com/{phone_id}/messages, type=template + body parametreleri).
+    Durum güncellemeleri (iletildi/okundu/hata) Meta webhook'undan gelir.
+    Kimlik env'de yoksa kurulu=False → gönderim reddedilir, UI'da 'kurulmadı'."""
     ad = "whatsapp"
     birim_ucret = WHATSAPP_BIRIM_UCRET
 
@@ -118,9 +125,63 @@ class WhatsAppCloudAPI(MesajKanali):
     def kurulu(self) -> bool:
         return WHATSAPP_ENABLED
 
-    async def gonder(self, telefon: str, metin: str, tur: str = "hizmet") -> KanalSonuc:
-        # FAZ 2: graph.facebook.com/{phone_id}/messages şablon gönderimi burada olacak.
-        return KanalSonuc(False, hata="WhatsApp kanalı Faz 2'de aktifleşecek (iskelet)")
+    async def gonder(self, telefon: str, metin: str, tur: str = "hizmet", meta: dict = None) -> KanalSonuc:
+        if not self.kurulu:
+            return KanalSonuc(False, hata="WhatsApp kanalı kurulmadı (WHATSAPP_TOKEN/PHONE_ID env eksik)")
+        no = wa_no(telefon)
+        if not no:
+            return KanalSonuc(False, durum="gecersiz", hata="Geçersiz telefon numarası")
+        meta = meta or {}
+        sablon = meta.get("sablon_adi") or WHATSAPP_DEFAULT_TEMPLATE
+        dil = meta.get("dil") or WHATSAPP_DEFAULT_LANG
+        # Değişken parametreler: verilmezse tüm metin tek {{1}} body parametresi olur.
+        parametreler = meta.get("parametreler")
+        if not parametreler:
+            parametreler = [metin]
+        try:
+            return await self._istek(no, sablon, dil, parametreler)
+        except Exception as ex:
+            logging.warning(f"[whatsapp] gönderim hatası: {ex}")
+            return KanalSonuc(False, hata=str(ex))
+
+    async def _istek(self, no: str, sablon: str, dil: str, parametreler: list) -> KanalSonuc:
+        """POST /{phone_id}/messages — type=template. Başarı: messages[0].id (wamid)."""
+        import httpx
+        url = f"{WHATSAPP_BASE_URL}/{WHATSAPP_PHONE_ID}/messages"
+        components = []
+        if parametreler:
+            components.append({
+                "type": "body",
+                "parameters": [{"type": "text", "text": str(p)} for p in parametreler],
+            })
+        govde = {
+            "messaging_product": "whatsapp",
+            "to": no,
+            "type": "template",
+            "template": {"name": sablon, "language": {"code": dil}, "components": components},
+        }
+        async with httpx.AsyncClient(timeout=30) as c:
+            r = await c.post(url, json=govde,
+                             headers={"Authorization": f"Bearer {WHATSAPP_TOKEN}",
+                                      "Content-Type": "application/json"})
+        try:
+            data = r.json()
+        except Exception:
+            data = {}
+        mesajlar = data.get("messages") or []
+        if r.status_code < 300 and mesajlar:
+            return KanalSonuc(True, saglayici_id=mesajlar[0].get("id"), durum="gonderildi", ham=data)
+        hata = ((data.get("error") or {}).get("message")) or f"WhatsApp HTTP {r.status_code}"
+        return KanalSonuc(False, hata=hata, ham=data)
+
+
+# WhatsApp webhook durum kodu → iç durum (ilerleme sırası: gonderildi<iletildi<okundu)
+WHATSAPP_DURUM_ESLE = {"sent": "gonderildi", "delivered": "iletildi", "read": "okundu", "failed": "hata"}
+_DURUM_RANK = {"gonderildi": 1, "iletildi": 2, "okundu": 3}
+
+
+def whatsapp_durum_esle(wa_status: str) -> str:
+    return WHATSAPP_DURUM_ESLE.get(str(wa_status or "").lower(), "")
 
 
 def _tr_telefon(tel: str) -> str:
@@ -138,6 +199,19 @@ def tr_gsm_no(tel: str):
     TR-dışı (ABD/Almanya vb.) veya geçersiz → None (Netgsm SMS gönderemez)."""
     rak = _tr_telefon(tel)
     return rak if (len(rak) == 10 and rak.startswith("5")) else None
+
+
+def wa_no(tel: str):
+    """WhatsApp için ülke-kodlu uluslararası numara (+ ve boşluk yok). TR cep →
+    '905XXXXXXXXX'. Zaten ülke kodlu görünen numaralar (11-15 hane) olduğu gibi
+    döner. Geçersiz → None. (WhatsApp TR-dışını da gönderebilir; SMS'ten farkı bu.)"""
+    tr = tr_gsm_no(tel)
+    if tr:
+        return "90" + tr
+    rak = "".join(ch for ch in str(tel or "") if ch.isdigit())
+    if rak.startswith("0"):
+        rak = rak[1:]
+    return rak if 10 <= len(rak) <= 15 else None
 
 
 def sms_parca_sayisi(metin: str) -> int:

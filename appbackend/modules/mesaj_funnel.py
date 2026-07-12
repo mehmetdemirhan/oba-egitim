@@ -16,14 +16,18 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body, Query, Request
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
 from core.db import db
 from core.auth import require_role, UserRole
 from core.audit import islem_kaydet
-from core.config import SMS_BIRIM_UCRET, WHATSAPP_BIRIM_UCRET
-from core.mesaj_kanallari import kanal_al, kanallar_bilgi, _tr_telefon, tr_gsm_no, sms_parca_sayisi
+from core.config import SMS_BIRIM_UCRET, WHATSAPP_BIRIM_UCRET, WHATSAPP_WEBHOOK_VERIFY_TOKEN
+from core.mesaj_kanallari import (
+    kanal_al, kanallar_bilgi, _tr_telefon, tr_gsm_no, sms_parca_sayisi,
+    whatsapp_durum_esle, _DURUM_RANK,
+)
 from modules.crm import _kur_no
 
 router = APIRouter()
@@ -325,6 +329,8 @@ async def gonderim_olustur(payload: dict = Body(...), current_user=Depends(_YETK
     doc = {
         "id": str(uuid.uuid4()),
         "segment": segment, "sablon_id": sablon_id, "kanal": kanal, "tur": tur,
+        # WhatsApp şablon meta (şablonda tanımlıysa; yoksa gönderimde config varsayılanı)
+        "wa_sablon_adi": sablon.get("wa_sablon_adi"), "wa_dil": sablon.get("wa_dil"),
         "alicilar": hazir,
         "ozet": {"toplam": len(hazir), "kuyrukta": len(kuyrukta),
                  "onaysiz": len(hazir) - len(kuyrukta) - yurtdisi, "yurtdisi": yurtdisi,
@@ -361,7 +367,12 @@ async def gonderim_onayla(gid: str, current_user=Depends(_YETKI)):
     for a in g["alicilar"]:
         if a.get("durum") != "kuyrukta":
             continue  # onaysiz / yurtdisi → ASLA gönderilmez
-        sonuc = await kanal.gonder(a["telefon"], a["mesaj"], g.get("tur", "hizmet"))
+        # WhatsApp: şablon adı/dil + değişken parametre (dolu metin tek {{1}} body)
+        meta = None
+        if g.get("kanal") == "whatsapp":
+            meta = {"sablon_adi": g.get("wa_sablon_adi"), "dil": g.get("wa_dil"),
+                    "parametreler": [a["mesaj"]]}
+        sonuc = await kanal.gonder(a["telefon"], a["mesaj"], g.get("tur", "hizmet"), meta=meta)
         if sonuc.ok:
             a["durum"] = "gonderildi"
             a["saglayici_id"] = sonuc.saglayici_id
@@ -418,3 +429,73 @@ async def gonderim_donusum(gid: str, current_user=Depends(_YETKI)):
     n = len(gonderilenler)
     return {"gonderilen": n, "donusen": donusen,
             "oran": round(donusen / n * 100) if n else 0, "pencere_gun": 14}
+
+
+# ── WhatsApp durum webhook'u (Meta Cloud API) — PUBLIC (auth yok; verify token korur) ──
+
+@router.get("/funnel/whatsapp/webhook", response_class=PlainTextResponse)
+async def whatsapp_webhook_dogrula(
+    mode: str = Query(None, alias="hub.mode"),
+    token: str = Query(None, alias="hub.verify_token"),
+    challenge: str = Query(None, alias="hub.challenge"),
+):
+    """Meta webhook doğrulaması: hub.verify_token env'deki token ile eşleşirse
+    hub.challenge aynen 200 düz-metin döner; aksi halde 403."""
+    if mode == "subscribe" and token and WHATSAPP_WEBHOOK_VERIFY_TOKEN and token == WHATSAPP_WEBHOOK_VERIFY_TOKEN:
+        return PlainTextResponse(challenge or "")
+    raise HTTPException(status_code=403, detail="Webhook doğrulaması başarısız")
+
+
+async def _wa_durum_uygula(saglayici_id: str, yeni_durum: str, hata_msg: str = None) -> bool:
+    """saglayici_id (wamid) ile alıcıyı bul, durumu İLERİ yönde güncelle (out-of-order
+    webhook geri almaz) + gönderim özet sayaçlarını tazele."""
+    g = await db.mesaj_gonderimleri.find_one({"alicilar.saglayici_id": saglayici_id})
+    if not g:
+        return False
+    degisti = False
+    for a in g.get("alicilar", []):
+        if a.get("saglayici_id") != saglayici_id:
+            continue
+        mevcut = a.get("durum")
+        if yeni_durum == "hata":
+            if mevcut in ("gonderildi", "kuyrukta"):
+                a["durum"] = "hata"; a["hata"] = hata_msg or "WhatsApp: gönderilemedi"; degisti = True
+        elif _DURUM_RANK.get(yeni_durum, 0) > _DURUM_RANK.get(mevcut, 0):
+            a["durum"] = yeni_durum; degisti = True
+        break
+    if not degisti:
+        return False
+    al = g["alicilar"]
+    ozet = {**g.get("ozet", {}),
+            "gonderildi": sum(1 for a in al if a.get("durum") == "gonderildi"),
+            "iletildi": sum(1 for a in al if a.get("durum") == "iletildi"),
+            "okundu": sum(1 for a in al if a.get("durum") == "okundu"),
+            "hata": sum(1 for a in al if a.get("durum") == "hata")}
+    await db.mesaj_gonderimleri.update_one({"id": g["id"]}, {"$set": {"alicilar": al, "ozet": ozet}})
+    return True
+
+
+@router.post("/funnel/whatsapp/webhook")
+async def whatsapp_webhook(req: Request):
+    """Meta durum bildirimleri: value.statuses[].{id, status} → alıcı durumu güncelle
+    (sent→gonderildi, delivered→iletildi, read→okundu, failed→hata). PUBLIC; her zaman
+    200 döner (Meta yeniden-denemesin)."""
+    try:
+        govde = await req.json()
+    except Exception:
+        return {"ok": True, "guncellenen": 0}
+    guncellenen = 0
+    for entry in (govde.get("entry") or []):
+        for ch in (entry.get("changes") or []):
+            for st in ((ch.get("value") or {}).get("statuses") or []):
+                wamid = st.get("id")
+                ic = whatsapp_durum_esle(st.get("status"))
+                if not wamid or not ic:
+                    continue
+                hata_msg = None
+                if ic == "hata":
+                    errs = st.get("errors") or []
+                    hata_msg = (errs[0].get("title") if errs else None) or "WhatsApp hatası"
+                if await _wa_durum_uygula(wamid, ic, hata_msg):
+                    guncellenen += 1
+    return {"ok": True, "guncellenen": guncellenen}
