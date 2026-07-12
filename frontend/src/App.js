@@ -36,6 +36,7 @@ import IslemKayitlari from "./components/admin/IslemKayitlari";
 import MuhasebeAyarlari from "./components/admin/MuhasebeAyarlari";
 import OgretmenDonemOdeme from "./components/admin/OgretmenDonemOdeme";
 import GecikenKurlar from "./components/admin/GecikenKurlar";
+import FunnelPanel from "./components/admin/FunnelPanel";
 import DashboardAnalitik from "./components/admin/DashboardAnalitik";
 import SinavYonetimi from "./components/admin/SinavYonetimi";
 import SinavCozum from "./components/SinavCozum";
@@ -8102,6 +8103,7 @@ function MesajlarPanel({ user }) {
           { v: "gelen", l: "Gelen Kutusu", badge: okunmamisSayisi },
           { v: "giden", l: "Gönderilenler" },
           { v: "yeni", l: "Yeni Mesaj" },
+          ...(user.role === "admin" ? [{ v: "funnel", l: "📣 Veli Mesajları / Funnel" }] : []),
         ].map(t => (
           <button key={t.v} onClick={() => setGorunum(t.v)}
             className={`px-4 py-2 rounded-xl text-sm font-medium transition-all border flex items-center gap-2 ${gorunum === t.v ? 'bg-primary text-white border-primary shadow' : 'bg-surface text-subtle border-line hover:border-primary'}`}>
@@ -8110,6 +8112,9 @@ function MesajlarPanel({ user }) {
           </button>
         ))}
       </div>
+
+      {/* Veli Mesajları / Funnel (yalnız admin) */}
+      {gorunum === "funnel" && user.role === "admin" && <FunnelPanel apiBase={API} />}
 
       {/* Yeni Mesaj */}
       {gorunum === "yeni" && (

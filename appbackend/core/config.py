@@ -85,3 +85,20 @@ AI_DEFAULT_MODEL = AI_MODEL
 AI_HAIKU_MODEL = AI_MODEL
 AI_CACHE_HOURS = int(os.environ.get("AI_CACHE_HOURS", "24"))
 AI_MAX_DAILY_REQUESTS = int(os.environ.get("AI_MAX_DAILY_REQUESTS", "500"))
+
+# ── Veli Mesaj Funnel'ı: kanallar ──
+# Kanal kimlik bilgisi TANIMLI değilse UI'da "kurulmadı" görünür; gönderim yapılmaz.
+# FAZ 1 — SMS (Netgsm; TR'de yaygın REST API). Değerler yoksa kanal pasif.
+NETGSM_USERNAME = os.environ.get("NETGSM_USERNAME", "")
+NETGSM_PASSWORD = os.environ.get("NETGSM_PASSWORD", "")
+NETGSM_HEADER = os.environ.get("NETGSM_HEADER", "")          # onaylı gönderici başlığı
+NETGSM_BASE_URL = os.environ.get("NETGSM_BASE_URL", "https://api.netgsm.com.tr").rstrip("/")
+SMS_BIRIM_UCRET = float(os.environ.get("SMS_BIRIM_UCRET", "0.15"))  # maliyet tahmini (TL/SMS)
+NETGSM_ENABLED = bool(NETGSM_USERNAME and NETGSM_PASSWORD and NETGSM_HEADER)
+
+# FAZ 2 — WhatsApp Cloud API (iskelet; henüz AKTİF DEĞİL, şablon+webhook sonra).
+WHATSAPP_TOKEN = os.environ.get("WHATSAPP_TOKEN", "")
+WHATSAPP_PHONE_ID = os.environ.get("WHATSAPP_PHONE_ID", "")
+WHATSAPP_BASE_URL = os.environ.get("WHATSAPP_BASE_URL", "https://graph.facebook.com/v20.0").rstrip("/")
+WHATSAPP_BIRIM_UCRET = float(os.environ.get("WHATSAPP_BIRIM_UCRET", "0.35"))
+WHATSAPP_ENABLED = bool(WHATSAPP_TOKEN and WHATSAPP_PHONE_ID)
