@@ -18,6 +18,7 @@ from pydantic import BaseModel
 from core.db import db
 from core.config import SMTP_ENABLED, FRONTEND_URL, SIFRE_RESET_TOKEN_DK
 from core.mail import send_email
+from core.giris_log import giris_kaydet
 from core.auth import (
     UserRole, get_current_user, require_role,
     hash_password, verify_password, create_access_token,
@@ -82,7 +83,7 @@ class ChangePassword(BaseModel):
 # ─────────────────────────────────────────────
 
 @router.post("/auth/login", response_model=TokenResponse)
-async def login(credentials: UserLogin):
+async def login(credentials: UserLogin, request: Request):
     girdi = (credentials.email_or_phone or credentials.email or "").lower().strip()
     if not girdi:
         raise HTTPException(status_code=400, detail="E-posta veya telefon gerekli")
@@ -91,12 +92,15 @@ async def login(credentials: UserLogin):
     if not user:
         user = await db.users.find_one({"telefon": girdi})
     if not user or not verify_password(credentials.password, user.get("password_hash", "")):
+        # Başarısız giriş: denenen e-posta/telefon + IP (şifre ASLA loglanmaz)
+        await giris_kaydet("login_basarisiz", user=user, request=request, denenen_email=girdi)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="E-posta/telefon veya şifre hatalı"
         )
 
     token = create_access_token({"sub": user["id"], "role": user["role"]})
+    await giris_kaydet("login_basarili", user=user, request=request)
 
     zorunlu = bool(user.get("sifre_degistirme_zorunlu", False))
     user_response = UserResponse(
@@ -118,7 +122,7 @@ async def login(credentials: UserLogin):
 
 
 @router.post("/auth/refresh")
-async def refresh_access(payload: dict = Body(...)):
+async def refresh_access(request: Request, payload: dict = Body(...)):
     """Refresh token ile yeni kısa ömürlü access token üretir (kalıcı oturum)."""
     user_id = await refresh_token_dogrula(payload.get("refresh_token", ""))
     if not user_id:
@@ -127,13 +131,25 @@ async def refresh_access(payload: dict = Body(...)):
     if not user:
         raise HTTPException(status_code=401, detail="Kullanıcı bulunamadı")
     token = create_access_token({"sub": user["id"], "role": user["role"]})
+    await giris_kaydet("token_yenile", user=user, request=request)
     return {"access_token": token, "token_type": "bearer"}
 
 
 @router.post("/auth/logout")
-async def logout(payload: dict = Body(default={})):
+async def logout(request: Request, payload: dict = Body(default={})):
     """Refresh token'ı iptal eder (bu cihaz için oturumu kapatır)."""
-    await refresh_token_sil(payload.get("refresh_token", ""))
+    rt = payload.get("refresh_token", "")
+    # Kullanıcıyı auth zorunlu kılmadan refresh token'dan çöz (süresi dolmuş
+    # access token'la da çıkış yapılabilmeli). Çözülemezse anonim loglanır.
+    user = None
+    try:
+        uid = await refresh_token_dogrula(rt) if rt else None
+        if uid:
+            user = await db.users.find_one({"id": uid})
+    except Exception:
+        user = None
+    await refresh_token_sil(rt)
+    await giris_kaydet("logout", user=user, request=request)
     return {"ok": True}
 
 

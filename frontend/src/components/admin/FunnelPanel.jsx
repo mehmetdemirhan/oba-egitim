@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { useToast } from "../../hooks/use-toast";
-import { Send, Users, FileText, Clock, Check, X, AlertTriangle, Plus, Trash2 } from "lucide-react";
+import { Send, Users, FileText, Clock, Check, X, AlertTriangle, Plus, Trash2, Settings } from "lucide-react";
+import KanalAyarlari from "./KanalAyarlari";
 
 /**
  * FunnelPanel — Veli Mesajları / Funnel (admin + muhasebe).
@@ -107,7 +108,11 @@ export default function FunnelPanel({ apiBase }) {
         <Sekme id="segmentler" ikon={Users}>Segmentler</Sekme>
         <Sekme id="sablonlar" ikon={FileText}>Şablonlar ({sablonlar.length})</Sekme>
         <Sekme id="gonderimler" ikon={Clock}>Gönderimler</Sekme>
+        <Sekme id="ayarlar" ikon={Settings}>Kanal Ayarları</Sekme>
       </div>
+
+      {/* KANAL AYARLARI — SMS + WhatsApp kimlik bilgileri (admin panelinden) */}
+      {bolum === "ayarlar" && <KanalAyarlari apiBase={apiBase} onKayit={yukle} />}
 
       {/* SEGMENTLER — kampanya başlat */}
       {bolum === "segmentler" && (

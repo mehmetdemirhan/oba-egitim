@@ -23,16 +23,17 @@ from pydantic import BaseModel, Field
 from core.db import db
 from core.auth import require_role, UserRole
 from core.audit import islem_kaydet
-from core.config import SMS_BIRIM_UCRET, WHATSAPP_BIRIM_UCRET, WHATSAPP_WEBHOOK_VERIFY_TOKEN
+from core.config import SMS_BIRIM_UCRET, WHATSAPP_BIRIM_UCRET
 from core.mesaj_kanallari import (
     kanal_al, kanallar_bilgi, _tr_telefon, tr_gsm_no, sms_parca_sayisi,
-    whatsapp_durum_esle, _DURUM_RANK,
+    whatsapp_durum_esle, _DURUM_RANK, sms_config, whatsapp_config,
 )
 from modules.crm import _kur_no
 
 router = APIRouter()
 
 _YETKI = require_role(UserRole.ADMIN, UserRole.ACCOUNTANT)
+_YETKI_ADMIN = require_role(UserRole.ADMIN)  # kanal kimlik ayarları — yalnız admin
 
 FUNNEL_AYAR_DEFAULT = {"yenileme_gun": 7, "odeme_gun": 14}
 DEGISKENLER = ["{veli_adi}", "{ogrenci_adi}", "{kur_no}", "{kalan_borc}"]
@@ -158,7 +159,71 @@ async def _segment_alicilar(segment: str, ayar: dict, elle_ogrenci_ids: list = N
 # ── KANALLAR ─────────────────────────────────────────────────────────────────
 @router.get("/funnel/kanallar")
 async def funnel_kanallar(current_user=Depends(_YETKI)):
-    return {"kanallar": kanallar_bilgi()}
+    return {"kanallar": await kanallar_bilgi()}
+
+
+# ── Kanal kimlik AYARLARI (admin panelinden) — yalnız admin; sırlar maskeli ──
+async def _kanal_ayarlar_ozet() -> dict:
+    """Mevcut SMS + WhatsApp ayarları. Sır alanları (şifre/token/verify token) ASLA
+    değer olarak dönmez; yalnız 'dolu mu' bilgisi + kurulu durumu."""
+    sms = await sms_config()
+    wa = await whatsapp_config()
+    return {
+        "sms": {
+            "username": sms["username"], "sifre_dolu": bool(sms["password"]),
+            "header": sms["header"], "iys_filter": bool(sms["iys_filter"]),
+            "partner_code": sms["partner_code"], "base_url": sms["base_url"],
+            "kurulu": sms["enabled"],
+        },
+        "whatsapp": {
+            "token_dolu": bool(wa["token"]), "phone_id": wa["phone_id"],
+            "base_url": wa["base_url"], "default_template": wa["default_template"],
+            "default_lang": wa["default_lang"],
+            "verify_token_dolu": bool(wa["webhook_verify_token"]),
+            "kurulu": wa["enabled"],
+        },
+    }
+
+
+async def _ayar_kaydet(tip: str, acik_alanlar: tuple, sir_alanlar: tuple, payload: dict):
+    """Açık alanları günceller; SIR alanları yalnız boş-olmayan değer gelirse yazılır
+    (boş → mevcut korunur), '<alan>_temizle': true → siler. DB'de saklanır."""
+    d = ((await db.sistem_ayarlari.find_one({"tip": tip})) or {}).get("degerler", {}) or {}
+    yeni = {**d}
+    for alan in acik_alanlar:
+        if alan in payload:
+            v = payload[alan]
+            yeni[alan] = v.strip() if isinstance(v, str) else v
+    for alan in sir_alanlar:
+        if payload.get(alan):
+            yeni[alan] = str(payload[alan])
+        if payload.get(f"{alan}_temizle"):
+            yeni[alan] = ""
+    await db.sistem_ayarlari.update_one({"tip": tip}, {"$set": {"tip": tip, "degerler": yeni}}, upsert=True)
+
+
+@router.get("/funnel/ayarlar")
+async def funnel_ayarlar_getir(current_user=Depends(_YETKI_ADMIN)):
+    """Kanal kimlik ayarları (admin). Sırlar maskeli (yalnız 'dolu mu')."""
+    return await _kanal_ayarlar_ozet()
+
+
+@router.put("/funnel/ayarlar/sms")
+async def funnel_ayarlar_sms(payload: dict = Body(...), current_user=Depends(_YETKI_ADMIN)):
+    """SMS (Netgsm) kimlik/ayarları. Şifre boş gönderilirse mevcut korunur."""
+    await _ayar_kaydet("mesaj_sms", ("username", "header", "partner_code", "base_url", "iys_filter"),
+                       ("password",), payload)
+    await islem_kaydet(current_user, "mesaj", "ayar_sms", "kanal", "sms", None, None, "SMS ayarı güncellendi")
+    return {"ok": True, **(await _kanal_ayarlar_ozet())}
+
+
+@router.put("/funnel/ayarlar/whatsapp")
+async def funnel_ayarlar_whatsapp(payload: dict = Body(...), current_user=Depends(_YETKI_ADMIN)):
+    """WhatsApp Cloud API kimlik/ayarları. Token/verify token boş gönderilirse korunur."""
+    await _ayar_kaydet("mesaj_whatsapp", ("phone_id", "base_url", "default_template", "default_lang"),
+                       ("token", "webhook_verify_token"), payload)
+    await islem_kaydet(current_user, "mesaj", "ayar_whatsapp", "kanal", "whatsapp", None, None, "WhatsApp ayarı güncellendi")
+    return {"ok": True, **(await _kanal_ayarlar_ozet())}
 
 
 # ── İLETİŞİM ONAYI (KVKK) ────────────────────────────────────────────────────
@@ -359,7 +424,7 @@ async def gonderim_onayla(gid: str, current_user=Depends(_YETKI)):
         raise HTTPException(status_code=409, detail="Bu gönderim zaten tamamlandı")
 
     kanal = kanal_al(g.get("kanal"))
-    if kanal is None or not kanal.kurulu:
+    if kanal is None or not await kanal.kurulu_mu():
         raise HTTPException(status_code=400,
                             detail=f"'{g.get('kanal')}' kanalı kurulmadı — gönderim yapılamaz")
 
@@ -439,9 +504,10 @@ async def whatsapp_webhook_dogrula(
     token: str = Query(None, alias="hub.verify_token"),
     challenge: str = Query(None, alias="hub.challenge"),
 ):
-    """Meta webhook doğrulaması: hub.verify_token env'deki token ile eşleşirse
+    """Meta webhook doğrulaması: hub.verify_token DB/env'deki token ile eşleşirse
     hub.challenge aynen 200 düz-metin döner; aksi halde 403."""
-    if mode == "subscribe" and token and WHATSAPP_WEBHOOK_VERIFY_TOKEN and token == WHATSAPP_WEBHOOK_VERIFY_TOKEN:
+    beklenen = (await whatsapp_config())["webhook_verify_token"]
+    if mode == "subscribe" and token and beklenen and token == beklenen:
         return PlainTextResponse(challenge or "")
     raise HTTPException(status_code=403, detail="Webhook doğrulaması başarısız")
 

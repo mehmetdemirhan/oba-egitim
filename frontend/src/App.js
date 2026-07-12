@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./components/ui/dialog";
 import { Badge } from "./components/ui/badge";
-import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send, Bell, Database, RefreshCw, GitBranch, AlertTriangle, Package, ClipboardList, Flame, Target, Award, Heart, FlaskConical, Medal, Lock, Sparkles, Lightbulb, MessageCircle, TrendingUp, Palette, Brain, XCircle, Check, Clock, Save, Image as ImageIcon, ArrowLeft, ArrowRight, Play, Pause, Settings, Music, Printer, Search, Link2, Pin, Upload } from "lucide-react";
+import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send, Bell, Database, RefreshCw, GitBranch, AlertTriangle, Package, ClipboardList, Flame, Target, Award, Heart, FlaskConical, Medal, Lock, Sparkles, Lightbulb, MessageCircle, TrendingUp, Palette, Brain, XCircle, Check, Clock, Save, Image as ImageIcon, ArrowLeft, ArrowRight, Play, Pause, Settings, Music, Printer, Search, Link2, Pin, Upload, Activity, ScrollText, HelpCircle } from "lucide-react";
 import { useToast } from "./hooks/use-toast";
 import { IkonCoz } from "./lib/ikonlar";
 import { Toaster } from "./components/ui/toaster";
@@ -33,6 +33,9 @@ import { bildirimYonlendir } from "./utils/bildirimYonlendirme";
 import TopluKayit from "./components/admin/TopluKayit";
 import EgitimTurleriYonetimi from "./components/admin/EgitimTurleriYonetimi";
 import IslemKayitlari from "./components/admin/IslemKayitlari";
+import Loglar from "./components/admin/Loglar";
+import SSSYonetimi from "./components/admin/SSSYonetimi";
+import SSS from "./components/SSS";
 import MuhasebeAyarlari from "./components/admin/MuhasebeAyarlari";
 import OgretmenDonemOdeme from "./components/admin/OgretmenDonemOdeme";
 import GecikenKurlar from "./components/admin/GecikenKurlar";
@@ -299,6 +302,7 @@ function AppContent() {
   const { toast } = useToast();
   const { isFullscreen } = useFullscreenExercise();
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [sssBekleyenSayi, setSssBekleyenSayi] = useState(0);
   const [teachers, setTeachers] = useState([]);
   const [students, setStudents] = useState([]);
   const [muhasebeKisiler, setMuhasebeKisiler] = useState({ ogrenciler: [], ogretmenler: [] });
@@ -353,6 +357,20 @@ function AppContent() {
   }, []);
 
   // Admin rozet + anket özeti — ayrı useEffect (fetchAll'dan bağımsız)
+  // SSS bekleyen soru sayısı — bildirim rozetine yansır (özet, spam yok)
+  useEffect(() => {
+    if (!user || (user.role !== "admin" && user.role !== "coordinator")) return;
+    const fetchSssBekleyen = async () => {
+      try {
+        const r = await axios.get(`${API}/sss/bekleyen-sayisi`);
+        setSssBekleyenSayi(r.data?.sayi || 0);
+      } catch (e) {}
+    };
+    fetchSssBekleyen();
+    const iv = setInterval(fetchSssBekleyen, 60000);
+    return () => clearInterval(iv);
+  }, [user]);
+
   useEffect(() => {
     if (!user || (user.role !== "admin" && user.role !== "coordinator")) return;
     const fetchRozetAnket = async () => {
@@ -547,6 +565,8 @@ function AppContent() {
             <TabsTrigger value="ders-programi" className={tabClass}><Calendar className="h-4 w-4 mr-2" />Ders Programı</TabsTrigger>
             <TabsTrigger value="giris-analizi" className={tabClass}><Stethoscope className="h-4 w-4 mr-2" />Analiz</TabsTrigger>
             <TabsTrigger value="mesajlar" className={tabClass}><Mail className="h-4 w-4 mr-2" />Mesajlar</TabsTrigger>
+            {adminVeyaKoord && <TabsTrigger value="loglar" className={tabClass}><Activity className="h-4 w-4 mr-2" />Loglar</TabsTrigger>}
+            {adminVeyaKoord && <TabsTrigger value="sss-yonetimi" className={tabClass}><HelpCircle className="h-4 w-4 mr-2" />SSS{sssBekleyenSayi > 0 && <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">{sssBekleyenSayi}</span>}</TabsTrigger>}
             {adminVeyaKoord && <TabsTrigger value="ayarlar" className={tabClass}><Star className="h-4 w-4 mr-2" />Ayarlar</TabsTrigger>}
             {user.role === "admin" && <TabsTrigger value="yedekleme" className={tabClass}><Database className="h-4 w-4 mr-2" />Yedekleme</TabsTrigger>}
             {user.role === "admin" && <TabsTrigger value="guncelleme" className={tabClass}><GitBranch className="h-4 w-4 mr-2" />Güncelleme</TabsTrigger>}
@@ -1352,8 +1372,21 @@ function AppContent() {
               <div className="space-y-6">
                 <SistemAyarlari user={user} />
                 <EgitimTurleriYonetimi apiBase={API} />
-                <IslemKayitlari apiBase={API} />
               </div>
+            </TabsContent>
+          )}
+
+          {/* Loglar - Admin + Koordinatör (İşlem Kayıtları Ayarlar'dan buraya taşındı) */}
+          {adminVeyaKoord && (
+            <TabsContent value="loglar">
+              <Loglar apiBase={API} />
+            </TabsContent>
+          )}
+
+          {/* SSS Yönetimi - Admin + Koordinatör */}
+          {adminVeyaKoord && (
+            <TabsContent value="sss-yonetimi">
+              <SSSYonetimi apiBase={API} onBekleyenDegisti={setSssBekleyenSayi} />
             </TabsContent>
           )}
 
@@ -5250,6 +5283,7 @@ function OgretmenPaneli({ user, logout }) {
     { id: "program", label: "Program", icon: "📅" },
     ozellikAktif("ogretmen_mesajlar")      && { id: "mesajlar",     label: "Mesajlar",     icon: "✉️", badge: okunmamisSayisi || null },
     { id: "profilim", label: "Profilim", icon: "👤" },
+    { id: "sss", label: "Yardım", icon: "❓" },
   ].filter(Boolean);
 
   // ── ÖĞRENCİ DETAY ──
@@ -6201,6 +6235,8 @@ function OgretmenPaneli({ user, logout }) {
         {/* ═══ PROFİLİM ═══ */}
         {aktifSekme === "profilim" && (<OgretmenProfil apiBase={API} />)}
 
+        {aktifSekme === "sss" && (<SSS apiBase={API} />)}
+
         {/* ═══ MESAJLAR ═══ */}
         {aktifSekme === "mesajlar" && (<div className="space-y-4">
           <h2 className="text-lg font-bold">Mesajlar</h2>
@@ -6236,6 +6272,7 @@ function OgretmenPaneli({ user, logout }) {
 
 function OgrenciPaneli({ user, logout }) {
   const [sinavCozum, setSinavCozum] = useState(null);
+  const [sssAcik, setSssAcik] = useState(false);
   const sinavBaslat = (odevId, gorevId) => setSinavCozum({ odevId, gorevId });
   const { toast } = useToast();
   const { isFullscreen } = useFullscreenExercise();
@@ -6915,6 +6952,14 @@ function OgrenciPaneli({ user, logout }) {
   return (
     <div className="min-h-screen bg-gray-50">
       {sinavCozum && <SinavCozum apiBase={API} odevId={sinavCozum.odevId} gorevId={sinavCozum.gorevId} onClose={() => setSinavCozum(null)} onComplete={(gid) => { if (gid) gorevTamamla(gid); setSinavCozum(null); }} />}
+      {sssAcik && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-start justify-center overflow-y-auto p-4" onClick={() => setSssAcik(false)}>
+          <div className="bg-surface rounded-2xl shadow-xl w-full max-w-2xl my-8 p-5 relative" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setSssAcik(false)} className="absolute top-3 right-3 text-subtle hover:text-content" title="Kapat"><XCircle className="h-6 w-6" /></button>
+            <SSS apiBase={API} />
+          </div>
+        </div>
+      )}
       {/* Header — tam ekran egzersiz modunda gizlenir */}
       {!isFullscreen && (
       <div className="bg-surface border-b sticky top-0 z-30">
@@ -6926,6 +6971,7 @@ function OgrenciPaneli({ user, logout }) {
           <div className="flex items-center gap-2">
             <div className="text-center"><div className="text-lg font-bold text-orange-600">{seviyeEmoji} Sv.{seviye}</div></div>
             <BildirimZili user={user} onNavigate={(sekme) => setAktifSekme(sekme)} />
+            <Button variant="outline" size="sm" onClick={() => setSssAcik(true)} className="text-xs" title="Yardım / SSS"><HelpCircle className="h-3.5 w-3.5" /></Button>
             <Button variant="outline" size="sm" onClick={logout} className="text-xs"><LogOut className="h-3 w-3 mr-1" />Çıkış</Button>
           </div>
         </div>
@@ -8319,6 +8365,7 @@ function VeliPaneli({ user, logout }) {
     ozellikAktif("veli_gorev_takip")  && { id: "gorevler", label: "Görevler",    icon: <Pin className="h-4 w-4" /> },
     ozellikAktif("veli_anket")        && { id: "anket",    label: "Değerlendir", icon: <Star className="h-4 w-4" /> },
     ozellikAktif("veli_mesajlar")     && { id: "mesajlar", label: "Mesajlar",    icon: <Mail className="h-4 w-4" />, badge: okunmamisSayisi || null },
+    { id: "sss", label: "Yardım", icon: <HelpCircle className="h-4 w-4" /> },
   ].filter(Boolean);
 
   return (
@@ -8513,6 +8560,8 @@ function VeliPaneli({ user, logout }) {
               })}
             </div>)}
           </div>)}
+
+          {aktifSekme === "sss" && (<SSS apiBase={API} />)}
 
           {aktifSekme === "mesajlar" && ozellikAktif("veli_mesajlar") && (<div className="space-y-4">
             <h2 className="inline-flex items-center gap-2 text-xl font-bold"><Mail className="h-5 w-5" />Mesajlar</h2>
