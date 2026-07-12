@@ -194,5 +194,13 @@
   {
     "name": "mesaj_funnel",
     "active": true
+  },
+  {
+    "name": "loglar",
+    "active": true
+  },
+  {
+    "name": "sss",
+    "active": true
   }
 ]

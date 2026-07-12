@@ -100,6 +100,32 @@ async def ensure_indexes():
         # Kalıcı oturum refresh token'ları
         await db.refresh_tokens.create_index("token_hash", unique=True, name="uq_refresh_hash")
         await db.refresh_tokens.create_index("user_id", name="ix_refresh_user")
-        logging.info("[db] rozet+tema index'leri hazır (uq_kullanici_rozet, uq_rozet_rol_kod, uq_tema_kod)")
+        # Giriş/çıkış logu (giris_log): TTL ile otomatik silme + sorgu index'leri.
+        # Saklama süresi ayardan (tip=log_saklama, gün); yoksa 90 gün.
+        try:
+            _ayar = await db.sistem_ayarlari.find_one({"tip": "log_saklama"})
+            _gun = int(((_ayar or {}).get("degerler") or {}).get("gun") or 90)
+        except Exception:
+            _gun = 90
+        _ttl_saniye = max(1, _gun) * 86400
+        try:
+            await db.giris_log.create_index(
+                "olusturma", expireAfterSeconds=_ttl_saniye, name="ttl_giris_log")
+        except Exception:
+            # Index farklı süreyle zaten var → collMod ile güncelle
+            try:
+                await db.command({
+                    "collMod": "giris_log",
+                    "index": {"name": "ttl_giris_log", "expireAfterSeconds": _ttl_saniye},
+                })
+            except Exception as _ie:
+                logging.warning(f"[db] giris_log TTL güncellenemedi: {_ie}")
+        await db.giris_log.create_index([("tip", 1), ("olusturma", -1)], name="ix_giris_tip")
+        await db.giris_log.create_index([("rol", 1), ("olusturma", -1)], name="ix_giris_rol")
+        # SSS: yayın kayıtları (kategori+sıra) ve bekleyen kuyruk (durum+tarih)
+        await db.sss.create_index([("aktif", 1), ("kategori", 1), ("sira", 1)], name="ix_sss_liste")
+        await db.sss_sorular.create_index([("durum", 1), ("olusturma", -1)], name="ix_sss_kuyruk")
+        await db.sss_sorular.create_index([("soran_id", 1), ("olusturma", -1)], name="ix_sss_soran")
+        logging.info("[db] rozet+tema+giris_log+sss index'leri hazır")
     except Exception as ex:
         logging.error(f"[db] ensure_indexes hatası: {type(ex).__name__}: {ex}")
