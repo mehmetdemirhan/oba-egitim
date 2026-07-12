@@ -56,8 +56,8 @@ async def run():
         def __init__(self): self.gonderilenler = []
         @property
         def kurulu(self): return True
-        async def gonder(self, telefon, metin):
-            self.gonderilenler.append({"telefon": telefon, "metin": metin})
+        async def gonder(self, telefon, metin, tur="hizmet"):
+            self.gonderilenler.append({"telefon": telefon, "metin": metin, "tur": tur})
             return mk.KanalSonuc(True, saglayici_id=f"mock-{len(self.gonderilenler)}")
         def bilgi(self): return {"ad": "sms", "kurulu": True, "birim_ucret": 0.15}
     mock = MockSMS()
@@ -73,10 +73,13 @@ async def run():
 
     # S_odeme: borçlu, ödemesiz → ödeme (hizmet). S_yen: kuru 10g önce bitti, açık kur yok →
     # yenileme (pazarlama). S_teb: kuru 2g önce bitti → tebrik (pazarlama).
-    s_odeme, s_yen, s_teb = str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4())
+    s_odeme, s_yen, s_teb, s_yd = str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4())
     await server.db.students.insert_many([
         {"id": s_odeme, "ad": "Ali", "soyad": "Yilmaz", "kur": "2", "veli_ad": "Ayşe", "veli_soyad": "Yilmaz",
          "veli_telefon": "0555 111 0001", "ogretmen_id": tid, "yapilmasi_gereken_odeme": 1000.0, "yapilan_odeme": 0.0},
+        # Yurt dışı veli (ABD numarası) — SMS gönderilemez, kuyrukta 'yurtdisi'
+        {"id": s_yd, "ad": "Deniz", "soyad": "Ada", "kur": "2", "veli_ad": "Derya", "veli_soyad": "Ada",
+         "veli_telefon": "+1 202 555 0100", "ogretmen_id": tid, "yapilmasi_gereken_odeme": 500.0, "yapilan_odeme": 0.0},
         {"id": s_yen, "ad": "Can", "soyad": "Kaya", "kur": "1", "veli_ad": "Cem", "veli_soyad": "Kaya",
          "veli_telefon": "0555 111 0002", "ogretmen_id": tid, "yapilmasi_gereken_odeme": 0.0, "yapilan_odeme": 0.0},
         {"id": s_teb, "ad": "Efe", "soyad": "Demir", "kur": "3", "veli_ad": "Eda", "veli_soyad": "Demir",
@@ -100,14 +103,15 @@ async def run():
         # Segment sayıları
         r = await ac.get("/api/funnel/segmentler", headers=H_admin)
         seg = {s["ad"]: s["alici_sayisi"] for s in r.json()["segmentler"]}
-        check(seg.get("odeme") == 1 and seg.get("yenileme") == 1 and seg.get("tebrik") == 1,
-              f"segmentler doğru ayrıştı odeme/yenileme/tebrik=1/1/1 ({seg})")
+        check(seg.get("odeme") == 2 and seg.get("yenileme") == 1 and seg.get("tebrik") == 1,
+              f"segmentler doğru ayrıştı odeme/yenileme/tebrik=2/1/1 ({seg})")
 
         # Segment alıcıları + doğru kişi
         r = await ac.get("/api/funnel/segmentler/odeme", headers=H_acc)
         od = r.json()["alicilar"]
-        check(len(od) == 1 and od[0]["ogrenci_id"] == s_odeme and od[0]["kalan_borc"] == 1000.0,
-              f"ödeme segmenti S_odeme (kalan 1000) ({len(od)})")
+        s_od = next((x for x in od if x["ogrenci_id"] == s_odeme), None)
+        check(len(od) == 2 and s_od and s_od["kalan_borc"] == 1000.0,
+              f"ödeme segmenti 2 alıcı (S_odeme kalan 1000) ({len(od)})")
 
         # Şablon (pazarlama) + değişken doldurma
         r = await ac.post("/api/funnel/sablonlar", headers=H_admin, json={
@@ -136,6 +140,7 @@ async def run():
         onceki = len(mock.gonderilenler)
         check(r.status_code == 200 and r.json()["ozet"]["gonderildi"] == 1 and onceki == 1,
               f"onayla → mock 1 SMS gönderdi ({r.json()['ozet']})")
+        check(mock.gonderilenler[-1]["tur"] == "pazarlama", "pazarlama türü kanala iletildi (İYS filtresi için)")
 
         # HİZMET segmenti: onaysıza GİDER (ödeme, S_odeme onayı yok)
         r = await ac.post("/api/funnel/sablonlar", headers=H_admin, json={
@@ -143,7 +148,23 @@ async def run():
         sablon_hiz = r.json()["id"]
         r = await ac.post("/api/funnel/gonderim", headers=H_acc, json={"segment": "odeme", "sablon_id": sablon_hiz})
         gh = r.json()
-        check(gh["ozet"]["kuyrukta"] == 1, f"hizmet mesajı onaysıza gider (kuyrukta 1) ({gh['ozet']})")
+        yd = next((a for a in gh["alicilar"] if a["ogrenci_id"] == s_yd), None)
+        check(gh["ozet"]["kuyrukta"] == 1 and gh["ozet"]["yurtdisi"] == 1 and yd and yd["durum"] == "yurtdisi",
+              f"hizmet onaysıza gider (kuyrukta 1); yurt dışı numara ayrı (yurtdisi 1) ({gh['ozet']})")
+        # Yurt dışı gönderilmez + hata sayılmaz
+        onceki_yd = len(mock.gonderilenler)
+        r2 = await ac.post(f"/api/funnel/gonderim/{gh['id']}/onayla", headers=H_acc)
+        check(r2.json()["ozet"]["gonderildi"] == 1 and r2.json()["ozet"]["hata"] == 0
+              and len(mock.gonderilenler) == onceki_yd + 1,
+              f"yurt dışı gönderilmez, hata sayılmaz (1 gönderildi, 0 hata) ({r2.json()['ozet']})")
+
+        # Parça-bazlı maliyet: 80 Türkçe karakter → 2 SMS parçası → 2×birim
+        r = await ac.post("/api/funnel/sablonlar", headers=H_admin, json={"ad": "Uzun", "kanal": "sms", "tur": "hizmet", "metin": "ç" * 80})
+        s_uzun = r.json()["id"]
+        r = await ac.post("/api/funnel/gonderim", headers=H_acc, json={"segment": "odeme", "sablon_id": s_uzun})
+        gu = r.json()
+        check(gu["ozet"]["kuyrukta"] == 1 and gu["ozet"]["toplam_parca"] == 2 and abs(gu["tahmini_maliyet"] - 0.30) < 1e-6,
+              f"parça-bazlı maliyet: 2 parça × 0.15 = 0.30 ({gu['ozet'].get('toplam_parca')}, {gu['tahmini_maliyet']})")
 
         # 'ret' → hizmet bile GİTMEZ (opt-out'a saygı)
         await ac.put("/api/funnel/onay", headers=H_admin, json={"telefon": "0555 111 0001", "durum": "ret"})

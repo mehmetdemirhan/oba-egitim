@@ -15,7 +15,7 @@ import { Send, Users, FileText, Clock, Check, X, AlertTriangle, Plus, Trash2 } f
 const TUR_RENK = { pazarlama: "bg-purple-100 text-purple-700", hizmet: "bg-blue-100 text-blue-700" };
 const ONAY_RENK = { var: "bg-green-100 text-green-700", yok: "bg-gray-100 text-gray-600", ret: "bg-red-100 text-red-700" };
 const ONAY_ET = { var: "Onaylı", yok: "Onaysız", ret: "Ret" };
-const DURUM_RENK = { kuyrukta: "text-green-600", onaysiz: "text-gray-400", gonderildi: "text-green-600", hata: "text-red-600" };
+const DURUM_RENK = { kuyrukta: "text-green-600", onaysiz: "text-gray-400", yurtdisi: "text-amber-600", gonderildi: "text-green-600", hata: "text-red-600" };
 
 export default function FunnelPanel({ apiBase }) {
   const { toast } = useToast();
@@ -143,8 +143,8 @@ export default function FunnelPanel({ apiBase }) {
       {bolum === "taslak" && taslak && (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-3 bg-app border border-line rounded-xl p-3">
-            <div className="text-sm"><b>{taslak.ozet?.toplam}</b> alıcı · <b className="text-green-600">{taslak.ozet?.kuyrukta}</b> gönderilecek · <span className="text-subtle">{taslak.ozet?.onaysiz} onaysız</span></div>
-            <div className="text-sm">Tahmini maliyet: <b className="tabular-nums">{taslak.tahmini_maliyet}₺</b> ({taslak.kanal.toUpperCase()})</div>
+            <div className="text-sm"><b>{taslak.ozet?.toplam}</b> alıcı · <b className="text-green-600">{taslak.ozet?.kuyrukta}</b> gönderilecek · <span className="text-subtle">{taslak.ozet?.onaysiz} onaysız</span>{taslak.ozet?.yurtdisi ? <span className="text-amber-600"> · {taslak.ozet.yurtdisi} yurt dışı</span> : null}</div>
+            <div className="text-sm">Tahmini maliyet: <b className="tabular-nums">{taslak.tahmini_maliyet}₺</b> ({taslak.kanal.toUpperCase()}{taslak.ozet?.toplam_parca ? `, ${taslak.ozet.toplam_parca} SMS parçası` : ""})</div>
             <div className="ml-auto flex gap-2">
               <button onClick={() => { setTaslak(null); setBolum("segmentler"); }} className="px-3 py-1.5 rounded-lg border border-line text-sm">Vazgeç</button>
               <button onClick={onaylaGonder} disabled={yukleniyor || !taslak.ozet?.kuyrukta || !kanalKurulu(taslak.kanal)}

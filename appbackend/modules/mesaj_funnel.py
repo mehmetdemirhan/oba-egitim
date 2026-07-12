@@ -23,7 +23,7 @@ from core.db import db
 from core.auth import require_role, UserRole
 from core.audit import islem_kaydet
 from core.config import SMS_BIRIM_UCRET, WHATSAPP_BIRIM_UCRET
-from core.mesaj_kanallari import kanal_al, kanallar_bilgi, _tr_telefon
+from core.mesaj_kanallari import kanal_al, kanallar_bilgi, _tr_telefon, tr_gsm_no, sms_parca_sayisi
 from modules.crm import _kur_no
 
 router = APIRouter()
@@ -304,24 +304,32 @@ async def gonderim_olustur(payload: dict = Body(...), current_user=Depends(_YETK
             continue  # bu veliye zaten bir alıcı eklendi
         if tel_norm:
             gorulen_tel.add(tel_norm)
+        mesaj = _sablon_doldur(sablon["metin"], a)
         onay = await onay_durum(a["telefon"])
-        gidebilir = bool(a["telefon"]) and _gonderilebilir(tur, onay)
+        if kanal == "sms" and not tr_gsm_no(a["telefon"]):
+            durum = "yurtdisi"   # TR-dışı/geçersiz numara — gönderilemez (hata DEĞİL)
+        elif bool(a["telefon"]) and _gonderilebilir(tur, onay):
+            durum = "kuyrukta"
+        else:
+            durum = "onaysiz"
         hazir.append({
-            **a, "onay_durum": onay,
-            "mesaj": _sablon_doldur(sablon["metin"], a),
-            "durum": "kuyrukta" if gidebilir else "onaysiz",
-            "saglayici_id": None, "hata": None,
+            **a, "onay_durum": onay, "mesaj": mesaj,
+            "parca": sms_parca_sayisi(mesaj) if kanal == "sms" else 1,
+            "durum": durum, "saglayici_id": None, "hata": None,
         })
 
     kuyrukta = [h for h in hazir if h["durum"] == "kuyrukta"]
+    yurtdisi = sum(1 for h in hazir if h["durum"] == "yurtdisi")
+    toplam_parca = sum(h["parca"] for h in kuyrukta)
     birim = _BIRIM.get(kanal, SMS_BIRIM_UCRET)
     doc = {
         "id": str(uuid.uuid4()),
         "segment": segment, "sablon_id": sablon_id, "kanal": kanal, "tur": tur,
         "alicilar": hazir,
         "ozet": {"toplam": len(hazir), "kuyrukta": len(kuyrukta),
-                 "onaysiz": len(hazir) - len(kuyrukta)},
-        "tahmini_maliyet": round(len(kuyrukta) * birim, 2),
+                 "onaysiz": len(hazir) - len(kuyrukta) - yurtdisi, "yurtdisi": yurtdisi,
+                 "toplam_parca": toplam_parca},
+        "tahmini_maliyet": round(toplam_parca * birim, 2),
         "birim_ucret": birim,
         "durum": "taslak",
         "olusturan_id": current_user.get("id"),
@@ -352,8 +360,8 @@ async def gonderim_onayla(gid: str, current_user=Depends(_YETKI)):
     gonderildi = iletildi = hata = 0
     for a in g["alicilar"]:
         if a.get("durum") != "kuyrukta":
-            continue  # onaysiz → ASLA gönderilmez
-        sonuc = await kanal.gonder(a["telefon"], a["mesaj"])
+            continue  # onaysiz / yurtdisi → ASLA gönderilmez
+        sonuc = await kanal.gonder(a["telefon"], a["mesaj"], g.get("tur", "hizmet"))
         if sonuc.ok:
             a["durum"] = "gonderildi"
             a["saglayici_id"] = sonuc.saglayici_id

@@ -93,7 +93,10 @@ NETGSM_USERNAME = os.environ.get("NETGSM_USERNAME", "")
 NETGSM_PASSWORD = os.environ.get("NETGSM_PASSWORD", "")
 NETGSM_HEADER = os.environ.get("NETGSM_HEADER", "")          # onaylı gönderici başlığı
 NETGSM_BASE_URL = os.environ.get("NETGSM_BASE_URL", "https://api.netgsm.com.tr").rstrip("/")
-SMS_BIRIM_UCRET = float(os.environ.get("SMS_BIRIM_UCRET", "0.15"))  # maliyet tahmini (TL/SMS)
+SMS_BIRIM_UCRET = float(os.environ.get("SMS_BIRIM_UCRET", "0.15"))  # maliyet tahmini (TL/parça)
+# İYS (opsiyonel — hesaba özel). Pazarlama mesajlarında Netgsm İYS filtresi (2. katman).
+NETGSM_IYS_FILTER = os.environ.get("NETGSM_IYS_FILTER", "")
+NETGSM_PARTNER_CODE = os.environ.get("NETGSM_PARTNER_CODE", "")
 NETGSM_ENABLED = bool(NETGSM_USERNAME and NETGSM_PASSWORD and NETGSM_HEADER)
 
 # FAZ 2 — WhatsApp Cloud API (iskelet; henüz AKTİF DEĞİL, şablon+webhook sonra).

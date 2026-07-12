@@ -16,6 +16,7 @@ import logging
 
 from core.config import (
     NETGSM_USERNAME, NETGSM_PASSWORD, NETGSM_HEADER, NETGSM_BASE_URL, NETGSM_ENABLED,
+    NETGSM_IYS_FILTER, NETGSM_PARTNER_CODE,
     SMS_BIRIM_UCRET, WHATSAPP_ENABLED, WHATSAPP_BIRIM_UCRET,
 )
 
@@ -44,7 +45,7 @@ class MesajKanali:
     def kurulu(self) -> bool:
         return False
 
-    async def gonder(self, telefon: str, metin: str) -> KanalSonuc:
+    async def gonder(self, telefon: str, metin: str, tur: str = "hizmet") -> KanalSonuc:
         raise NotImplementedError
 
     async def durum_sorgula(self, saglayici_id: str) -> str:
@@ -63,30 +64,48 @@ class NetgsmSMS(MesajKanali):
     def kurulu(self) -> bool:
         return NETGSM_ENABLED
 
-    async def gonder(self, telefon: str, metin: str) -> KanalSonuc:
+    async def gonder(self, telefon: str, metin: str, tur: str = "hizmet") -> KanalSonuc:
         if not self.kurulu:
             return KanalSonuc(False, hata="SMS kanalı kurulmadı (NETGSM_* env eksik)")
+        no = tr_gsm_no(telefon)
+        if not no:
+            # TR-dışı/geçersiz numara — Netgsm SMS gönderemez (hata DEĞİL, ayrı durum)
+            return KanalSonuc(False, durum="yurtdisi",
+                              hata="TR-dışı/geçersiz numara — Netgsm SMS gönderemez")
         try:
-            return await self._istek(telefon, metin)
+            return await self._istek(no, metin, tur)
         except Exception as ex:
             logging.warning(f"[netgsm] gönderim hatası: {ex}")
             return KanalSonuc(False, hata=str(ex))
 
-    async def _istek(self, telefon: str, metin: str) -> KanalSonuc:
-        # Netgsm REST v2 (varsayımsal — hesap gelince teyit edilecek).
+    async def _istek(self, no: str, metin: str, tur: str) -> KanalSonuc:
+        # Resmî SDK (@netgsm/sms — src/netgsm.ts): POST /sms/rest/v2/send, HTTP Basic
+        # (base64 user:pass), gövde {msgheader, encoding, messages:[{msg,no}],
+        # iysfilter?, partnercode?}. Başarı: yanıt JSON code=="00", jobid döner.
         import httpx
         url = f"{NETGSM_BASE_URL}/sms/rest/v2/send"
         govde = {
             "msgheader": NETGSM_HEADER,
-            "messages": [{"msg": metin, "no": _tr_telefon(telefon)}],
+            "encoding": "TR",                       # Türkçe karakter desteği
+            "messages": [{"msg": metin, "no": no}],  # no = 5XXXXXXXXX (0/+90 yok)
         }
+        if tur == "pazarlama" and NETGSM_IYS_FILTER:
+            govde["iysfilter"] = NETGSM_IYS_FILTER   # İYS 2. katman (yalnız pazarlama)
+        if NETGSM_PARTNER_CODE:
+            govde["partnercode"] = NETGSM_PARTNER_CODE
         async with httpx.AsyncClient(timeout=30) as c:
-            r = await c.post(url, json=govde, auth=(NETGSM_USERNAME, NETGSM_PASSWORD))
-        ok = r.status_code == 200 and str(r.text)[:2] in ("00", "01", "02")
-        # Netgsm başarı kodları 00/01/02 ile başlar; jobid döner.
-        jobid = r.text.strip().split()[-1] if ok else None
-        return KanalSonuc(ok, saglayici_id=jobid,
-                          hata=None if ok else f"Netgsm yanıtı: {r.text[:120]}", ham=r.text[:200])
+            r = await c.post(url, json=govde, auth=(NETGSM_USERNAME, NETGSM_PASSWORD),
+                             headers={"Content-Type": "application/json"})
+        try:
+            data = r.json()
+        except Exception:
+            data = {}
+        code = str(data.get("code", ""))
+        ok = code == "00"
+        return KanalSonuc(
+            ok, saglayici_id=data.get("jobid"),
+            hata=None if ok else (data.get("description") or f"Netgsm kod {code or r.status_code}"),
+            ham=data)
 
 
 class WhatsAppCloudAPI(MesajKanali):
@@ -99,19 +118,40 @@ class WhatsAppCloudAPI(MesajKanali):
     def kurulu(self) -> bool:
         return WHATSAPP_ENABLED
 
-    async def gonder(self, telefon: str, metin: str) -> KanalSonuc:
+    async def gonder(self, telefon: str, metin: str, tur: str = "hizmet") -> KanalSonuc:
         # FAZ 2: graph.facebook.com/{phone_id}/messages şablon gönderimi burada olacak.
         return KanalSonuc(False, hata="WhatsApp kanalı Faz 2'de aktifleşecek (iskelet)")
 
 
 def _tr_telefon(tel: str) -> str:
-    """TR telefonu sadeleştir: rakamları al, 0/90 önekini normalize et → 5XXXXXXXXX."""
+    """Rakamları al, 0/90/+90 önekini soy → gövde (onay anahtarı/dedup için)."""
     rak = "".join(ch for ch in str(tel or "") if ch.isdigit())
     if rak.startswith("90"):
         rak = rak[2:]
-    if rak.startswith("0"):
+    elif rak.startswith("0"):
         rak = rak[1:]
     return rak
+
+
+def tr_gsm_no(tel: str):
+    """Geçerli TR cep no ise '5XXXXXXXXX' (10 hane, 5 ile başlar) döner; değilse None.
+    TR-dışı (ABD/Almanya vb.) veya geçersiz → None (Netgsm SMS gönderemez)."""
+    rak = _tr_telefon(tel)
+    return rak if (len(rak) == 10 and rak.startswith("5")) else None
+
+
+def sms_parca_sayisi(metin: str) -> int:
+    """Netgsm 'TR' encoding'de mesaj kaç SMS'e bölünür. Türkçe/unicode karakter varsa
+    segment kısalır (70/67); yoksa GSM (160/153). Maliyet tahmini için."""
+    import math
+    s = str(metin or "")
+    turkce = set("çğıöşüÇĞİÖŞÜ")
+    if any((ch in turkce) or (ord(ch) > 127) for ch in s):
+        tek, coklu = 70, 67
+    else:
+        tek, coklu = 160, 153
+    n = len(s)
+    return 1 if n <= tek else math.ceil(n / coklu)
 
 
 # Kanal registry — testte MOCK ile değiştirilebilir (gerçek gönderim yapılmaz).
