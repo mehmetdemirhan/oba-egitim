@@ -84,6 +84,45 @@ def _kur_gizli(satir: dict) -> bool:
     return satir.get("durum") == "tamamlandi" and _num(satir.get("kalan")) <= 0.01
 
 
+async def _odeme_sonrasi_islem(ogrenci_id: str) -> None:
+    """Ödeme kaydı sonrası tetiklenir (SPEC B + SPEC A). Asla exception fırlatmaz.
+    (1) Veli ödemesi TAMAMLANAN (kalan=0) kur kayıtlarına `odeme_tamamlanma_tarihi`
+        damgalar — ödeme-bazlı öğretmen hakedişi bu tarihe göre döneme girer. Damga
+        yalnız yoksa konur (idempotent, ileriye dönük; kısmi ödeme damga doğurmaz).
+    (2) SPEC A: mezun + borçlu öğrenci borcunu kapattıysa otomatik arşivlenir + admin/
+        muhasebeye bildirim (borç kapanınca normal arşiv + son ödeme hakediş kuralı)."""
+    try:
+        s = await db.students.find_one({"id": ogrenci_id})
+        if not s:
+            return
+        kurlar = await db.kur_ucretleri.find({"ogrenci_id": ogrenci_id}, {"_id": 0}).to_list(length=500)
+        kurlar.sort(key=lambda k: str(k.get("baslangic_tarihi") or k.get("tarih") or ""))
+        now = datetime.now(timezone.utc).isoformat()
+        for d in _kur_dagilimi(kurlar, _num(s.get("yapilan_odeme"))):
+            kid = d.get("kur_ucreti_id")
+            if kid and d.get("kalan", 1) <= 0.01:
+                k = next((x for x in kurlar if x.get("id") == kid), None)
+                if k and not k.get("odeme_tamamlanma_tarihi"):
+                    await db.kur_ucretleri.update_one(
+                        {"id": kid}, {"$set": {"odeme_tamamlanma_tarihi": now}})
+        # SPEC A: mezun + borç kapandı → otomatik arşiv
+        if s.get("mezun") and not s.get("arsivli"):
+            borc = max(0.0, _num(s.get("yapilmasi_gereken_odeme")) - _num(s.get("yapilan_odeme")))
+            if borc <= 0.01:
+                await db.students.update_one({"id": ogrenci_id}, {"$set": {"arsivli": True}})
+                try:
+                    from modules.bildirim import bildirim_olustur
+                    ad = f"{s.get('ad', '')} {s.get('soyad', '')}".strip()
+                    async for u in db.users.find({"role": {"$in": ["admin", "accountant"]}}, {"_id": 0, "id": 1}):
+                        if u.get("id"):
+                            await bildirim_olustur(u["id"], "egitim_tamamla",
+                                                   f"{ad} borcunu kapattı, arşive alındı.", ogrenci_id)
+                except Exception:
+                    pass
+    except Exception as ex:
+        logging.warning(f"[muhasebe] odeme_sonrasi_islem hatası: {ex}")
+
+
 async def _alinmayan_ozet() -> dict:
     """İŞ 4 — Alınmayan ödeme: ödenen < beklenen (kalan>0) olan GÖRÜNÜR kur/alacak
     kayıtlarının sayısı + toplam kalan. Gizli (tamamlanmış+ödenmiş) kayıtlar sayılmaz."""
@@ -302,6 +341,10 @@ async def muhasebe_kisi_duzenle(tip: str, kisi_id: str, data: dict, current_user
     for alan, yeni in guncelle.items():
         await _log(current_user, tip, kisi_id, alan, kayit.get(alan), yeni)
 
+    # Ödeme değiştiyse: kur ödeme-tamamlanma damgası + mezun borç kapanış kontrolü
+    if tip == "ogrenci" and "yapilan_odeme" in guncelle:
+        await _odeme_sonrasi_islem(kisi_id)
+
     guncel = await koleksiyon.find_one({"id": kisi_id}, {"_id": 0})
     gereken = _num(guncel.get("yapilmasi_gereken_odeme"))
     yapilan = _num(guncel.get("yapilan_odeme"))
@@ -324,11 +367,16 @@ async def kur_ucreti_ekle(ogrenci_id: str, data: dict, current_user=Depends(_ERI
         raise HTTPException(status_code=422, detail="Tutar sayısal olmalı")
     if not kur_adi or tutar <= 0:
         raise HTTPException(status_code=422, detail="Kur adı ve pozitif tutar gerekli")
+    # Öğretmen payı snapshot: kur oluşturulurken o anki pay tanımından sabitlenir
+    egitim_turu = str(data.get("egitim_turu", "")).strip() or ogr.get("aldigi_egitim")
+    pay_snapshot = await get_ogretmen_payi(egitim_turu)
     kayit = {
         "id": str(uuid.uuid4()),
         "ogrenci_id": ogrenci_id,
         "kur_adi": kur_adi,
         "tutar": tutar,
+        "egitim_turu": egitim_turu,
+        "ogretmen_pay": pay_snapshot,   # snapshot (admin/muhasebe satır-içi düzeltebilir)
         "baslangic_tarihi": str(data.get("baslangic_tarihi", "")).strip() or None,
         "tarih": datetime.utcnow().isoformat(),
         "ekleyen_id": current_user.get("id"),
@@ -369,8 +417,10 @@ async def muhasebe_ogrenci_kur_ozet(ogrenci_id: str, current_user=Depends(_ERISI
             "yapilan_odeme": round(yapilan, 2),
             "kalan": round(max(0.0, gereken - yapilan), 2),
         }]
+    pay_map = {k.get("id"): k.get("ogretmen_pay") for k in kurlar}
     for d in dagilim:
         d["gizli"] = _kur_gizli(d)  # ana listede gizlenmiş mi (bilgi amaçlı)
+        d["ogretmen_pay"] = pay_map.get(d.get("kur_ucreti_id"))  # SPEC B — satır-içi düzeltilebilir
     beklenen = round(sum(d["yapilmasi_gereken_odeme"] for d in dagilim), 2)
     odenen = round(sum(d["yapilan_odeme"] for d in dagilim), 2)
     return {
@@ -565,8 +615,11 @@ def _guncel_donem() -> str:
 
 
 async def _donem_kalemleri(donem: str, ogretmen_id: str = None):
-    """Döneme giren, ödenmemiş, tamamlanmış kurları öğretmen bazında gruplar.
-    ogretmen_id verilirse yalnız o öğretmen. get_ogretmen_payi ile pay hesaplanır."""
+    """SPEC B: Veli ödemesi TAMAMLANAN (odeme_tamamlanma_tarihi damgalı), henüz
+    hakedişe girmemiş kurları öğretmen bazında gruplar. Dönem ataması ödemenin
+    tamamlandığı tarihe göre (önceki ayın 15'i hariç → bu ayın 15'i dahil). Pay,
+    kur kaydındaki snapshot (`ogretmen_pay`) varsa ondan; yoksa güncel tanımdan.
+    ogretmen_id verilirse yalnız o öğretmen."""
     baslangic, bitis = _donem_araligi(donem)
     ogretmen_ad, ogrenci = {}, {}
     async for t in db.teachers.find({}, {"_id": 0, "id": 1, "ad": 1, "soyad": 1}):
@@ -578,16 +631,20 @@ async def _donem_kalemleri(donem: str, ogretmen_id: str = None):
     if not ogrenci:
         return gruplar
     async for k in db.kur_ucretleri.find(
-            {"ogrenci_id": {"$in": list(ogrenci)}, "durum": "tamamlandi"}, {"_id": 0}):
+            {"ogrenci_id": {"$in": list(ogrenci)}, "odeme_tamamlanma_tarihi": {"$ne": None}}, {"_id": 0}):
         if k.get("odendi_donem"):
             continue
-        if not _donem_icinde(k.get("tamamlanma_tarihi"), baslangic, bitis):
+        if not _donem_icinde(k.get("odeme_tamamlanma_tarihi"), baslangic, bitis):
             continue
         s = ogrenci.get(k.get("ogrenci_id")) or {}
         oid = s.get("ogretmen_id")
         if not oid:
             continue
-        pay = await get_ogretmen_payi(k.get("egitim_turu") or s.get("aldigi_egitim"))
+        # Snapshot pay öncelikli; yoksa güncel tanımdan
+        pay = k.get("ogretmen_pay")
+        if pay is None:
+            pay = await get_ogretmen_payi(k.get("egitim_turu") or s.get("aldigi_egitim"))
+        pay = _num(pay)
         g = gruplar.setdefault(oid, {"ogretmen_id": oid, "ogretmen_ad": ogretmen_ad.get(oid, ""),
                                      "kurlar": [], "toplam": 0.0})
         g["kurlar"].append({
@@ -597,6 +654,7 @@ async def _donem_kalemleri(donem: str, ogretmen_id: str = None):
             "kur": k.get("kur_adi", ""),
             "egitim_turu": k.get("egitim_turu") or s.get("aldigi_egitim", ""),
             "tamamlanma_tarihi": k.get("tamamlanma_tarihi"),
+            "odeme_tamamlanma_tarihi": k.get("odeme_tamamlanma_tarihi"),
             "pay": pay,
         })
         g["toplam"] = round(g["toplam"] + pay, 2)
@@ -658,6 +716,97 @@ async def ogretmen_donem_gecmis(ogretmen_id: str = None, limit: int = 100, curre
     q = {"ogretmen_id": ogretmen_id} if ogretmen_id else {}
     docs = await db.ogretmen_donem_odemeleri.find(q, {"_id": 0}).sort("tarih", -1).to_list(length=min(limit, 500))
     return {"odemeler": docs}
+
+
+@router.patch("/muhasebe/kur-ucreti/{kur_id}/pay")
+async def kur_ogretmen_pay_duzelt(kur_id: str, data: dict, current_user=Depends(_ERISIM)):
+    """SPEC B: Bir kur kaydının öğretmen payı snapshot'ını satır-içi düzeltir (yalnız
+    admin/muhasebe; öğretmen bu alanı görmez/erişemez). Değişiklik audit'e düşer.
+    Zaten hakedişe girmiş (odendi_donem) kur düzeltilemez."""
+    kur = await db.kur_ucretleri.find_one({"id": kur_id})
+    if not kur:
+        raise HTTPException(status_code=404, detail="Kur kaydı bulunamadı")
+    if kur.get("odendi_donem"):
+        raise HTTPException(status_code=400, detail="Bu kur hakedişe girmiş, payı değiştirilemez")
+    try:
+        yeni_pay = round(float(data.get("ogretmen_pay")), 2)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Geçersiz pay değeri")
+    if yeni_pay < 0:
+        raise HTTPException(status_code=400, detail="Pay negatif olamaz")
+    eski = kur.get("ogretmen_pay")
+    await db.kur_ucretleri.update_one({"id": kur_id}, {"$set": {"ogretmen_pay": yeni_pay}})
+    await _log(current_user, "kur_ucreti", kur_id, "ogretmen_pay", eski, yeni_pay)
+    return {"ok": True, "ogretmen_pay": yeni_pay}
+
+
+@router.post("/muhasebe/gecis/odeme-tarihi-backfill")
+async def odeme_tarihi_backfill(current_user=Depends(require_role(UserRole.ADMIN))):
+    """SPEC B geçişi (tek seferlik, yalnız admin, idempotent): ödeme-bazlı hakediş
+    kuralına geçerken, HÂLEN tam ödenmiş (kalan=0) ama henüz hakedişe girmemiş ve
+    `odeme_tamamlanma_tarihi` damgası OLMAYAN kurlara bugünün tarihini damgalar — bu
+    kurlar GEÇMİŞ dönemlere değil, İÇİNDE bulunulan döneme bir kez girer (geçmiş
+    yeniden hesaplanmaz). Zaten damgalı/ödenmiş kurlara dokunmaz."""
+    now = datetime.now(timezone.utc).isoformat()
+    ogrenciler = await db.students.find(
+        {}, {"_id": 0, "id": 1, "yapilan_odeme": 1}).to_list(length=None)
+    damgalanan = 0
+    for s in ogrenciler:
+        kurlar = await db.kur_ucretleri.find({"ogrenci_id": s.get("id")}, {"_id": 0}).to_list(length=500)
+        if not kurlar:
+            continue
+        kurlar.sort(key=lambda k: str(k.get("baslangic_tarihi") or k.get("tarih") or ""))
+        for d in _kur_dagilimi(kurlar, _num(s.get("yapilan_odeme"))):
+            kid = d.get("kur_ucreti_id")
+            if kid and d.get("kalan", 1) <= 0.01:
+                k = next((x for x in kurlar if x.get("id") == kid), None)
+                if k and not k.get("odeme_tamamlanma_tarihi") and not k.get("odendi_donem"):
+                    await db.kur_ucretleri.update_one({"id": kid}, {"$set": {"odeme_tamamlanma_tarihi": now}})
+                    damgalanan += 1
+    return {"ok": True, "damgalanan_kur": damgalanan,
+            "not": "Bu kurlar içinde bulunulan döneme girecek; geçmiş yeniden hesaplanmadı."}
+
+
+@router.get("/muhasebe/ogretmen-gruplu")
+async def muhasebe_ogretmen_gruplu(current_user=Depends(_ERISIM)):
+    """SPEC B: Öğrenci ödemelerinin öğretmen bazlı gruplu görünümü. Her öğretmen satırı:
+    öğrenci sayısı, toplam beklenen/ödenen/kalan, bu dönem hakedişi; altında öğrenciler.
+    (Düz liste görünümü mevcut uçtan gelir; bu, 'Öğretmene Göre' anahtarını besler.)"""
+    donem = _guncel_donem()
+    kalemler = await _donem_kalemleri(donem)  # {ogretmen_id: {..., "toplam": ₺}}
+    gruplar = {}
+
+    def _grup(oid, ad):
+        return gruplar.setdefault(oid or "_atanmamis", {
+            "ogretmen_id": oid, "ogretmen_ad": ad, "ogrenciler": [],
+            "ogrenci_sayisi": 0, "beklenen": 0.0, "odenen": 0.0, "kalan": 0.0,
+            "bu_donem_hakedis": _num((kalemler.get(oid) or {}).get("toplam", 0)),
+        })
+
+    async for t in db.teachers.find({}, {"_id": 0, "id": 1, "ad": 1, "soyad": 1}):
+        _grup(t.get("id"), f"{t.get('ad', '')} {t.get('soyad', '')}".strip())
+
+    async for s in db.students.find({"arsivli": {"$ne": True}},
+                                    {"_id": 0, "id": 1, "ad": 1, "soyad": 1, "ogretmen_id": 1,
+                                     "yapilmasi_gereken_odeme": 1, "yapilan_odeme": 1, "mezun": 1}):
+        oid = s.get("ogretmen_id")
+        g = gruplar.get(oid) or _grup(None, "Atanmamış")
+        beklenen = _num(s.get("yapilmasi_gereken_odeme"))
+        odenen = _num(s.get("yapilan_odeme"))
+        kalan = max(0.0, round(beklenen - odenen, 2))
+        g["ogrenciler"].append({
+            "id": s.get("id"), "ad": f"{s.get('ad', '')} {s.get('soyad', '')}".strip(),
+            "beklenen": beklenen, "odenen": odenen, "kalan": kalan,
+            "mezun": bool(s.get("mezun")), "mezun_borclu": bool(s.get("mezun")) and kalan > 0.01,
+        })
+        g["ogrenci_sayisi"] += 1
+        g["beklenen"] = round(g["beklenen"] + beklenen, 2)
+        g["odenen"] = round(g["odenen"] + odenen, 2)
+        g["kalan"] = round(g["kalan"] + kalan, 2)
+
+    result = sorted((g for g in gruplar.values() if g["ogrenci_sayisi"] > 0),
+                    key=lambda g: g["ogretmen_ad"] or "zzz")
+    return {"gruplar": result, "donem": donem}
 
 
 # ── İŞ 2: Kur süresi gecikme uyarısı ──

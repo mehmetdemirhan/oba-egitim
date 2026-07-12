@@ -8,12 +8,19 @@ const AuthContext = createContext(null);
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
+// ── Bakım modu köprüsü: 503 + {bakim:true} yanıtında provider'a haber ver ──
+let _onBakim = null;
+
 // ── Otomatik token yenileme (kalıcı 45 günlük oturum) ──
 // Access token 401 verince refresh ile sessizce yenilenir ve istek tekrarlanır.
 let _yenilemePromise = null;
 axios.interceptors.response.use(
   (r) => r,
   async (error) => {
+    // Bakım modu: admin-dışı kullanıcı 503 alır → bakım ekranına yönlendir
+    if (error.response?.status === 503 && error.response.data?.bakim) {
+      if (_onBakim) _onBakim(error.response.data);
+    }
     const orig = error.config || {};
     const rt = localStorage.getItem("oba_refresh");
     const url = String(orig.url || "");
@@ -45,6 +52,13 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem("oba_token"));
   const [loading, setLoading] = useState(true);
+  const [bakim, setBakim] = useState(null);  // {aktif, mesaj, tahmini_bitis}
+
+  // Bakım köprüsü: 503+bakim yanıtında (interceptor) bakım durumunu ayarla
+  useEffect(() => {
+    _onBakim = (d) => setBakim({ aktif: true, mesaj: d?.mesaj, tahmini_bitis: d?.tahmini_bitis });
+    return () => { _onBakim = null; };
+  }, []);
 
   // Token değişince header'ı set et
   useEffect(() => {
@@ -127,7 +141,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading, refreshUser }}>
+    <AuthContext.Provider value={{ user, token, login, logout, loading, refreshUser, bakim, setBakim }}>
       {children}
     </AuthContext.Provider>
   );

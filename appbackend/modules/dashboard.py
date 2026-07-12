@@ -373,10 +373,14 @@ async def dashboard_analitik(current_user=Depends(require_role(UserRole.ADMIN)))
                             gec_say += 1
                         elif tam and (bugun - tam).days < 30:
                             bek_say += 1
-                        if tam and donem_bas < tam <= donem_bitis and not k.get("odendi_donem"):
-                            hakedis += pay(k.get("egitim_turu") or s.get("aldigi_egitim"))
                 elif durum in (None, "acik") and bas and (bugun - bas).days > 35:
                     geciken += 1
+                # SPEC B: hakediş ödeme-bazlı — veli ödemesi tamamlanan (damgalı) kur
+                # döneme giriyorsa; pay snapshot varsa ondan, yoksa güncel tanımdan.
+                ott = _gunf(k.get("odeme_tamamlanma_tarihi")) if k.get("odeme_tamamlanma_tarihi") else None
+                if ott and donem_bas < ott <= donem_bitis and not k.get("odendi_donem"):
+                    pk = k.get("ogretmen_pay")
+                    hakedis += _numf(pk) if pk is not None else pay(k.get("egitim_turu") or s.get("aldigi_egitim"))
         payda_yen = tam_say - bek_say
         puanlar = anket_puan.get(tid, [])
         performans.append({

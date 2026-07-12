@@ -28,6 +28,7 @@ import { BildirimTercihleri } from "./components/BildirimTercihleri";
 import MebKelimeYonetimi from "./components/admin/MebKelimeYonetimi";
 import MuhasebePaneli from "./components/MuhasebePaneli";
 import OdemeTablosu from "./components/OdemeTablosu";
+import OgretmenGruplu from "./components/admin/OgretmenGruplu";
 import OgretmenDetayOzet from "./components/admin/OgretmenDetayOzet";
 import { bildirimYonlendir } from "./utils/bildirimYonlendirme";
 import TopluKayit from "./components/admin/TopluKayit";
@@ -36,6 +37,8 @@ import IslemKayitlari from "./components/admin/IslemKayitlari";
 import Loglar from "./components/admin/Loglar";
 import SSSYonetimi from "./components/admin/SSSYonetimi";
 import SSS from "./components/SSS";
+import BakimModu from "./components/admin/BakimModu";
+import BakimEkrani from "./components/BakimEkrani";
 import MuhasebeAyarlari from "./components/admin/MuhasebeAyarlari";
 import OgretmenDonemOdeme from "./components/admin/OgretmenDonemOdeme";
 import GecikenKurlar from "./components/admin/GecikenKurlar";
@@ -298,13 +301,15 @@ function SimpleEditForm({ item, teachers, courses, classes, onSave, onCancel, us
 
 function AppContent() {
   // ── TÜM HOOK'LAR EN ÜSTTE ──
-  const { user, logout, loading } = useAuth();
+  const { user, logout, loading, bakim } = useAuth();
   const { toast } = useToast();
   const { isFullscreen } = useFullscreenExercise();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [sssBekleyenSayi, setSssBekleyenSayi] = useState(0);
   const [teachers, setTeachers] = useState([]);
   const [students, setStudents] = useState([]);
+  const [ogrenciGorunum, setOgrenciGorunum] = useState("aktif"); // aktif | mezun
+  const [odemeGorunum, setOdemeGorunum] = useState("duz"); // duz | gruplu (SPEC B)
   const [muhasebeKisiler, setMuhasebeKisiler] = useState({ ogrenciler: [], ogretmenler: [] });
   const [muhasebeOzet, setMuhasebeOzet] = useState(null);
   const [muhasebeBorclu, setMuhasebeBorclu] = useState(false);
@@ -423,6 +428,11 @@ function AppContent() {
     return <LoginPage />;
   }
 
+  // Bakım modu: admin dışındaki açık oturumlar bakım ekranına yönlendirilir
+  if (bakim?.aktif && user.role !== "admin") {
+    return <BakimEkrani mesaj={bakim.mesaj} tahminiBitis={bakim.tahmini_bitis} onYonetici={logout} />;
+  }
+
   // İlk giriş: geçici şifreyle oluşturulan hesap, şifre değiştirmeden hiçbir modüle erişemez
   if (user.sifre_degistirme_zorunlu) return <ZorunluSifreDegistir />;
 
@@ -442,7 +452,7 @@ function AppContent() {
   const adminVeyaKoord = user.role === "admin" || user.role === "coordinator";
 
   const fetchTeachers = async () => { try { const r = await axios.get(`${API}/teachers`); setTeachers(r.data); } catch(e) {} };
-  const fetchStudents = async () => { try { const r = await axios.get(`${API}/students`); setStudents(r.data); } catch(e) {} };
+  const fetchStudents = async (durum) => { try { const g = durum || ogrenciGorunum; const r = await axios.get(`${API}/students`, { params: g === "mezun" ? { durum: "mezun" } : {} }); setStudents(r.data); } catch(e) {} };
   const fetchCourses = async () => { try { const r = await axios.get(`${API}/courses`); setCourses(r.data); } catch(e) {} };
   const fetchKursDersleri = async (kursId) => { try { const r = await axios.get(`${API}/courses/${kursId}/dersler`); setKursDersleri(prev => ({...prev, [kursId]: r.data})); } catch(e) {} };
   const fetchPayments = async () => { try { const r = await axios.get(`${API}/payments`); setPayments(r.data); } catch(e) {} };
@@ -479,6 +489,24 @@ function AppContent() {
   const deleteTeacher = async (id) => { try { await axios.delete(`${API}/teachers/${id}`); fetchTeachers(); fetchDashboard(); setTeacherStudents(p => { const n={...p}; delete n[id]; return n; }); toast({ title:"Başarılı", description:"Silindi" }); } catch { toast({ title:"Hata", variant:"destructive" }); } };
   const deleteStudent = async (id) => { try { await axios.delete(`${API}/students/${id}`); fetchStudents(); fetchTeachers(); fetchDashboard(); setTeacherStudents({}); toast({ title:"Başarılı", description:"Silindi" }); } catch { toast({ title:"Hata", variant:"destructive" }); } };
   const deleteCourse = async (id) => { try { await axios.delete(`${API}/courses/${id}`); fetchCourses(); fetchDashboard(); toast({ title:"Başarılı", description:"Silindi" }); } catch { toast({ title:"Hata", variant:"destructive" }); } };
+
+  // ── Eğitimi Tamamladı (mezuniyet) ──
+  const egitimTamamla = async (s) => {
+    if (!window.confirm(`${s.ad} ${s.soyad} eğitimini tamamladı olarak işaretlensin mi?\n\nAçık kuru tamamlanacak; borcu yoksa arşive kalkacak, borcu varsa borç kapanınca otomatik arşivlenecek.`)) return;
+    try {
+      const r = await axios.post(`${API}/students/${s.id}/egitim-tamamla`);
+      fetchStudents(); fetchTeachers(); fetchDashboard();
+      toast({ title: "Eğitim tamamlandı", description: r.data?.arsivlendi ? "Öğrenci arşive alındı." : "Borç kapanınca otomatik arşivlenecek." });
+    } catch (e) { toast({ title: "İşlem başarısız", description: e?.response?.data?.detail, variant: "destructive" }); }
+  };
+  const egitimGeriAl = async (s) => {
+    if (!window.confirm(`${s.ad} ${s.soyad} için eğitim tamamlama geri alınsın mı? Öğrenci aktife dönecek.`)) return;
+    try {
+      await axios.post(`${API}/students/${s.id}/egitim-tamamla-geri-al`);
+      fetchStudents(); fetchTeachers(); fetchDashboard();
+      toast({ title: "Geri alındı", description: "Öğrenci aktife döndü." });
+    } catch (e) { toast({ title: "Geri alınamadı", description: e?.response?.data?.detail, variant: "destructive" }); }
+  };
 
   // ── Arşivleme ──
   const toggleArsiv = async (type, id, current) => {
@@ -903,6 +931,16 @@ function AppContent() {
 
           {/* Students */}
           <TabsContent value="students">
+            <div className="flex items-center gap-2 mb-4">
+              <button onClick={() => { setOgrenciGorunum("aktif"); fetchStudents("aktif"); }}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium border ${ogrenciGorunum === "aktif" ? "bg-indigo-600 text-white border-indigo-600" : "border-line hover:bg-app"}`}>
+                Aktif Öğrenciler
+              </button>
+              <button onClick={() => { setOgrenciGorunum("mezun"); fetchStudents("mezun"); }}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium border inline-flex items-center gap-1 ${ogrenciGorunum === "mezun" ? "bg-indigo-600 text-white border-indigo-600" : "border-line hover:bg-app"}`}>
+                🎓 Eğitimi Tamamlayanlar
+              </button>
+            </div>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <Card className="lg:col-span-1 border border-line shadow-sm">
                 <CardHeader><CardTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />Yeni Öğrenci</CardTitle></CardHeader>
@@ -963,7 +1001,7 @@ function AppContent() {
                             <TableCell><span className="text-xs font-medium text-orange-600">{risk?.toplam_xp || s.toplam_xp || 0}</span></TableCell>
                             <TableCell>{t ? `${t.ad} ${t.soyad}` : '-'}</TableCell>
                             {user.role !== "coordinator" && <TableCell className="text-green-600 font-semibold">{formatCurrency(Math.max(0, s.yapilmasi_gereken_odeme - s.yapilan_odeme))}</TableCell>}
-                            <TableCell><div className="flex gap-2">{user.role !== "coordinator" && <Button variant="outline" size="sm" className="text-green-600 border-green-300 hover:bg-green-50" onClick={() => setTahsilatDialog({tip:'ogrenci', kisi:s, miktar:0, aciklama:''})}><CreditCard className="h-4 w-4" /></Button>}<Button variant="outline" size="sm" onClick={() => { setEditingItem({type:'student',data:s}); setEditDialogOpen(true); }}><Edit2 className="h-4 w-4" /></Button><Button variant="outline" size="sm" className={s.arsivli ? "text-green-600 border-green-300" : "text-yellow-600 border-yellow-300"} onClick={() => toggleArsiv('student', s.id, s.arsivli)} title={s.arsivli ? "Arşivden Çıkar" : "Arşivle"}>{s.arsivli ? "📂" : "📦"}</Button><Button variant="destructive" size="sm" onClick={() => deleteStudent(s.id)}><Trash2 className="h-4 w-4" /></Button></div></TableCell>
+                            <TableCell><div className="flex gap-2">{user.role !== "coordinator" && <Button variant="outline" size="sm" className="text-green-600 border-green-300 hover:bg-green-50" onClick={() => setTahsilatDialog({tip:'ogrenci', kisi:s, miktar:0, aciklama:''})}><CreditCard className="h-4 w-4" /></Button>}<Button variant="outline" size="sm" onClick={() => { setEditingItem({type:'student',data:s}); setEditDialogOpen(true); }}><Edit2 className="h-4 w-4" /></Button><Button variant="outline" size="sm" className={s.arsivli ? "text-green-600 border-green-300" : "text-yellow-600 border-yellow-300"} onClick={() => toggleArsiv('student', s.id, s.arsivli)} title={s.arsivli ? "Arşivden Çıkar" : "Arşivle"}>{s.arsivli ? "📂" : "📦"}</Button>{s.mezun ? <Button variant="outline" size="sm" className="text-blue-600 border-blue-300" onClick={() => egitimGeriAl(s)} title="Eğitim tamamlamayı geri al">↩️</Button> : <Button variant="outline" size="sm" className="text-indigo-600 border-indigo-300 hover:bg-indigo-50" onClick={() => egitimTamamla(s)} title="Eğitimi Tamamladı">🎓</Button>}<Button variant="destructive" size="sm" onClick={() => deleteStudent(s.id)}><Trash2 className="h-4 w-4" /></Button></div></TableCell>
                           </TableRow>
                         );
                       })}
@@ -1257,11 +1295,23 @@ function AppContent() {
                 Excel-benzeri satır içi düzenlenebilir bileşen (OdemeTablosu). */}
             <div className="space-y-6">
               <div>
-                <h3 className="text-base font-semibold text-content mb-2">Öğrenci Ödemeleri</h3>
-                <OdemeTablosu tip="ogrenci" kisiler={muhasebeKisiler.ogrenciler} payments={payments} apiBase={API} onDegisim={muhasebeYenile}
-                  sadeceBorclu={muhasebeBorclu} onBorcluTemizle={() => setMuhasebeBorclu(false)}
-                  yasKovasi={muhasebeYasKovasi} onYasTemizle={() => setMuhasebeYasKovasi(null)}
-                  odakKisiId={muhasebeOdakKisi} onOdakTemizle={() => setMuhasebeOdakKisi("")} />
+                <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                  <h3 className="text-base font-semibold text-content">Öğrenci Ödemeleri</h3>
+                  <div className="inline-flex rounded-lg border border-line overflow-hidden text-sm">
+                    <button onClick={() => setOdemeGorunum("duz")}
+                            className={`px-3 py-1.5 ${odemeGorunum === "duz" ? "bg-indigo-600 text-white" : "hover:bg-app"}`}>Düz Liste</button>
+                    <button onClick={() => setOdemeGorunum("gruplu")}
+                            className={`px-3 py-1.5 border-l border-line ${odemeGorunum === "gruplu" ? "bg-indigo-600 text-white" : "hover:bg-app"}`}>Öğretmene Göre</button>
+                  </div>
+                </div>
+                {odemeGorunum === "gruplu" ? (
+                  <OgretmenGruplu apiBase={API} />
+                ) : (
+                  <OdemeTablosu tip="ogrenci" kisiler={muhasebeKisiler.ogrenciler} payments={payments} apiBase={API} onDegisim={muhasebeYenile}
+                    sadeceBorclu={muhasebeBorclu} onBorcluTemizle={() => setMuhasebeBorclu(false)}
+                    yasKovasi={muhasebeYasKovasi} onYasTemizle={() => setMuhasebeYasKovasi(null)}
+                    odakKisiId={muhasebeOdakKisi} onOdakTemizle={() => setMuhasebeOdakKisi("")} />
+                )}
               </div>
               <div>
                 <h3 className="text-base font-semibold text-content mb-2">Öğretmen Ödemeleri</h3>
@@ -1371,6 +1421,7 @@ function AppContent() {
             <TabsContent value="ayarlar">
               <div className="space-y-6">
                 <SistemAyarlari user={user} />
+                {user.role === "admin" && <BakimModu apiBase={API} />}
                 <EgitimTurleriYonetimi apiBase={API} />
               </div>
             </TabsContent>

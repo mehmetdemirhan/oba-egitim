@@ -99,6 +99,15 @@ async def login(credentials: UserLogin, request: Request):
             detail="E-posta/telefon veya şifre hatalı"
         )
 
+    # Bakım modu: admin DIŞINDAKİ roller giriş yapamaz (login ucu admin'e açık kalır).
+    from core.bakim import bakim_durumu
+    _bakim = await bakim_durumu()
+    if _bakim.get("aktif") and user.get("role") != "admin":
+        await giris_kaydet("login_basarisiz", user=user, request=request, denenen_email=girdi)
+        from starlette.responses import JSONResponse
+        return JSONResponse(status_code=503, content={
+            "bakim": True, "mesaj": _bakim.get("mesaj"), "tahmini_bitis": _bakim.get("tahmini_bitis")})
+
     token = create_access_token({"sub": user["id"], "role": user["role"]})
     await giris_kaydet("login_basarili", user=user, request=request)
 
