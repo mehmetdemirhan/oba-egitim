@@ -54,12 +54,10 @@ async def run():
     class MockSMS:
         ad = "sms"; birim_ucret = 0.15
         def __init__(self): self.gonderilenler = []
-        @property
-        def kurulu(self): return True
+        async def kurulu_mu(self): return True
         async def gonder(self, telefon, metin, tur="hizmet", meta=None):
             self.gonderilenler.append({"telefon": telefon, "metin": metin, "tur": tur, "meta": meta})
             return mk.KanalSonuc(True, saglayici_id=f"mock-{len(self.gonderilenler)}")
-        def bilgi(self): return {"ad": "sms", "kurulu": True, "birim_ucret": 0.15}
     mock = MockSMS()
     mk.KANALLAR["sms"] = mock
 

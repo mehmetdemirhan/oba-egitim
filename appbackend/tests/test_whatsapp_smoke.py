@@ -61,14 +61,14 @@ async def run():
     await server.client.drop_database(TEST_DB)
     httpx.AsyncClient = _FakeClient  # canlı çağrı yok
 
-    # Kanalı test için AÇ (env yerine modül-içi bayrağı) — canlı kimlik yok
-    mk.WHATSAPP_ENABLED = True
+    # Kanalı test için AÇ: env fallback (config) sabitlerini modülde doldur — DB boş,
+    # whatsapp_config() bu fallback'i okur. Canlı kimlik yok.
     mk.WHATSAPP_TOKEN = "TESTTOKEN"
     mk.WHATSAPP_PHONE_ID = "PHONE123"
     mk.WHATSAPP_BASE_URL = "https://graph.facebook.com/v20.0"
     mk.WHATSAPP_DEFAULT_TEMPLATE = "bilgilendirme"
     mk.WHATSAPP_DEFAULT_LANG = "tr"
-    mf.WHATSAPP_WEBHOOK_VERIFY_TOKEN = "verify-secret"
+    mk.WHATSAPP_WEBHOOK_VERIFY_TOKEN = "verify-secret"
 
     wa = mk.KANALLAR["whatsapp"]
 
@@ -93,13 +93,15 @@ async def run():
     check(not s2.ok and "Invalid recipient" in (s2.hata or ""), "API hatası yakalandı")
     _FakeClient.yanit = None  # başarıya dön
 
-    # ── 3) Kurulmadı (env yok) → gönderim reddedilir ──
-    mk.WHATSAPP_ENABLED = False
+    # ── 3) Kurulmadı (kimlik boş) → gönderim reddedilir ──
+    _tok = mk.WHATSAPP_TOKEN
+    mk.WHATSAPP_TOKEN = ""  # kimlik boş → whatsapp_config enabled=False
     s3 = await wa.gonder("05551112233", "x", "hizmet")
     check(not s3.ok and "kurulmadı" in (s3.hata or ""), "kurulmadı → gönderim reddedildi")
-    check(any(b["ad"] == "whatsapp" and b["kurulu"] is False for b in mk.kanallar_bilgi()),
+    bilgi = await mk.kanallar_bilgi()
+    check(any(b["ad"] == "whatsapp" and b["kurulu"] is False for b in bilgi),
           "UI: whatsapp 'kurulmadı' gösterir")
-    mk.WHATSAPP_ENABLED = True  # tekrar aç
+    mk.WHATSAPP_TOKEN = _tok  # tekrar aç
 
     transport = ASGITransport(app=server.app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
@@ -161,6 +163,39 @@ async def run():
                   f"onaysız veliye WhatsApp PAZARLAMA 'onaysiz' (gönderilmez) — {hedef and hedef['durum']}")
         else:
             check(False, f"funnel gönderim oluşturulamadı ({r.status_code})")
+
+        # ── 7) Kanal ayarları admin panelinden (DB) — env fallback boşken ──
+        mk.WHATSAPP_TOKEN = ""; mk.WHATSAPP_PHONE_ID = ""  # env boş → DB'siz kurulmadı
+        acc2 = str(uuid.uuid4())
+        await server.db.users.insert_one({"id": acc2, "ad": "M", "soyad": "A", "role": "accountant"})
+        Hacc = {"Authorization": f"Bearer {create_access_token({'sub': acc2})}"}
+        check((await ac.get("/api/funnel/ayarlar", headers=Hacc)).status_code == 403,
+              "kanal ayarları yalnız admin (accountant 403)")
+        a0 = (await ac.get("/api/funnel/ayarlar", headers=H)).json()
+        check(a0["whatsapp"]["kurulu"] is False and a0["whatsapp"]["token_dolu"] is False,
+              "başta whatsapp kurulmadı (env+DB boş)")
+        # WhatsApp kimliğini admin panelinden kaydet
+        r = await ac.put("/api/funnel/ayarlar/whatsapp", headers=H,
+                         json={"token": "DB_TOKEN_XYZ", "phone_id": "PH_DB", "webhook_verify_token": "vt-db"})
+        check(r.status_code == 200 and r.json()["whatsapp"]["kurulu"] is True, "kimlik kaydedilince whatsapp kuruldu")
+        check("DB_TOKEN_XYZ" not in str(r.json()) and r.json()["whatsapp"]["token_dolu"] is True,
+              "token yanıtta MASKELİ (değer sızmıyor, yalnız 'dolu')")
+        # DB config kanalı gerçekten açtı mı (kanallar_bilgi + gönderim)
+        bilgi2 = await mk.kanallar_bilgi()
+        check(any(b["ad"] == "whatsapp" and b["kurulu"] for b in bilgi2), "kanallar_bilgi: whatsapp artık kurulu (DB'den)")
+        _FakeClient.yanit = _FakeResp(200, {"messages": [{"id": "wamid.DB"}]})
+        sdb = await wa.gonder("05551112233", "test", "hizmet")
+        check(sdb.ok and _FakeClient.son["headers"]["Authorization"] == "Bearer DB_TOKEN_XYZ",
+              "gönderim DB'deki token'ı kullandı")
+        # Boş token ile PUT → mevcut korunur (silinmez)
+        await ac.put("/api/funnel/ayarlar/whatsapp", headers=H, json={"phone_id": "PH_DB2"})
+        a1 = (await ac.get("/api/funnel/ayarlar", headers=H)).json()
+        check(a1["whatsapp"]["token_dolu"] is True and a1["whatsapp"]["phone_id"] == "PH_DB2",
+              "boş token gönderilince mevcut token korundu")
+        # Webhook verify artık DB token'ıyla çalışır
+        rv = await ac.get("/api/funnel/whatsapp/webhook",
+                         params={"hub.mode": "subscribe", "hub.verify_token": "vt-db", "hub.challenge": "7"})
+        check(rv.status_code == 200 and rv.text == "7", "webhook verify DB'deki token ile doğrular")
 
     await server.client.drop_database(TEST_DB)
 

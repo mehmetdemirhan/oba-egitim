@@ -15,13 +15,45 @@ anahtarı geldiğinde `NetgsmSMS._istek` gövdesi teyit edilmeli.
 """
 import logging
 
+from core.db import db
 from core.config import (
-    NETGSM_USERNAME, NETGSM_PASSWORD, NETGSM_HEADER, NETGSM_BASE_URL, NETGSM_ENABLED,
+    NETGSM_USERNAME, NETGSM_PASSWORD, NETGSM_HEADER, NETGSM_BASE_URL,
     NETGSM_IYS_FILTER, NETGSM_PARTNER_CODE,
-    SMS_BIRIM_UCRET, WHATSAPP_ENABLED, WHATSAPP_BIRIM_UCRET,
+    SMS_BIRIM_UCRET, WHATSAPP_BIRIM_UCRET,
     WHATSAPP_TOKEN, WHATSAPP_PHONE_ID, WHATSAPP_BASE_URL,
-    WHATSAPP_DEFAULT_TEMPLATE, WHATSAPP_DEFAULT_LANG,
+    WHATSAPP_DEFAULT_TEMPLATE, WHATSAPP_DEFAULT_LANG, WHATSAPP_WEBHOOK_VERIFY_TOKEN,
 )
+
+
+# ── Kanal kimlik ayarları: DB (admin panelinden) > env fallback ──
+# Kimlik bilgileri db.sistem_ayarlari'da saklanır; admin panelinden düzenlenir.
+# env değerleri yalnız DB boşsa kullanılır. Kanal, kimlik DOLUysa "kurulu" olur.
+async def sms_config() -> dict:
+    d = ((await db.sistem_ayarlari.find_one({"tip": "mesaj_sms"})) or {}).get("degerler", {}) or {}
+    username = (d.get("username") or NETGSM_USERNAME or "").strip()
+    password = d.get("password") or NETGSM_PASSWORD or ""
+    return {
+        "username": username, "password": password,
+        "header": (d.get("header") or NETGSM_HEADER or "").strip(),
+        "base_url": (d.get("base_url") or NETGSM_BASE_URL).rstrip("/"),
+        "iys_filter": d.get("iys_filter") if d.get("iys_filter") not in (None, "") else NETGSM_IYS_FILTER,
+        "partner_code": (d.get("partner_code") or NETGSM_PARTNER_CODE or "").strip(),
+        "enabled": bool(username and password),
+    }
+
+
+async def whatsapp_config() -> dict:
+    d = ((await db.sistem_ayarlari.find_one({"tip": "mesaj_whatsapp"})) or {}).get("degerler", {}) or {}
+    token = d.get("token") or WHATSAPP_TOKEN or ""
+    phone_id = (d.get("phone_id") or WHATSAPP_PHONE_ID or "").strip()
+    return {
+        "token": token, "phone_id": phone_id,
+        "base_url": (d.get("base_url") or WHATSAPP_BASE_URL).rstrip("/"),
+        "default_template": (d.get("default_template") or WHATSAPP_DEFAULT_TEMPLATE or "").strip(),
+        "default_lang": (d.get("default_lang") or WHATSAPP_DEFAULT_LANG or "tr").strip(),
+        "webhook_verify_token": d.get("webhook_verify_token") or WHATSAPP_WEBHOOK_VERIFY_TOKEN or "",
+        "enabled": bool(token and phone_id),
+    }
 
 
 class KanalSonuc:
@@ -40,12 +72,11 @@ class KanalSonuc:
 
 
 class MesajKanali:
-    """Kanal arayüzü. Alt sınıflar `kurulu` + `gonder` (+ opsiyonel durum_sorgula)."""
+    """Kanal arayüzü. Alt sınıflar `kurulu_mu` (async) + `gonder`."""
     ad = "base"
     birim_ucret = 0.0
 
-    @property
-    def kurulu(self) -> bool:
+    async def kurulu_mu(self) -> bool:
         return False
 
     async def gonder(self, telefon: str, metin: str, tur: str = "hizmet", meta: dict = None) -> KanalSonuc:
@@ -56,50 +87,45 @@ class MesajKanali:
     async def durum_sorgula(self, saglayici_id: str) -> str:
         return "bilinmiyor"
 
-    def bilgi(self) -> dict:
-        return {"ad": self.ad, "kurulu": self.kurulu, "birim_ucret": self.birim_ucret}
-
 
 class NetgsmSMS(MesajKanali):
-    """Netgsm SMS (FAZ 1). Kurulu değilse gönderim reddedilir."""
+    """Netgsm SMS (FAZ 1). Kimlik DB/env'den; kurulu değilse gönderim reddedilir."""
     ad = "sms"
     birim_ucret = SMS_BIRIM_UCRET
 
-    @property
-    def kurulu(self) -> bool:
-        return NETGSM_ENABLED
+    async def kurulu_mu(self) -> bool:
+        return (await sms_config())["enabled"]
 
     async def gonder(self, telefon: str, metin: str, tur: str = "hizmet", meta: dict = None) -> KanalSonuc:
-        if not self.kurulu:
-            return KanalSonuc(False, hata="SMS kanalı kurulmadı (NETGSM_* env eksik)")
+        cfg = await sms_config()
+        if not cfg["enabled"]:
+            return KanalSonuc(False, hata="SMS kanalı kurulmadı (kullanıcı adı/şifre girilmedi)")
         no = tr_gsm_no(telefon)
         if not no:
             # TR-dışı/geçersiz numara — Netgsm SMS gönderemez (hata DEĞİL, ayrı durum)
             return KanalSonuc(False, durum="yurtdisi",
                               hata="TR-dışı/geçersiz numara — Netgsm SMS gönderemez")
         try:
-            return await self._istek(no, metin, tur)
+            return await self._istek(cfg, no, metin, tur)
         except Exception as ex:
             logging.warning(f"[netgsm] gönderim hatası: {ex}")
             return KanalSonuc(False, hata=str(ex))
 
-    async def _istek(self, no: str, metin: str, tur: str) -> KanalSonuc:
-        # Resmî SDK (@netgsm/sms — src/netgsm.ts): POST /sms/rest/v2/send, HTTP Basic
-        # (base64 user:pass), gövde {msgheader, encoding, messages:[{msg,no}],
-        # iysfilter?, partnercode?}. Başarı: yanıt JSON code=="00", jobid döner.
+    async def _istek(self, cfg: dict, no: str, metin: str, tur: str) -> KanalSonuc:
+        # POST /sms/rest/v2/send, HTTP Basic (user:pass). Başarı: JSON code=="00", jobid.
         import httpx
-        url = f"{NETGSM_BASE_URL}/sms/rest/v2/send"
+        url = f"{cfg['base_url']}/sms/rest/v2/send"
         govde = {
-            "msgheader": NETGSM_HEADER,
+            "msgheader": cfg["header"],
             "encoding": "TR",                       # Türkçe karakter desteği
             "messages": [{"msg": metin, "no": no}],  # no = 5XXXXXXXXX (0/+90 yok)
         }
-        if tur == "pazarlama" and NETGSM_IYS_FILTER:
-            govde["iysfilter"] = NETGSM_IYS_FILTER   # İYS 2. katman (yalnız pazarlama)
-        if NETGSM_PARTNER_CODE:
-            govde["partnercode"] = NETGSM_PARTNER_CODE
+        if tur == "pazarlama" and cfg["iys_filter"]:
+            govde["iysfilter"] = cfg["iys_filter"]   # İYS 2. katman (yalnız pazarlama)
+        if cfg["partner_code"]:
+            govde["partnercode"] = cfg["partner_code"]
         async with httpx.AsyncClient(timeout=30) as c:
-            r = await c.post(url, json=govde, auth=(NETGSM_USERNAME, NETGSM_PASSWORD),
+            r = await c.post(url, json=govde, auth=(cfg["username"], cfg["password"]),
                              headers={"Content-Type": "application/json"})
         try:
             data = r.json()
@@ -121,33 +147,33 @@ class WhatsAppCloudAPI(MesajKanali):
     ad = "whatsapp"
     birim_ucret = WHATSAPP_BIRIM_UCRET
 
-    @property
-    def kurulu(self) -> bool:
-        return WHATSAPP_ENABLED
+    async def kurulu_mu(self) -> bool:
+        return (await whatsapp_config())["enabled"]
 
     async def gonder(self, telefon: str, metin: str, tur: str = "hizmet", meta: dict = None) -> KanalSonuc:
-        if not self.kurulu:
-            return KanalSonuc(False, hata="WhatsApp kanalı kurulmadı (WHATSAPP_TOKEN/PHONE_ID env eksik)")
+        cfg = await whatsapp_config()
+        if not cfg["enabled"]:
+            return KanalSonuc(False, hata="WhatsApp kanalı kurulmadı (token/telefon id girilmedi)")
         no = wa_no(telefon)
         if not no:
             return KanalSonuc(False, durum="gecersiz", hata="Geçersiz telefon numarası")
         meta = meta or {}
-        sablon = meta.get("sablon_adi") or WHATSAPP_DEFAULT_TEMPLATE
-        dil = meta.get("dil") or WHATSAPP_DEFAULT_LANG
+        sablon = meta.get("sablon_adi") or cfg["default_template"]
+        dil = meta.get("dil") or cfg["default_lang"]
         # Değişken parametreler: verilmezse tüm metin tek {{1}} body parametresi olur.
         parametreler = meta.get("parametreler")
         if not parametreler:
             parametreler = [metin]
         try:
-            return await self._istek(no, sablon, dil, parametreler)
+            return await self._istek(cfg, no, sablon, dil, parametreler)
         except Exception as ex:
             logging.warning(f"[whatsapp] gönderim hatası: {ex}")
             return KanalSonuc(False, hata=str(ex))
 
-    async def _istek(self, no: str, sablon: str, dil: str, parametreler: list) -> KanalSonuc:
+    async def _istek(self, cfg: dict, no: str, sablon: str, dil: str, parametreler: list) -> KanalSonuc:
         """POST /{phone_id}/messages — type=template. Başarı: messages[0].id (wamid)."""
         import httpx
-        url = f"{WHATSAPP_BASE_URL}/{WHATSAPP_PHONE_ID}/messages"
+        url = f"{cfg['base_url']}/{cfg['phone_id']}/messages"
         components = []
         if parametreler:
             components.append({
@@ -162,7 +188,7 @@ class WhatsAppCloudAPI(MesajKanali):
         }
         async with httpx.AsyncClient(timeout=30) as c:
             r = await c.post(url, json=govde,
-                             headers={"Authorization": f"Bearer {WHATSAPP_TOKEN}",
+                             headers={"Authorization": f"Bearer {cfg['token']}",
                                       "Content-Type": "application/json"})
         try:
             data = r.json()
@@ -239,6 +265,7 @@ def kanal_al(ad: str) -> MesajKanali:
     return KANALLAR.get(ad)
 
 
-def kanallar_bilgi() -> list:
-    """UI için: hangi kanal kurulu/kurulmadı."""
-    return [k.bilgi() for k in KANALLAR.values()]
+async def kanallar_bilgi() -> list:
+    """UI için: hangi kanal kurulu/kurulmadı (kimlik DB/env'den, çalışma-zamanı)."""
+    return [{"ad": k.ad, "kurulu": await k.kurulu_mu(), "birim_ucret": k.birim_ucret}
+            for k in KANALLAR.values()]
