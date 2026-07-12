@@ -73,7 +73,7 @@ function EditableCell({ value, kind = "text", format, align = "left", editable =
   );
 }
 
-export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisim, sadeceBorclu = false, onBorcluTemizle, odakKisiId = "", onOdakTemizle }) {
+export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisim, sadeceBorclu = false, onBorcluTemizle, odakKisiId = "", onOdakTemizle, yasKovasi = null, onYasTemizle }) {
   const { toast } = useToast();
   const [arama, setArama] = useState("");
   const [acik, setAcik] = useState(null);
@@ -82,15 +82,27 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
 
   const ogrenciMi = tip === "ogrenci";
 
+  // Alacak yaşı (kur başlangıç/kayıt zamanından bugüne gün) — yaşlandırma kovası filtresi
+  const kovaUyar = (k) => {
+    if (!yasKovasi) return true;
+    if (Number(k.kalan || 0) <= 0) return false;
+    const t = k.kayit_zamani ? new Date(k.kayit_zamani) : null;
+    if (!t || isNaN(t)) return false;
+    const gun = Math.floor((Date.now() - t.getTime()) / 86400000);
+    return yasKovasi === "0-30" ? gun <= 30 : yasKovasi === "31-60" ? (gun > 30 && gun <= 60) : gun > 60;
+  };
+
   const filtreli = useMemo(() => {
     let liste = kisiler;
     if (odakKisiId) liste = liste.filter((k) => k.kisi_id === odakKisiId);  // bildirimden gelen öğrenci odağı
     if (sadeceBorclu) liste = liste.filter((k) => Number(k.kalan || 0) > 0);  // İŞ 4 — alınmayan
+    if (yasKovasi) liste = liste.filter(kovaUyar);  // yaşlandırma kovası
     const q = arama.trim().toLocaleLowerCase("tr");
     if (!q) return liste;
     return liste.filter((k) =>
       `${k.ad} ${k.soyad} ${k.veli_ad || ""} ${k.veli_soyad || ""} ${k.kur || ""} ${k.sinif || ""}`.toLocaleLowerCase("tr").includes(q));
-  }, [kisiler, arama, sadeceBorclu, odakKisiId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kisiler, arama, sadeceBorclu, odakKisiId, yasKovasi]);
 
   // Ödemeler kişi (öğrenci/öğretmen) bazında — kur satırları aynı kisi_id'yi paylaşır
   const kisiOdemeleri = useCallback(
@@ -179,6 +191,12 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
         <div className="flex items-center gap-2 text-xs">
           <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 px-2 py-1 rounded-full font-medium">Filtre: yalnız alınmayan ödemeler ({filtreli.length})</span>
           {onBorcluTemizle && <button onClick={onBorcluTemizle} className="text-primary hover:underline">Temizle</button>}
+        </div>
+      )}
+      {yasKovasi && (
+        <div className="flex items-center gap-2 text-xs">
+          <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 px-2 py-1 rounded-full font-medium">Filtre: {yasKovasi} gün yaşlı alacaklar ({filtreli.length})</span>
+          {onYasTemizle && <button onClick={onYasTemizle} className="text-primary hover:underline">Temizle</button>}
         </div>
       )}
 

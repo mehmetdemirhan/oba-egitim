@@ -3,11 +3,12 @@ import axios from "axios";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { useToast } from "../hooks/use-toast";
-import { Wallet, TrendingUp, TrendingDown, Clock, LogOut, GraduationCap, Users, Receipt, PiggyBank, AlertTriangle } from "lucide-react";
+import { Wallet, TrendingUp, TrendingDown, Clock, LogOut, GraduationCap, Users, Receipt, PiggyBank, AlertTriangle, Send } from "lucide-react";
 import OdemeTablosu from "./OdemeTablosu";
 import MuhasebeAyarlari from "./admin/MuhasebeAyarlari";
 import OgretmenDonemOdeme from "./admin/OgretmenDonemOdeme";
 import GecikenKurlar from "./admin/GecikenKurlar";
+import FunnelPanel from "./admin/FunnelPanel";
 
 /**
  * MuhasebePaneli — "accountant" rolüne özel SADE ödeme paneli.
@@ -113,16 +114,22 @@ export default function MuhasebePaneli({ user, logout }) {
 
         <GecikenKurlar apiBase={API} />
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {tabButon("ogrenci", "Öğrenci Ödemeleri", GraduationCap)}
           {tabButon("ogretmen", "Öğretmen Ödemeleri", Users)}
+          {tabButon("funnel", "Veli Mesajları", Send)}
         </div>
 
-        <OdemeTablosu tip={sekme} kisiler={liste} payments={payments} apiBase={API} onDegisim={veriYukle}
-          sadeceBorclu={sekme === "ogrenci" && sadeceBorclu} onBorcluTemizle={() => setSadeceBorclu(false)} />
+        {(sekme === "ogrenci" || sekme === "ogretmen") && (
+          <OdemeTablosu tip={sekme} kisiler={liste} payments={payments} apiBase={API} onDegisim={veriYukle}
+            sadeceBorclu={sekme === "ogrenci" && sadeceBorclu} onBorcluTemizle={() => setSadeceBorclu(false)} />
+        )}
 
         {/* Öğretmen sekmesinde dönem bazlı ödeme (ayın 15'i) */}
         {sekme === "ogretmen" && <OgretmenDonemOdeme apiBase={API} />}
+
+        {/* Veli Mesajları / Funnel */}
+        {sekme === "funnel" && <FunnelPanel apiBase={API} />}
 
         {/* Muhasebe Ayarları — muhasebeci de vergi oranı + kur ücretlerini düzenler */}
         <MuhasebeAyarlari apiBase={API} />

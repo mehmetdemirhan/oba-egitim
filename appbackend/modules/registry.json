@@ -190,5 +190,9 @@
   {
     "name": "admin_migrations",
     "active": true
+  },
+  {
+    "name": "mesaj_funnel",
+    "active": true
   }
 ]
