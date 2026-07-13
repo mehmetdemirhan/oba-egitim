@@ -3,7 +3,7 @@ import axios from "axios";
 import { useToast } from "../hooks/use-toast";
 import { kurRenkSinifi } from "../utils/kurSiniflandirma";
 import {
-  ChevronDown, ChevronRight, Plus, Trash2, AlertTriangle, Search,
+  ChevronDown, ChevronRight, Plus, Trash2, AlertTriangle, Search, Users,
 } from "lucide-react";
 
 /**
@@ -73,14 +73,25 @@ function EditableCell({ value, kind = "text", format, align = "left", editable =
   );
 }
 
-export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisim, sadeceBorclu = false, onBorcluTemizle, odakKisiId = "", onOdakTemizle, yasKovasi = null, onYasTemizle }) {
+export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisim, sadeceBorclu = false, onBorcluTemizle, odakKisiId = "", onOdakTemizle, yasKovasi = null, onYasTemizle, grupla = false }) {
   const { toast } = useToast();
   const [arama, setArama] = useState("");
   const [acik, setAcik] = useState(null);
   const [silDialog, setSilDialog] = useState(null);
   const [kurForm, setKurForm] = useState({ kur_adi: "", tutar: "", baslangic_tarihi: "" });
+  const [hakedisMap, setHakedisMap] = useState({}); // ogretmen_id → bu dönem hakediş (grupla)
 
   const ogrenciMi = tip === "ogrenci";
+
+  // Öğretmene göre gruplu görünümde bu dönem hakediş özetini çek
+  useEffect(() => {
+    if (!grupla || !ogrenciMi) return;
+    axios.get(`${apiBase}/muhasebe/ogretmen-gruplu`).then((r) => {
+      const m = {};
+      (r.data?.gruplar || []).forEach((g) => { m[g.ogretmen_id || "_yok"] = g.bu_donem_hakedis; });
+      setHakedisMap(m);
+    }).catch(() => {});
+  }, [grupla, ogrenciMi, apiBase]);
 
   // Alacak yaşı (kur başlangıç/kayıt zamanından bugüne gün) — yaşlandırma kovası filtresi
   const kovaUyar = (k) => {
@@ -103,6 +114,22 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
       `${k.ad} ${k.soyad} ${k.veli_ad || ""} ${k.veli_soyad || ""} ${k.kur || ""} ${k.sinif || ""}`.toLocaleLowerCase("tr").includes(q));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kisiler, arama, sadeceBorclu, odakKisiId, yasKovasi]);
+
+  // Öğretmene göre gruplu görünüm: satırları öğretmene göre sırala + grup özetleri
+  const { siraliListe, grupOzet } = useMemo(() => {
+    if (!grupla || !ogrenciMi) return { siraliListe: filtreli, grupOzet: null };
+    const sirali = [...filtreli].sort((a, b) => (a.ogretmen_ad || "zzz").localeCompare(b.ogretmen_ad || "zzz", "tr"));
+    const ozet = {};
+    sirali.forEach((k) => {
+      const id = k.ogretmen_id || "_yok";
+      const o = ozet[id] || (ozet[id] = { ad: k.ogretmen_ad || "Atanmamış", beklenen: 0, odenen: 0, kalan: 0, sayi: 0 });
+      o.beklenen += Number(k.yapilmasi_gereken_odeme || 0);
+      o.odenen += Number(k.yapilan_odeme || 0);
+      o.kalan += Number(k.kalan || 0);
+      o.sayi += 1;
+    });
+    return { siraliListe: sirali, grupOzet: ozet };
+  }, [grupla, ogrenciMi, filtreli]);
 
   // Ödemeler kişi (öğrenci/öğretmen) bazında — kur satırları aynı kisi_id'yi paylaşır
   const kisiOdemeleri = useCallback(
@@ -148,13 +175,6 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
     k.kur_ucreti_id
       ? req(() => axios.patch(`${apiBase}/muhasebe/kur-ucreti/${k.kur_ucreti_id}`, { tutar: parseFloat(yeniTutar) || 0 }))
       : alanKaydet(k.kisi_id, "yapilmasi_gereken_odeme", yeniTutar);
-  // SPEC B — kur satırında öğretmen payı snapshot düzeltme (admin/muhasebe; öğretmen görmez)
-  const payKaydet = async (c, kisiId, yeniPay) => {
-    if (!c.kur_ucreti_id) return false;
-    const ok = await req(() => axios.patch(`${apiBase}/muhasebe/kur-ucreti/${c.kur_ucreti_id}/pay`, { ogretmen_pay: parseFloat(yeniPay) || 0 }), "Pay güncellenemedi");
-    if (ok) kurOzetCek(kisiId);
-    return ok;
-  };
 
   const odemeSil = async () => {
     if (await req(() => axios.delete(`${apiBase}/payments/${silDialog.id}`), "Silinemedi")) {
@@ -176,7 +196,7 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
     if (ok) { setKurForm({ kur_adi: "", tutar: "", baslangic_tarihi: "" }); toast({ title: "Kur ücreti eklendi", description: "Yeni satır olarak eklendi." }); }
   };
 
-  const kolonSayisi = ogrenciMi ? 12 : 7;
+  const kolonSayisi = ogrenciMi ? 13 : 7;
 
   return (
     <div className="space-y-3">
@@ -231,6 +251,7 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
                   <th className="px-3 py-2 text-right">Beklenen</th>
                   <th className="px-3 py-2 text-right">Ödenen</th>
                   <th className="px-3 py-2 text-right">Kalan</th>
+                  <th className="px-3 py-2 text-right" title="Öğretmen payı — öğretmen bu sütunu görmez">Öğr. Payı</th>
                   <th className="px-3 py-2">Açıklama</th>
                 </>
               ) : (
@@ -247,13 +268,31 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
           </thead>
           <tbody>
             {filtreli.length === 0 && <tr><td colSpan={kolonSayisi} className="px-3 py-8 text-center text-subtle">Kayıt yok.</td></tr>}
-            {filtreli.map((k) => {
+            {siraliListe.map((k, _idx) => {
               const acikMi = acik === k.id;
               const odemeler = kisiOdemeleri(k.kisi_id);
               // İŞ 3 — satır renklendirme KUR NUMARASINA göre: kur 1 = mor (yeni), kur >1 = yeşil (üst kur)
               const satirRenk = ogrenciMi ? kurRenkSinifi(k.kur) : "";
+              // Öğretmene göre gruplu: yeni öğretmen grubu başlıyorsa özet başlık satırı
+              const grupBasi = grupla && ogrenciMi && (_idx === 0 || (siraliListe[_idx - 1].ogretmen_id || "_yok") !== (k.ogretmen_id || "_yok"));
+              const oz = grupBasi ? grupOzet[k.ogretmen_id || "_yok"] : null;
+              const hakedis = grupBasi ? (hakedisMap[k.ogretmen_id || "_yok"] ?? 0) : 0;
               return (
                 <React.Fragment key={k.id}>
+                  {grupBasi && oz && (
+                    <tr className="bg-indigo-50/60 border-b border-indigo-200">
+                      <td colSpan={kolonSayisi} className="px-3 py-2">
+                        <div className="flex items-center gap-3 flex-wrap text-sm">
+                          <span className="font-bold text-indigo-800 inline-flex items-center gap-1"><Users className="h-4 w-4" />{oz.ad}</span>
+                          <span className="text-subtle">{oz.sayi} kayıt</span>
+                          <span className="text-subtle">Beklenen <b className="text-content">{formatTL(oz.beklenen)}</b></span>
+                          <span className="text-subtle">Ödenen <b className="text-emerald-600">{formatTL(oz.odenen)}</b></span>
+                          <span className="text-subtle">Kalan <b className={oz.kalan > 0 ? "text-amber-600" : "text-content"}>{formatTL(oz.kalan)}</b></span>
+                          <span className="ml-auto bg-indigo-600 text-white rounded-full px-2.5 py-0.5 text-xs font-semibold" title="Bu dönem hakedişi">Hakediş {formatTL(hakedis)}</span>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                   <tr className={`border-b border-line ${satirRenk}`}>
                     <td className="px-3 py-2">
                       <button onClick={() => { setAcik(acikMi ? null : k.id); setKurForm({ kur_adi: "", tutar: "", baslangic_tarihi: "" }); }}
@@ -280,6 +319,9 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
                           onSave={(v) => beklenenKaydet(k, v)} />
                         <td className="px-3 py-2 text-right tabular-nums text-subtle">{formatTL(k.yapilan_odeme)}</td>
                         <td className={`px-3 py-2 text-right tabular-nums font-medium ${k.kalan > 0 ? "text-amber-600" : "text-subtle"}`}>{formatTL(k.kalan)}</td>
+                        <EditableCell value={k.ogretmen_pay} kind="number" align="right" format={formatTL}
+                          editable={!!k.kur_ucreti_id} placeholder="Pay"
+                          onSave={(v) => k.kur_ucreti_id ? req(() => axios.patch(`${apiBase}/muhasebe/kur-ucreti/${k.kur_ucreti_id}/pay`, { ogretmen_pay: parseFloat(v) || 0 }), "Pay güncellenemedi") : false} />
                         <EditableCell value={k.muhasebe_notu} placeholder="Not ekle" kind="text"
                           onSave={(v) => alanKaydet(k.kisi_id, "muhasebe_notu", v)} />
                       </>
@@ -318,12 +360,11 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
                                       <th className="px-2 py-1.5 text-right">Beklenen</th>
                                       <th className="px-2 py-1.5 text-right">Ödenen</th>
                                       <th className="px-2 py-1.5 text-right">Kalan</th>
-                                      <th className="px-2 py-1.5 text-right" title="Öğretmen payı — öğretmen bu sütunu görmez">Öğr. Payı</th>
                                       <th className="px-2 py-1.5">Durum</th>
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {kurlar.length === 0 && <tr><td colSpan={7} className="px-2 py-2 text-subtle">Yükleniyor…</td></tr>}
+                                    {kurlar.length === 0 && <tr><td colSpan={6} className="px-2 py-2 text-subtle">Yükleniyor…</td></tr>}
                                     {kurlar.map((c, i) => (
                                       <tr key={c.kur_ucreti_id || i} className={`border-b border-line last:border-0 ${c.gizli ? "opacity-60" : ""}`}>
                                         <td className="px-2 py-1.5 font-medium text-content">{c.kur || "—"}</td>
@@ -331,14 +372,6 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
                                         <td className="px-2 py-1.5 text-right tabular-nums">{formatTL(c.yapilmasi_gereken_odeme)}</td>
                                         <td className="px-2 py-1.5 text-right tabular-nums text-emerald-600">{formatTL(c.yapilan_odeme)}</td>
                                         <td className={`px-2 py-1.5 text-right tabular-nums ${c.kalan > 0 ? "text-amber-600 font-medium" : "text-subtle"}`}>{formatTL(c.kalan)}</td>
-                                        <td className="px-2 py-1.5 text-right">
-                                          {c.kur_ucreti_id ? (
-                                            <input type="number" min="0" defaultValue={c.ogretmen_pay ?? ""}
-                                              onBlur={(e) => { const v = e.target.value; if (v !== String(c.ogretmen_pay ?? "")) payKaydet(c, k.kisi_id, v); }}
-                                              className="w-16 border border-line rounded px-1 py-0.5 text-right text-xs bg-surface tabular-nums"
-                                              title="Öğretmen payı (₺) — satır içi düzeltilebilir" />
-                                          ) : <span className="text-subtle text-xs">—</span>}
-                                        </td>
                                         <td className="px-2 py-1.5 whitespace-nowrap">
                                           {c.durum === "tamamlandi"
                                             ? <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">Tamamlandı</span>
@@ -353,7 +386,6 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
                                         <td className="px-2 py-1.5 text-right tabular-nums">{formatTL(oz.toplam.beklenen)}</td>
                                         <td className="px-2 py-1.5 text-right tabular-nums text-emerald-600">{formatTL(oz.toplam.odenen)}</td>
                                         <td className={`px-2 py-1.5 text-right tabular-nums ${oz.toplam.kalan > 0 ? "text-amber-600" : "text-subtle"}`}>{formatTL(oz.toplam.kalan)}</td>
-                                        <td></td>
                                         <td></td>
                                       </tr>
                                     )}
