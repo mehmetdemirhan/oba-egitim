@@ -34,6 +34,8 @@ class GorevCreate(BaseModel):
     kitap_link: Optional[str] = None
     kitap_kapak: Optional[str] = None
     film_link: Optional[str] = None
+    film_izle_link: Optional[str] = None  # opsiyonel izleme linki → öğrenci "İzle" görür
+    film_gorsel: Optional[str] = None
 
 class GorevModel(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -57,6 +59,8 @@ class GorevModel(BaseModel):
     kitap_link: Optional[str] = None
     kitap_kapak: Optional[str] = None
     film_link: Optional[str] = None
+    film_izle_link: Optional[str] = None
+    film_gorsel: Optional[str] = None
     olusturma_tarihi: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
 
 
@@ -128,6 +132,7 @@ async def create_toplu_gorev(payload: dict, current_user=Depends(get_current_use
             makale_link=gorev_bilgi.get("makale_link"), kitap_yazar=gorev_bilgi.get("kitap_yazar"),
             kitap_isbn=gorev_bilgi.get("kitap_isbn"), kitap_link=gorev_bilgi.get("kitap_link"),
             kitap_kapak=gorev_bilgi.get("kitap_kapak"), film_link=gorev_bilgi.get("film_link"),
+            film_izle_link=gorev_bilgi.get("film_izle_link"), film_gorsel=gorev_bilgi.get("film_gorsel"),
             atayan_id=current_user["id"],
             atayan_ad=f"{current_user.get('ad', '')} {current_user.get('soyad', '')}".strip(),
             atayan_rol=role,

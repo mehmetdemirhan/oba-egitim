@@ -69,6 +69,12 @@ class IcerikCreate(BaseModel):
     okuma_metni: Optional[str] = None
     okuma_seviye: Optional[str] = None  # kolay, orta, zor
     okuma_sure: Optional[int] = None  # dakika
+    # Film alanları (kaynak: sinemalar.com; izle_link opsiyonel — öğrenci "İzle" görür)
+    film_link: Optional[str] = None       # bilgi/kaynak sayfası (sinemalar.com)
+    film_izle_link: Optional[str] = None  # opsiyonel izleme linki (YouTube/platform)
+    film_gorsel: Optional[str] = None     # afiş görseli URL
+    film_yil: Optional[str] = None
+    film_sure: Optional[str] = None
 
 class IcerikModel(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -93,6 +99,11 @@ class IcerikModel(BaseModel):
     okuma_metni: Optional[str] = None
     okuma_seviye: Optional[str] = None
     okuma_sure: Optional[int] = None
+    film_link: Optional[str] = None
+    film_izle_link: Optional[str] = None
+    film_gorsel: Optional[str] = None
+    film_yil: Optional[str] = None
+    film_sure: Optional[str] = None
     ekleyen_id: str = ""
     ekleyen_ad: str = ""
     durum: str = "beklemede"  # beklemede, oylama, yayinda, reddedildi
@@ -148,6 +159,77 @@ async def gelisim_dosya_yukle(
 
 
 # İçerik ekleme (admin veya öğretmen)
+@router.post("/film-bilgi-cek")
+async def film_bilgi_cek(data: dict, current_user=Depends(get_current_user)):
+    """sinemalar.com (veya benzeri) film sayfasından bilgileri çeker (og: meta + regex).
+    KIRILGAN SCRAPING'E SERT BAĞIMLILIK YOK: çekilemezse HATA VERMEZ, alanları boş
+    döndürür — kullanıcı elle doldurur. {baslik, yil, ozet, gorsel, sure, link}."""
+    import urllib.request, ssl, re as _re, asyncio
+
+    url = (data or {}).get("link", "").strip()
+    sonuc = {"baslik": "", "yil": "", "ozet": "", "gorsel": "", "sure": "", "link": url}
+    if not url:
+        return sonuc
+
+    def fetch_url(u):
+        try:
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            req = urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
+            with urllib.request.urlopen(req, timeout=12, context=ctx) as resp:
+                raw = resp.read()
+                try:
+                    return raw.decode("utf-8")
+                except Exception:
+                    return raw.decode("latin-1")
+        except Exception:
+            return None
+
+    try:
+        html = await asyncio.to_thread(fetch_url, url)
+    except Exception:
+        html = None
+    if not html:
+        return sonuc  # erişilemedi → boş (elle doldurulur)
+
+    QP = """[\"']"""
+    def meta(prop):
+        m = _re.search(r'property\s*=\s*' + QP + prop + QP + r'[^>]*content\s*=\s*' + QP + r'([^"\']+)', html, _re.I)
+        return m.group(1).strip() if m else ""
+
+    try:
+        baslik = meta("og:title")
+        if not baslik:
+            m = _re.search(r"<title[^>]*>([^<]+)</title>", html, _re.I)
+            if m:
+                baslik = m.group(1).split(" - ")[0].split(" | ")[0].strip()
+        # Başlıktaki yıl (örn "Film Adı (2019)")
+        yil = ""
+        my = _re.search(r"\((\d{4})\)", baslik)
+        if my:
+            yil = my.group(1)
+            baslik = _re.sub(r"\s*\(\d{4}\)\s*", "", baslik).strip()
+        else:
+            my = _re.search(r"\b(19|20)\d{2}\b", html)
+            yil = my.group(0) if my else ""
+        # Süre (dakika)
+        sure = ""
+        ms = _re.search(r"(\d{1,3})\s*(?:dakika|dk|min)", html, _re.I)
+        if ms:
+            sure = f"{ms.group(1)} dk"
+        sonuc.update({
+            "baslik": baslik,
+            "yil": yil,
+            "ozet": (meta("og:description") or "")[:500],
+            "gorsel": meta("og:image"),
+            "sure": sure,
+        })
+    except Exception:
+        pass  # ayrıştırma hatası → eldeki kısmi/boş sonuç
+    return sonuc
+
+
 @router.post("/gelisim/icerik")
 async def create_icerik(icerik: IcerikCreate, current_user=Depends(get_current_user)):
     role = current_user.get("role", "")
@@ -189,6 +271,7 @@ async def create_icerik(icerik: IcerikCreate, current_user=Depends(get_current_u
             logging.error(f"[gelisim] soru_bonus puanı yazılamadı (kullanıcı {current_user['id']}): {e}")
 
     await db.gelisim_icerik.insert_one(data)
+    data.pop("_id", None)  # insert_one'ın eklediği ObjectId'i response'tan çıkar (JSON serialize edilemez)
 
     # Kitap türünde içerik eklendiyse kitap havuzuna da kaydet (bölüm bazlı soru için)
     if data.get("tur") == "kitap":
