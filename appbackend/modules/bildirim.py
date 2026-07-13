@@ -38,6 +38,7 @@ BILDIRIM_TURLERI = {
     "kur_gecisi":       {"baslik": "🎓 Kur Geçişi — Yeni Alacak", "oncelik": "yuksek", "kategori": "ogretmen", "onem": "orta", "cooldown_saat": 0},
     "kur_gecikme":      {"baslik": "⏰ Kur Süresi Aşıldı", "oncelik": "yuksek", "kategori": "ogretmen", "onem": "orta", "cooldown_saat": 0},
     "sss_yanit":        {"baslik": "✅ Sorunuz Yanıtlandı", "oncelik": "normal", "kategori": "ogrenci", "onem": "bilgi", "cooldown_saat": 0},
+    "egitim_tamamla":   {"baslik": "🎓 Eğitim Tamamlandı", "oncelik": "normal", "kategori": "ogrenci", "onem": "bilgi", "cooldown_saat": 0},
 }
 
 VARSAYILAN_TERCIH = {"ogrenci": True, "ogretmen": True, "veli": True}

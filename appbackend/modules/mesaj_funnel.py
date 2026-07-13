@@ -91,7 +91,8 @@ async def _seg_yenileme(ayar: dict) -> list:
     """Kuru tamamlanalı X gün olmuş, açık kuru olmayan (sonraki kura geçmemiş)."""
     esik = (_simdi() - timedelta(days=int(ayar["yenileme_gun"]))).isoformat()
     out = []
-    async for s in db.students.find({"arsivli": {"$ne": True}}):
+    # Mezun (eğitimi tamamlamış) öğrenci yenileme adayı DEĞİLDİR (SPEC A)
+    async for s in db.students.find({"arsivli": {"$ne": True}, "mezun": {"$ne": True}}):
         # Açık/aktif kuru varsa aday değil (durum None de "aktif" sayılır)
         if await db.kur_ucretleri.count_documents({"ogrenci_id": s["id"], "durum": {"$in": [None, "acik"]}}):
             continue
@@ -119,14 +120,24 @@ async def _seg_odeme(ayar: dict) -> list:
 
 
 async def _seg_tebrik(ayar: dict) -> list:
-    """Kuru bu hafta (son 7 gün) tamamlanan."""
+    """Kuru bu hafta (son 7 gün) tamamlanan (mezunlar hariç — onlar 'mezun' segmentinde)."""
     esik = (_simdi() - timedelta(days=7)).isoformat()
     out = []
     async for ku in db.kur_ucretleri.find(
             {"durum": "tamamlandi", "tamamlanma_tarihi": {"$gte": esik}}):
         s = await db.students.find_one({"id": ku.get("ogrenci_id")})
-        if s and not s.get("arsivli"):
+        if s and not s.get("arsivli") and not s.get("mezun"):
             out.append(_alici(s, kur_no=_kur_no(ku.get("kur_adi"))))
+    return out
+
+
+async def _seg_mezun(ayar: dict) -> list:
+    """Bu hafta (son 7 gün) eğitimini tamamlayan mezunlar — mezuniyet tebriği / yeni
+    dönem teklifi (onaylı kuyruk + iletişim onayı şartıyla; SPEC A)."""
+    esik = (_simdi() - timedelta(days=7)).isoformat()
+    out = []
+    async for s in db.students.find({"mezun": True, "tamamlama_tarihi": {"$gte": esik}}):
+        out.append(_alici(s))
     return out
 
 
@@ -137,6 +148,8 @@ SEGMENTLER = {
               "aciklama": "Kalan borcu olan, son ödemesinden Y gün geçen."},
     "tebrik": {"ad": "Kur tebriği", "tur": "pazarlama", "fn": _seg_tebrik,
                "aciklama": "Kuru bu hafta tamamlanan."},
+    "mezun": {"ad": "Mezun (eğitimi tamamlayan)", "tur": "pazarlama", "fn": _seg_mezun,
+              "aciklama": "Bu hafta eğitimini tamamlayan mezunlar — tebrik / yeni dönem teklifi."},
     "elle": {"ad": "Elle seçim", "tur": "hizmet", "fn": None,
              "aciklama": "Muhasebe/öğrenci tablosundan işaretlenen kişiler."},
 }

@@ -92,6 +92,39 @@ class CustomCORSMiddleware(BaseHTTPMiddleware):
             response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept, Origin, X-Requested-With"
         return response
 
+# ── Bakım modu middleware ──
+# Merkezi kontrol: bakım açıkken admin DIŞINDAKİ tüm roller 503 + bakım yanıtı alır.
+# Admin token'ı muaf (kilitli kalma riski sıfır). Muaf yollar: public durum ucu,
+# login (admin girebilsin; non-admin login ucun kendi içinde engellenir) ve webhook'lar.
+from starlette.responses import JSONResponse as _JSONResponse
+from core.bakim import bakim_durumu as _bakim_durumu
+from core.auth import decode_token as _decode_token
+
+_BAKIM_MUAF = ("/api/sistem/durum", "/api/auth/login", "/api/funnel/whatsapp/webhook")
+
+class BakimMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        # OPTIONS, /api dışı (health/static) ve muaf yollar her zaman geçer
+        if (request.method == "OPTIONS" or not path.startswith("/api/")
+                or any(path.startswith(p) for p in _BAKIM_MUAF)):
+            return await call_next(request)
+        durum = await _bakim_durumu()
+        if not durum.get("aktif"):
+            return await call_next(request)
+        # Admin muaf — token rolü admin ise geç
+        auth = request.headers.get("authorization", "")
+        if auth.lower().startswith("bearer "):
+            try:
+                payload = _decode_token(auth[7:])
+                if payload and payload.get("role") == "admin":
+                    return await call_next(request)
+            except Exception:
+                pass
+        return _JSONResponse(status_code=503, content={
+            "bakim": True, "mesaj": durum.get("mesaj"), "tahmini_bitis": durum.get("tahmini_bitis")})
+
+app.add_middleware(BakimMiddleware)   # önce eklenir → CORS'un İÇİNDE kalır (503'e CORS header eklenir)
 app.add_middleware(CustomCORSMiddleware)
 
 # Create a router with the /api prefix

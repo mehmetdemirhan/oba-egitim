@@ -52,13 +52,13 @@ async def run():
         {"id": S["s3"], "ad": "Üç", "soyad": "Z", "ogretmen_id": tA, "aldigi_egitim": "Genel Ders"},
         {"id": S["s4"], "ad": "Dört", "soyad": "W", "ogretmen_id": tA, "aldigi_egitim": "Genel Ders"},
     ])
-    # Tamamlanmış kurlar — dönem 2026-07-15 için sınır testleri
-    # Aralık: 2026-06-15 (HARİÇ) → 2026-07-15 (DAHİL)
+    # SPEC B: hakediş ödeme-bazlı — dönem ataması ÖDEME tamamlanma tarihine göre.
+    # Dönem 2026-07-15 aralığı: 2026-06-15 (HARİÇ) → 2026-07-15 (DAHİL)
     await server.db.kur_ucretleri.insert_many([
-        {"id": "k1", "ogrenci_id": S["s1"], "kur_adi": "1", "durum": "tamamlandi", "egitim_turu": "Hızlı Okuma", "tamamlanma_tarihi": "2026-06-16T10:00:00"},  # İÇERDE
-        {"id": "k2", "ogrenci_id": S["s2"], "kur_adi": "1", "durum": "tamamlandi", "egitim_turu": "Genel Ders", "tamamlanma_tarihi": "2026-07-15T09:00:00"},   # İÇERDE (15 dahil)
-        {"id": "k3", "ogrenci_id": S["s3"], "kur_adi": "1", "durum": "tamamlandi", "egitim_turu": "Genel Ders", "tamamlanma_tarihi": "2026-06-15T09:00:00"},   # DIŞARDA (15 hariç)
-        {"id": "k4", "ogrenci_id": S["s4"], "kur_adi": "1", "durum": "tamamlandi", "egitim_turu": "Genel Ders", "tamamlanma_tarihi": "2026-07-16T09:00:00"},   # DIŞARDA (sonraki dönem)
+        {"id": "k1", "ogrenci_id": S["s1"], "kur_adi": "1", "durum": "tamamlandi", "egitim_turu": "Hızlı Okuma", "odeme_tamamlanma_tarihi": "2026-06-16T10:00:00"},  # İÇERDE
+        {"id": "k2", "ogrenci_id": S["s2"], "kur_adi": "1", "durum": "tamamlandi", "egitim_turu": "Genel Ders", "odeme_tamamlanma_tarihi": "2026-07-15T09:00:00"},   # İÇERDE (15 dahil)
+        {"id": "k3", "ogrenci_id": S["s3"], "kur_adi": "1", "durum": "tamamlandi", "egitim_turu": "Genel Ders", "odeme_tamamlanma_tarihi": "2026-06-15T09:00:00"},   # DIŞARDA (15 hariç)
+        {"id": "k4", "ogrenci_id": S["s4"], "kur_adi": "1", "durum": "tamamlandi", "egitim_turu": "Genel Ders", "odeme_tamamlanma_tarihi": "2026-07-16T09:00:00"},   # DIŞARDA (sonraki dönem)
     ])
 
     H_admin = {"Authorization": f"Bearer {create_access_token({'sub': admin_id})}"}

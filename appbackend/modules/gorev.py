@@ -91,6 +91,7 @@ async def create_gorev(gorev: GorevCreate, current_user=Depends(get_current_user
     )
     data = model.dict()
     await db.gorevler.insert_one(data)
+    data.pop("_id", None)  # insert_one'ın eklediği ObjectId'i response'tan çıkar (JSON serialize edilemez)
     # Bildirim gönder
     try: await bildirim_gorev_atandi(data.get("hedef_id"), data.get("baslik", ""), data.get("atayan_ad", ""))
     except: pass
@@ -133,6 +134,7 @@ async def create_toplu_gorev(payload: dict, current_user=Depends(get_current_use
         )
         data = model.dict()
         await db.gorevler.insert_one(data)
+        data.pop("_id", None)  # insert_one'ın eklediği ObjectId'i response'tan çıkar (JSON serialize edilemez)
         olusturulan.append(data)
 
     return {"olusturulan": len(olusturulan), "gorevler": olusturulan}

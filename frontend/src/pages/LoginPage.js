@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
 import Logo from "../components/Logo";
+import BakimEkrani from "../components/BakimEkrani";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -13,6 +14,13 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [mode, setMode] = useState("login"); // login | forgot | reset-done
   const [forgotResult, setForgotResult] = useState(null);
+  const [bakimDurum, setBakimDurum] = useState(null); // public /sistem/durum
+  const [yoneticiGiris, setYoneticiGiris] = useState(false);
+
+  // Bakım durumunu public uçtan oku (auth yok)
+  useEffect(() => {
+    axios.get(`${API}/sistem/durum`).then((r) => setBakimDurum(r.data || null)).catch(() => {});
+  }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -25,11 +33,23 @@ export default function LoginPage() {
     try {
       await login(emailOrPhone.trim(), password);
     } catch (err) {
+      // Bakım modu: admin-dışı giriş → bakım ekranını göster
+      if (err.response?.status === 503 && err.response.data?.bakim) {
+        setBakimDurum({ bakim: true, mesaj: err.response.data.mesaj, tahmini_bitis: err.response.data.tahmini_bitis });
+        setYoneticiGiris(false);
+        return;
+      }
       setError(err.response?.data?.detail || "Giriş başarısız. Bilgilerinizi kontrol edin.");
     } finally {
       setLoading(false);
     }
   };
+
+  // Bakım açık ve yönetici girişi seçilmediyse → bakım ekranı (admin "Yönetici girişi" ile açar)
+  if (bakimDurum?.bakim && !yoneticiGiris) {
+    return <BakimEkrani mesaj={bakimDurum.mesaj} tahminiBitis={bakimDurum.tahmini_bitis}
+                        onYonetici={() => setYoneticiGiris(true)} />;
+  }
 
   const handleForgot = async (e) => {
     e.preventDefault();

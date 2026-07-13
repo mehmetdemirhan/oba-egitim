@@ -148,6 +148,13 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
     k.kur_ucreti_id
       ? req(() => axios.patch(`${apiBase}/muhasebe/kur-ucreti/${k.kur_ucreti_id}`, { tutar: parseFloat(yeniTutar) || 0 }))
       : alanKaydet(k.kisi_id, "yapilmasi_gereken_odeme", yeniTutar);
+  // SPEC B — kur satırında öğretmen payı snapshot düzeltme (admin/muhasebe; öğretmen görmez)
+  const payKaydet = async (c, kisiId, yeniPay) => {
+    if (!c.kur_ucreti_id) return false;
+    const ok = await req(() => axios.patch(`${apiBase}/muhasebe/kur-ucreti/${c.kur_ucreti_id}/pay`, { ogretmen_pay: parseFloat(yeniPay) || 0 }), "Pay güncellenemedi");
+    if (ok) kurOzetCek(kisiId);
+    return ok;
+  };
 
   const odemeSil = async () => {
     if (await req(() => axios.delete(`${apiBase}/payments/${silDialog.id}`), "Silinemedi")) {
@@ -311,11 +318,12 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
                                       <th className="px-2 py-1.5 text-right">Beklenen</th>
                                       <th className="px-2 py-1.5 text-right">Ödenen</th>
                                       <th className="px-2 py-1.5 text-right">Kalan</th>
+                                      <th className="px-2 py-1.5 text-right" title="Öğretmen payı — öğretmen bu sütunu görmez">Öğr. Payı</th>
                                       <th className="px-2 py-1.5">Durum</th>
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {kurlar.length === 0 && <tr><td colSpan={6} className="px-2 py-2 text-subtle">Yükleniyor…</td></tr>}
+                                    {kurlar.length === 0 && <tr><td colSpan={7} className="px-2 py-2 text-subtle">Yükleniyor…</td></tr>}
                                     {kurlar.map((c, i) => (
                                       <tr key={c.kur_ucreti_id || i} className={`border-b border-line last:border-0 ${c.gizli ? "opacity-60" : ""}`}>
                                         <td className="px-2 py-1.5 font-medium text-content">{c.kur || "—"}</td>
@@ -323,6 +331,14 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
                                         <td className="px-2 py-1.5 text-right tabular-nums">{formatTL(c.yapilmasi_gereken_odeme)}</td>
                                         <td className="px-2 py-1.5 text-right tabular-nums text-emerald-600">{formatTL(c.yapilan_odeme)}</td>
                                         <td className={`px-2 py-1.5 text-right tabular-nums ${c.kalan > 0 ? "text-amber-600 font-medium" : "text-subtle"}`}>{formatTL(c.kalan)}</td>
+                                        <td className="px-2 py-1.5 text-right">
+                                          {c.kur_ucreti_id ? (
+                                            <input type="number" min="0" defaultValue={c.ogretmen_pay ?? ""}
+                                              onBlur={(e) => { const v = e.target.value; if (v !== String(c.ogretmen_pay ?? "")) payKaydet(c, k.kisi_id, v); }}
+                                              className="w-16 border border-line rounded px-1 py-0.5 text-right text-xs bg-surface tabular-nums"
+                                              title="Öğretmen payı (₺) — satır içi düzeltilebilir" />
+                                          ) : <span className="text-subtle text-xs">—</span>}
+                                        </td>
                                         <td className="px-2 py-1.5 whitespace-nowrap">
                                           {c.durum === "tamamlandi"
                                             ? <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">Tamamlandı</span>
@@ -337,6 +353,7 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
                                         <td className="px-2 py-1.5 text-right tabular-nums">{formatTL(oz.toplam.beklenen)}</td>
                                         <td className="px-2 py-1.5 text-right tabular-nums text-emerald-600">{formatTL(oz.toplam.odenen)}</td>
                                         <td className={`px-2 py-1.5 text-right tabular-nums ${oz.toplam.kalan > 0 ? "text-amber-600" : "text-subtle"}`}>{formatTL(oz.toplam.kalan)}</td>
+                                        <td></td>
                                         <td></td>
                                       </tr>
                                     )}
