@@ -83,6 +83,8 @@ class Student(BaseModel):
     yapilan_odeme: float = 0.0
     ogretmene_yapilacak_odeme: float = 0.0
     ogretmen_id: Optional[str] = None
+    il: Optional[str] = None
+    ilce: Optional[str] = None
     arsivli: bool = False
     # Eğitimi Tamamladı (mezuniyet) akışı
     mezun: bool = False
@@ -103,6 +105,8 @@ class StudentCreate(BaseModel):
     yapilmasi_gereken_odeme: float = 0.0
     ogretmene_yapilacak_odeme: float = 0.0
     ogretmen_id: Optional[str] = None
+    il: Optional[str] = None
+    ilce: Optional[str] = None
 
 class StudentUpdate(BaseModel):
     ad: Optional[str] = None
@@ -117,6 +121,8 @@ class StudentUpdate(BaseModel):
     yapilan_odeme: Optional[float] = None
     ogretmene_yapilacak_odeme: Optional[float] = None
     ogretmen_id: Optional[str] = None
+    il: Optional[str] = None
+    ilce: Optional[str] = None
     arsivli: Optional[bool] = None
 
 class Course(BaseModel):

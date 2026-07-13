@@ -41,7 +41,7 @@ MAX_DOSYA_BYTE = 8 * 1024 * 1024  # 8 MB
 # Varsayılan kolon eşlemesi (pozisyon bazlı — başlıklar anlamsız).
 _VARSAYILAN_KOLON = {
     "kayit_tarihi": 0, "ogretmen_ad": 1, "ogrenci_ad": 2, "sinif": 3, "kur": 4,
-    "veli_ad": 5, "veli_telefon": 7, "notlar": 8, "durum": 9,
+    "veli_ad": 5, "veli_telefon": 7, "notlar": 8, "durum": 9, "il": 10,
 }
 # Başlık satırı tespiti için ipuçları.
 _BASLIK_IPUCU = ["telefon", "öğretmen", "ogretmen", "öğrenci", "ogrenci", "sınıf", "sinif", "kur", "veli", "tarih", "not"]
@@ -139,6 +139,7 @@ def _satir_isle(satir: list, kolon: dict, ogretmen_harita: dict, satir_no: int) 
         "egitim_notu": not_sinif["egitim_notu"],
         "aciklama": not_sinif["aciklama"],
         "taksit_notu": not_sinif["taksit_notu"],
+        "il": (ham.get("il", "") or "").strip(),  # "Şehir" kolonu → il
     }
 
     # Kuyruk: öğrenci adı geçersiz/kur yok → elle; öğretmen belirsiz VEYA telefon
@@ -420,7 +421,8 @@ async def toplu_kayit_uygula(taslak_id: str, dry_run: bool = Query(False), curre
                             "veli_soyad": n.get("veli_soyad", ""), "veli_telefon": n.get("veli_telefon") or "",
                             "aldigi_egitim": "", "kur": str(n["kurlar"][0]) if n["kurlar"] else "",
                             "yapilmasi_gereken_odeme": 0.0, "yapilan_odeme": 0.0, "ogretmene_yapilacak_odeme": 0.0,
-                            "ogretmen_id": teacher_id, "arsivli": False, "olusturma_tarihi": now, "kaynak": "toplu_kayit"}
+                            "ogretmen_id": teacher_id, "arsivli": False, "il": n.get("il", ""),
+                            "olusturma_tarihi": now, "kaynak": "toplu_kayit"}
                     if n.get("egitim_notu"):
                         sdoc["egitim_notu"] = n["egitim_notu"]   # yalnız eğitimci rollerinin göreceği alan
                     await db.students.insert_one(sdoc)
