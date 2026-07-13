@@ -591,7 +591,7 @@ function AppContent() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           {!isFullscreen && (
-          <TabsList className="inline-flex h-12 items-center justify-center rounded-2xl bg-surface p-1 shadow-sm border border-line flex-wrap gap-1 mb-6">
+          <TabsList className="flex w-full items-center justify-start rounded-2xl bg-surface p-1 shadow-sm border border-line gap-1 mb-6 overflow-x-auto flex-nowrap h-auto">
             <TabsTrigger value="dashboard" className={tabClass}><BarChart3 className="h-4 w-4 mr-2" />Dashboard</TabsTrigger>
             <TabsTrigger value="teachers" className={tabClass}><UserCheck className="h-4 w-4 mr-2" />Öğretmenler</TabsTrigger>
             <TabsTrigger value="students" className={tabClass}><Users className="h-4 w-4 mr-2" />Öğrenciler</TabsTrigger>
@@ -7282,7 +7282,7 @@ function OgrenciPaneli({ user, logout }) {
         {/* ═══ GÖREVLERİM ═══ */}
         {aktifSekme === "gorevler" && (<div className="space-y-3"><h2 className="text-lg font-bold">Görevlerim</h2>
           {bekleyenGorevler.length === 0 && tamamlananGorevler.length === 0 ? (<div className="text-center py-12"><div className="text-5xl mb-3">✅</div><p className="text-subtle">Tüm görevler tamamlandı!</p></div>) : (<>
-            {bekleyenGorevler.map(g => (<Card key={g.id} className="border border-line shadow-sm"><CardContent className="p-4 flex items-start justify-between gap-3"><div className="min-w-0"><div className="font-bold text-sm">{g.baslik}</div>{g.aciklama && <p className="text-xs text-subtle mt-1">{g.aciklama}</p>}<div className="text-xs text-subtle mt-1">{g.atayan_ad && `Atayan: ${g.atayan_ad}`}{g.son_tarih && ` • Son: ${new Date(g.son_tarih).toLocaleDateString('tr-TR')}`}</div>{g.film_link && <a href={g.film_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 block mt-1">🎬 Film Linki</a>}{g.makale_link && <a href={g.makale_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 block mt-1">📄 Makale</a>}</div>{g.tur === "sinav_odevi" ? <Button size="sm" className="bg-indigo-600 text-white text-xs shrink-0" onClick={() => sinavBaslat(g.icerik_id, g.id)}>Sınavı Başlat</Button> : <Button size="sm" className="bg-green-600 text-white text-xs shrink-0" onClick={() => gorevTamamla(g.id)}>Tamamla</Button>}</CardContent></Card>))}
+            {bekleyenGorevler.map(g => (<Card key={g.id} className="border border-line shadow-sm"><CardContent className="p-4 flex items-start justify-between gap-3"><div className="min-w-0"><div className="font-bold text-sm">{g.baslik}</div>{g.aciklama && <p className="text-xs text-subtle mt-1">{g.aciklama}</p>}<div className="text-xs text-subtle mt-1">{g.atayan_ad && `Atayan: ${g.atayan_ad}`}{g.son_tarih && ` • Son: ${new Date(g.son_tarih).toLocaleDateString('tr-TR')}`}</div>{g.film_izle_link && <a href={g.film_izle_link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 mt-1 mr-2 px-2 py-1 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700">▶ İzle</a>}{g.film_link && <a href={g.film_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 mt-1 inline-block">🎬 Film Linki</a>}{g.makale_link && <a href={g.makale_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 block mt-1">📄 Makale</a>}</div>{g.tur === "sinav_odevi" ? <Button size="sm" className="bg-indigo-600 text-white text-xs shrink-0" onClick={() => sinavBaslat(g.icerik_id, g.id)}>Sınavı Başlat</Button> : <Button size="sm" className="bg-green-600 text-white text-xs shrink-0" onClick={() => gorevTamamla(g.id)}>Tamamla</Button>}</CardContent></Card>))}
             {tamamlananGorevler.length >0 && (<><h3 className="text-xs font-medium text-subtle mt-4">Tamamlanan ({tamamlananGorevler.length})</h3>{tamamlananGorevler.slice(0,5).map(g =>(<div key={g.id} className="bg-green-50 rounded-xl p-3 border border-green-100 opacity-60 text-sm">{g.baslik}</div>))}</>)}
           </>)}
         </div>)}
@@ -10056,6 +10056,11 @@ function GorevYonetimi({ user, students, teachers }) {
   const [kitapYukleniyor, setKitapYukleniyor] = useState(false);
   const [gelisimIcerikleri, setGelisimIcerikleri] = useState([]);
   const [icerikSecDialogu, setIcerikSecDialogu] = useState(false);
+  const [icerikArama, setIcerikArama] = useState("");
+  const [icerikTurFiltre, setIcerikTurFiltre] = useState("");   // "" = tümü
+  const [yeniIcerikModal, setYeniIcerikModal] = useState(false);
+  const [yeniIcerik, setYeniIcerik] = useState({ baslik: "", tur: "film", aciklama: "", hedef_kitle: "ogrenci", film_link: "", film_izle_link: "", film_gorsel: "", makale_link: "", kitap_yazar: "" });
+  const [yeniIcerikKaydediliyor, setYeniIcerikKaydediliyor] = useState(false);
   // Sınav ödevi seti (otomatik kriter)
   const [sinavDersler, setSinavDersler] = useState([]);
   const [sinavKriter, setSinavKriter] = useState({ ders: "", zorluk: "", soruSayisi: 10 });
@@ -10088,7 +10093,7 @@ function GorevYonetimi({ user, students, teachers }) {
     ? <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-primary text-xs rounded-full font-medium"><Users className="h-3 w-3" />Öğretmen</span>
     : <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-600 text-xs rounded-full font-medium"><GraduationCap className="h-3 w-3" />Öğrenci</span>;
 
-  const resetForm = () => setForm({ baslik: "", aciklama: "", tur: "ozel", hedef_tip: form.hedef_tip, son_tarih: "", icerik_id: "", makale_link: "", kitap_yazar: "", kitap_isbn: "", kitap_link: "", kitap_kapak: "", film_link: "" });
+  const resetForm = () => setForm({ baslik: "", aciklama: "", tur: "ozel", hedef_tip: form.hedef_tip, son_tarih: "", icerik_id: "", makale_link: "", kitap_yazar: "", kitap_isbn: "", kitap_link: "", kitap_kapak: "", film_link: "", film_izle_link: "", film_gorsel: "" });
 
   const gorevOlustur = async (e) => {
     e.preventDefault();
@@ -10130,8 +10135,58 @@ function GorevYonetimi({ user, students, teachers }) {
     setKitapYukleniyor(false);
   };
 
+  // Film bilgisi çekme (sinemalar.com) — başarısızsa sessiz, elle doldurulur
+  const filmBilgiCekGorev = async (link) => {
+    if (!link.trim()) return;
+    setKitapYukleniyor(true);
+    try {
+      const r = await axios.post(`${API}/film-bilgi-cek`, { link });
+      const d = r.data || {};
+      setForm(prev => ({ ...prev, baslik: d.baslik || prev.baslik,
+        aciklama: d.ozet || prev.aciklama, film_link: link, film_gorsel: d.gorsel || prev.film_gorsel }));
+      if (d.baslik) toast({ title: "🎬 Film bilgileri çekildi!" });
+      else toast({ title: "Bilgi çekilemedi, alanları elle doldurun", variant: "destructive" });
+    } catch (e) { toast({ title: "Bilgi çekilemedi, elle girin", variant: "destructive" }); }
+    setKitapYukleniyor(false);
+  };
+
+  // Havuz seçim dialogunu aç — tür filtresini seçili görev türüne ön-ayarla
+  const havuzuAc = () => {
+    fetchGelisimIcerikleri();
+    const havuzTurleri = ["film", "kitap", "makale", "hizmetici"];
+    setIcerikTurFiltre(havuzTurleri.includes(form.tur) ? form.tur : "");
+    setIcerikArama("");
+    setIcerikSecDialogu(true);
+  };
+  // Yeni içerik modalında film bilgisi çek
+  const yeniIcerikFilmCek = async () => {
+    if (!yeniIcerik.film_link.trim()) return;
+    setYeniIcerikKaydediliyor(true);
+    try {
+      const r = await axios.post(`${API}/film-bilgi-cek`, { link: yeniIcerik.film_link });
+      const d = r.data || {};
+      setYeniIcerik(p => ({ ...p, baslik: d.baslik || p.baslik, aciklama: d.ozet || p.aciklama, film_gorsel: d.gorsel || p.film_gorsel }));
+      toast({ title: d.baslik ? "🎬 Bilgiler çekildi" : "Çekilemedi, elle girin", variant: d.baslik ? undefined : "destructive" });
+    } catch { toast({ title: "Çekilemedi, elle girin", variant: "destructive" }); }
+    setYeniIcerikKaydediliyor(false);
+  };
+  // Yeni içeriği havuza ekle → otomatik seçili olarak göreve döndür
+  const yeniIcerikKaydet = async () => {
+    if (!yeniIcerik.baslik.trim()) { toast({ title: "Başlık gerekli", variant: "destructive" }); return; }
+    setYeniIcerikKaydediliyor(true);
+    try {
+      const r = await axios.post(`${API}/gelisim/icerik`, yeniIcerik);
+      const eklenen = r.data?.id ? r.data : { ...yeniIcerik, id: r.data?.id };
+      toast({ title: "İçerik havuza eklendi ve seçildi" });
+      setYeniIcerikModal(false);
+      iceriktenGorev(eklenen);   // otomatik seç → göreve döner
+      setYeniIcerik({ baslik: "", tur: "film", aciklama: "", hedef_kitle: "ogrenci", film_link: "", film_izle_link: "", film_gorsel: "", makale_link: "", kitap_yazar: "" });
+    } catch (e) { toast({ title: "Eklenemedi", description: e?.response?.data?.detail, variant: "destructive" }); }
+    setYeniIcerikKaydediliyor(false);
+  };
+
   const iceriktenGorev = (icerik) => {
-    setForm({ ...form, baslik: icerik.baslik, aciklama: icerik.aciklama, tur: icerik.tur, icerik_id: icerik.id, makale_link: icerik.makale_link || "", kitap_yazar: icerik.kitap_yazar || "", kitap_isbn: icerik.kitap_isbn || "", kitap_link: icerik.kitap_link || "", kitap_kapak: icerik.kitap_kapak || "" });
+    setForm({ ...form, baslik: icerik.baslik, aciklama: icerik.aciklama, tur: icerik.tur, icerik_id: icerik.id, makale_link: icerik.makale_link || "", kitap_yazar: icerik.kitap_yazar || "", kitap_isbn: icerik.kitap_isbn || "", kitap_link: icerik.kitap_link || "", kitap_kapak: icerik.kitap_kapak || "", film_link: icerik.film_link || "", film_izle_link: icerik.film_izle_link || "", film_gorsel: icerik.film_gorsel || "" });
     setIcerikSecDialogu(false);
     toast({ title: `"${icerik.baslik}" içeriği görev olarak seçildi` });
   };
@@ -10238,7 +10293,7 @@ function GorevYonetimi({ user, students, teachers }) {
           </Card>
 
           <Card className="border border-line shadow-sm"><CardHeader><div className="flex items-center justify-between"><CardTitle className="text-base">2. Görev Detayı</CardTitle>
-            <button type="button" onClick={() => { fetchGelisimIcerikleri(); setIcerikSecDialogu(true); }} className="text-xs text-primary hover:underline flex items-center gap-1"><BookOpen className="h-3 w-3" /> Mevcut içerikten seç</button></div></CardHeader>
+            <button type="button" onClick={havuzuAc} className="text-xs text-primary hover:underline flex items-center gap-1"><BookOpen className="h-3 w-3" /> Havuzdan seç</button></div></CardHeader>
             <CardContent className="space-y-4">
               <div><Label className="mb-2 block">Görev Türü</Label><div className="flex flex-wrap gap-2">
                 {[{v:"ozel",l:"Özel Görev"},{v:"hizmetici",l:"Hizmetiçi"},{v:"film",l:"Film"},{v:"kitap",l:"Kitap"},{v:"makale",l:"Makale"},{v:"egzersiz",l:"Egzersiz"},{v:"sinav_odevi",l:"Sınav"}].map(t => (
@@ -10249,7 +10304,11 @@ function GorevYonetimi({ user, students, teachers }) {
               <div><Label>Açıklama</Label><textarea value={form.aciklama} onChange={e => setForm({...form, aciklama: e.target.value})} placeholder="Detaylı açıklama..." className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px]" /></div>
               <div><Label>Son Tarih</Label><Input type="date" value={form.son_tarih} onChange={e => setForm({...form, son_tarih: e.target.value})} /></div>
 
-              {form.tur === "film" && (<div className="p-4 bg-app border border-line rounded-xl space-y-3"><div className="inline-flex items-center gap-1.5 font-semibold text-sm text-content"><Film className="h-4 w-4" />Film Bilgileri</div><div><Label>Film Linki</Label><Input value={form.film_link} onChange={e => setForm({...form, film_link: e.target.value})} placeholder="https://..." /></div></div>)}
+              {form.tur === "film" && (<div className="p-4 bg-app border border-line rounded-xl space-y-3"><div className="inline-flex items-center gap-1.5 font-semibold text-sm text-content"><Film className="h-4 w-4" />Film Bilgileri</div>
+                <div><Label>sinemalar.com Linki</Label><div className="flex gap-2"><Input value={form.film_link} onChange={e => setForm({...form, film_link: e.target.value})} placeholder="https://www.sinemalar.com/film/..." /><Button type="button" variant="outline" disabled={kitapYukleniyor} onClick={() => filmBilgiCekGorev(form.film_link)} className="shrink-0">{kitapYukleniyor ? "…" : "Çek"}</Button></div><p className="text-[11px] text-subtle mt-1">Link yapıştırıp "Çek"e basın; ad/özet/afiş otomatik dolar (çekilemezse elle girin).</p></div>
+                {form.film_gorsel && <img src={form.film_gorsel} alt="afiş" className="h-24 rounded border border-line object-cover" />}
+                <div><Label>İzleme Linki (opsiyonel)</Label><Input value={form.film_izle_link} onChange={e => setForm({...form, film_izle_link: e.target.value})} placeholder="YouTube / platform linki — öğrenci 'İzle' görür" /></div>
+              </div>)}
 
               {form.tur === "kitap" && (<div className="p-4 bg-app border border-line rounded-xl space-y-3"><div className="inline-flex items-center gap-1.5 font-semibold text-sm text-content"><BookMarked className="h-4 w-4" />Kitap Bilgileri</div>
                 <div className="flex gap-2"><Input placeholder="ISBN veya Barkod" value={form.kitap_isbn} onChange={e => setForm({...form, kitap_isbn: e.target.value})} className="flex-1" />
@@ -10295,13 +10354,35 @@ function GorevYonetimi({ user, students, teachers }) {
           </div>
         </form>
 
-        <Dialog open={icerikSecDialogu} onOpenChange={setIcerikSecDialogu}><DialogContent className="max-w-xl"><DialogHeader><DialogTitle>Mevcut İçerikten Görev Seç</DialogTitle><DialogDescription>Gelişim alanındaki yayında olan içeriklerden birini görev olarak atayabilirsiniz.</DialogDescription></DialogHeader>
-          <div className="max-h-96 overflow-y-auto space-y-2">
-            {gelisimIcerikleri.length === 0 && <p className="text-subtle text-sm text-center py-8">Yayında içerik yok</p>}
-            {gelisimIcerikleri.map(ic => (<button key={ic.id} onClick={() => iceriktenGorev(ic)}
-              className="w-full text-left p-3 rounded-xl border border-line hover:border-primary hover:bg-app transition-all">
-              <div className="flex items-center gap-2"><span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${turColorGorev(ic.tur)}`}>{turIcon(ic.tur)} {turLabelGorev(ic.tur)}</span><span className="font-medium text-sm">{ic.baslik}</span></div>
-              {ic.aciklama && <p className="text-xs text-subtle mt-1 truncate">{ic.aciklama}</p>}</button>))}
+        <Dialog open={icerikSecDialogu} onOpenChange={setIcerikSecDialogu}><DialogContent className="max-w-xl"><DialogHeader><DialogTitle>İçerik Havuzundan Seç</DialogTitle><DialogDescription>Havuzdaki içeriklerden birini seçin ya da yeni içerik ekleyip atayın.</DialogDescription></DialogHeader>
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative flex-1 min-w-[160px]"><Search className="h-4 w-4 text-subtle absolute left-2.5 top-1/2 -translate-y-1/2" /><Input value={icerikArama} onChange={e => setIcerikArama(e.target.value)} placeholder="İçerik ara…" className="pl-8" /></div>
+            <select value={icerikTurFiltre} onChange={e => setIcerikTurFiltre(e.target.value)} className="border border-line rounded-lg px-2 py-2 text-sm bg-surface">
+              <option value="">Tüm türler</option><option value="film">Film</option><option value="kitap">Kitap</option><option value="makale">Makale</option><option value="hizmetici">Hizmet içi</option>
+            </select>
+            <Button type="button" size="sm" onClick={() => { setYeniIcerik(p => ({ ...p, tur: ["film","kitap","makale","hizmetici"].includes(form.tur) ? form.tur : "film" })); setYeniIcerikModal(true); }} className="bg-emerald-600 text-white shrink-0"><Plus className="h-4 w-4 mr-1" />Yeni ekle</Button>
+          </div>
+          <div className="max-h-96 overflow-y-auto space-y-2 mt-2">
+            {(() => { const q = icerikArama.trim().toLocaleLowerCase("tr"); const liste = gelisimIcerikleri.filter(ic => (!icerikTurFiltre || ic.tur === icerikTurFiltre) && (!q || (ic.baslik||"").toLocaleLowerCase("tr").includes(q) || (ic.aciklama||"").toLocaleLowerCase("tr").includes(q)));
+              if (liste.length === 0) return <p className="text-subtle text-sm text-center py-8">Eşleşen içerik yok. "Yeni ekle" ile havuza ekleyebilirsiniz.</p>;
+              return liste.map(ic => (<button key={ic.id} onClick={() => iceriktenGorev(ic)}
+                className="w-full text-left p-3 rounded-xl border border-line hover:border-primary hover:bg-app transition-all flex items-center gap-3">
+                {ic.film_gorsel && <img src={ic.film_gorsel} alt="" className="h-12 w-9 object-cover rounded shrink-0" />}
+                <div className="min-w-0"><div className="flex items-center gap-2"><span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${turColorGorev(ic.tur)}`}>{turIcon(ic.tur)} {turLabelGorev(ic.tur)}</span><span className="font-medium text-sm">{ic.baslik}</span></div>
+                {ic.aciklama && <p className="text-xs text-subtle mt-1 truncate">{ic.aciklama}</p>}</div></button>)); })()}
+          </div></DialogContent></Dialog>
+
+        <Dialog open={yeniIcerikModal} onOpenChange={setYeniIcerikModal}><DialogContent className="max-w-lg"><DialogHeader><DialogTitle>Havuza Yeni İçerik Ekle</DialogTitle><DialogDescription>Eklenen içerik havuza kaydolur ve göreve otomatik seçilir.</DialogDescription></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Tür</Label><select value={yeniIcerik.tur} onChange={e => setYeniIcerik({...yeniIcerik, tur: e.target.value})} className="w-full border border-line rounded-lg px-2 py-2 text-sm bg-surface"><option value="film">Film</option><option value="kitap">Kitap</option><option value="makale">Makale</option><option value="hizmetici">Hizmet içi</option></select></div>
+            {yeniIcerik.tur === "film" && (<div><Label>sinemalar.com Linki</Label><div className="flex gap-2"><Input value={yeniIcerik.film_link} onChange={e => setYeniIcerik({...yeniIcerik, film_link: e.target.value})} placeholder="https://www.sinemalar.com/film/..." /><Button type="button" variant="outline" disabled={yeniIcerikKaydediliyor} onClick={yeniIcerikFilmCek} className="shrink-0">Çek</Button></div></div>)}
+            {yeniIcerik.film_gorsel && <img src={yeniIcerik.film_gorsel} alt="afiş" className="h-24 rounded border border-line object-cover" />}
+            <div><Label>Başlık</Label><Input value={yeniIcerik.baslik} onChange={e => setYeniIcerik({...yeniIcerik, baslik: e.target.value})} placeholder="İçerik başlığı" /></div>
+            <div><Label>Açıklama / Özet</Label><textarea value={yeniIcerik.aciklama} onChange={e => setYeniIcerik({...yeniIcerik, aciklama: e.target.value})} rows={3} className="w-full border border-line rounded-lg px-3 py-2 text-sm bg-surface" /></div>
+            {yeniIcerik.tur === "film" && (<div><Label>İzleme Linki (opsiyonel)</Label><Input value={yeniIcerik.film_izle_link} onChange={e => setYeniIcerik({...yeniIcerik, film_izle_link: e.target.value})} placeholder="YouTube / platform linki" /></div>)}
+            {yeniIcerik.tur === "makale" && (<div><Label>Makale Linki</Label><Input value={yeniIcerik.makale_link} onChange={e => setYeniIcerik({...yeniIcerik, makale_link: e.target.value})} placeholder="https://..." /></div>)}
+            {yeniIcerik.tur === "kitap" && (<div><Label>Yazar</Label><Input value={yeniIcerik.kitap_yazar} onChange={e => setYeniIcerik({...yeniIcerik, kitap_yazar: e.target.value})} placeholder="Yazar" /></div>)}
+            <div className="flex gap-2"><Button type="button" disabled={yeniIcerikKaydediliyor} onClick={yeniIcerikKaydet} className="flex-1 bg-emerald-600 text-white">Ekle ve Seç</Button><Button type="button" variant="outline" onClick={() => setYeniIcerikModal(false)}>İptal</Button></div>
           </div></DialogContent></Dialog>
       </div>
     );
