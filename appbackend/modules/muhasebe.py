@@ -183,10 +183,12 @@ async def muhasebe_kisiler(current_user=Depends(_ERISIM)):
                 "veli_telefon": s.get("veli_telefon", ""),
                 "muhasebe_notu": s.get("muhasebe_notu", ""),
                 "ogretmen_ad": ogretmen_ad.get(s.get("ogretmen_id"), ""),
+                "ogretmen_id": s.get("ogretmen_id"),
                 "ogretmene_yapilacak_odeme": _num(s.get("ogretmene_yapilacak_odeme")),
             }
             kurlar = kur_map.get(s.get("id")) or []
             if kurlar:
+                pay_map = {k.get("id"): k.get("ogretmen_pay") for k in kurlar}  # SPEC B — kur snapshot payı
                 # FIFO dağılımı (paylaşımlı helper) → satırlar; geçilmiş VE tam ödenmiş
                 # kur ana listede GİZLENİR (öğrenci detayında yine görünür).
                 for d in _kur_dagilimi(kurlar, _num(s.get("yapilan_odeme"))):
@@ -199,6 +201,7 @@ async def muhasebe_kisiler(current_user=Depends(_ERISIM)):
                         "kur": d["kur"],
                         "kayit_zamani": d["kayit_zamani"] or s.get("olusturma_tarihi") or "",
                         "durum": d["durum"],
+                        "ogretmen_pay": pay_map.get(d["kur_ucreti_id"]),
                         "yapilmasi_gereken_odeme": d["yapilmasi_gereken_odeme"],
                         "yapilan_odeme": d["yapilan_odeme"],
                         "kalan": d["kalan"],

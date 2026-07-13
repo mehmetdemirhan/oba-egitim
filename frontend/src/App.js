@@ -28,7 +28,6 @@ import { BildirimTercihleri } from "./components/BildirimTercihleri";
 import MebKelimeYonetimi from "./components/admin/MebKelimeYonetimi";
 import MuhasebePaneli from "./components/MuhasebePaneli";
 import OdemeTablosu from "./components/OdemeTablosu";
-import OgretmenGruplu from "./components/admin/OgretmenGruplu";
 import OgretmenDetayOzet from "./components/admin/OgretmenDetayOzet";
 import { bildirimYonlendir } from "./utils/bildirimYonlendirme";
 import TopluKayit from "./components/admin/TopluKayit";
@@ -506,6 +505,16 @@ function AppContent() {
       fetchStudents(); fetchTeachers(); fetchDashboard();
       toast({ title: "Geri alındı", description: "Öğrenci aktife döndü." });
     } catch (e) { toast({ title: "Geri alınamadı", description: e?.response?.data?.detail, variant: "destructive" }); }
+  };
+
+  // ── SPEC B geçişi: mevcut tam ödenmiş kurları döneme dahil et (tek seferlik) ──
+  const odemeTarihiBackfill = async () => {
+    if (!window.confirm("Ödeme-bazlı hakedişe geçiş:\n\nHÂLEN tam ödenmiş (kalan=0) ama hakedişe girmemiş kurlar, İÇİNDE bulunulan döneme bir kez dahil edilecek. Geçmiş dönemler YENİDEN HESAPLANMAZ.\n\nÖnce Muhasebe Ayarları'nda öğretmen payı tanımını girdiğinden emin ol. Devam?")) return;
+    try {
+      const r = await axios.post(`${API}/muhasebe/gecis/odeme-tarihi-backfill`);
+      muhasebeYenile();
+      toast({ title: "Geçiş tamamlandı", description: `${r.data?.damgalanan_kur ?? 0} kur bu döneme dahil edildi.` });
+    } catch (e) { toast({ title: "Geçiş başarısız", description: e?.response?.data?.detail, variant: "destructive" }); }
   };
 
   // ── Arşivleme ──
@@ -1297,21 +1306,26 @@ function AppContent() {
               <div>
                 <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
                   <h3 className="text-base font-semibold text-content">Öğrenci Ödemeleri</h3>
-                  <div className="inline-flex rounded-lg border border-line overflow-hidden text-sm">
-                    <button onClick={() => setOdemeGorunum("duz")}
-                            className={`px-3 py-1.5 ${odemeGorunum === "duz" ? "bg-indigo-600 text-white" : "hover:bg-app"}`}>Düz Liste</button>
-                    <button onClick={() => setOdemeGorunum("gruplu")}
-                            className={`px-3 py-1.5 border-l border-line ${odemeGorunum === "gruplu" ? "bg-indigo-600 text-white" : "hover:bg-app"}`}>Öğretmene Göre</button>
+                  <div className="flex items-center gap-2">
+                    {user.role === "admin" && odemeGorunum === "gruplu" && (
+                      <button onClick={odemeTarihiBackfill} title="Ödeme-bazlı hakedişe geçiş: mevcut tam ödenmiş kurları içinde bulunulan döneme bir kez dahil eder (geçmişi bozmaz)."
+                              className="text-xs px-2.5 py-1.5 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50">
+                        ⚙️ Mevcut ödemeleri döneme dahil et
+                      </button>
+                    )}
+                    <div className="inline-flex rounded-lg border border-line overflow-hidden text-sm">
+                      <button onClick={() => setOdemeGorunum("duz")}
+                              className={`px-3 py-1.5 ${odemeGorunum === "duz" ? "bg-indigo-600 text-white" : "hover:bg-app"}`}>Düz Liste</button>
+                      <button onClick={() => setOdemeGorunum("gruplu")}
+                              className={`px-3 py-1.5 border-l border-line ${odemeGorunum === "gruplu" ? "bg-indigo-600 text-white" : "hover:bg-app"}`}>Öğretmene Göre</button>
+                    </div>
                   </div>
                 </div>
-                {odemeGorunum === "gruplu" ? (
-                  <OgretmenGruplu apiBase={API} />
-                ) : (
-                  <OdemeTablosu tip="ogrenci" kisiler={muhasebeKisiler.ogrenciler} payments={payments} apiBase={API} onDegisim={muhasebeYenile}
-                    sadeceBorclu={muhasebeBorclu} onBorcluTemizle={() => setMuhasebeBorclu(false)}
-                    yasKovasi={muhasebeYasKovasi} onYasTemizle={() => setMuhasebeYasKovasi(null)}
-                    odakKisiId={muhasebeOdakKisi} onOdakTemizle={() => setMuhasebeOdakKisi("")} />
-                )}
+                <OdemeTablosu tip="ogrenci" kisiler={muhasebeKisiler.ogrenciler} payments={payments} apiBase={API} onDegisim={muhasebeYenile}
+                  grupla={odemeGorunum === "gruplu"}
+                  sadeceBorclu={muhasebeBorclu} onBorcluTemizle={() => setMuhasebeBorclu(false)}
+                  yasKovasi={muhasebeYasKovasi} onYasTemizle={() => setMuhasebeYasKovasi(null)}
+                  odakKisiId={muhasebeOdakKisi} onOdakTemizle={() => setMuhasebeOdakKisi("")} />
               </div>
               <div>
                 <h3 className="text-base font-semibold text-content mb-2">Öğretmen Ödemeleri</h3>
@@ -1421,7 +1435,6 @@ function AppContent() {
             <TabsContent value="ayarlar">
               <div className="space-y-6">
                 <SistemAyarlari user={user} />
-                {user.role === "admin" && <BakimModu apiBase={API} />}
                 <EgitimTurleriYonetimi apiBase={API} />
               </div>
             </TabsContent>
@@ -9423,7 +9436,7 @@ function SistemAyarlari({ user }) {
       <p className="text-subtle text-sm">Rozet, XP, lig ve anket ayarlarını buradan yönetin. Değişiklikler anında uygulanır.</p>
 
       <div className="flex gap-2 flex-wrap">
-        {[{id:"ozellikler",l:"Özellik Yönetimi"},{id:"xp",l:"XP Değerleri"},{id:"ogretmen_xp",l:"Öğretmen XP"},{id:"lig",l:"Lig Eşikleri"},{id:"ogretmen_rozet",l:"Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"Öğrenci Rozetleri"},{id:"anket",l:"Anket Soruları"},{id:"kutulu_okuma",l:"Kutulu Okuma"},{id:"rapor_olcutleri",l:"Rapor Ölçütleri"},{id:"timi_anahtar",l:"TIMI Puanlama Anahtarı"},{id:"profil_gorunurluk",l:"Profil Görünürlüğü"},{id:"instagram",l:"Instagram"},{id:"kvkk",l:"Veri & KVKK"},{id:"sezon",l:"Sezonluk Reset"}].map(s => (
+        {[{id:"ozellikler",l:"Özellik Yönetimi"},{id:"xp",l:"XP Değerleri"},{id:"ogretmen_xp",l:"Öğretmen XP"},{id:"lig",l:"Lig Eşikleri"},{id:"ogretmen_rozet",l:"Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"Öğrenci Rozetleri"},{id:"anket",l:"Anket Soruları"},{id:"kutulu_okuma",l:"Kutulu Okuma"},{id:"rapor_olcutleri",l:"Rapor Ölçütleri"},{id:"timi_anahtar",l:"TIMI Puanlama Anahtarı"},{id:"profil_gorunurluk",l:"Profil Görünürlüğü"},{id:"instagram",l:"Instagram"},{id:"kvkk",l:"Veri & KVKK"},{id:"sezon",l:"Sezonluk Reset"},...(user?.role === "admin" ? [{id:"bakim",l:"🔧 Bakım Modu"}] : [])].map(s => (
           <button key={s.id} onClick={() => setAyarSekme(s.id)}
             className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${ayarSekme === s.id ? 'bg-primary text-white border-blue-600' : 'bg-surface text-subtle border-line'}`}>{s.l}</button>
         ))}
@@ -9560,6 +9573,9 @@ function SistemAyarlari({ user }) {
       {/* Sezonluk Reset */}
       {ayarSekme === "sezon" && (
         <SezonlukReset user={user} />
+      )}
+      {ayarSekme === "bakim" && user?.role === "admin" && (
+        <BakimModu apiBase={API} />
       )}
     </div>
   );
