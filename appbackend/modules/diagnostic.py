@@ -190,6 +190,54 @@ class MetinOyCreate(BaseModel):
 
 
 # ★ Metin ekleme endpoint'i (frontend: axios.post(`${API}/diagnostic/texts`, ...))
+@router.post("/diagnostic/akici-okuma-goc")
+async def akici_okuma_goc(current_user=Depends(require_role(UserRole.ADMIN))):
+    """AKICI OKUMA metinlerini (150, sorularıyla) Analiz havuzuna yükler; DİĞER tüm
+    metinleri 'Okuma Parçaları' bölümüne taşır (SİLMEZ). Başlık eşleşmesinde mükerrer
+    oluşturmaz (mevcut kaydı günceller). İdempotent — tekrar çalıştırılabilir."""
+    import json as _json
+    import os as _os
+    yol = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
+                        "data", "akici_okuma_metinleri.json")
+    if not _os.path.exists(yol):
+        raise HTTPException(status_code=404, detail="akici_okuma_metinleri.json bulunamadı")
+    with open(yol, encoding="utf-8") as f:
+        metinler = _json.load(f)
+
+    now = datetime.utcnow().isoformat()
+    # 1) TÜM mevcut metinleri geçici olarak 'okuma_parcalari'na al; 150 yeni metin
+    #    aşağıda (başlık+kelime eşleşmesiyle) 'analiz'e geri çekilir. Aynı başlıklı ama
+    #    farklı kelime sayılı metinler ayrı sayılır (docx'te tekrar eden başlıklar var).
+    toplam_mevcut = await db.analiz_metinler.count_documents({})
+    await db.analiz_metinler.update_many({}, {"$set": {"bolum": "okuma_parcalari"}})
+
+    eklenen, guncellenen = 0, 0
+    for m in metinler:
+        ortak = {
+            "baslik": m["baslik"], "icerik": m["icerik"], "kelime_sayisi": m["kelime_sayisi"],
+            "sorular": m.get("sorular", []), "acik_uclu": m.get("acik_uclu", []),
+            "bolum": "analiz", "durum": "havuzda", "kaynak": "akici_okuma_yeni",
+            "guncelleme_tarihi": now,
+        }
+        # Bileşik anahtar: başlık + kelime sayısı (mükerrer başlıkları çökertmemek için)
+        mevcut = await db.analiz_metinler.find_one(
+            {"baslik": m["baslik"], "kelime_sayisi": m["kelime_sayisi"]})
+        if mevcut:
+            await db.analiz_metinler.update_one({"id": mevcut["id"]}, {"$set": ortak})
+            guncellenen += 1
+        else:
+            await db.analiz_metinler.insert_one({
+                "id": str(uuid.uuid4()), **ortak, "tur": "olcum", "zorluk": "orta",
+                "oylar": {}, "ekleyen_id": current_user["id"],
+                "olusturma_tarihi": now, "yayin_tarihi": now,
+            })
+            eklenen += 1
+    okuma_parcalari_say = await db.analiz_metinler.count_documents({"bolum": "okuma_parcalari"})
+    return {"ok": True, "eklenen": eklenen, "guncellenen": guncellenen,
+            "okuma_parcalarina_tasinan": okuma_parcalari_say, "onceki_toplam": toplam_mevcut,
+            "toplam_metin": len(metinler)}
+
+
 @router.post("/diagnostic/texts")
 async def create_metin(data: MetinCreate, current_user=Depends(get_current_user)):
     role = current_user.get("role", "")
@@ -352,12 +400,19 @@ async def get_metinler(
     sinif_seviyesi: Optional[str] = None,
     min_kelime: Optional[int] = None,   # SEVİYE (kelime sayısı) alt sınırı
     max_kelime: Optional[int] = None,   # SEVİYE (kelime sayısı) üst sınırı
+    bolum: Optional[str] = None,        # None/"analiz" = Analiz havuzu; "okuma_parcalari" = eski metinler
     current_user=Depends(get_current_user),
 ):
     role = current_user.get("role", "")
     user_id = current_user.get("id", "")
 
     query = {}
+    # Bölüm ayrımı: Analiz yalnız yeni havuzla (bolum != okuma_parcalari) çalışır.
+    # "Okuma Parçaları" bölümü eski/pasife alınan metinleri gösterir.
+    if bolum == "okuma_parcalari":
+        query["bolum"] = "okuma_parcalari"
+    else:
+        query["bolum"] = {"$ne": "okuma_parcalari"}
     if sinif_seviyesi:
         m = re.search(r"\d+", sinif_seviyesi)
         if m:
