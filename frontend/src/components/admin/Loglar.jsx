@@ -204,8 +204,9 @@ export default function Loglar({ apiBase }) {
         </div>
       </div>
 
-      {/* Saatlik yoğunluk ısı haritası */}
-      <div className="bg-surface border border-line rounded-2xl shadow-sm p-4">
+      {/* Saatlik yoğunluk ısı haritası + kullanım süresi (yan yana) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="bg-surface border border-line rounded-2xl shadow-sm p-4 lg:col-span-2">
         <h3 className="text-sm font-bold text-content mb-3">Saatlik yoğunluk (gün × saat, son 30 gün)</h3>
         <div className="overflow-x-auto">
           <table className="border-collapse">
@@ -236,6 +237,32 @@ export default function Loglar({ apiBase }) {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Kullanıcıların Geçirdiği Süre */}
+      <div className="bg-surface border border-line rounded-2xl shadow-sm p-4">
+        <h3 className="text-sm font-bold text-content mb-1 inline-flex items-center gap-1">
+          Kullanıcıların Geçirdiği Süre
+          <span title="Ortalama oturum süresi: giriş→çıkış çiftlerinden hesaplanır. Çıkış yoksa son aktiviteye (token yenileme) göre tahmin edilir; tahmin en fazla 20 dk varsayılır. Son 30 gün."
+                className="text-subtle cursor-help">ⓘ</span>
+        </h3>
+        <p className="text-xs text-subtle mb-3">Ortalama oturum (son 30 gün)</p>
+        <div className="text-center mb-3">
+          <div className="text-3xl font-bold text-indigo-600 tabular-nums">{ozet?.oturum_sure?.ortalama_dk ?? 0}<span className="text-base font-medium text-subtle"> dk</span></div>
+          <div className="text-xs text-subtle">{ozet?.oturum_sure?.toplam_oturum ?? 0} oturum</div>
+        </div>
+        <div className="space-y-1.5">
+          {(ozet?.oturum_sure?.rol_bazli || []).map((r) => (
+            <div key={r.rol} className="flex items-center justify-between text-sm">
+              <span className="text-subtle">{ROL_ETIKET[r.rol] || r.rol || "?"}</span>
+              <span className="text-content tabular-nums"><b>{r.ortalama_dk}</b> dk <span className="text-xs text-subtle">({r.oturum_sayisi})</span></span>
+            </div>
+          ))}
+          {(!ozet?.oturum_sure?.rol_bazli || ozet.oturum_sure.rol_bazli.length === 0) && (
+            <p className="text-xs text-subtle text-center py-2">Yeterli oturum verisi yok.</p>
+          )}
+        </div>
+      </div>
       </div>
 
       {/* Canlı akış tablosu */}
