@@ -182,7 +182,7 @@ async def get_vergi_orani() -> float:
 # Eğitim türü bazlı tanımlanabilir; tanımsız türde "genel" varsayılan kullanılır.
 # Değer generic /ayarlar/kur_ucretleri ile "degerler" altında saklanır:
 #   {"genel": 1000, "turler": {"Hızlı Okuma": 1500, ...}}
-KUR_UCRETLERI_DEFAULT = {"genel": 0, "turler": {}}
+KUR_UCRETLERI_DEFAULT = {"genel": 14400, "turler": {}}
 
 
 async def get_kur_ucretleri_ayarlari():
@@ -206,7 +206,7 @@ async def get_kur_ucreti(egitim_turu: str = None) -> float:
 # Kur ücretlerine PARALEL: genel varsayılan + eğitim türü bazlı. Dönem bazlı öğretmen
 # ödemesinde (ayın 15'i) tamamlanan her kur için bu pay hesaplanır.
 # Generic /muhasebe/ayarlar üzerinden saklanır: {"genel": 500, "turler": {...}}
-OGRETMEN_PAYLARI_DEFAULT = {"genel": 0, "turler": {}}
+OGRETMEN_PAYLARI_DEFAULT = {"genel": 3000, "turler": {}}
 
 
 async def get_ogretmen_paylari_ayarlari():

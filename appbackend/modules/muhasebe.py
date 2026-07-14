@@ -21,7 +21,7 @@ from core.db import db
 from core.auth import require_role, UserRole
 from core.audit import islem_kaydet, islem_listele
 from core.sistem import (
-    get_vergi_orani, get_ogretmen_payi,
+    get_vergi_orani, get_ogretmen_payi, get_kur_ucreti,
     VERGI_AYARLARI_DEFAULT, KUR_UCRETLERI_DEFAULT, OGRETMEN_PAYLARI_DEFAULT,
 )
 
@@ -364,14 +364,20 @@ async def kur_ucreti_ekle(ogrenci_id: str, data: dict, current_user=Depends(_ERI
     if not ogr:
         raise HTTPException(status_code=404, detail="Öğrenci bulunamadı")
     kur_adi = str(data.get("kur_adi", "")).strip()
-    try:
-        tutar = round(float(data.get("tutar")), 2)
-    except (TypeError, ValueError):
-        raise HTTPException(status_code=422, detail="Tutar sayısal olmalı")
+    egitim_turu = str(data.get("egitim_turu", "")).strip() or ogr.get("aldigi_egitim")
+    # Tutar verilmemiş/0 ise Ayarlar'daki genel/tür kur ücretinden otomatik doldur
+    # (varsayılan ₺14.400). Kullanıcı düzeltebilir.
+    ham_tutar = data.get("tutar")
+    if ham_tutar in (None, "", 0, "0"):
+        tutar = round(float(await get_kur_ucreti(egitim_turu)), 2)
+    else:
+        try:
+            tutar = round(float(ham_tutar), 2)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=422, detail="Tutar sayısal olmalı")
     if not kur_adi or tutar <= 0:
         raise HTTPException(status_code=422, detail="Kur adı ve pozitif tutar gerekli")
     # Öğretmen payı snapshot: kur oluşturulurken o anki pay tanımından sabitlenir
-    egitim_turu = str(data.get("egitim_turu", "")).strip() or ogr.get("aldigi_egitim")
     pay_snapshot = await get_ogretmen_payi(egitim_turu)
     kayit = {
         "id": str(uuid.uuid4()),

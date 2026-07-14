@@ -192,7 +192,7 @@ async def dashboard_analitik(current_user=Depends(require_role(UserRole.ADMIN)))
     bugun = datetime.now(timezone.utc).date()
 
     students = await db.students.find({}, {
-        "_id": 0, "id": 1, "ogretmen_id": 1, "arsivli": 1, "aldigi_egitim": 1,
+        "_id": 0, "id": 1, "ogretmen_id": 1, "arsivli": 1, "aldigi_egitim": 1, "kur": 1,
         "yapilmasi_gereken_odeme": 1, "yapilan_odeme": 1, "olusturma_tarihi": 1}).to_list(length=None)
     teachers = await db.teachers.find({}, {"_id": 0, "id": 1, "ad": 1, "soyad": 1}).to_list(length=None)
     kurlar = await db.kur_ucretleri.find({"durum": {"$ne": "iptal"}}, {
@@ -241,6 +241,24 @@ async def dashboard_analitik(current_user=Depends(require_role(UserRole.ADMIN)))
                     comp[n] = d
         seviyeler[oid] = lv
         tamamlanan[oid] = comp
+
+    # Üst kurdan kayıt = önceki kurlar TAMAMLANMIŞ sayılır (yalnız sayım/istatistik;
+    # muhasebeye etki YOK — kur_ucretleri'ye kayıt açılmaz). Öğrenci mevcut kur K ise
+    # 1..K-1 tamamlanmış + 1..K seviyesine ulaşılmış kabul edilir. Türetilen tamamlanma
+    # tarihi SABİT ESKİ (trend penceresi dışında): huni sayımına girer, aylık trendi
+    # kirletmez, 30 gün "beklemede" tetiklemez. Gerçek tamamlanma tarihi varsa KORUNUR.
+    _TURETME_TARIHI = date(2000, 1, 1)
+    for s in students:
+        mk = _kur_no(s.get("kur"))
+        if not mk or mk <= 1:
+            continue
+        oid = s.get("id")
+        lv = seviyeler.setdefault(oid, set())
+        comp = tamamlanan.setdefault(oid, {})
+        for n in range(1, mk):
+            lv.add(n)
+            comp.setdefault(n, _TURETME_TARIHI)
+        lv.add(mk)
 
     # 1a) Huni
     maxlv = max((max(lv) for lv in seviyeler.values() if lv), default=0)
