@@ -146,6 +146,8 @@ app.add_event_handler("startup", create_default_admin)
 # Kritik DB index'lerini oluştur (kazanilan_rozetler unique vb.) — FAZ 1
 from core.db import ensure_indexes
 app.add_event_handler("startup", ensure_indexes)
+from modules.duyuru import duyurulari_seed
+app.add_event_handler("startup", duyurulari_seed)
 
 # MEVCUT MODELLER (değişmeden korunuyor)
 
