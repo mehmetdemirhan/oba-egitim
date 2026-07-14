@@ -42,6 +42,7 @@ async def loglar_ozet(current_user=Depends(_YONETICI)):
         "gunluk_aktif": [], "isi_haritasi": [], "bugun_rol": [],
         "basarisiz_gunluk": [], "islem_hacmi": [], "uyarilar": [],
         "esik": {"sayi": ESIK_SAYI, "dakika": ESIK_DK},
+        "oturum_sure": {"ortalama_dk": 0, "toplam_oturum": 0, "rol_bazli": []},
     }
 
     try:
@@ -103,6 +104,62 @@ async def loglar_ozet(current_user=Depends(_YONETICI)):
             {"$sort": {"sayi": -1}},
         ])
         sonuc["islem_hacmi"] = await cur.to_list(length=100)
+
+        # Oturum süresi: login→logout çiftlerinden (logout yoksa sonraki aktivite/
+        # varsayılan tavan tahmini). Rol bazlı kırılım (son 30 gün).
+        VARSAYILAN_TAVAN_DK = 20  # logout yoksa oturum en fazla bu kadar sayılır
+        cur = db.giris_log.find(
+            {"olusturma": {"$gte": otuz}, "tip": {"$in": ["login_basarili", "logout", "token_yenile"]}},
+            {"_id": 0, "user_id": 1, "rol": 1, "tip": 1, "olusturma": 1}).sort("olusturma", 1)
+        olaylar = await cur.to_list(length=50000)
+        kul = {}
+        for o in olaylar:
+            uid = o.get("user_id")
+            if uid:
+                kul.setdefault(uid, []).append(o)
+        rol_sure, rol_say = {}, {}
+        toplam_sure, toplam_say = 0.0, 0
+        for uid, lst in kul.items():
+            i = 0
+            while i < len(lst):
+                if lst[i]["tip"] == "login_basarili":
+                    bas = lst[i]["olusturma"]
+                    rol = lst[i].get("rol") or "?"
+                    # Bu login'den sonraki ilk logout'u bul (araya token_yenile girebilir)
+                    j = i + 1
+                    bitis = None
+                    while j < len(lst):
+                        if lst[j]["tip"] == "logout":
+                            bitis = lst[j]["olusturma"]; break
+                        if lst[j]["tip"] == "login_basarili":
+                            break  # yeni oturum başlamış, öncekinde logout yok
+                        j += 1
+                    if bitis is not None:
+                        dk = (bitis - bas).total_seconds() / 60.0
+                    else:
+                        # logout yok → son token_yenile'ye kadar tahmin; aktivite yoksa
+                        # tavan varsay; aşırı uzun tahmini 8 saatle sınırla.
+                        son_aktivite = bas
+                        for k in range(i + 1, len(lst)):
+                            if lst[k]["tip"] == "token_yenile":
+                                son_aktivite = lst[k]["olusturma"]
+                            elif lst[k]["tip"] == "login_basarili":
+                                break
+                        span = (son_aktivite - bas).total_seconds() / 60.0
+                        dk = min(span if span > 1 else VARSAYILAN_TAVAN_DK, 8 * 60)
+                    if 0 < dk <= 24 * 60:  # 0<dk≤1 gün makul
+                        toplam_sure += dk; toplam_say += 1
+                        rol_sure[rol] = rol_sure.get(rol, 0.0) + dk
+                        rol_say[rol] = rol_say.get(rol, 0) + 1
+                i += 1
+        sonuc["oturum_sure"] = {
+            "ortalama_dk": round(toplam_sure / toplam_say, 1) if toplam_say else 0,
+            "toplam_oturum": toplam_say,
+            "rol_bazli": sorted(
+                [{"rol": r, "ortalama_dk": round(rol_sure[r] / rol_say[r], 1), "oturum_sayisi": rol_say[r]}
+                 for r in rol_sure],
+                key=lambda x: x["oturum_sayisi"], reverse=True),
+        }
     except Exception as ex:
         logging.warning(f"[loglar] ozet aggregation hatası: {ex}")
 
