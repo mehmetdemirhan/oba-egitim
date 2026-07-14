@@ -2657,7 +2657,7 @@ function MetinDuzenleEkrani({ metin, user, onGeri }) {
 // ── CANLI ANALİZ EKRANI ──
 // user.role === "student" → tam ekran metin (salt okunur)
 // user.role === "teacher"/"admin" → üstte rapor formu, altta metin + kontroller
-function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
+function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, onAnasayfayaDon, taslakVeri, user }) {
   const [sure, setSure] = useState(0);
   const [calisıyor, setCalisıyor] = useState(false);
   const [hatalar, setHatalar] = useState([]);
@@ -2758,11 +2758,36 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
 
   const isOgretmen = user?.role === "admin" || user?.role === "coordinator" || user?.role === "teacher";
 
+  // Taslaktan devam: kaldığı yerden state'i geri yükle (yalnız ilk açılışta)
+  useEffect(() => {
+    if (taslakVeri && typeof taslakVeri === "object") {
+      if (Array.isArray(taslakVeri.hatalar)) setHatalar(taslakVeri.hatalar);
+      if (taslakVeri.gozlem_notu != null) setGozlemNotu(taslakVeri.gozlem_notu);
+      if (taslakVeri.anlama) setAnlama(taslakVeri.anlama);
+      if (taslakVeri.prozodik) setProzodik(taslakVeri.prozodik);
+      if (taslakVeri.ogretmen_notu != null) setOgretmenNotu(taslakVeri.ogretmen_notu);
+      if (taslakVeri.ogretmen_kur != null) setKurKarari(taslakVeri.ogretmen_kur);
+      if (taslakVeri.sure != null) setSure(taslakVeri.sure);
+      if (taslakVeri.raporAdim != null) setRaporAdim(taslakVeri.raporAdim);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const taslakSnapshot = () => ({
+    hatalar, gozlem_notu: gozlemNotu, anlama, prozodik,
+    ogretmen_notu: ogretmenNotu, ogretmen_kur: kurKarari, sure, raporAdim,
+  });
+
   const tamamla = () => {
     if (sure === 0) return;
     clearInterval(intervalRef.current);
     setCalisıyor(false);
     onTamamla({ sure_saniye: sure, hatalar, gozlem_notu: gozlemNotu, anlama, prozodik, ogretmen_notu: ogretmenNotu, ogretmen_kur: kurKarari });
+  };
+
+  const anasayfayaDon = () => {
+    clearInterval(intervalRef.current);
+    if (onAnasayfayaDon) onAnasayfayaDon(taslakSnapshot());
   };
 
 
@@ -2808,9 +2833,13 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
     <div className="fixed inset-0 bg-app z-50 flex flex-col overflow-hidden">
       {/* Üst bar */}
       <div className="bg-surface border-b px-4 py-2 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <button onClick={anasayfayaDon} title="Taslak olarak kaydedip anasayfaya dön"
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-line text-sm text-subtle hover:bg-app">
+            <ArrowLeft className="h-4 w-4" />Anasayfaya Dön
+          </button>
           <span className="font-semibold text-content">{ogrenci.ad} {ogrenci.soyad}</span>
-          <span className="text-sm text-subtle">{metin.baslik} • {metin.kelime_sayisi} kelime</span>
+          <span className="text-sm text-subtle hidden sm:inline">{metin.baslik} • {metin.kelime_sayisi} kelime</span>
         </div>
         <div className="flex items-center gap-4">
           <FontKontrol />
@@ -4886,6 +4915,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
   const [seciliOgrenci, setSeciliOgrenci] = useState(null);
   const [seciliMetin, setSeciliMetin] = useState(null);
   const [aktifOturumId, setAktifOturumId] = useState(null);
+  const [aktifTaslak, setAktifTaslak] = useState(null); // devam edilen taslağın kaydedilmiş verisi
   const [sonuc, setSonuc] = useState(null);
   const [gecmisOturumlar, setGecmisOturumlar] = useState([]);
   const [aktifRapor, setAktifRapor] = useState(null);
@@ -4911,8 +4941,29 @@ function GirisAnaliziModul({ user, students, teachers }) {
       const r = await axios.post(`${API}/diagnostic/sessions`, payload);
       if (!r.data?.id) throw new Error('Oturum ID alınamadı');
       setAktifOturumId(r.data.id);
+      setAktifTaslak(null);   // yeni oturum → taslak yok
       setAdim("canli");
     } catch(e) { toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
+  };
+
+  // "Anasayfaya Dön" → yarım analizi taslak olarak kaydet, listeye dön (rapor üretmez)
+  const analizTaslakKaydet = async (taslak) => {
+    try {
+      if (aktifOturumId) await axios.post(`${API}/diagnostic/sessions/${aktifOturumId}/taslak`, { taslak_veri: taslak });
+      toast({ title: "Taslak kaydedildi", description: "Analize daha sonra kaldığınız yerden devam edebilirsiniz." });
+    } catch (e) { toast({ title: "Taslak kaydedilemedi", variant: "destructive" }); }
+    setAdim("liste"); setAktifOturumId(null); setAktifTaslak(null); setSeciliMetin(null); fetchGecmis();
+  };
+
+  // Yarım kalan analize (durum='devam') kaldığı yerden devam et
+  const analizeDevam = (oturum) => {
+    const ogr = (students || []).find(s => s.id === oturum.ogrenci_id) ||
+      { id: oturum.ogrenci_id, ad: (oturum.ogrenci_ad || "").split(" ")[0] || "", soyad: (oturum.ogrenci_ad || "").split(" ").slice(1).join(" "), sinif: oturum.ogrenci_sinif };
+    setSeciliOgrenci(ogr);
+    setSeciliMetin({ id: oturum.metin_id, baslik: oturum.metin_baslik || "Metin", kelime_sayisi: oturum.metin_kelime_sayisi || 0, icerik: oturum.metin_icerik || "" });
+    setAktifOturumId(oturum.id);
+    setAktifTaslak(oturum.taslak_veri || {});
+    setAdim("canli");
   };
 
   const analiziTamamla = async (veri) => {
@@ -4971,7 +5022,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
           <Button variant="outline" size="sm" onClick={() => { setAdim("liste"); setAktifOturumId(null); }}><ArrowLeft className="h-4 w-4 mr-1" />Geri</Button>
           <h2 className="text-xl font-bold">Canlı Analiz</h2>
         </div>
-        <CanlıAnalizEkrani ogrenci={seciliOgrenci} metin={seciliMetin} oturumId={aktifOturumId} onTamamla={analiziTamamla} user={user} />
+        <CanlıAnalizEkrani ogrenci={seciliOgrenci} metin={seciliMetin} oturumId={aktifOturumId} onTamamla={analiziTamamla} onAnasayfayaDon={analizTaslakKaydet} taslakVeri={aktifTaslak} user={user} />
       </div>
     );
   }
@@ -5124,6 +5175,26 @@ function GirisAnaliziModul({ user, students, teachers }) {
           <GelisimRaporuButonu students={students} />
         </CardContent>
       </Card>
+      )}
+
+      {/* Yarım kalan analizler (taslak — durum='devam') */}
+      {gecmisOturumlar.filter(o => o.durum === "devam").length > 0 && (
+        <Card className="border border-amber-300 shadow-sm bg-amber-50/40">
+          <CardHeader><CardTitle className="text-base inline-flex items-center gap-2"><Pause className="h-4 w-4 text-amber-600" />Yarım Kalan Analizler</CardTitle></CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {gecmisOturumlar.filter(o => o.durum === "devam").map(o => (
+                <div key={o.id} className="flex items-center justify-between gap-2 p-3 rounded-xl border border-amber-200 bg-surface">
+                  <div className="min-w-0">
+                    <div className="font-medium text-sm text-content truncate">{o.ogrenci_ad || o.ogrenci_id?.slice(0,8)}</div>
+                    <div className="text-xs text-subtle">{o.metin_baslik || "Metin"} • {o.taslak_tarihi ? new Date(o.taslak_tarihi).toLocaleString("tr-TR") : "başlatıldı"}</div>
+                  </div>
+                  <Button size="sm" onClick={() => analizeDevam(o)} className="bg-amber-600 hover:bg-amber-700 text-white shrink-0"><Play className="h-4 w-4 mr-1" />Devam Et</Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Geçmiş Analizler */}

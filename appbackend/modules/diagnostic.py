@@ -671,6 +671,13 @@ async def baslat_oturum(data: AnalizOturumBaslat, current_user=Depends(get_curre
     d = oturum.dict()
     d["olusturma_tarihi"] = d["olusturma_tarihi"].isoformat()
     d["tamamlama_tarihi"] = None
+    # Taslaktan devam edebilmek için metin bilgisini oturuma sakla
+    d["metin_baslik"] = metin.get("baslik", "")
+    d["metin_kelime_sayisi"] = metin.get("kelime_sayisi", 0)
+    d["metin_icerik"] = metin.get("icerik", "")
+    ogr = await db.students.find_one({"id": data.ogrenci_id})
+    d["ogrenci_ad"] = f"{(ogr or {}).get('ad','')} {(ogr or {}).get('soyad','')}".strip()
+    d["ogrenci_sinif"] = (ogr or {}).get("sinif", "")
     await db.diagnostic_oturumlar.insert_one(d)
     d.pop("_id", None)
     return d
@@ -689,6 +696,22 @@ async def get_ogrenci_oturumlari(ogrenci_id: str, current_user=Depends(get_curre
     items = await db.diagnostic_oturumlar.find({"ogrenci_id": ogrenci_id}).sort("olusturma_tarihi", -1).to_list(length=None)
     for i in items: i.pop("_id", None)
     return items
+
+@router.post("/diagnostic/sessions/{oturum_id}/taslak")
+async def taslak_kaydet_oturum(oturum_id: str, data: dict, current_user=Depends(get_current_user)):
+    """Yarım bırakılan analizi taslak olarak kaydeder (ilerleme/cevaplar). durum 'devam'
+    kalır → RAPOR ÜRETMEZ. 'Devam et' ile kaldığı yerden sürer. Zaten tamamlanmışsa dokunmaz."""
+    oturum = await db.diagnostic_oturumlar.find_one({"id": oturum_id})
+    if not oturum:
+        raise HTTPException(status_code=404, detail="Oturum bulunamadı")
+    if oturum.get("durum") == "tamamlandi":
+        raise HTTPException(status_code=400, detail="Tamamlanmış oturum taslak olarak kaydedilemez")
+    await db.diagnostic_oturumlar.update_one(
+        {"id": oturum_id},
+        {"$set": {"taslak_veri": (data or {}).get("taslak_veri", data or {}),
+                  "taslak_tarihi": datetime.utcnow().isoformat(), "durum": "devam"}})
+    return {"ok": True, "durum": "devam"}
+
 
 @router.post("/diagnostic/sessions/{oturum_id}/complete")
 async def tamamla_oturum(oturum_id: str, data: AnalizTamamla, current_user=Depends(get_current_user)):
@@ -729,6 +752,7 @@ async def tamamla_oturum(oturum_id: str, data: AnalizTamamla, current_user=Depen
         "hiz_deger": hiz_deger,
         "sistem_kur": sistem_kur,
         "ogretmen_kur": atanan_kur,
+        "taslak_veri": None,  # tamamlanınca taslak temizlenir
         "tamamlama_tarihi": now
     }
     await db.diagnostic_oturumlar.update_one({"id": oturum_id}, {"$set": guncelle})
