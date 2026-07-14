@@ -711,12 +711,12 @@ async def tamamla_oturum(oturum_id: str, data: AnalizTamamla, current_user=Depen
     sistem_kur = await kur_onerisi_hesapla(wpm, dogruluk, sinif_seviyesi)
     atanan_kur = data.ogretmen_kur if data.ogretmen_kur else sistem_kur
 
-    # Hata dağılımı
-    hata_sayilari = {"atlama": 0, "yanlis_okuma": 0, "takilma": 0, "tekrar": 0}
+    # Hata dağılımı — tüm türleri dinamik say (18 kategorili tür; eski türler de dahil)
+    hata_sayilari = {}
     for h in data.hatalar:
         tip = h.tip if hasattr(h, "tip") else h.get("tip", "")
-        if tip in hata_sayilari:
-            hata_sayilari[tip] += 1
+        if tip:
+            hata_sayilari[tip] = hata_sayilari.get(tip, 0) + 1
 
     now = datetime.utcnow().isoformat()
     guncelle = {
