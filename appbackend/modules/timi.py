@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from core.db import db
@@ -401,6 +402,100 @@ async def timi_sonuc_getir(sonuc_id: str, current_user=Depends(get_current_user)
         raise HTTPException(status_code=404, detail="TIMI sonucu bulunamadı")
     sonuc.pop("_id", None)
     return sonuc
+
+
+@router.get("/timi/{sonuc_id}/pdf")
+async def timi_pdf(sonuc_id: str, current_user=Depends(get_current_user)):
+    """TIMI sonuç raporu PDF'i — grafik + baskın zeka vurgusu + öğrenci/tarih.
+    Mevcut Gelişim PDF altyapısını (reportlab + TR font) yeniden kullanır."""
+    if not _yetkili(current_user):
+        raise HTTPException(status_code=403, detail="Yetkisiz")
+    sonuc = await db.timi_sonuclar.find_one({"id": sonuc_id})
+    if not sonuc:
+        raise HTTPException(status_code=404, detail="TIMI sonucu bulunamadı")
+    if sonuc.get("durum") != "tamamlandi":
+        raise HTTPException(status_code=400, detail="Yalnız tamamlanmış TIMI raporu PDF olarak alınabilir")
+
+    ogr = await db.students.find_one({"id": sonuc.get("ogrenci_id")}) or {}
+    ogretmen = await db.users.find_one({"id": sonuc.get("ogretmen_id")}) or {}
+
+    import io
+    from modules.diagnostic import _tr_font
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Paragraph as RLPara, Spacer, Table as RLTable, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER
+    from reportlab.graphics.shapes import Drawing, Rect, String
+    FONT, FONTB = _tr_font()
+    MAVI = colors.HexColor('#1F4E79'); ACIK = colors.HexColor('#F2F7FB')
+    VURGU = colors.HexColor('#F39C12'); BAR = colors.HexColor('#3B7DD8')
+
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(name='TT', fontSize=18, leading=22, alignment=TA_CENTER, spaceAfter=4, textColor=MAVI, fontName=FONTB))
+    styles.add(ParagraphStyle(name='TS', fontSize=11, leading=14, alignment=TA_CENTER, spaceAfter=14, textColor=colors.HexColor('#666'), fontName=FONT))
+    styles.add(ParagraphStyle(name='TSect', fontSize=12, leading=16, spaceBefore=14, spaceAfter=8, textColor=MAVI, fontName=FONTB))
+    styles.add(ParagraphStyle(name='TBody', fontSize=10, leading=14, fontName=FONT))
+
+    kp = sonuc.get("kategori_puanlari", {}) or {}
+    baskin = sonuc.get("baskin_zeka_alanlari", []) or []
+    en_yuksek = max([kp.get(k, 0) for k in KATEGORI_SIRASI] + [1])
+
+    el = []
+    el.append(RLPara("Okuma Becerileri Akademisi", styles['TT']))
+    el.append(RLPara("TIMI Çoklu Zeka Raporu", styles['TS']))
+    el.append(RLPara("Öğrenci Bilgileri", styles['TSect']))
+    info = [
+        ["Adı Soyadı:", f"{ogr.get('ad','')} {ogr.get('soyad','')}".strip() or "-", "Sınıfı:", sonuc.get("sinif_seviyesi") or ogr.get("sinif", "-")],
+        ["Eğitimci:", f"{ogretmen.get('ad','')} {ogretmen.get('soyad','')}".strip() or "-", "Tarih:", (sonuc.get("uygulama_tarihi") or sonuc.get("created_at") or "")[:10]],
+    ]
+    t = RLTable(info, colWidths=[3*cm, 5*cm, 3*cm, 5*cm])
+    t.setStyle(TableStyle([('FONTNAME', (0,0), (0,-1), FONTB), ('FONTNAME', (2,0), (2,-1), FONTB),
+        ('FONTNAME', (1,0), (1,-1), FONT), ('FONTNAME', (3,0), (3,-1), FONT), ('FONTSIZE', (0,0), (-1,-1), 9),
+        ('TEXTCOLOR', (0,0), (0,-1), MAVI), ('TEXTCOLOR', (2,0), (2,-1), MAVI),
+        ('BACKGROUND', (0,0), (-1,-1), ACIK), ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor('#CCC')),
+        ('INNERGRID', (0,0), (-1,-1), 0.3, colors.HexColor('#DDD')), ('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('PADDING', (0,0), (-1,-1), 6)]))
+    el.append(t)
+
+    # Baskın zeka vurgusu
+    baskin_tr = [TIMI_KATEGORILER[i]["tr"] for i in range(1, 8) if TIMI_KATEGORILER[i]["key"] in baskin]
+    el.append(RLPara("Baskın Zeka Alanı" + ("ları" if len(baskin_tr) > 1 else ""), styles['TSect']))
+    vurgu_t = RLTable([[", ".join(baskin_tr) or "-"]], colWidths=[16*cm])
+    vurgu_t.setStyle(TableStyle([('FONTNAME', (0,0), (-1,-1), FONTB), ('FONTSIZE', (0,0), (-1,-1), 12),
+        ('TEXTCOLOR', (0,0), (-1,-1), colors.white), ('BACKGROUND', (0,0), (-1,-1), VURGU),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'), ('PADDING', (0,0), (-1,-1), 10)]))
+    el.append(vurgu_t)
+
+    # Kategori grafiği (yatay bar)
+    el.append(RLPara("Zeka Alanları Dağılımı", styles['TSect']))
+    satir_yuksek = 22
+    d = Drawing(460, satir_yuksek * len(KATEGORI_SIRASI) + 10)
+    for idx, k in enumerate(KATEGORI_SIRASI):
+        puan = kp.get(k, 0)
+        y = d.height - (idx + 1) * satir_yuksek
+        etiket = TIMI_KATEGORILER[idx + 1]["tr"]
+        d.add(String(2, y + 6, etiket, fontName=FONT, fontSize=8, fillColor=colors.HexColor('#333')))
+        bar_x = 190
+        tam_gen = 230
+        gen = (puan / en_yuksek) * tam_gen if en_yuksek else 0
+        d.add(Rect(bar_x, y + 2, tam_gen, 12, fillColor=ACIK, strokeColor=colors.HexColor('#DDD'), strokeWidth=0.5))
+        renk = VURGU if k in baskin else BAR
+        d.add(Rect(bar_x, y + 2, max(gen, 0.5), 12, fillColor=renk, strokeColor=None))
+        d.add(String(bar_x + tam_gen + 6, y + 6, str(puan), fontName=FONTB, fontSize=9, fillColor=colors.HexColor('#333')))
+    el.append(d)
+
+    if sonuc.get("notlar"):
+        el.append(RLPara("Notlar", styles['TSect']))
+        el.append(RLPara(str(sonuc.get("notlar")), styles['TBody']))
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=1.5*cm, bottomMargin=1.5*cm, leftMargin=2*cm, rightMargin=2*cm)
+    doc.build(el)
+    buffer.seek(0)
+    ad = f"{ogr.get('ad','')}_{ogr.get('soyad','')}".strip("_") or "TIMI"
+    return StreamingResponse(buffer, media_type="application/pdf",
+                             headers={"Content-Disposition": f'attachment; filename="TIMI_Raporu_{ad}.pdf"'})
 
 
 @router.delete("/timi/{sonuc_id}")
