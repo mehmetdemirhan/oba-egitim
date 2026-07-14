@@ -15442,15 +15442,29 @@ function GelisimAlani({ user, students = [], teachers = [], courses = [], onTabC
               </CardContent>
             </Card>
 
-          {/* Puan Rehberi */}
+          {/* Puan Rehberi — her madde ilgili eylemin yapıldığı yere götürür.
+              Eşlemesi olmayan (pasif) madde tıklanamaz kalır. */}
           <Card className="border border-line shadow-sm bg-gradient-to-br from-orange-50 to-yellow-50">
             <CardContent className="p-5">
               <h4 className="font-semibold text-content mb-3">Puan Rehberi</h4>
-              <div className="space-y-2 text-sm text-subtle">
-                <div className="flex justify-between"><span>✅ İçerik tamamla</span><span className="font-bold text-orange-600">+1</span></div>
-                <div className="flex justify-between"><span>📝 Test çöz (tam puan)</span><span className="font-bold text-orange-600">+10</span></div>
-                <div className="flex justify-between"><span>🗳️ Oylama katıl</span><span className="font-bold text-orange-600">+2</span></div>
-                <div className="flex justify-between"><span>🌟 İçeriğin yayına girdi</span><span className="font-bold text-orange-600">+5</span></div>
+              <div className="space-y-1.5 text-sm">
+                {[
+                  { etiket: "✅ İçerik tamamla", puan: "+1", git: "icerikler", ipucu: "İçerikler'e git" },
+                  { etiket: "📝 Test çöz (tam puan)", puan: "+10", git: "icerikler", ipucu: "İçerik testine git" },
+                  { etiket: "🗳️ Oylama katıl", puan: "+2", git: "icerikler", ipucu: "Oylamadaki içeriklere git" },
+                  { etiket: "🌟 İçeriğin yayına girdi", puan: "+5", git: null }, // pasif — tıklanamaz
+                ].map((m, i) => (
+                  m.git ? (
+                    <button key={i} type="button" title={m.ipucu}
+                      onClick={() => { setGelisimSekme(m.git); if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                      className="w-full flex justify-between items-center px-2 py-1.5 -mx-2 rounded-lg text-subtle hover:bg-orange-100/60 hover:text-content transition-colors group">
+                      <span className="inline-flex items-center gap-1">{m.etiket}<ChevronRight className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity" /></span>
+                      <span className="font-bold text-orange-600">{m.puan}</span>
+                    </button>
+                  ) : (
+                    <div key={i} className="flex justify-between px-2 py-1.5 text-subtle"><span>{m.etiket}</span><span className="font-bold text-orange-600">{m.puan}</span></div>
+                  )
+                ))}
               </div>
             </CardContent>
           </Card>
