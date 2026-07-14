@@ -53,6 +53,7 @@ import InstagramAyarlari from "./components/admin/InstagramAyarlari";
 import ExerciseStarter from "./components/ExerciseStarter";
 import UnifiedExerciseGrid from "./components/exercises/UnifiedExerciseGrid";
 import { GOZ_YENI_EGZERSIZLER, GOZ_YENI_RENDER } from "./components/exercises/goz";
+import { HIZLI_OKUMA_EGZERSIZLER, HIZLI_OKUMA_RENDER } from "./components/exercises/hizli";
 import { EgzersizDuzen } from "./components/exercises/goz/ortak";
 import OgretmenBasarilarim from "./components/gelisim/OgretmenBasarilarim";
 import OgretmenProfil from "./components/profil/OgretmenProfil";
@@ -3919,13 +3920,17 @@ function EgzersizlerModul({ user, egzersizPuanlari = {}, onTamamla }) {
     // Yeni göz/görme/tarama egzersizleri (components/exercises/goz/) — kendi
     // başlat/durdur/ayar mantığını yönetir; aşağıda GOZ_YENI_RENDER ile çizilir.
     ...GOZ_YENI_EGZERSIZLER,
+    // Hızlı Okuma egzersizleri (blok/gölgeleme/gruplama/takistoskop) — kendi
+    // başlat/durdur/ayar mantığını yönetir; HIZLI_OKUMA_RENDER ile çizilir.
+    ...HIZLI_OKUMA_EGZERSIZLER,
   ];
 
-  // Aktif egzersiz yeni (goz/) modüllerinden biri mi?
-  const yeniRender = aktifEgzersiz ? GOZ_YENI_RENDER[aktifEgzersiz] : null;
+  // Aktif egzersiz yeni (goz/ veya hizli/) modüllerinden biri mi?
+  const yeniRender = aktifEgzersiz ? (GOZ_YENI_RENDER[aktifEgzersiz] || HIZLI_OKUMA_RENDER[aktifEgzersiz]) : null;
 
   // Kart listesi için kategori başlıkları ve gösterim sırası.
   const KATEGORILER = [
+    { key: 'hizli-okuma', baslik: '⚡ Hızlı Okuma' },
     { key: 'goz',    baslik: '👁️ Göz Egzersizleri' },
     { key: 'gorme',  baslik: '🔭 Görme Alanı' },
     { key: 'okuma',  baslik: '📖 Okuma ve Tarama Egzersizleri' },
