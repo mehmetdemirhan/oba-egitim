@@ -306,7 +306,7 @@ function SimpleEditForm({ item, teachers, courses, classes, onSave, onCancel, us
 
 // Ayarlar/Gelişim altına taşınan sekmeler (üst çubuktan kaldırıldı; alt-nav ile erişilir)
 const AYARLAR_GRUP = ["ai-merkezi", "loglar", "sss-yonetimi", "tema-yonetimi", "rozet-yonetimi", "toplu-kayit", "moduller", "guncelleme", "yedekleme"];
-const GELISIM_GRUP = ["sinav", "meb-kelime", "ders-programi"];
+const GELISIM_GRUP = ["sinav", "meb-kelime", "ders-programi", "okuma-metinleri"];
 
 // Hata çeşitleri (kaynak: "Hata Çeşitleri.docx" — 4 kategori, 18 tür). Analiz hata
 // takibi + sonuç ekranı + gelişim raporu bu tek kaynağı kullanır.
@@ -663,6 +663,7 @@ function AppContent() {
                 { v: "sinav", l: "Sınavlar", g: adminVeyaKoord },
                 { v: "meb-kelime", l: "MEB Kelimeleri", g: adminVeyaKoord },
                 { v: "ders-programi", l: "Ders Programı", g: true },
+                { v: "okuma-metinleri", l: "Okuma Metinleri", g: adminVeyaKoord },
               ].filter(s => s.g).map(s => (
                 <button key={s.v} onClick={() => setActiveTab(s.v)}
                   className={"px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all " +
@@ -696,6 +697,13 @@ function AppContent() {
           {adminVeyaKoord && (
             <TabsContent value="meb-kelime">
               <MebKelimeYonetimi apiBase={API} />
+            </TabsContent>
+          )}
+
+          {/* Okuma Metinleri (eski/taşınan havuz — Analiz'de kullanılmaz) */}
+          {adminVeyaKoord && (
+            <TabsContent value="okuma-metinleri">
+              <MetinYonetimi tamEkran sabitBolum="okuma_parcalari" user={user} />
             </TabsContent>
           )}
 
@@ -2114,7 +2122,7 @@ function MetinKatkiPaneli({ metin, user, onDegisti, acik: acikProp, onToggle }) 
   );
 }
 
-function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEkran = false, onDuzenle }) {
+function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEkran = false, onDuzenle, sabitBolum }) {
   const { toast } = useToast();
   const [metinler, setMetinler] = useState([]);
   const [formAcik, setFormAcik] = useState(false);
@@ -2127,7 +2135,8 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
   // kelime sayısına göre seçilir.
   const [kelimeAralik, setKelimeAralik] = useState(null); // {min,max,l} | null
   const [acikId, setAcikId] = useState(null); // tıklayınca cevap anahtarı/görsel editörü açılan metin
-  const [bolum, setBolum] = useState("analiz"); // analiz | okuma_parcalari
+  const [bolum, setBolum] = useState(sabitBolum || "analiz"); // analiz | okuma_parcalari
+  const okumaParcalariGorunumu = bolum === "okuma_parcalari";
   const [gocYukleniyor, setGocYukleniyor] = useState(false);
   const KELIME_ARALIKLARI = [
     { l: "0–70 kelime", min: 0, max: 70 },
@@ -2145,7 +2154,7 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
     try {
       const params = new URLSearchParams();
       if (filtreSinif) params.set("sinif_seviyesi", filtreSinif);
-      if (bolum === "okuma_parcalari") params.set("bolum", "okuma_parcalari");
+      params.set("bolum", bolum); // "analiz" → yalnız 150 havuz; "okuma_parcalari" → eskiler
       const r = await axios.get(`${API}/diagnostic/texts?${params.toString()}`);
       setMetinler(r.data);
     } catch(e) { hataBildir(toast, "Metinler yüklenemedi"); }
@@ -2175,7 +2184,7 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
   const kaydet = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(`${API}/diagnostic/texts`, { ...form, kelime_sayisi: kelimeSay(form.icerik) });
+      await axios.post(`${API}/diagnostic/texts`, { ...form, kelime_sayisi: kelimeSay(form.icerik), bolum: okumaParcalariGorunumu ? "okuma_parcalari" : "analiz" });
       setForm({ baslik: "", icerik: "", kelime_sayisi: 0, sinif_seviyesi: "4", tur: "hikaye" });
       setFormAcik(false); fetchMetinler();
       const rol = user?.role;
@@ -2230,27 +2239,23 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
     <div className="space-y-4">
       {/* Üst bar */}
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-content">{bolum === "okuma_parcalari" ? "Okuma Parçaları (pasif)" : "Analiz Metinleri"}</h3>
+        <h3 className="font-semibold text-content">{okumaParcalariGorunumu ? "Okuma Metinleri" : "Analiz Metinleri"}</h3>
         <Button onClick={() => setFormAcik(!formAcik)} className="bg-primary hover:bg-primary-hover text-white" size="sm">
           <Plus className="h-4 w-4 mr-1"/>{formAcik ? "İptal" : "Metin Ekle (+5 puan)"}
         </Button>
       </div>
 
-      {/* Bölüm anahtarı + Akıcı Okuma göç (yönetim modunda) */}
-      {!secimModu && (
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="inline-flex rounded-lg border border-line overflow-hidden text-sm">
-            <button onClick={() => setBolum("analiz")} className={`px-3 py-1.5 ${bolum === "analiz" ? "bg-primary text-white" : "hover:bg-app"}`}>Analiz Havuzu</button>
-            <button onClick={() => setBolum("okuma_parcalari")} className={`px-3 py-1.5 border-l border-line ${bolum === "okuma_parcalari" ? "bg-primary text-white" : "hover:bg-app"}`}>Okuma Parçaları</button>
-          </div>
-          <button onClick={akiciOkumaGoc} disabled={gocYukleniyor} title="150 Akıcı Okuma metnini yükle; eskileri Okuma Parçaları'na taşı"
+      {/* Akıcı Okuma göç (yalnız Analiz havuzu yönetimi; okuma_parçaları görünümünde yok) */}
+      {!secimModu && !okumaParcalariGorunumu && user?.role === "admin" && (
+        <div className="flex items-center justify-end gap-2 flex-wrap">
+          <button onClick={akiciOkumaGoc} disabled={gocYukleniyor} title="150 Akıcı Okuma metnini sınıf seviyeleriyle yükle; eski metinleri Okuma Metinleri'ne taşı"
             className="text-xs px-2.5 py-1.5 rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">
             {gocYukleniyor ? "Yükleniyor…" : "⬆ Akıcı Okuma metinlerini yükle"}
           </button>
         </div>
       )}
-      {bolum === "okuma_parcalari" && (
-        <p className="text-xs text-subtle bg-app rounded-lg p-2">Bu metinler Analiz'de pasiftir (yeni 150 metin dışındakiler). Burada erişilebilir kalırlar; silinmezler.</p>
+      {okumaParcalariGorunumu && (
+        <p className="text-xs text-subtle bg-app rounded-lg p-2">Bu metinler eski havuzdan taşınan okuma metinleridir; Analiz'de kullanılmaz. Buradan erişilebilir; silinmezler.</p>
       )}
 
       {/* Metin Ekleme Formu */}
