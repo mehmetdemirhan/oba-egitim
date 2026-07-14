@@ -16,16 +16,18 @@ import axios from "axios";
  */
 const DURUM_ETIKET = { planli: "Planlı", katildi: "Katıldı", katilmadi: "Katılmadı", iptal: "İptal" };
 
-export default function DersDetayModal({ apiBase, ders, onKapat, onGuncellendi }) {
-  const [mod, setMod] = useState(null); // null | "tasi" | "yoklama" | "seri-iptal"
+export default function DersDetayModal({ apiBase, ders, ogrenciler = [], onKapat, onGuncellendi }) {
+  const [mod, setMod] = useState(null); // null | "tasi" | "yoklama" | "seri-iptal" | "ogrenci" | "kalici-sil"
   const [tarih, setTarih] = useState(ders.tarih);
   const [bas, setBas] = useState(ders.baslangic_saati);
   const [bit, setBit] = useState(ders.bitis_saati);
   const [sebep, setSebep] = useState("");
+  const [yeniOgrenci, setYeniOgrenci] = useState("");
   const [yoklamaDurum, setYoklamaDurum] = useState("katildi");
   const [yoklamaNot, setYoklamaNot] = useState("");
   const [hata, setHata] = useState(null);
   const [bekliyor, setBekliyor] = useState(false);
+  const ogrenciAd = (o) => `${o.ad || ""} ${o.soyad || ""}`.trim();
 
   const calistir = async (fn) => {
     setBekliyor(true); setHata(null);
@@ -51,6 +53,14 @@ export default function DersDetayModal({ apiBase, ders, onKapat, onGuncellendi }
   const seriIptal = () => {
     if (!sebep.trim()) { setHata("Sebep zorunludur."); return; }
     calistir(() => axios.delete(`${apiBase}/ders/seri/${ders.seri_id}?sebep=${encodeURIComponent(sebep)}`));
+  };
+  const ogrenciDegistir = () => {
+    if (!yeniOgrenci) { setHata("Yeni öğrenci seçin."); return; }
+    if (!sebep.trim()) { setHata("Sebep zorunludur."); return; }
+    calistir(() => axios.put(`${apiBase}/ders/seri/${ders.seri_id}`, { ogrenci_id: yeniOgrenci, sebep }));
+  };
+  const kaliciSil = () => {
+    calistir(() => axios.delete(`${apiBase}/ders/seri/${ders.seri_id}?kalici=true&sebep=${encodeURIComponent(sebep || "Yanlış giriş")}`));
   };
 
   return (
@@ -82,8 +92,47 @@ export default function DersDetayModal({ apiBase, ders, onKapat, onGuncellendi }
               <button onClick={() => setMod("tasi")} className="px-4 py-2 rounded-xl border border-indigo-200 text-indigo-600 text-sm font-medium hover:bg-indigo-50">🕑 Saati Değiştir</button>
               <button onClick={() => setMod("yoklama")} className="px-4 py-2 rounded-xl border border-green-200 text-green-600 text-sm font-medium hover:bg-green-50">✅ Yoklama Gir</button>
               {ders.seri_id && (
+                <button onClick={() => setMod("ogrenci")} className="px-4 py-2 rounded-xl border border-blue-200 text-blue-600 text-sm font-medium hover:bg-blue-50">👤 Öğrenciyi Değiştir</button>
+              )}
+              {ders.seri_id && (
                 <button onClick={() => setMod("seri-iptal")} className="px-4 py-2 rounded-xl border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50">🗑 Seriyi Sonlandır</button>
               )}
+              {ders.seri_id && (
+                <button onClick={() => setMod("kalici-sil")} className="px-4 py-2 rounded-xl border border-red-300 text-red-700 text-sm font-medium hover:bg-red-50">⛔ Kalıcı Sil (yanlış giriş)</button>
+              )}
+            </div>
+          )}
+
+          {/* Öğrenci değiştir */}
+          {mod === "ogrenci" && (
+            <div className="space-y-2">
+              <div className="text-sm text-gray-600">Bu program yanlış öğrenciye girildiyse doğru öğrenciyi seçin. Seri ve gelecek dersler yeni öğrenciye taşınır.</div>
+              <label className="block text-xs text-gray-600">Yeni öğrenci <span className="text-red-500">*</span>
+                <select value={yeniOgrenci} onChange={(e) => setYeniOgrenci(e.target.value)} className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200 text-sm">
+                  <option value="">— Öğrenci seçin —</option>
+                  {ogrenciler.map((o) => <option key={o.id} value={o.id}>{ogrenciAd(o)}</option>)}
+                </select></label>
+              <label className="block text-xs text-gray-600">Sebep <span className="text-red-500">*</span>
+                <textarea value={sebep} onChange={(e) => setSebep(e.target.value)} rows={2} placeholder="Neden değiştiriliyor?"
+                  className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200 text-sm" /></label>
+              <div className="flex justify-end gap-2">
+                <button onClick={() => setMod(null)} className="px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-600">Geri</button>
+                <button onClick={ogrenciDegistir} disabled={bekliyor} className="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold disabled:opacity-40">Değiştir</button>
+              </div>
+            </div>
+          )}
+
+          {/* Kalıcı sil (yanlış giriş) */}
+          {mod === "kalici-sil" && (
+            <div className="space-y-2">
+              <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg p-2.5">⚠️ Bu ders serisi ve tüm dersleri <b>kalıcı olarak silinecek</b> (geri alınamaz). Yanlış girilen program için kullanın; öğrenciye bildirim gönderilmez.</div>
+              <label className="block text-xs text-gray-600">Sebep (opsiyonel)
+                <input value={sebep} onChange={(e) => setSebep(e.target.value)} placeholder="Yanlış giriş"
+                  className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200 text-sm" /></label>
+              <div className="flex justify-end gap-2">
+                <button onClick={() => setMod(null)} className="px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-600">Geri</button>
+                <button onClick={kaliciSil} disabled={bekliyor} className="px-4 py-2 rounded-xl bg-red-700 text-white text-sm font-semibold disabled:opacity-40">Kalıcı Sil</button>
+              </div>
             </div>
           )}
 

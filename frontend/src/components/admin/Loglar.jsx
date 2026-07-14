@@ -36,19 +36,20 @@ export default function Loglar({ apiBase }) {
   const { toast } = useToast();
   const [ozet, setOzet] = useState(null);
   const [ozetYukleniyor, setOzetYukleniyor] = useState(false);
+  const [surePeriyot, setSurePeriyot] = useState("ay"); // gun | hafta | ay
 
   // ── Özet (grafikler) ──
   const ozetYukle = useCallback(async () => {
     setOzetYukleniyor(true);
     try {
-      const r = await axios.get(`${apiBase}/loglar/ozet`);
+      const r = await axios.get(`${apiBase}/loglar/ozet`, { params: { sure_periyot: surePeriyot } });
       setOzet(r.data || null);
     } catch {
       toast({ title: "Log özeti yüklenemedi", variant: "destructive" });
     } finally {
       setOzetYukleniyor(false);
     }
-  }, [apiBase, toast]);
+  }, [apiBase, toast, surePeriyot]);
 
   useEffect(() => { ozetYukle(); }, [ozetYukle]);
 
@@ -241,12 +242,20 @@ export default function Loglar({ apiBase }) {
 
       {/* Kullanıcıların Geçirdiği Süre */}
       <div className="bg-surface border border-line rounded-2xl shadow-sm p-4">
-        <h3 className="text-sm font-bold text-content mb-1 inline-flex items-center gap-1">
-          Kullanıcıların Geçirdiği Süre
-          <span title="Ortalama oturum süresi: giriş→çıkış çiftlerinden hesaplanır. Çıkış yoksa son aktiviteye (token yenileme) göre tahmin edilir; tahmin en fazla 20 dk varsayılır. Son 30 gün."
-                className="text-subtle cursor-help">ⓘ</span>
-        </h3>
-        <p className="text-xs text-subtle mb-3">Ortalama oturum (son 30 gün)</p>
+        <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
+          <h3 className="text-sm font-bold text-content inline-flex items-center gap-1">
+            Kullanıcıların Geçirdiği Süre
+            <span title="Ortalama oturum süresi: giriş→çıkış çiftlerinden hesaplanır. Çıkış yoksa son aktiviteye (token yenileme) göre tahmin edilir; tahmin en fazla 20 dk varsayılır."
+                  className="text-subtle cursor-help">ⓘ</span>
+          </h3>
+          <div className="inline-flex rounded-lg border border-line overflow-hidden text-xs">
+            {[["gun", "Günlük"], ["hafta", "Haftalık"], ["ay", "Aylık"]].map(([v, l]) => (
+              <button key={v} onClick={() => setSurePeriyot(v)}
+                className={`px-2.5 py-1 ${surePeriyot === v ? "bg-indigo-600 text-white" : "hover:bg-app text-subtle"} ${v !== "gun" ? "border-l border-line" : ""}`}>{l}</button>
+            ))}
+          </div>
+        </div>
+        <p className="text-xs text-subtle mb-3">Ortalama oturum ({surePeriyot === "gun" ? "bugün / son 24 saat" : surePeriyot === "hafta" ? "son 7 gün" : "son 30 gün"})</p>
         <div className="text-center mb-3">
           <div className="text-3xl font-bold text-indigo-600 tabular-nums">{ozet?.oturum_sure?.ortalama_dk ?? 0}<span className="text-base font-medium text-subtle"> dk</span></div>
           <div className="text-xs text-subtle">{ozet?.oturum_sure?.toplam_oturum ?? 0} oturum</div>
