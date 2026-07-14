@@ -300,6 +300,10 @@ function SimpleEditForm({ item, teachers, courses, classes, onSave, onCancel, us
   );
 }
 
+// Ayarlar/Gelişim altına taşınan sekmeler (üst çubuktan kaldırıldı; alt-nav ile erişilir)
+const AYARLAR_GRUP = ["ai-merkezi", "loglar", "sss-yonetimi", "tema-yonetimi", "rozet-yonetimi", "toplu-kayit", "moduller", "guncelleme", "yedekleme"];
+const GELISIM_GRUP = ["sinav", "meb-kelime", "ders-programi"];
+
 function AppContent() {
   // ── TÜM HOOK'LAR EN ÜSTTE ──
   const { user, logout, loading, bakim } = useAuth();
@@ -593,29 +597,55 @@ function AppContent() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           {!isFullscreen && (
-          <TabsList className="flex w-full items-center justify-start rounded-2xl bg-surface p-1 shadow-sm border border-line gap-1 mb-6 overflow-x-auto flex-nowrap h-auto">
+          <TabsList className="flex w-full items-center justify-start rounded-2xl bg-surface p-1 shadow-sm border border-line gap-1 mb-4 overflow-x-auto flex-nowrap h-auto">
             <TabsTrigger value="dashboard" className={tabClass}><BarChart3 className="h-4 w-4 mr-2" />Dashboard</TabsTrigger>
             <TabsTrigger value="teachers" className={tabClass}><UserCheck className="h-4 w-4 mr-2" />Öğretmenler</TabsTrigger>
             <TabsTrigger value="students" className={tabClass}><Users className="h-4 w-4 mr-2" />Öğrenciler</TabsTrigger>
             {user.role !== "coordinator" && <TabsTrigger value="payments" className={tabClass}><CreditCard className="h-4 w-4 mr-2" />Muhasebe</TabsTrigger>}
             {adminVeyaKoord && <TabsTrigger value="users" className={tabClass}><Shield className="h-4 w-4 mr-2" />Kullanıcılar</TabsTrigger>}
-            {adminVeyaKoord && <TabsTrigger value="toplu-kayit" className={tabClass}><Upload className="h-4 w-4 mr-2" />Toplu Kayıt</TabsTrigger>}
             <TabsTrigger value="gelisim" className={tabClass}><Trophy className="h-4 w-4 mr-2" />Gelişim</TabsTrigger>
-            <TabsTrigger value="ders-programi" className={tabClass}><Calendar className="h-4 w-4 mr-2" />Ders Programı</TabsTrigger>
             <TabsTrigger value="giris-analizi" className={tabClass}><Stethoscope className="h-4 w-4 mr-2" />Analiz</TabsTrigger>
             <TabsTrigger value="mesajlar" className={tabClass}><Mail className="h-4 w-4 mr-2" />Mesajlar</TabsTrigger>
-            {adminVeyaKoord && <TabsTrigger value="loglar" className={tabClass}><Activity className="h-4 w-4 mr-2" />Loglar</TabsTrigger>}
-            {adminVeyaKoord && <TabsTrigger value="sss-yonetimi" className={tabClass}><HelpCircle className="h-4 w-4 mr-2" />SSS{sssBekleyenSayi > 0 && <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">{sssBekleyenSayi}</span>}</TabsTrigger>}
-            {adminVeyaKoord && <TabsTrigger value="ayarlar" className={tabClass}><Star className="h-4 w-4 mr-2" />Ayarlar</TabsTrigger>}
-            {user.role === "admin" && <TabsTrigger value="yedekleme" className={tabClass}><Database className="h-4 w-4 mr-2" />Yedekleme</TabsTrigger>}
-            {user.role === "admin" && <TabsTrigger value="guncelleme" className={tabClass}><GitBranch className="h-4 w-4 mr-2" />Güncelleme</TabsTrigger>}
-            {user.role === "admin" && <TabsTrigger value="moduller" className={tabClass}><Package className="h-4 w-4 mr-2" />Modüller</TabsTrigger>}
-            {adminVeyaKoord && <TabsTrigger value="tema-yonetimi" className={tabClass}><Palette className="h-4 w-4 mr-2" />Tema</TabsTrigger>}
-            {adminVeyaKoord && <TabsTrigger value="rozet-yonetimi" className={tabClass}><Medal className="h-4 w-4 mr-2" />Rozetler</TabsTrigger>}
-            {adminVeyaKoord && <TabsTrigger value="meb-kelime" className={tabClass}><BookMarked className="h-4 w-4 mr-2" />MEB Kelimeleri</TabsTrigger>}
-            {adminVeyaKoord && <TabsTrigger value="sinav" className={tabClass}><ClipboardList className="h-4 w-4 mr-2" />Sınavlar</TabsTrigger>}
-            <TabsTrigger value="ai-merkezi" className={tabClass}><Brain className="h-4 w-4 mr-2" />AI Merkezi</TabsTrigger>
+            {adminVeyaKoord && <TabsTrigger value="ayarlar" className={tabClass}><Star className="h-4 w-4 mr-2" />Ayarlar{sssBekleyenSayi > 0 && <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">{sssBekleyenSayi}</span>}</TabsTrigger>}
           </TabsList>
+          )}
+
+          {/* ── Ayarlar alt-navigasyonu (taşınan sekmeler) ── */}
+          {!isFullscreen && adminVeyaKoord && (activeTab === "ayarlar" || AYARLAR_GRUP.includes(activeTab)) && (
+            <div className="flex items-center gap-1.5 flex-wrap mb-4 p-1.5 rounded-xl bg-app border border-line">
+              {[
+                { v: "ayarlar", l: "Sistem Ayarları", g: true },
+                { v: "ai-merkezi", l: "AI Merkezi", g: true },
+                { v: "loglar", l: "Loglar", g: true },
+                { v: "sss-yonetimi", l: `SSS Yönetimi${sssBekleyenSayi > 0 ? ` (${sssBekleyenSayi})` : ""}`, g: true },
+                { v: "tema-yonetimi", l: "Tema", g: true },
+                { v: "rozet-yonetimi", l: "Rozetler", g: true },
+                { v: "toplu-kayit", l: "Toplu Kayıt", g: true },
+                { v: "moduller", l: "Modüller", g: user.role === "admin" },
+                { v: "guncelleme", l: "Güncelleme", g: user.role === "admin" },
+                { v: "yedekleme", l: "Yedekleme", g: user.role === "admin" },
+              ].filter(s => s.g).map(s => (
+                <button key={s.v} onClick={() => setActiveTab(s.v)}
+                  className={"px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all " +
+                    (activeTab === s.v ? "bg-primary text-white shadow-sm" : "text-subtle hover:bg-surface")}>{s.l}</button>
+              ))}
+            </div>
+          )}
+
+          {/* ── Gelişim alt-navigasyonu (taşınan sekmeler) ── */}
+          {!isFullscreen && (activeTab === "gelisim" || GELISIM_GRUP.includes(activeTab)) && (
+            <div className="flex items-center gap-1.5 flex-wrap mb-4 p-1.5 rounded-xl bg-app border border-line">
+              {[
+                { v: "gelisim", l: "Gelişim Özeti", g: true },
+                { v: "sinav", l: "Sınavlar", g: adminVeyaKoord },
+                { v: "meb-kelime", l: "MEB Kelimeleri", g: adminVeyaKoord },
+                { v: "ders-programi", l: "Ders Programı", g: true },
+              ].filter(s => s.g).map(s => (
+                <button key={s.v} onClick={() => setActiveTab(s.v)}
+                  className={"px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all " +
+                    (activeTab === s.v ? "bg-primary text-white shadow-sm" : "text-subtle hover:bg-surface")}>{s.l}</button>
+              ))}
+            </div>
           )}
 
           {/* Modül Yönetimi (yama sistemi) */}
