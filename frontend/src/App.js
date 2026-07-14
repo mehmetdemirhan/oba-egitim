@@ -4520,9 +4520,23 @@ const timiKartGorsel = (no, ab) => `${process.env.PUBLIC_URL || ""}/timi/card_${
 
 // Sonuç raporu (hem canlı sonuç hem geçmiş görüntüleme için ortak)
 function TimiRapor({ sonuc, ogrenci }) {
+  const { toast } = useToast();
   const [detayAcik, setDetayAcik] = useState(false);
+  const [pdfYukleniyor, setPdfYukleniyor] = useState(false);
   const puanlar = sonuc?.kategori_puanlari || {};
   const baskin = sonuc?.baskin_zeka_alanlari || [];
+  const timiPdfIndir = async () => {
+    if (!sonuc?.id) return;
+    setPdfYukleniyor(true);
+    try {
+      const r = await axios.get(`${API}/timi/${sonuc.id}/pdf`, { responseType: "blob" });
+      const url = URL.createObjectURL(r.data);
+      const a = document.createElement("a"); a.href = url;
+      a.download = `TIMI_Raporu_${(ogrenci?.ad || "").trim() || "ogrenci"}.pdf`; a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) { toast({ title: "PDF indirilemedi", description: e?.response?.data?.detail, variant: "destructive" }); }
+    setPdfYukleniyor(false);
+  };
   const radarData = TIMI_SIRA.map(k => ({ alan: TIMI_KISA[k], puan: puanlar[k] || 0, key: k }));
   const ogrAd = ogrenci ? `${ogrenci.ad || ""} ${ogrenci.soyad || ""}`.trim() : "";
   const tarih = sonuc?.uygulama_tarihi ? new Date(sonuc.uygulama_tarihi).toLocaleDateString("tr-TR") : "";
@@ -4535,7 +4549,12 @@ function TimiRapor({ sonuc, ogrenci }) {
           <div className="text-lg font-bold text-content">{ogrAd || "Öğrenci"}</div>
           <div className="text-sm text-subtle">{sonuc?.sinif_seviyesi ? `${sonuc.sinif_seviyesi}. sınıf` : ""}{tarih ? ` • ${tarih}` : ""}</div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 items-center">
+          {sonuc?.durum === "tamamlandi" && sonuc?.id && (
+            <Button size="sm" onClick={timiPdfIndir} disabled={pdfYukleniyor} className="bg-primary hover:bg-primary-hover text-white">
+              <FileText className="h-4 w-4 mr-1" />{pdfYukleniyor ? "…" : "PDF İndir"}
+            </Button>
+          )}
           {baskin.map(k => (
             <span key={k} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-primary text-white text-sm font-semibold shadow-sm tabular-nums">
               {TIMI_IKON[k]} {TIMI_TR[k]} ({puanlar[k] || 0}/8)
