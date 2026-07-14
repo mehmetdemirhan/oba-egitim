@@ -393,26 +393,61 @@ async def seri_guncelle(seri_id: str, data: dict, current_user=Depends(_DERS_YET
     if cakisan:
         raise HTTPException(status_code=409, detail=f"Çakışma: {GUN_ADLARI[gun]} {bas} dolu.")
 
-    eski = f"{GUN_ADLARI[seri['gun']]} {seri['baslangic_saati']}-{seri['bitis_saati']}"
-    yeni = f"{GUN_ADLARI[gun]} {bas}-{bit}"
-    await db.ders_serileri.update_one({"id": seri_id}, {"$set": {
+    # Öğrenci değiştirme (yanlış öğrenciye girilen program düzeltmesi)
+    yeni_ogrenci_id = seri["ogrenci_id"]
+    yeni_ogrenci_ad = seri["ogrenci_ad"]
+    ogrenci_degisti = False
+    if data.get("ogrenci_id") and data["ogrenci_id"] != seri["ogrenci_id"]:
+        ogr = await db.students.find_one({"id": data["ogrenci_id"]})
+        if not ogr:
+            raise HTTPException(status_code=404, detail="Yeni öğrenci bulunamadı.")
+        yeni_ogrenci_id = data["ogrenci_id"]
+        yeni_ogrenci_ad = await _ogrenci_ad(yeni_ogrenci_id)
+        ogrenci_degisti = True
+
+    eski = f"{seri['ogrenci_ad']} — {GUN_ADLARI[seri['gun']]} {seri['baslangic_saati']}-{seri['bitis_saati']}"
+    yeni = f"{yeni_ogrenci_ad} — {GUN_ADLARI[gun]} {bas}-{bit}"
+    guncelle_set = {
         "gun": gun, "baslangic_saati": bas, "bitis_saati": bit, "bitis_tarihi": bit_tarih,
-    }})
+        "ogrenci_id": yeni_ogrenci_id, "ogrenci_ad": yeni_ogrenci_ad,
+    }
+    await db.ders_serileri.update_one({"id": seri_id}, {"$set": guncelle_set})
+    if ogrenci_degisti:
+        # Gelecek oturumları da yeni öğrenciye taşı.
+        await db.ders_oturumlari.update_many(
+            {"seri_id": seri_id},
+            {"$set": {"ogrenci_id": yeni_ogrenci_id, "ogrenci_ad": yeni_ogrenci_ad}})
     await _degisiklik_logla("seri_guncelle", seri["ogretmen_id"], seri["ogretmen_ad"],
-                            seri["ogrenci_id"], seri["ogrenci_ad"], eski, yeni, sebep,
+                            yeni_ogrenci_id, yeni_ogrenci_ad, eski, yeni, sebep,
                             current_user, seri_id=seri_id)
-    await _bildir(seri["ogrenci_id"], f"Ders programınız değişti: {eski} → {yeni}. Sebep: {sebep}",
+    # Güncel (yeni) öğrenciye bildir. Öğrenci değiştiyse eski öğrenciye de bilgi ver.
+    await _bildir(yeni_ogrenci_id, f"Ders programınız güncellendi: {yeni}. Sebep: {sebep}",
                   seri_id, current_user)
+    if ogrenci_degisti:
+        await _bildir(seri["ogrenci_id"], f"Bir ders programı sizden {yeni_ogrenci_ad} adlı öğrenciye taşındı. Sebep: {sebep}",
+                      seri_id, current_user)
     guncel = await db.ders_serileri.find_one({"id": seri_id})
     return _temizle(guncel)
 
 
 @router.delete("/ders/seri/{seri_id}")
-async def seri_sonlandir(seri_id: str, sebep: str = Query(""), current_user=Depends(_DERS_YETKI)):
+async def seri_sonlandir(seri_id: str, sebep: str = Query(""), kalici: bool = Query(False),
+                         current_user=Depends(_DERS_YETKI)):
     seri = await db.ders_serileri.find_one({"id": seri_id})
     if not seri:
         raise HTTPException(status_code=404, detail="Ders serisi bulunamadı.")
     _yetki_kontrol(seri["ogretmen_id"], current_user)
+    # Kalıcı sil (yanlış girilen program): seriyi ve tüm oturumlarını tamamen kaldırır,
+    # öğrenciye bildirim GÖNDERMEZ (hatalı kayıt). Sebep zorunlu değildir.
+    if kalici:
+        await db.ders_serileri.delete_one({"id": seri_id})
+        silinen_oturum = await db.ders_oturumlari.delete_many({"seri_id": seri_id})
+        await _degisiklik_logla("seri_kalici_sil", seri["ogretmen_id"], seri["ogretmen_ad"],
+                                seri["ogrenci_id"], seri["ogrenci_ad"],
+                                f"{GUN_ADLARI[seri['gun']]} {seri['baslangic_saati']}-{seri['bitis_saati']}",
+                                "Kalıcı silindi (yanlış giriş)", (sebep or "Yanlış giriş"),
+                                current_user, seri_id=seri_id)
+        return {"id": seri_id, "durum": "silindi", "silinen_oturum": silinen_oturum.deleted_count}
     sebep = (sebep or "").strip()
     if not sebep:
         raise HTTPException(status_code=400, detail="Seriyi sonlandırmak için sebep zorunludur.")

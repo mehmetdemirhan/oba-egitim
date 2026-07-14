@@ -710,7 +710,6 @@ function AppContent() {
           <TabsContent value="dashboard">
             {dashboardStats && (
               <div className="space-y-6">
-                <YeniNeVarKarti apiBase={API} />
                 {/* KPI: Risk Durumu + Okuma Aktivitesi */}
                 {ogrenciRiskler.length > 0 && (
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -5836,7 +5835,6 @@ function OgretmenPaneli({ user, logout }) {
 
         {/* ═══ DASHBOARD ═══ */}
         {aktifSekme === "dashboard" && (<div className="space-y-5">
-          <YeniNeVarKarti apiBase={API} />
           {/* Motivasyon cümlesi — her girişte değişir */}
           {(() => {
             const motivasyonlar = [
@@ -6339,6 +6337,9 @@ function OgretmenPaneli({ user, logout }) {
           <div className="opacity-60 hover:opacity-100 transition-opacity">
             <InstagramWidget apiBase={API} compact />
           </div>
+
+          {/* Yeni Ne Var — dashboard'un en altında */}
+          <YeniNeVarKarti apiBase={API} />
 
         </div>)}
 
@@ -9804,7 +9805,10 @@ function SistemAyarlari({ user }) {
         <SezonlukReset user={user} />
       )}
       {ayarSekme === "duyurular" && user?.role === "admin" && (
-        <DuyuruYonetimi apiBase={API} />
+        <div className="space-y-5">
+          <YeniNeVarKarti apiBase={API} />
+          <DuyuruYonetimi apiBase={API} />
+        </div>
       )}
       {ayarSekme === "altyapi" && user?.role === "admin" && (
         <AltyapiKullanim apiBase={API} />

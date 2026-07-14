@@ -142,7 +142,7 @@ export default function HaftalikTakvim({ apiBase, user, ogrenciler = [], ogretme
           varsayilan={yeniModal} onKapat={() => setYeniModal(null)} onKaydedildi={yukle} />
       )}
       {detay && (
-        <DersDetayModal apiBase={apiBase} ders={detay} onKapat={() => setDetay(null)} onGuncellendi={yukle} />
+        <DersDetayModal apiBase={apiBase} ders={detay} ogrenciler={ogrenciler} onKapat={() => setDetay(null)} onGuncellendi={yukle} />
       )}
     </div>
   );

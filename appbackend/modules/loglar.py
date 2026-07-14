@@ -31,12 +31,16 @@ def _gun_str(alan: str = "$olusturma"):
 
 
 @router.get("/loglar/ozet")
-async def loglar_ozet(current_user=Depends(_YONETICI)):
-    """Log ekranındaki tüm grafiklerin verisini tek çağrıda döndürür."""
+async def loglar_ozet(sure_periyot: str = "ay", current_user=Depends(_YONETICI)):
+    """Log ekranındaki tüm grafiklerin verisini tek çağrıda döndürür.
+    sure_periyot: 'gun' | 'hafta' | 'ay' → sadece 'Kullanıcıların Geçirdiği Süre'
+    metriğinin zaman penceresini değiştirir (diğer grafikler 30 gün sabit)."""
     simdi = datetime.utcnow()
     otuz = simdi - timedelta(days=30)
     bugun_bas = datetime(simdi.year, simdi.month, simdi.day)
     esik_bas = simdi - timedelta(minutes=ESIK_DK)
+    _sure_gun = {"gun": 1, "hafta": 7, "ay": 30}.get(sure_periyot, 30)
+    sure_bas = simdi - timedelta(days=_sure_gun)
 
     sonuc = {
         "gunluk_aktif": [], "isi_haritasi": [], "bugun_rol": [],
@@ -109,7 +113,7 @@ async def loglar_ozet(current_user=Depends(_YONETICI)):
         # varsayılan tavan tahmini). Rol bazlı kırılım (son 30 gün).
         VARSAYILAN_TAVAN_DK = 20  # logout yoksa oturum en fazla bu kadar sayılır
         cur = db.giris_log.find(
-            {"olusturma": {"$gte": otuz}, "tip": {"$in": ["login_basarili", "logout", "token_yenile"]}},
+            {"olusturma": {"$gte": sure_bas}, "tip": {"$in": ["login_basarili", "logout", "token_yenile"]}},
             {"_id": 0, "user_id": 1, "rol": 1, "tip": 1, "olusturma": 1}).sort("olusturma", 1)
         olaylar = await cur.to_list(length=50000)
         kul = {}
@@ -153,6 +157,7 @@ async def loglar_ozet(current_user=Depends(_YONETICI)):
                         rol_say[rol] = rol_say.get(rol, 0) + 1
                 i += 1
         sonuc["oturum_sure"] = {
+            "periyot": sure_periyot if sure_periyot in ("gun", "hafta", "ay") else "ay",
             "ortalama_dk": round(toplam_sure / toplam_say, 1) if toplam_say else 0,
             "toplam_oturum": toplam_say,
             "rol_bazli": sorted(

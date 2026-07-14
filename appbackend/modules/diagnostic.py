@@ -190,6 +190,19 @@ class MetinOyCreate(BaseModel):
 
 
 # ★ Metin ekleme endpoint'i (frontend: axios.post(`${API}/diagnostic/texts`, ...))
+def _kelime_sinif(k: int) -> str:
+    """Akıcı okuma metnini kelime sayısına göre sınıf seviyesine eşler (1-8).
+    İçerik ilkokula ağırlıklı olduğundan bantlar buna göre kalibre edilmiştir."""
+    if k <= 45:  return "1"
+    if k <= 70:  return "2"
+    if k <= 105: return "3"
+    if k <= 150: return "4"
+    if k <= 210: return "5"
+    if k <= 280: return "6"
+    if k <= 360: return "7"
+    return "8"
+
+
 @router.post("/diagnostic/akici-okuma-goc")
 async def akici_okuma_goc(current_user=Depends(require_role(UserRole.ADMIN))):
     """AKICI OKUMA metinlerini (150, sorularıyla) Analiz havuzuna yükler; DİĞER tüm
@@ -217,6 +230,7 @@ async def akici_okuma_goc(current_user=Depends(require_role(UserRole.ADMIN))):
             "baslik": m["baslik"], "icerik": m["icerik"], "kelime_sayisi": m["kelime_sayisi"],
             "sorular": m.get("sorular", []), "acik_uclu": m.get("acik_uclu", []),
             "bolum": "analiz", "durum": "havuzda", "kaynak": "akici_okuma_yeni",
+            "sinif_seviyesi": _kelime_sinif(m["kelime_sayisi"]),  # öğrenci sınıfına göre gelsin
             "guncelleme_tarihi": now,
         }
         # Bileşik anahtar: başlık + kelime sayısı (mükerrer başlıkları çökertmemek için)
