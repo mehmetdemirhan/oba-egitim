@@ -418,3 +418,55 @@ async def kitap_bilgi_cek(data: dict, current_user=Depends(get_current_user)):
     if not result["baslik"]:
         raise HTTPException(status_code=404, detail="Kitap bilgisi bulunamadi")
     return result
+
+
+@router.post("/kitap-ara")
+async def kitap_ara(data: dict, current_user=Depends(get_current_user)):
+    """Kitap ADIYLA Google Books'ta arar; çoklu sonuç (kapak+ad+yazar+konu) döner.
+    Kaynak: resmî Google Books API (ücretsiz, TR kitapları kapak+açıklamayla).
+    Scraping YOK. Sonuç yoksa boş liste → kullanıcı elle girer."""
+    import urllib.request, ssl, json, asyncio, urllib.parse
+    q = (data or {}).get("q", "").strip()
+    if not q:
+        return {"sonuclar": []}
+
+    def fetch(url):
+        try:
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=12, context=ctx) as resp:
+                return resp.read().decode("utf-8", "ignore")
+        except Exception:
+            return None
+
+    url = ("https://www.googleapis.com/books/v1/volumes?q=" + urllib.parse.quote(q)
+           + "&maxResults=8&langRestrict=tr&country=TR&printType=books")
+    raw = await asyncio.to_thread(fetch, url)
+    sonuclar = []
+    if raw:
+        try:
+            j = json.loads(raw)
+            for item in (j.get("items") or [])[:8]:
+                vol = item.get("volumeInfo", {}) or {}
+                imgs = vol.get("imageLinks", {}) or {}
+                kapak = (imgs.get("thumbnail") or imgs.get("smallThumbnail") or "").replace("http://", "https://")
+                isbn = ""
+                for x in vol.get("industryIdentifiers", []) or []:
+                    if str(x.get("type", "")).startswith("ISBN"):
+                        isbn = x.get("identifier", ""); break
+                sonuclar.append({
+                    "baslik": vol.get("title", ""),
+                    "yazar": ", ".join(vol.get("authors", []) or []),
+                    "yayinevi": vol.get("publisher", ""),
+                    "sayfa_sayisi": str(vol.get("pageCount", "") or ""),
+                    "aciklama": (vol.get("description", "") or "")[:400],
+                    "kapak_url": kapak,
+                    "isbn": isbn,
+                    "yil": (vol.get("publishedDate", "") or "")[:4],
+                    "link": vol.get("infoLink", ""),
+                })
+        except Exception:
+            pass
+    return {"sonuclar": sonuclar}
