@@ -40,6 +40,7 @@ import IlIlceSecici from "./components/IlIlceSecici";
 import YeniNeVarKarti from "./components/YeniNeVarKarti";
 import DuyuruYonetimi from "./components/admin/DuyuruYonetimi";
 import AltyapiKullanim from "./components/admin/AltyapiKullanim";
+import MedyaKart from "./components/gelisim/MedyaKart";
 import BakimModu from "./components/admin/BakimModu";
 import BakimEkrani from "./components/BakimEkrani";
 import MuhasebeAyarlari from "./components/admin/MuhasebeAyarlari";
@@ -7517,7 +7518,7 @@ function OgrenciPaneli({ user, logout }) {
         {/* ═══ GÖREVLERİM ═══ */}
         {aktifSekme === "gorevler" && (<div className="space-y-3"><h2 className="text-lg font-bold">Görevlerim</h2>
           {bekleyenGorevler.length === 0 && tamamlananGorevler.length === 0 ? (<div className="text-center py-12"><div className="text-5xl mb-3">✅</div><p className="text-subtle">Tüm görevler tamamlandı!</p></div>) : (<>
-            {bekleyenGorevler.map(g => (<Card key={g.id} className="border border-line shadow-sm"><CardContent className="p-4 flex items-start justify-between gap-3"><div className="min-w-0"><div className="font-bold text-sm">{g.baslik}</div>{g.aciklama && <p className="text-xs text-subtle mt-1">{g.aciklama}</p>}<div className="text-xs text-subtle mt-1">{g.atayan_ad && `Atayan: ${g.atayan_ad}`}{g.son_tarih && ` • Son: ${new Date(g.son_tarih).toLocaleDateString('tr-TR')}`}</div>{g.film_izle_link && <a href={g.film_izle_link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 mt-1 mr-2 px-2 py-1 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700">▶ İzle</a>}{g.film_link && <a href={g.film_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 mt-1 inline-block">🎬 Film Linki</a>}{g.makale_link && <a href={g.makale_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 block mt-1">📄 Makale</a>}</div>{g.tur === "sinav_odevi" ? <Button size="sm" className="bg-indigo-600 text-white text-xs shrink-0" onClick={() => sinavBaslat(g.icerik_id, g.id)}>Sınavı Başlat</Button> : <Button size="sm" className="bg-green-600 text-white text-xs shrink-0" onClick={() => gorevTamamla(g.id)}>Tamamla</Button>}</CardContent></Card>))}
+            {bekleyenGorevler.map(g => (<Card key={g.id} className="border border-line shadow-sm"><CardContent className="p-4 flex items-start justify-between gap-3"><div className="min-w-0">{(g.tur === "film" || g.tur === "kitap") ? (<><MedyaKart tur={g.tur} baslik={g.baslik} konu={g.aciklama} gorsel={g.tur === "kitap" ? g.kitap_kapak : g.film_gorsel} puan={g.film_puan} yazar={g.kitap_yazar} izleLink={g.film_izle_link} link={g.tur === "kitap" ? g.kitap_link : g.film_link} apiBase={API} kompakt /><div className="text-xs text-subtle mt-1">{g.atayan_ad && `Atayan: ${g.atayan_ad}`}{g.son_tarih && ` • Son: ${new Date(g.son_tarih).toLocaleDateString('tr-TR')}`}</div></>) : (<><div className="font-bold text-sm">{g.baslik}</div>{g.aciklama && <p className="text-xs text-subtle mt-1">{g.aciklama}</p>}<div className="text-xs text-subtle mt-1">{g.atayan_ad && `Atayan: ${g.atayan_ad}`}{g.son_tarih && ` • Son: ${new Date(g.son_tarih).toLocaleDateString('tr-TR')}`}</div>{g.makale_link && <a href={g.makale_link} target="_blank" rel="noreferrer" className="text-xs text-blue-600 block mt-1">📄 Makale</a>}</>)}</div>{g.tur === "sinav_odevi" ? <Button size="sm" className="bg-indigo-600 text-white text-xs shrink-0" onClick={() => sinavBaslat(g.icerik_id, g.id)}>Sınavı Başlat</Button> : <Button size="sm" className="bg-green-600 text-white text-xs shrink-0" onClick={() => gorevTamamla(g.id)}>Tamamla</Button>}</CardContent></Card>))}
             {tamamlananGorevler.length >0 && (<><h3 className="text-xs font-medium text-subtle mt-4">Tamamlanan ({tamamlananGorevler.length})</h3>{tamamlananGorevler.slice(0,5).map(g =>(<div key={g.id} className="bg-green-50 rounded-xl p-3 border border-green-100 opacity-60 text-sm">{g.baslik}</div>))}</>)}
           </>)}
         </div>)}
@@ -10305,6 +10306,30 @@ function GorevYonetimi({ user, students, teachers }) {
   const [yeniIcerikModal, setYeniIcerikModal] = useState(false);
   const [yeniIcerik, setYeniIcerik] = useState({ baslik: "", tur: "film", aciklama: "", hedef_kitle: "ogrenci", film_link: "", film_izle_link: "", film_gorsel: "", makale_link: "", kitap_yazar: "" });
   const [yeniIcerikKaydediliyor, setYeniIcerikKaydediliyor] = useState(false);
+  const [kitapAramaQ, setKitapAramaQ] = useState("");
+  const [kitapSonuclar, setKitapSonuclar] = useState([]);
+  const [kitapAraniyor, setKitapAraniyor] = useState(false);
+  const kitapAra = async () => {
+    if (!kitapAramaQ.trim()) return;
+    setKitapAraniyor(true);
+    try {
+      const r = await axios.post(`${API}/kitap-ara`, { q: kitapAramaQ });
+      setKitapSonuclar(r.data?.sonuclar || []);
+      if (!(r.data?.sonuclar || []).length) toast({ title: "Sonuç yok, elle girin" });
+    } catch { toast({ title: "Arama başarısız", variant: "destructive" }); }
+    setKitapAraniyor(false);
+  };
+  const kitapSec = async (s) => {
+    let kapak = s.kapak_url || "";
+    // Kapağı sunucuya indir (hotlink yok); indirilemezse uzak URL'e düş
+    try { const r = await axios.post(`${API}/gelisim/medya-indir`, { url: s.kapak_url }); if (r.data?.yerel_url) kapak = r.data.yerel_url; } catch {}
+    setYeniIcerik(p => ({ ...p, baslik: s.baslik || p.baslik, aciklama: s.aciklama || p.aciklama,
+      kitap_yazar: s.yazar || p.kitap_yazar, kitap_kapak: kapak, kitap_isbn: s.isbn || p.kitap_isbn,
+      kitap_yayinevi: s.yayinevi || p.kitap_yayinevi, kitap_sayfa: s.sayfa_sayisi || p.kitap_sayfa,
+      kitap_link: s.link || p.kitap_link }));
+    setKitapSonuclar([]);
+    toast({ title: "📚 Kitap seçildi" });
+  };
   // Sınav ödevi seti (otomatik kriter)
   const [sinavDersler, setSinavDersler] = useState([]);
   const [sinavKriter, setSinavKriter] = useState({ ders: "", zorluk: "", soruSayisi: 10 });
@@ -10409,7 +10434,7 @@ function GorevYonetimi({ user, students, teachers }) {
     try {
       const r = await axios.post(`${API}/film-bilgi-cek`, { link: yeniIcerik.film_link });
       const d = r.data || {};
-      setYeniIcerik(p => ({ ...p, baslik: d.baslik || p.baslik, aciklama: d.ozet || p.aciklama, film_gorsel: d.gorsel || p.film_gorsel }));
+      setYeniIcerik(p => ({ ...p, baslik: d.baslik || p.baslik, aciklama: d.ozet || p.aciklama, film_gorsel: d.gorsel || p.film_gorsel, film_puan: d.puan || p.film_puan, film_yil: d.yil || p.film_yil, film_sure: d.sure || p.film_sure }));
       toast({ title: d.baslik ? "🎬 Bilgiler çekildi" : "Çekilemedi, elle girin", variant: d.baslik ? undefined : "destructive" });
     } catch { toast({ title: "Çekilemedi, elle girin", variant: "destructive" }); }
     setYeniIcerikKaydediliyor(false);
@@ -10620,12 +10645,24 @@ function GorevYonetimi({ user, students, teachers }) {
           <div className="space-y-3">
             <div><Label>Tür</Label><select value={yeniIcerik.tur} onChange={e => setYeniIcerik({...yeniIcerik, tur: e.target.value})} className="w-full border border-line rounded-lg px-2 py-2 text-sm bg-surface"><option value="film">Film</option><option value="kitap">Kitap</option><option value="makale">Makale</option><option value="hizmetici">Hizmet içi</option></select></div>
             {yeniIcerik.tur === "film" && (<div><Label>sinemalar.com Linki</Label><div className="flex gap-2"><Input value={yeniIcerik.film_link} onChange={e => setYeniIcerik({...yeniIcerik, film_link: e.target.value})} placeholder="https://www.sinemalar.com/film/..." /><Button type="button" variant="outline" disabled={yeniIcerikKaydediliyor} onClick={yeniIcerikFilmCek} className="shrink-0">Çek</Button></div></div>)}
-            {yeniIcerik.film_gorsel && <img src={yeniIcerik.film_gorsel} alt="afiş" className="h-24 rounded border border-line object-cover" />}
+            {yeniIcerik.tur === "film" && yeniIcerik.film_gorsel && (<MedyaKart tur="film" baslik={yeniIcerik.baslik} konu={yeniIcerik.aciklama} gorsel={yeniIcerik.film_gorsel} puan={yeniIcerik.film_puan} yil={yeniIcerik.film_yil} sure={yeniIcerik.film_sure} izleLink={yeniIcerik.film_izle_link} apiBase={API} kompakt />)}
             <div><Label>Başlık</Label><Input value={yeniIcerik.baslik} onChange={e => setYeniIcerik({...yeniIcerik, baslik: e.target.value})} placeholder="İçerik başlığı" /></div>
             <div><Label>Açıklama / Özet</Label><textarea value={yeniIcerik.aciklama} onChange={e => setYeniIcerik({...yeniIcerik, aciklama: e.target.value})} rows={3} className="w-full border border-line rounded-lg px-3 py-2 text-sm bg-surface" /></div>
             {yeniIcerik.tur === "film" && (<div><Label>İzleme Linki (opsiyonel)</Label><Input value={yeniIcerik.film_izle_link} onChange={e => setYeniIcerik({...yeniIcerik, film_izle_link: e.target.value})} placeholder="YouTube / platform linki" /></div>)}
             {yeniIcerik.tur === "makale" && (<div><Label>Makale Linki</Label><Input value={yeniIcerik.makale_link} onChange={e => setYeniIcerik({...yeniIcerik, makale_link: e.target.value})} placeholder="https://..." /></div>)}
-            {yeniIcerik.tur === "kitap" && (<div><Label>Yazar</Label><Input value={yeniIcerik.kitap_yazar} onChange={e => setYeniIcerik({...yeniIcerik, kitap_yazar: e.target.value})} placeholder="Yazar" /></div>)}
+            {yeniIcerik.tur === "kitap" && (<div className="space-y-2">
+              <div><Label>Kitap Ara (Google Books)</Label><div className="flex gap-2"><Input value={kitapAramaQ} onChange={e => setKitapAramaQ(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); kitapAra(); } }} placeholder="Kitap adı yazıp Ara'ya basın" /><Button type="button" variant="outline" disabled={kitapAraniyor} onClick={kitapAra} className="shrink-0">{kitapAraniyor ? "…" : "Ara"}</Button></div><p className="text-[11px] text-subtle mt-1">Ad/konu/kapak otomatik dolar; sonuçtan seçin (bulunamazsa elle girin).</p></div>
+              {kitapSonuclar.length > 0 && (<div className="max-h-64 overflow-y-auto space-y-1 border border-line rounded-lg p-1">
+                {kitapSonuclar.map((s, i) => (
+                  <button type="button" key={i} onClick={() => kitapSec(s)} className="w-full flex gap-2 items-start text-left p-2 rounded-lg hover:bg-app">
+                    {s.kapak_url ? <img src={s.kapak_url} alt="" className="w-10 h-14 object-cover rounded shrink-0" /> : <div className="w-10 h-14 rounded bg-slate-200 shrink-0" />}
+                    <div className="min-w-0"><div className="text-sm font-medium text-content line-clamp-1">{s.baslik}</div><div className="text-xs text-subtle line-clamp-1">{s.yazar}{s.yil ? ` • ${s.yil}` : ""}</div>{s.aciklama && <div className="text-[11px] text-subtle line-clamp-2 mt-0.5">{s.aciklama}</div>}</div>
+                  </button>
+                ))}
+              </div>)}
+              {yeniIcerik.kitap_kapak && (<MedyaKart tur="kitap" baslik={yeniIcerik.baslik} konu={yeniIcerik.aciklama} gorsel={yeniIcerik.kitap_kapak} yazar={yeniIcerik.kitap_yazar} apiBase={API} kompakt />)}
+              <div><Label>Yazar</Label><Input value={yeniIcerik.kitap_yazar} onChange={e => setYeniIcerik({...yeniIcerik, kitap_yazar: e.target.value})} placeholder="Yazar" /></div>
+            </div>)}
             <div className="flex gap-2"><Button type="button" disabled={yeniIcerikKaydediliyor} onClick={yeniIcerikKaydet} className="flex-1 bg-emerald-600 text-white">Ekle ve Seç</Button><Button type="button" variant="outline" onClick={() => setYeniIcerikModal(false)}>İptal</Button></div>
           </div></DialogContent></Dialog>
       </div>

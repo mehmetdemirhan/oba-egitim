@@ -17,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, Body, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, Request, Body, UploadFile, File, Form, Response
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel, Field
 
@@ -75,6 +75,7 @@ class IcerikCreate(BaseModel):
     film_gorsel: Optional[str] = None     # afiş görseli URL
     film_yil: Optional[str] = None
     film_sure: Optional[str] = None
+    film_puan: Optional[str] = None
 
 class IcerikModel(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -104,6 +105,7 @@ class IcerikModel(BaseModel):
     film_gorsel: Optional[str] = None
     film_yil: Optional[str] = None
     film_sure: Optional[str] = None
+    film_puan: Optional[str] = None
     ekleyen_id: str = ""
     ekleyen_ad: str = ""
     durum: str = "beklemede"  # beklemede, oylama, yayinda, reddedildi
@@ -158,6 +160,69 @@ async def gelisim_dosya_yukle(
     }
 
 
+# ── Medya (afiş/kapak) sunucuya indirme + saklama (hotlink yok) ──
+# Uzak görsel URL'i indirilir, base64 olarak db.medya_gorseller'e saklanır ve yerel
+# /api/gelisim/medya/{id} üzerinden servis edilir. İndirme başarısızsa boş döner.
+async def _gorsel_indir_sakla(url: str, ekleyen_id: str = "") -> str:
+    import urllib.request as _u, ssl as _ssl, asyncio as _a, base64 as _b64, uuid as _uuid
+    url = (url or "").strip()
+    if not url or not url.lower().startswith(("http://", "https://")):
+        return ""
+
+    def _indir(u):
+        try:
+            ctx = _ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = _ssl.CERT_NONE
+            req = _u.Request(u, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
+            with _u.urlopen(req, timeout=12, context=ctx) as resp:
+                mime = resp.headers.get("Content-Type", "image/jpeg").split(";")[0].strip()
+                if not mime.startswith("image/"):
+                    return None, None
+                ham = resp.read(4 * 1024 * 1024 + 1)  # en fazla ~4MB
+                if len(ham) > 4 * 1024 * 1024 or len(ham) < 64:
+                    return None, None
+                return ham, mime
+        except Exception:
+            return None, None
+
+    try:
+        ham, mime = await _a.to_thread(_indir, url)
+    except Exception:
+        ham, mime = None, None
+    if not ham:
+        return ""
+    mid = str(_uuid.uuid4())
+    await db.medya_gorseller.insert_one({
+        "id": mid, "dosya_b64": _b64.b64encode(ham).decode("ascii"), "mime": mime,
+        "kaynak_url": url, "ekleyen_id": ekleyen_id,
+    })
+    return f"/api/gelisim/medya/{mid}"
+
+
+@router.get("/gelisim/medya/{medya_id}")
+async def gelisim_medya_getir(medya_id: str):
+    """Sunucuda saklanan afiş/kapak görselini binary olarak servis eder."""
+    import base64 as _b64
+    m = await db.medya_gorseller.find_one({"id": medya_id})
+    if not m or not m.get("dosya_b64"):
+        raise HTTPException(status_code=404, detail="Görsel bulunamadı")
+    try:
+        ham = _b64.b64decode(m["dosya_b64"])
+    except Exception:
+        raise HTTPException(status_code=500, detail="Görsel çözülemedi")
+    return Response(content=ham, media_type=m.get("mime", "image/jpeg"),
+                    headers={"Cache-Control": "public, max-age=604800"})
+
+
+@router.post("/gelisim/medya-indir")
+async def gelisim_medya_indir(data: dict, current_user=Depends(get_current_user)):
+    """Verilen uzak görsel URL'ini indirip saklar; yerel URL döner (kitap kapağı seçimi
+    gibi). İndirilemezse yerel_url boş — çağıran uzak URL'e düşebilir."""
+    yerel = await _gorsel_indir_sakla((data or {}).get("url", ""), current_user.get("id", ""))
+    return {"yerel_url": yerel}
+
+
 # İçerik ekleme (admin veya öğretmen)
 @router.post("/film-bilgi-cek")
 async def film_bilgi_cek(data: dict, current_user=Depends(get_current_user)):
@@ -167,7 +232,7 @@ async def film_bilgi_cek(data: dict, current_user=Depends(get_current_user)):
     import urllib.request, ssl, re as _re, asyncio
 
     url = (data or {}).get("link", "").strip()
-    sonuc = {"baslik": "", "yil": "", "ozet": "", "gorsel": "", "sure": "", "link": url}
+    sonuc = {"baslik": "", "yil": "", "ozet": "", "gorsel": "", "sure": "", "puan": "", "link": url}
     if not url:
         return sonuc
 
@@ -218,12 +283,31 @@ async def film_bilgi_cek(data: dict, current_user=Depends(get_current_user)):
         ms = _re.search(r"(\d{1,3})\s*(?:dakika|dk|min)", html, _re.I)
         if ms:
             sure = f"{ms.group(1)} dk"
+        # Puan (IMDb/site puanı): schema.org ratingValue veya "IMDb 7.5" / "Puan: 7,5"
+        puan = ""
+        for pat in (r'"ratingValue"\s*:\s*"?([\d]+[.,]?[\d]*)',
+                    r'itemprop=["\']ratingValue["\'][^>]*content=["\']([\d.,]+)',
+                    r'(?:IMDb|IMDB|Puan|puan)[^\d]{0,10}([\d]+[.,][\d]+)'):
+            mp = _re.search(pat, html)
+            if mp:
+                p = mp.group(1).replace(",", ".")
+                try:
+                    pf = float(p)
+                    if 0 < pf <= 10:
+                        puan = f"{pf:g}"
+                        break
+                except ValueError:
+                    pass
+        # Afişi sunucuya indir (hotlink yok); indirilemezse uzak URL'e düş
+        og_gorsel = meta("og:image")
+        yerel = await _gorsel_indir_sakla(og_gorsel, current_user.get("id", ""))
         sonuc.update({
             "baslik": baslik,
             "yil": yil,
             "ozet": (meta("og:description") or "")[:500],
-            "gorsel": meta("og:image"),
+            "gorsel": yerel or og_gorsel,
             "sure": sure,
+            "puan": puan,
         })
     except Exception:
         pass  # ayrıştırma hatası → eldeki kısmi/boş sonuç
