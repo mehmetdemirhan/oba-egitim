@@ -202,6 +202,11 @@ async def dashboard_analitik(current_user=Depends(require_role(UserRole.ADMIN)))
     donem_odemeleri = await db.ogretmen_donem_odemeleri.find({}, {"_id": 0, "toplam": 1, "tarih": 1}).to_list(length=None)
     anketler = await db.veli_anketleri.find({}, {"_id": 0, "ogretmen_id": 1, "yanitlar": 1}).to_list(length=None)
     paylar_ayar = ((await db.sistem_ayarlari.find_one({"tip": "ogretmen_paylari"})) or {}).get("degerler", {}) or {}
+    # Satış Başarısı için: kur geçişleri (yenileme) + genel kur ücreti (beklenen gelir)
+    kur_atlamalari = await db.kur_atlamalari.find(
+        {}, {"_id": 0, "tarih": 1, "kaynak": 1}).to_list(length=None)
+    ucret_ayar = ((await db.sistem_ayarlari.find_one({"tip": "kur_ucretleri"})) or {}).get("degerler", {}) or {}
+    genel_ucret = _numf(ucret_ayar.get("genel", 0)) or 14400
 
     def pay(et):
         turler = paylar_ayar.get("turler", {}) or {}
@@ -295,6 +300,36 @@ async def dashboard_analitik(current_user=Depends(require_role(UserRole.ADMIN)))
         t = yt[a]
         payda = t["tamamlanan"] - t["beklemede"]
         yenileme_trend.append({"ay": a, **t, "oran": round(t["gecen"] * 100 / payda, 1) if payda > 0 else None})
+
+    # 1c) Satış Başarısı — aylık SATILAN KUR = yeni kayıt kurları + yenileme kurları
+    #     (mevcut öğrencinin sonraki kura geçişi). Yenileme oranı yenileme_trend ile
+    #     tutarlı (30 gün beklemede penceresi). Beklenen gelir = satılan × genel ücret.
+    oran_map = {r["ay"]: r["oran"] for r in yenileme_trend}
+    sb_yeni = {a: 0 for a in aylar}
+    sb_yenileme = {a: 0 for a in aylar}
+    for s in students:
+        d = _gunf(s.get("olusturma_tarihi"))
+        if d:
+            key = f"{d.year:04d}-{d.month:02d}"
+            if key in sb_yeni:
+                sb_yeni[key] += 1
+    for ka in kur_atlamalari:
+        # ust_kur_kayit = yeni kayıt (yukarıda sayıldı); yenileme = kur_gecis/manuel geçiş
+        if (ka.get("kaynak") or "") not in ("kur_gecis", "manuel"):
+            continue
+        d = _gunf(ka.get("tarih"))
+        if d:
+            key = f"{d.year:04d}-{d.month:02d}"
+            if key in sb_yenileme:
+                sb_yenileme[key] += 1
+    satis_basarisi = []
+    for a in aylar:
+        yeni, yenileme = sb_yeni[a], sb_yenileme[a]
+        satilan = yeni + yenileme
+        satis_basarisi.append({
+            "ay": a, "yeni_kur": yeni, "yenileme_kur": yenileme, "satilan_kur": satilan,
+            "yenileme_orani": oran_map.get(a), "beklenen_gelir": round(satilan * genel_ucret, 2),
+        })
 
     # 2a) Aylık nakit akışı
     nk = {a: {"tahsilat": 0.0, "vergi": 0.0, "ogretmen_odeme": 0.0} for a in aylar}
@@ -417,6 +452,7 @@ async def dashboard_analitik(current_user=Depends(require_role(UserRole.ADMIN)))
     return {
         "huni": huni,
         "yenileme_trend": yenileme_trend,
+        "satis_basarisi": satis_basarisi,
         "nakit_akisi": nakit_akisi,
         "yaslandirma": yas,
         "yaslandirma_tanim": "Yaş = kur başlangıç tarihinden bugüne (gün).",

@@ -15,6 +15,21 @@ const AY_KISA = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl"
 const formatTL = (v) => new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(Number(v || 0));
 const ayEtiket = (ym) => { if (!ym) return ""; const [y, m] = ym.split("-"); return `${AY_KISA[parseInt(m, 10) - 1]} ${y.slice(2)}`; };
 
+function SatisTooltip({ active, payload }) {
+  if (!active || !payload || !payload.length) return null;
+  const d = payload[0].payload;
+  return (
+    <div className="bg-surface border border-line rounded-lg shadow-lg p-2.5 text-xs space-y-0.5">
+      <div className="font-bold text-content mb-1">{d.ayK}</div>
+      <div className="flex justify-between gap-4"><span className="text-blue-600">Yeni Kayıt</span><span className="font-medium">{d.yeni_kur} kur</span></div>
+      <div className="flex justify-between gap-4"><span className="text-violet-600">Yenileme</span><span className="font-medium">{d.yenileme_kur} kur</span></div>
+      <div className="flex justify-between gap-4 border-t border-line pt-0.5"><span className="text-content font-semibold">Satılan Kur</span><span className="font-bold">{d.satilan_kur}</span></div>
+      <div className="flex justify-between gap-4"><span className="text-emerald-600">Yenileme Oranı</span><span className="font-medium">{d.yenileme_orani == null ? "—" : `%${d.yenileme_orani}`}</span></div>
+      <div className="flex justify-between gap-4"><span className="text-subtle">Beklenen Gelir</span><span className="font-medium">{formatTL(d.beklenen_gelir)}</span></div>
+    </div>
+  );
+}
+
 function Bolum({ baslik, ikon: Ikon, children, varsayilanAcik = true }) {
   const [acik, setAcik] = useState(varsayilanAcik);
   return (
@@ -54,6 +69,7 @@ export default function DashboardAnalitik({ apiBase, onYaslandirmaSec, onOgretme
 
   const nakit = (veri.nakit_akisi || []).map((n) => ({ ...n, ayK: ayEtiket(n.ay) }));
   const trend = (veri.yenileme_trend || []).map((n) => ({ ...n, ayK: ayEtiket(n.ay) }));
+  const satis = (veri.satis_basarisi || []).map((n) => ({ ...n, ayK: ayEtiket(n.ay) }));
   const huni = veri.huni || [];
   const enFazla = Math.max(1, ...huni.map((h) => h.tamamlayan));
   const yas = veri.yaslandirma || {};
@@ -99,6 +115,26 @@ export default function DashboardAnalitik({ apiBase, onYaslandirmaSec, onOgretme
               </ResponsiveContainer>
             </div>
           </div>
+        </div>
+      </Bolum>
+
+      {/* 1b. Satış Başarısı */}
+      <Bolum baslik="Satış Başarısı" ikon={TrendingUp}>
+        <div className="text-xs text-subtle mb-1">Son 12 ay — çubuklar (yığılmış): satılan kur = yeni kayıt + yenileme; çizgi: yenileme oranı (%)</div>
+        <div style={{ width: "100%", height: 260 }}>
+          <ResponsiveContainer>
+            <ComposedChart data={satis} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+              <XAxis dataKey="ayK" tick={{ fontSize: 11 }} />
+              <YAxis yAxisId="left" allowDecimals={false} tick={{ fontSize: 11 }} />
+              <YAxis yAxisId="right" orientation="right" domain={[0, 100]} unit="%" tick={{ fontSize: 11 }} />
+              <Tooltip content={<SatisTooltip />} />
+              <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
+              <Bar yAxisId="left" dataKey="yeni_kur" stackId="s" fill="#3b82f6" name="Yeni Kayıt" />
+              <Bar yAxisId="left" dataKey="yenileme_kur" stackId="s" fill="#8b5cf6" name="Yenileme" radius={[4, 4, 0, 0]} />
+              <Line yAxisId="right" type="monotone" dataKey="yenileme_orani" stroke="#059669" strokeWidth={2.5} name="Yenileme %" connectNulls dot={{ r: 2 }} />
+            </ComposedChart>
+          </ResponsiveContainer>
         </div>
       </Bolum>
 
