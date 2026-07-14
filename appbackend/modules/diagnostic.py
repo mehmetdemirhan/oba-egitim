@@ -181,6 +181,7 @@ class MetinCreate(BaseModel):
     kelime_sayisi: int = 0
     sinif_seviyesi: str = "4"
     tur: str = "hikaye"  # hikaye, bilgilendirici, siir
+    bolum: str = "analiz"  # analiz (Analiz havuzu) | okuma_parcalari (Gelişim→Okuma Metinleri)
 
 # Metin oylama modeli — metin_oy_ver endpoint'i kullanıyor (NameError düzeltmesi)
 class MetinOyCreate(BaseModel):
@@ -273,6 +274,7 @@ async def create_metin(data: MetinCreate, current_user=Depends(get_current_user)
         "kelime_sayisi": kelime_sayisi,
         "sinif_seviyesi": data.sinif_seviyesi,
         "tur": data.tur,
+        "bolum": data.bolum if data.bolum in ("analiz", "okuma_parcalari") else "analiz",
         # Kutulu Okuma metin seçimi için otomatik zorluk etiketi (sezgisel).
         "zorluk": zorluk_hesapla(data.icerik or ""),
         "durum": durum,
@@ -421,10 +423,14 @@ async def get_metinler(
     user_id = current_user.get("id", "")
 
     query = {}
-    # Bölüm ayrımı: Analiz yalnız yeni havuzla (bolum != okuma_parcalari) çalışır.
-    # "Okuma Parçaları" bölümü eski/pasife alınan metinleri gösterir.
+    # Bölüm ayrımı:
+    #   bolum="okuma_parcalari" → Gelişim→Okuma Metinleri (eski/taşınan metinler).
+    #   bolum="analiz"          → Analiz havuzu (yalnız AKICI OKUMA + analiz etiketli).
+    #   bolum yok               → geriye uyumlu: okuma_parcalari HARİÇ tümü.
     if bolum == "okuma_parcalari":
         query["bolum"] = "okuma_parcalari"
+    elif bolum == "analiz":
+        query["bolum"] = "analiz"
     else:
         query["bolum"] = {"$ne": "okuma_parcalari"}
     if sinif_seviyesi:

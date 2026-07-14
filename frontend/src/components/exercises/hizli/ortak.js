@@ -27,7 +27,7 @@ export function useOkumaMetni(minKelime = 40) {
   const yenile = useCallback(async () => {
     setYukleniyor(true); setHata("");
     try {
-      const r = await axios.get(`${API}/diagnostic/texts`);
+      const r = await axios.get(`${API}/diagnostic/texts`, { params: { bolum: "analiz" } });
       const liste = Array.isArray(r.data) ? r.data.filter((m) => m?.icerik) : [];
       if (!liste.length) { setHata("Havuzda okuma metni bulunamadı. Yönetici 'Akıcı Okuma metinlerini yükle' ile ekleyebilir."); setMetin(null); return; }
       const uygun = liste.filter((m) => kelimelereBol(m.icerik).length >= minKelime);
