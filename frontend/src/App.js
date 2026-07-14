@@ -37,6 +37,8 @@ import Loglar from "./components/admin/Loglar";
 import SSSYonetimi from "./components/admin/SSSYonetimi";
 import SSS from "./components/SSS";
 import IlIlceSecici from "./components/IlIlceSecici";
+import YeniNeVarKarti from "./components/YeniNeVarKarti";
+import DuyuruYonetimi from "./components/admin/DuyuruYonetimi";
 import BakimModu from "./components/admin/BakimModu";
 import BakimEkrani from "./components/BakimEkrani";
 import MuhasebeAyarlari from "./components/admin/MuhasebeAyarlari";
@@ -706,6 +708,7 @@ function AppContent() {
           <TabsContent value="dashboard">
             {dashboardStats && (
               <div className="space-y-6">
+                <YeniNeVarKarti apiBase={API} />
                 {/* KPI: Risk Durumu + Okuma Aktivitesi */}
                 {ogrenciRiskler.length > 0 && (
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -5827,6 +5830,7 @@ function OgretmenPaneli({ user, logout }) {
 
         {/* ═══ DASHBOARD ═══ */}
         {aktifSekme === "dashboard" && (<div className="space-y-5">
+          <YeniNeVarKarti apiBase={API} />
           {/* Motivasyon cümlesi — her girişte değişir */}
           {(() => {
             const motivasyonlar = [
@@ -9655,7 +9659,7 @@ function SistemAyarlari({ user }) {
       <p className="text-subtle text-sm">Rozet, XP, lig ve anket ayarlarını buradan yönetin. Değişiklikler anında uygulanır.</p>
 
       <div className="flex gap-2 flex-wrap">
-        {[{id:"ozellikler",l:"Özellik Yönetimi"},{id:"xp",l:"XP Değerleri"},{id:"ogretmen_xp",l:"Öğretmen XP"},{id:"lig",l:"Lig Eşikleri"},{id:"ogretmen_rozet",l:"Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"Öğrenci Rozetleri"},{id:"anket",l:"Anket Soruları"},{id:"kutulu_okuma",l:"Kutulu Okuma"},{id:"rapor_olcutleri",l:"Rapor Ölçütleri"},{id:"timi_anahtar",l:"TIMI Puanlama Anahtarı"},{id:"profil_gorunurluk",l:"Profil Görünürlüğü"},{id:"instagram",l:"Instagram"},{id:"kvkk",l:"Veri & KVKK"},{id:"sezon",l:"Sezonluk Reset"},...(user?.role === "admin" ? [{id:"bakim",l:"🔧 Bakım Modu"}] : [])].map(s => (
+        {[{id:"ozellikler",l:"Özellik Yönetimi"},{id:"xp",l:"XP Değerleri"},{id:"ogretmen_xp",l:"Öğretmen XP"},{id:"lig",l:"Lig Eşikleri"},{id:"ogretmen_rozet",l:"Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"Öğrenci Rozetleri"},{id:"anket",l:"Anket Soruları"},{id:"kutulu_okuma",l:"Kutulu Okuma"},{id:"rapor_olcutleri",l:"Rapor Ölçütleri"},{id:"timi_anahtar",l:"TIMI Puanlama Anahtarı"},{id:"profil_gorunurluk",l:"Profil Görünürlüğü"},{id:"instagram",l:"Instagram"},{id:"kvkk",l:"Veri & KVKK"},{id:"sezon",l:"Sezonluk Reset"},...(user?.role === "admin" ? [{id:"duyurular",l:"✨ Yeni Ne Var"},{id:"bakim",l:"🔧 Bakım Modu"}] : [])].map(s => (
           <button key={s.id} onClick={() => setAyarSekme(s.id)}
             className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${ayarSekme === s.id ? 'bg-primary text-white border-blue-600' : 'bg-surface text-subtle border-line'}`}>{s.l}</button>
         ))}
@@ -9792,6 +9796,9 @@ function SistemAyarlari({ user }) {
       {/* Sezonluk Reset */}
       {ayarSekme === "sezon" && (
         <SezonlukReset user={user} />
+      )}
+      {ayarSekme === "duyurular" && user?.role === "admin" && (
+        <DuyuruYonetimi apiBase={API} />
       )}
       {ayarSekme === "bakim" && user?.role === "admin" && (
         <BakimModu apiBase={API} />

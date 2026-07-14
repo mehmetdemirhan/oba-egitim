@@ -206,5 +206,9 @@
   {
     "name": "sistem",
     "active": true
+  },
+  {
+    "name": "duyuru",
+    "active": true
   }
 ]
