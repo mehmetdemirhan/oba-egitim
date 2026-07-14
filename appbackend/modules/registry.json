@@ -210,5 +210,9 @@
   {
     "name": "duyuru",
     "active": true
+  },
+  {
+    "name": "altyapi",
+    "active": true
   }
 ]
