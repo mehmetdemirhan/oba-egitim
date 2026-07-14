@@ -120,6 +120,76 @@ async def _migrate_ust_kur_xp(dry_run: bool) -> dict:
     }
 
 
+def _bos_veya_sifir(v) -> bool:
+    """Bir tutar/pay alanı 'boş veya 0' mı? (None, '', 0, '0', 0.0)."""
+    if v in (None, "", 0, "0"):
+        return True
+    try:
+        return float(v) == 0
+    except (TypeError, ValueError):
+        return False
+
+
+@migration_kaydet(
+    "varsayilan-tutarlar",
+    "Genel kur ücreti ₺14.400 ve öğretmen payı ₺3.000 varsayılanlarını uygular. "
+    "YALNIZ boş/0 olan ayar geneli + kur kayıtlarına dokunur; elle girilmiş dolu "
+    "değerlerin ÜZERİNE YAZMAZ. İdempotent.",
+)
+async def _migrate_varsayilan_tutarlar(dry_run: bool) -> dict:
+    VARS_UCRET, VARS_PAY = 14400, 3000
+    rapor = {"ayar_kur_ucreti": "değişmedi", "ayar_ogretmen_payi": "değişmedi",
+             "kur_tutar_dolduruldu": 0, "kur_pay_dolduruldu": 0,
+             "toplam_beklenen_delta": 0.0, "atlanan_dolu": 0, "ornekler": []}
+
+    # 1) Ayar geneli (yalnız boş/0 ise)
+    for tip, vars_deger, anahtar in (
+        ("kur_ucretleri", VARS_UCRET, "ayar_kur_ucreti"),
+        ("ogretmen_paylari", VARS_PAY, "ayar_ogretmen_payi"),
+    ):
+        ayar = await db.sistem_ayarlari.find_one({"tip": tip})
+        degerler = (ayar or {}).get("degerler", {}) if ayar else {}
+        if _bos_veya_sifir(degerler.get("genel")):
+            rapor[anahtar] = f"0/boş → {vars_deger}"
+            if not dry_run:
+                yeni = {"genel": vars_deger, "turler": degerler.get("turler", {})}
+                await db.sistem_ayarlari.update_one(
+                    {"tip": tip}, {"$set": {"tip": tip, "degerler": yeni}}, upsert=True)
+
+    # 2) Kur kayıtları (yalnız boş/0; iptal hariç)
+    kurlar = await db.kur_ucretleri.find({"durum": {"$ne": "iptal"}}).to_list(length=None)
+    ogrenci_delta: dict = {}
+    for k in kurlar:
+        degisti = False
+        if _bos_veya_sifir(k.get("tutar")):
+            rapor["kur_tutar_dolduruldu"] += 1
+            rapor["toplam_beklenen_delta"] += VARS_UCRET
+            ogrenci_delta[k.get("ogrenci_id")] = ogrenci_delta.get(k.get("ogrenci_id"), 0) + VARS_UCRET
+            degisti = True
+            if not dry_run:
+                await db.kur_ucretleri.update_one({"id": k["id"]}, {"$set": {"tutar": VARS_UCRET}})
+        elif not _bos_veya_sifir(k.get("tutar")):
+            rapor["atlanan_dolu"] += 1
+        if _bos_veya_sifir(k.get("ogretmen_pay")):
+            rapor["kur_pay_dolduruldu"] += 1
+            degisti = True
+            if not dry_run:
+                await db.kur_ucretleri.update_one({"id": k["id"]}, {"$set": {"ogretmen_pay": VARS_PAY}})
+        if degisti and len(rapor["ornekler"]) < 10:
+            rapor["ornekler"].append({"ogrenci_id": k.get("ogrenci_id"), "kur_adi": k.get("kur_adi"),
+                                      "eski_tutar": k.get("tutar"), "eski_pay": k.get("ogretmen_pay"),
+                                      "durum": k.get("durum")})
+
+    # 3) Öğrenci beklenen toplamını (yapilmasi_gereken_odeme) tutar deltasıyla düzelt
+    rapor["etkilenen_ogrenci"] = len(ogrenci_delta)
+    if not dry_run:
+        for oid, delta in ogrenci_delta.items():
+            if oid and delta:
+                await db.students.update_one({"id": oid}, {"$inc": {"yapilmasi_gereken_odeme": delta}})
+
+    return rapor
+
+
 @router.get("/admin/migrations")
 async def migration_listele(current_user=Depends(require_role(UserRole.ADMIN))):
     """Kayıtlı migration'ları listeler (yalnız admin)."""
