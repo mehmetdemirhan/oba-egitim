@@ -304,6 +304,25 @@ function SimpleEditForm({ item, teachers, courses, classes, onSave, onCancel, us
 const AYARLAR_GRUP = ["ai-merkezi", "loglar", "sss-yonetimi", "tema-yonetimi", "rozet-yonetimi", "toplu-kayit", "moduller", "guncelleme", "yedekleme"];
 const GELISIM_GRUP = ["sinav", "meb-kelime", "ders-programi"];
 
+// Hata çeşitleri (kaynak: "Hata Çeşitleri.docx" — 4 kategori, 18 tür). Analiz hata
+// takibi + sonuç ekranı + gelişim raporu bu tek kaynağı kullanır.
+const HATA_KATEGORILERI = [
+  { kategori:"Atlama Hataları", renk:"bg-red-100 text-red-700 border-red-200", yaziRenk:"text-red-600", turler:[
+    {tip:"harf_atlama",etiket:"Harf Atlama"},{tip:"hece_atlama",etiket:"Hece Atlama"},
+    {tip:"kelime_atlama",etiket:"Kelime Atlama"},{tip:"satir_atlama",etiket:"Satır Atlama"}]},
+  { kategori:"Ekleme Hataları", renk:"bg-orange-100 text-orange-700 border-orange-200", yaziRenk:"text-orange-600", turler:[
+    {tip:"harf_ekleme",etiket:"Harf Ekleme"},{tip:"hece_ekleme",etiket:"Hece Ekleme"},
+    {tip:"kelime_ekleme",etiket:"Kelime Ekleme"},{tip:"satir_ekleme",etiket:"Satır Ekleme"}]},
+  { kategori:"Yer Değiştirme ve Ters Çevirme", renk:"bg-purple-100 text-purple-700 border-purple-200", yaziRenk:"text-purple-600", turler:[
+    {tip:"tersten_okuma",etiket:"Tersten Okuma"},{tip:"harf_sira_degistirme",etiket:"Harflerin Sırasını Değiştirme"},
+    {tip:"kelime_sira_degistirme",etiket:"Kelimelerin Sırasını Değiştirme"},{tip:"harf_uzamsal_ters",etiket:"Harfleri Uzamsal Olarak Ters Çevirme"}]},
+  { kategori:"Diğer Hatalar", renk:"bg-blue-100 text-blue-700 border-blue-200", yaziRenk:"text-blue-600", turler:[
+    {tip:"tekrar_etme",etiket:"Tekrar Etme"},{tip:"duraklama",etiket:"Duraklama"},
+    {tip:"yanlis_heceleme",etiket:"Hecelerine Yanlış Ayırma"},{tip:"akici_okuyamama",etiket:"Akıcı Okuyamama"},
+    {tip:"kendi_kendine_duzeltme",etiket:"Kendi Kendine Düzeltme"},{tip:"yanlis_okuma",etiket:"Yanlış Okuma"}]},
+];
+const HATA_ETIKET = Object.fromEntries(HATA_KATEGORILERI.flatMap(k => k.turler.map(t => [t.tip, t.etiket])));
+
 function AppContent() {
   // ── TÜM HOOK'LAR EN ÜSTTE ──
   const { user, logout, loading, bakim } = useAuth();
@@ -2746,13 +2765,6 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
     onTamamla({ sure_saniye: sure, hatalar, gozlem_notu: gozlemNotu, anlama, prozodik, ogretmen_notu: ogretmenNotu, ogretmen_kur: kurKarari });
   };
 
-  const hataRenk = { atlama:"bg-red-100 text-red-700 border-red-200", yanlis_okuma:"bg-orange-100 text-orange-700 border-orange-200", takilma:"bg-yellow-100 text-yellow-700 border-yellow-200", tekrar:"bg-purple-100 text-purple-700 border-purple-200" };
-  const hataTipler = [
-    { tip:"atlama", etiket:"Atlama" },
-    { tip:"yanlis_okuma", etiket:"Yanlış Okuma" },
-    { tip:"takilma", etiket:"Takılma" },
-    { tip:"tekrar", etiket:"Tekrar" },
-  ];
 
   const SeviyeSecici = ({ alan, etiket, state, setState }) => {
     const sevRenk = { zayif:"border-red-300 bg-red-50 text-red-700", orta:"border-yellow-300 bg-yellow-50 text-yellow-700", iyi:"border-green-300 bg-green-50 text-green-700" };
@@ -2835,14 +2847,21 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, user }) {
 
             {/* Adım 0: Hata Takibi */}
             {raporAdim === 0 && (
-              <div className="space-y-3">
-                {hataTipler.map(({tip, etiket}) => (
-                  <div key={tip} className={`flex items-center justify-between p-3 rounded-xl border ${hataRenk[tip]}`}>
-                    <span className="font-medium text-sm">{etiket}</span>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => hataGeriAl(tip)} className="w-7 h-7 rounded-lg bg-white/60 font-bold text-sm hover:bg-surface">−</button>
-                      <span className="w-8 text-center font-bold text-lg tabular-nums">{hataSay(tip)}</span>
-                      <button onClick={() => hataEkle(tip)} className="w-7 h-7 rounded-lg bg-white/60 font-bold text-sm hover:bg-surface">+</button>
+              <div className="space-y-4">
+                {HATA_KATEGORILERI.map(({kategori, renk, turler}) => (
+                  <div key={kategori}>
+                    <div className="text-xs font-bold text-subtle uppercase tracking-wide mb-1.5">{kategori}</div>
+                    <div className="space-y-1.5">
+                      {turler.map(({tip, etiket}) => (
+                        <div key={tip} className={`flex items-center justify-between px-3 py-2 rounded-xl border ${renk}`}>
+                          <span className="font-medium text-sm">{etiket}</span>
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => hataGeriAl(tip)} className="w-7 h-7 rounded-lg bg-white/60 font-bold text-sm hover:bg-surface">−</button>
+                            <span className="w-8 text-center font-bold text-lg tabular-nums">{hataSay(tip)}</span>
+                            <button onClick={() => hataEkle(tip)} className="w-7 h-7 rounded-lg bg-white/60 font-bold text-sm hover:bg-surface">+</button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
@@ -2995,19 +3014,28 @@ function AnalizSonucEkrani({ sonuc, ogrenci, onKaydet, onYeniAnaliz }) {
         </Card>
       </div>
 
-      {/* Hata Dağılımı */}
-      {sonuc.hata_sayilari && (
+      {/* Hata Dağılımı — kategorili (yalnız sıfırdan büyük türler) */}
+      {sonuc.hata_sayilari && Object.values(sonuc.hata_sayilari).some(v => v > 0) && (
         <Card className="border border-line shadow-sm">
           <CardHeader><CardTitle className="text-base">Hata Dağılımı</CardTitle></CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-3">
-              {[["atlama","Atlama","bg-red-50 border-red-200","text-red-600"],["yanlis_okuma","Yanlış Okuma","bg-orange-50 border-orange-200","text-orange-600"],["takilma","Takılma","bg-yellow-50 border-yellow-200","text-yellow-600"],["tekrar","Tekrar","bg-purple-50 border-purple-200","text-purple-600"]].map(([key,label,kutu,yazi]) => (
-                <div key={key} className={`flex items-center justify-between p-3 rounded-xl border ${kutu}`}>
-                  <span className="text-sm font-medium">{label}</span>
-                  <span className={`text-lg font-bold tabular-nums ${yazi}`}>{sonuc.hata_sayilari[key] || 0}</span>
+          <CardContent className="space-y-3">
+            {HATA_KATEGORILERI.map(({kategori, yaziRenk, turler}) => {
+              const gorunen = turler.filter(t => (sonuc.hata_sayilari[t.tip] || 0) > 0);
+              if (gorunen.length === 0) return null;
+              return (
+                <div key={kategori}>
+                  <div className="text-xs font-bold text-subtle uppercase tracking-wide mb-1.5">{kategori}</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {gorunen.map(t => (
+                      <div key={t.tip} className="flex items-center justify-between p-2.5 rounded-xl border border-line bg-app">
+                        <span className="text-sm">{t.etiket}</span>
+                        <span className={`text-lg font-bold tabular-nums ${yaziRenk}`}>{sonuc.hata_sayilari[t.tip]}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </CardContent>
         </Card>
       )}
@@ -3230,7 +3258,7 @@ METİN: ${metin?.baslik || ""} (${metin?.kelime_sayisi || 0} kelime, Tür: ${met
 VERİLER:
 - Okuma Hızı: ${sonuc?.wpm || 0} kelime/dk (${hizSev} düzey)
 - Doğruluk: %${sonuc?.dogruluk_yuzde || 0}
-- Hata dağılımı: Atlama: ${sonuc?.hata_sayilari?.atlama || 0}, Yanlış okuma: ${sonuc?.hata_sayilari?.yanlis_okuma || 0}, Takılma: ${sonuc?.hata_sayilari?.takilma || 0}, Tekrar: ${sonuc?.hata_sayilari?.tekrar || 0}
+- Hata dağılımı: ${sonuc?.hata_sayilari ? (Object.entries(sonuc.hata_sayilari).filter(([,v])=>v>0).map(([k,v])=>`${HATA_ETIKET[k]||k}: ${v}`).join(", ") || "hata yok") : "hata yok"}
 - Anlama yüzdesi: %${anlama.genel_yuzde || hesaplaAnlamaYuzde()} (${anlamaSev})
 - Anlama detay: Cümle anlama: ${seviyeLabel[anlama.cumle_anlama]}, Bilinmeyen sözcük: ${seviyeLabel[anlama.bilinmeyen_sozcuk]}, Bağlaç/zamir: ${seviyeLabel[anlama.baglac_zamir]}, Ana fikir: ${seviyeLabel[anlama.ana_fikir]}, Yardımcı fikir: ${seviyeLabel[anlama.yardimci_fikir]}, Konu: ${seviyeLabel[anlama.konu]}, Başlık önerme: ${seviyeLabel[anlama.baslik_onerme]}, Neden-sonuç: ${seviyeLabel[anlama.neden_sonuc]}, Çıkarım: ${seviyeLabel[anlama.cikarim]}, İpuçları: ${seviyeLabel[anlama.ipuclari]}, Yorumlama: ${seviyeLabel[anlama.yorumlama]}, Görüş bildirme: ${seviyeLabel[anlama.gorus_bildirme]}, Yazar amacı: ${seviyeLabel[anlama.yazar_amaci]}, Alternatif fikir: ${seviyeLabel[anlama.alternatif_fikir]}, Günlük hayat: ${seviyeLabel[anlama.guncelle_hayat]}${ekAnlamaStr}
 - Prozodik toplam: ${prozodikToplam}/20 (${prozSev}), Noktalama: ${prozodik.noktalama}/4, Vurgu: ${prozodik.vurgu}/4, Tonlama: ${prozodik.tonlama}/4, Akıcılık: ${prozodik.akicilik}/4, Anlamlı gruplama: ${prozodik.anlamli_gruplama}/4${ekProzodikStr}
