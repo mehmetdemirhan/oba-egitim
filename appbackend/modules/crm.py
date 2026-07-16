@@ -34,6 +34,13 @@ class Teacher(BaseModel):
     yapilmasi_gereken_odeme: float = 0.0
     yapilan_odeme: float = 0.0
     arsivli: bool = False
+    # ── Opsiyonel profil alanları (öğrencidekiyle aynı il/ilce konvansiyonu) ──
+    il: Optional[str] = None
+    ilce: Optional[str] = None
+    kargo_adresi: Optional[str] = None      # kitap/materyal gönderimi — öğrenci/veliye GÖSTERİLMEZ
+    universite: Optional[str] = None         # mezuniyet — öğrenci/veliye GÖSTERİLMEZ
+    fakulte: Optional[str] = None
+    bolum: Optional[str] = None
     olusturma_tarihi: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     @property
@@ -54,6 +61,13 @@ class TeacherCreate(BaseModel):
     telefon: str
     seviye: TeacherLevel
     yapilmasi_gereken_odeme: float = 0.0
+    # ── Opsiyonel profil alanları ──
+    il: Optional[str] = None
+    ilce: Optional[str] = None
+    kargo_adresi: Optional[str] = None
+    universite: Optional[str] = None
+    fakulte: Optional[str] = None
+    bolum: Optional[str] = None
     # ── Opsiyonel hesap oluşturma (tek adımda user + teacher) ──
     hesap_olustur: bool = False
     email: Optional[str] = None
@@ -68,6 +82,13 @@ class TeacherUpdate(BaseModel):
     yapilmasi_gereken_odeme: Optional[float] = None
     yapilan_odeme: Optional[float] = None
     arsivli: Optional[bool] = None
+    # ── Opsiyonel profil alanları ──
+    il: Optional[str] = None
+    ilce: Optional[str] = None
+    kargo_adresi: Optional[str] = None
+    universite: Optional[str] = None
+    fakulte: Optional[str] = None
+    bolum: Optional[str] = None
 
 class Student(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -222,6 +243,8 @@ async def create_teacher(
         ad=teacher_data.ad, soyad=teacher_data.soyad, brans=teacher_data.brans,
         telefon=teacher_data.telefon, seviye=teacher_data.seviye,
         yapilmasi_gereken_odeme=teacher_data.yapilmasi_gereken_odeme,
+        il=teacher_data.il, ilce=teacher_data.ilce, kargo_adresi=teacher_data.kargo_adresi,
+        universite=teacher_data.universite, fakulte=teacher_data.fakulte, bolum=teacher_data.bolum,
     )
     await db.teachers.insert_one(prepare_for_mongo(teacher.dict()))
     sonuc = teacher.dict()

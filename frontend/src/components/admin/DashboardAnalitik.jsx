@@ -4,7 +4,8 @@ import {
   ResponsiveContainer, ComposedChart, Bar, Line, LineChart, XAxis, YAxis,
   CartesianGrid, Tooltip, Legend,
 } from "recharts";
-import { Filter, TrendingUp, Users, ChevronDown, ChevronRight, ArrowUp, ArrowDown } from "lucide-react";
+import { Filter, TrendingUp, Users, ChevronDown, ChevronRight, ArrowUp, ArrowDown, ArrowDownRight, Clock } from "lucide-react";
+import BilgiIkonu from "../BilgiIkonu";
 
 /**
  * DashboardAnalitik — admin: kur yenileme hunisi + nakit akışı/alacak yaşlandırma +
@@ -30,14 +31,22 @@ function SatisTooltip({ active, payload }) {
   );
 }
 
-function Bolum({ baslik, ikon: Ikon, children, varsayilanAcik = true }) {
+function Bolum({ baslik, ikon: Ikon, bilgi, children, varsayilanAcik = true }) {
   const [acik, setAcik] = useState(varsayilanAcik);
   return (
     <div className="border border-line rounded-2xl bg-surface shadow-sm overflow-hidden">
-      <button onClick={() => setAcik(!acik)} className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-app transition-colors">
-        <span className="font-bold text-content flex items-center gap-2">{Ikon && <Ikon className="h-5 w-5 text-primary" />}{baslik}</span>
-        {acik ? <ChevronDown className="h-5 w-5 text-subtle" /> : <ChevronRight className="h-5 w-5 text-subtle" />}
-      </button>
+      {/* Başlık satırı: aç/kapa butonu + (i) bilgi ikonu ayrı öğeler (iç içe buton olmaz) */}
+      <div className="w-full flex items-center justify-between px-4 py-3 hover:bg-app transition-colors">
+        <button onClick={() => setAcik(!acik)} className="flex-1 flex items-center gap-2 text-left font-bold text-content">
+          {Ikon && <Ikon className="h-5 w-5 text-primary" />}{baslik}
+        </button>
+        <div className="flex items-center gap-2">
+          {bilgi && <BilgiIkonu k={bilgi} />}
+          <button onClick={() => setAcik(!acik)} aria-label={acik ? "Kapat" : "Aç"}>
+            {acik ? <ChevronDown className="h-5 w-5 text-subtle" /> : <ChevronRight className="h-5 w-5 text-subtle" />}
+          </button>
+        </div>
+      </div>
       {acik && <div className="border-t border-line p-4">{children}</div>}
     </div>
   );
@@ -76,34 +85,64 @@ export default function DashboardAnalitik({ apiBase, onYaslandirmaSec, onOgretme
   const KOVA = [["0-30", "0-30 gün", "bg-emerald-50 border-emerald-200 text-emerald-700"],
                 ["31-60", "31-60 gün", "bg-amber-50 border-amber-200 text-amber-700"],
                 ["60+", "60+ gün", "bg-red-50 border-red-200 text-red-700"]];
+  // Huni basamağının rengi = o basamaktan bir üst kura GEÇİŞ sağlığı (leak noktasını vurgular).
+  const oranRenk = (oran) =>
+    oran == null ? { bar: "bg-slate-400", ok: "text-slate-500" }
+      : oran >= 70 ? { bar: "bg-emerald-500", ok: "text-emerald-700" }
+        : oran >= 40 ? { bar: "bg-amber-500", ok: "text-amber-700" }
+          : { bar: "bg-red-500", ok: "text-red-600" };
 
   return (
     <div className="space-y-6">
       {/* 1. Kur Yenileme Hunisi */}
-      <Bolum baslik="Kur Yenileme Hunisi" ikon={Filter}>
+      <Bolum baslik="Kur Yenileme Hunisi" ikon={Filter} bilgi="huni">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            {huni.length === 0 ? <div className="text-sm text-subtle">Veri yok.</div> : huni.map((h, i) => (
-              <div key={h.kur}>
-                <div className="flex items-center justify-between text-xs mb-0.5">
-                  <span className="text-content font-medium">{h.kur}. kuru tamamlayan</span>
-                  <span className="text-subtle tabular-nums">{h.tamamlayan} öğrenci{h.beklemede > 0 && <span className="text-amber-600"> • beklemede: {h.beklemede}</span>}</span>
-                </div>
-                <div className="h-7 bg-app rounded-lg overflow-hidden relative">
-                  <div className="h-full bg-primary/80 rounded-lg flex items-center px-2" style={{ width: `${Math.max(8, (h.tamamlayan / enFazla) * 100)}%` }}>
-                    <span className="text-[11px] text-white font-semibold tabular-nums">{h.tamamlayan}</span>
+          <div className="space-y-1.5">
+            {huni.length === 0 ? <div className="text-sm text-subtle">Veri yok.</div> : huni.map((h, i) => {
+              const sonBasamak = i === huni.length - 1;
+              const renk = oranRenk(sonBasamak ? null : h.oran);
+              const gen = Math.max(10, (h.tamamlayan / enFazla) * 100);
+              return (
+                <div key={h.kur}>
+                  {/* Etiket bar ÜSTÜNDE — huni şekli (∝ öğrenci) korunur, metin okunur kalır */}
+                  <div className="flex items-center justify-between gap-2 text-xs mb-1">
+                    <span className="text-content font-medium">
+                      {h.kur}. kuru tamamlayan: <span className="tabular-nums font-bold">{h.tamamlayan}</span> öğrenci
+                    </span>
+                    {h.beklemede > 0 && (
+                      <span title="Kuru bitireli 30 günden az — bekleme penceresinde; geçiş oranı paydasından düşülür."
+                        className="shrink-0 inline-flex items-center gap-1 text-[11px] text-amber-500/80 bg-amber-50 border border-amber-200/60 rounded-md px-1.5 py-0.5">
+                        <Clock className="h-3 w-3" />{h.beklemede} beklemede
+                      </span>
+                    )}
                   </div>
-                </div>
-                {i < huni.length - 1 && (
-                  <div className="flex items-center gap-1 text-[11px] text-emerald-700 pl-2 mt-0.5">
-                    <TrendingUp className="h-3 w-3" />{h.kur}→{h.kur + 1}: {h.oran != null ? `%${h.oran}` : "—"} <span className="text-subtle">({h.gecen} geçti)</span>
+                  <div className="h-7 bg-app rounded-lg overflow-hidden">
+                    <div className={`h-full ${renk.bar} rounded-lg flex items-center px-2 transition-all`} style={{ width: `${gen}%` }}>
+                      <span className="text-[11px] text-white font-semibold tabular-nums">{h.tamamlayan}</span>
+                    </div>
                   </div>
-                )}
-              </div>
-            ))}
+                  {!sonBasamak && (
+                    <div className="flex items-center flex-wrap gap-x-1.5 gap-y-0.5 pl-3 py-1">
+                      <ArrowDownRight className={`h-3.5 w-3.5 ${renk.ok}`} />
+                      <span className={`text-[11px] font-semibold tabular-nums ${renk.ok}`}>
+                        {h.oran != null ? `%${h.oran} devam etti` : "geçiş yok"}
+                      </span>
+                      <span className="text-[11px] text-subtle tabular-nums">({h.gecen} öğrenci {h.kur + 1}. kura geçti)</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            <div className="pt-1.5 text-[10px] text-subtle flex items-start gap-1 leading-snug">
+              <Clock className="h-3 w-3 mt-0.5 shrink-0 text-amber-500/70" />
+              <span>"Beklemede" = kuru bitireli 30 günden az; henüz üst kura geçmemiş ama bekleme penceresi açık. Geçiş oranının paydasından düşülür (kaybolmuş sayılmaz).</span>
+            </div>
           </div>
           <div>
-            <div className="text-xs text-subtle mb-1">Aylık yenileme oranı (%) — beklemede penceresi paydadan düşülür</div>
+            <div className="text-xs text-subtle mb-1 flex items-center gap-1">
+              Aylık yenileme oranı (%) — beklemede penceresi paydadan düşülür
+              <BilgiIkonu k="yenileme_trend" konum="tl" />
+            </div>
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={trend}>
@@ -119,7 +158,7 @@ export default function DashboardAnalitik({ apiBase, onYaslandirmaSec, onOgretme
       </Bolum>
 
       {/* 1b. Satış Başarısı */}
-      <Bolum baslik="Satış Başarısı" ikon={TrendingUp}>
+      <Bolum baslik="Satış Başarısı" ikon={TrendingUp} bilgi="satis_basarisi">
         <div className="text-xs text-subtle mb-1">Son 12 ay — çubuklar (yığılmış): satılan kur = yeni kayıt + yenileme; çizgi: yenileme oranı (%)</div>
         <div style={{ width: "100%", height: 260 }}>
           <ResponsiveContainer>
@@ -139,7 +178,7 @@ export default function DashboardAnalitik({ apiBase, onYaslandirmaSec, onOgretme
       </Bolum>
 
       {/* 2. Nakit Akışı + Yaşlandırma */}
-      <Bolum baslik="Nakit Akışı & Alacak Yaşlandırma" ikon={TrendingUp}>
+      <Bolum baslik="Nakit Akışı & Alacak Yaşlandırma" ikon={TrendingUp} bilgi="nakit_akisi">
         <div className="text-xs text-subtle mb-1">Son 12 ay — çubuklar: tahsilat/vergi/öğretmen ödemesi, çizgi: NET (tahsilat − vergi − ödeme)</div>
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
@@ -156,7 +195,7 @@ export default function DashboardAnalitik({ apiBase, onYaslandirmaSec, onOgretme
           </ResponsiveContainer>
         </div>
         <div className="mt-4">
-          <div className="text-xs text-subtle mb-2" title={veri.yaslandirma_tanim}>Alacak Yaşlandırma — {veri.yaslandirma_tanim} (kovaya tıkla → tabloyu filtrele)</div>
+          <div className="text-xs text-subtle mb-2 flex items-center gap-1" title={veri.yaslandirma_tanim}>Alacak Yaşlandırma — {veri.yaslandirma_tanim} (kovaya tıkla → tabloyu filtrele)<BilgiIkonu k="yaslandirma" konum="tl" /></div>
           <div className="grid grid-cols-3 gap-3">
             {KOVA.map(([k, etiket, renk]) => (
               <button key={k} onClick={() => onYaslandirmaSec && onYaslandirmaSec(k)}
@@ -171,7 +210,7 @@ export default function DashboardAnalitik({ apiBase, onYaslandirmaSec, onOgretme
       </Bolum>
 
       {/* 3. Öğretmen Performans Tablosu */}
-      <Bolum baslik="Öğretmen Performans Tablosu" ikon={Users}>
+      <Bolum baslik="Öğretmen Performans Tablosu" ikon={Users} bilgi="ogretmen_performans">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

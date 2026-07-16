@@ -48,6 +48,7 @@ import OgretmenDonemOdeme from "./components/admin/OgretmenDonemOdeme";
 import GecikenKurlar from "./components/admin/GecikenKurlar";
 import FunnelPanel from "./components/admin/FunnelPanel";
 import DashboardAnalitik from "./components/admin/DashboardAnalitik";
+import BilgiIkonu from "./components/BilgiIkonu";
 import SinavYonetimi from "./components/admin/SinavYonetimi";
 import SinavCozum from "./components/SinavCozum";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
@@ -271,6 +272,14 @@ function SimpleEditForm({ item, teachers, courses, classes, onSave, onCancel, us
       {item.type === 'teacher' && <>
         <div><Label>Branş</Label><Input value={data.brans||''} onChange={e => setData({...data,brans:e.target.value})} /></div>
         <div><Label>Telefon</Label><Input value={data.telefon||''} onChange={e => setData({...data,telefon:e.target.value})} /></div>
+        <IlIlceSecici il={data.il||''} ilce={data.ilce||''} onIl={v => setData(p => ({...p,il:v}))} onIlce={v => setData(p => ({...p,ilce:v}))} />
+        <div><Label>Kargo Adresi</Label><textarea rows={2} value={data.kargo_adresi||''} onChange={e => setData({...data,kargo_adresi:e.target.value})}
+          className="w-full px-3 py-2 rounded-md border border-line text-sm outline-none focus:border-primary" /></div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div><Label>Üniversite</Label><Input value={data.universite||''} onChange={e => setData({...data,universite:e.target.value})} /></div>
+          <div><Label>Fakülte</Label><Input value={data.fakulte||''} onChange={e => setData({...data,fakulte:e.target.value})} /></div>
+          <div><Label>Bölüm</Label><Input value={data.bolum||''} onChange={e => setData({...data,bolum:e.target.value})} /></div>
+        </div>
       </>}
       {item.type === 'student' && <>
         <div><Label>Sınıf</Label>
@@ -350,10 +359,11 @@ function AppContent() {
   const [bekleyenler, setBekleyenler] = useState(null);
   const [weeklyStats, setWeeklyStats] = useState([]);
   const [monthlyStats, setMonthlyStats] = useState([]);
+  const [sinifDagilimi, setSinifDagilimi] = useState(null);
   const [teacherStudents, setTeacherStudents] = useState({});
   const [expandedTeachers, setExpandedTeachers] = useState(new Set());
   const [loadingAction, setLoadingAction] = useState(false);
-  const [teacherForm, setTeacherForm] = useState({ ad: "", soyad: "", brans: "", telefon: "", seviye: "yeni", yapilmasi_gereken_odeme: 0, hesap_olustur: false, email: "", hesap_rol: "teacher" });
+  const [teacherForm, setTeacherForm] = useState({ ad: "", soyad: "", brans: "", telefon: "", seviye: "yeni", yapilmasi_gereken_odeme: 0, hesap_olustur: false, email: "", hesap_rol: "teacher", il: "", ilce: "", kargo_adresi: "", universite: "", fakulte: "", bolum: "" });
   const [ogrGeciciSifre, setOgrGeciciSifre] = useState(null); // öğretmen hesabı geçici şifresi (bir kereliğine)
   const [studentForm, setStudentForm] = useState({ ad: "", soyad: "", sinif: "", veli_ad: "", veli_soyad: "", veli_telefon: "", aldigi_egitim: "", kur: "", yapilmasi_gereken_odeme: 0, ogretmene_yapilacak_odeme: 0, ogretmen_id: "", il: "", ilce: "" });
   const [courseForm, setCourseForm] = useState({ ad: "", fiyat: 0, sure: 0 });
@@ -380,6 +390,7 @@ function AppContent() {
     try { if ((user?.role === 'admin' || user?.role === 'coordinator')) { const r = await axios.get(`${API}/dashboard/bekleyenler`); setBekleyenler(r.data); } } catch(e) { setBekleyenler({ metin_bekleyen:[], metin_oylama:[], gelisim_bekleyen:[], gelisim_oylama:[], kitap_bekleyen:[], kitap_oylama:[], toplam:0 }); }
     try { const r = await axios.get(`${API}/stats/weekly`); setWeeklyStats(Array.isArray(r.data) ? r.data : []); } catch(e) {}
     try { const r = await axios.get(`${API}/stats/monthly`); setMonthlyStats(Array.isArray(r.data) ? r.data : []); } catch(e) {}
+    try { if ((user?.role === 'admin' || user?.role === 'coordinator')) { const r = await axios.get(`${API}/dashboard/sinif-dagilimi`); setSinifDagilimi(r.data); } } catch(e) {}
     try { const r = await axios.get(`${API}/teachers`); setTeachers(Array.isArray(r.data) ? r.data : []); } catch(e) {}
     try { const r = await axios.get(`${API}/students`); setStudents(Array.isArray(r.data) ? r.data : []); } catch(e) {}
     try { const r = await axios.get(`${API}/courses`); setCourses(Array.isArray(r.data) ? r.data : []); } catch(e) {}
@@ -511,7 +522,7 @@ function AppContent() {
     } catch { toast({ title: "Hata", description: "Güncelleme hatası", variant: "destructive" }); }
   };
 
-  const createTeacher = async (e) => { e.preventDefault(); setLoadingAction(true); try { const r = await axios.post(`${API}/teachers`, teacherForm); setTeacherForm({ ad:"",soyad:"",brans:"",telefon:"",seviye:"yeni",yapilmasi_gereken_odeme:0, hesap_olustur:false, email:"", hesap_rol:"teacher" }); fetchTeachers(); fetchDashboard(); const sifre = r.data?.hesap?.gecici_sifre; if (sifre) { setOgrGeciciSifre({ ad:`${r.data.ad} ${r.data.soyad}`, email:r.data.hesap.email, sifre }); } else { toast({ title:"Başarılı", description:"Öğretmen eklendi" }); } } catch(err) { toast({ title:"Hata", description: err.response?.data?.detail || "Hata oluştu", variant:"destructive" }); } setLoadingAction(false); };
+  const createTeacher = async (e) => { e.preventDefault(); setLoadingAction(true); try { const r = await axios.post(`${API}/teachers`, teacherForm); setTeacherForm({ ad:"",soyad:"",brans:"",telefon:"",seviye:"yeni",yapilmasi_gereken_odeme:0, hesap_olustur:false, email:"", hesap_rol:"teacher", il:"", ilce:"", kargo_adresi:"", universite:"", fakulte:"", bolum:"" }); fetchTeachers(); fetchDashboard(); const sifre = r.data?.hesap?.gecici_sifre; if (sifre) { setOgrGeciciSifre({ ad:`${r.data.ad} ${r.data.soyad}`, email:r.data.hesap.email, sifre }); } else { toast({ title:"Başarılı", description:"Öğretmen eklendi" }); } } catch(err) { toast({ title:"Hata", description: err.response?.data?.detail || "Hata oluştu", variant:"destructive" }); } setLoadingAction(false); };
   const createStudent = async (e) => { e.preventDefault(); setLoadingAction(true); try { await axios.post(`${API}/students`, studentForm); setStudentForm({ ad:"",soyad:"",sinif:"",veli_ad:"",veli_soyad:"",veli_telefon:"",aldigi_egitim:"",kur:"",yapilmasi_gereken_odeme:0,ogretmene_yapilacak_odeme:0,ogretmen_id:"",il:"",ilce:"" }); fetchStudents(); fetchTeachers(); fetchDashboard(); setTeacherStudents({}); toast({ title:"Başarılı", description:"Öğrenci eklendi" }); } catch { toast({ title:"Hata", description:"Hata oluştu", variant:"destructive" }); } setLoadingAction(false); };
   const createCourse = async (e) => { e.preventDefault(); setLoadingAction(true); try { await axios.post(`${API}/courses`, courseForm); setCourseForm({ ad:"",fiyat:0,sure:0 }); fetchCourses(); fetchDashboard(); toast({ title:"Başarılı", description:"Kurs eklendi" }); } catch { toast({ title:"Hata", description:"Hata oluştu", variant:"destructive" }); } setLoadingAction(false); };
   const createPayment = async (e) => { e.preventDefault(); setLoadingAction(true); try { await axios.post(`${API}/payments`, paymentForm); setPaymentForm({ tip:"ogrenci",kisi_id:"",miktar:0,aciklama:"" }); fetchPayments(); fetchTeachers(); fetchStudents(); fetchDashboard(); toast({ title:"Başarılı", description:"Ödeme kaydedildi" }); } catch { toast({ title:"Hata", description:"Hata oluştu", variant:"destructive" }); } setLoadingAction(false); };
@@ -738,7 +749,7 @@ function AppContent() {
                       <div className="text-xs text-red-500">öğrenci — müdahale gerekli</div>
                     </div>
                     <div className="bg-surface rounded-2xl p-4 border border-line shadow-sm">
-                      <div className="flex items-center gap-1.5 text-xs text-subtle font-medium"><TrendingUp className="h-3.5 w-3.5 text-primary" />North Star</div>
+                      <div className="flex items-center justify-between text-xs text-subtle font-medium"><span className="flex items-center gap-1.5"><TrendingUp className="h-3.5 w-3.5 text-primary" />North Star</span><BilgiIkonu k="risk" /></div>
                       <div className="text-3xl font-bold text-content tabular-nums mt-1">{ogrenciRiskler.length > 0 ? Math.round(ogrenciRiskler.filter(r => r.aktif_gunler_7 >= 4).length / ogrenciRiskler.length * 100) : 0}%</div>
                       <div className="text-xs text-subtle">haftada 4+ gün okuyan</div>
                     </div>
@@ -796,18 +807,36 @@ function AppContent() {
                   {/* Finansal grafikler — YALNIZ Yönetici (koordinatör/öğretmende gizli) */}
                   {user.role !== "coordinator" && (<>
                   <Card className="border border-line shadow-sm">
-                    <CardHeader><CardTitle>Finansal Durum</CardTitle></CardHeader>
+                    <CardHeader><CardTitle className="flex items-center justify-between">Finansal Durum <BilgiIkonu k="finansal_durum" /></CardTitle></CardHeader>
                     <CardContent><div className="h-64" role="img" aria-label="Finansal durum: öğrenci alacakları ve öğretmen borçları dağılımı"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value" nameKey="name" stroke="#fff" strokeWidth={2}>{pieData.map((e,i) => <Cell key={i} fill={e.color} />)}</Pie><Tooltip formatter={v => formatCurrency(v)} /><Legend verticalAlign="bottom" height={28} iconType="circle" /></PieChart></ResponsiveContainer></div></CardContent>
                   </Card>
                   <Card className="border border-line shadow-sm">
-                    <CardHeader><CardTitle>Aylık İstatistikler</CardTitle></CardHeader>
+                    <CardHeader><CardTitle className="flex items-center justify-between">Aylık İstatistikler <BilgiIkonu k="aylik_istatistik" /></CardTitle></CardHeader>
                     <CardContent><div className="h-64" role="img" aria-label="Aylık istatistikler: yeni öğrenci ve gelir grafiği"><ResponsiveContainer width="100%" height="100%"><BarChart data={monthlyStats}><CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" /><XAxis dataKey="ay" /><YAxis /><Tooltip /><Legend iconType="circle" /><Bar dataKey="yeni_ogrenciler" name="Yeni Öğrenci" fill="#3b82f6" /><Bar dataKey="gelir" name="Gelir" fill="#f97316" /></BarChart></ResponsiveContainer></div></CardContent>
                   </Card>
                   </>)}
                   {/* Öğrenci hareket grafikleri — HEM Yönetici HEM Koordinatör görür */}
                   <Card className="border border-line shadow-sm">
-                    <CardHeader><CardTitle>Yeni Kayıt vs Kur Atlayan (Bu Ay)</CardTitle></CardHeader>
+                    <CardHeader><CardTitle className="flex items-center justify-between">Yeni Kayıt vs Kur Atlayan (Bu Ay) <BilgiIkonu k="yeni_vs_kuratlayan" /></CardTitle></CardHeader>
                     <CardContent><div className="h-64" role="img" aria-label="Bu ay yeni kayıt ve kur atlayan öğrenci dağılımı"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={pieDataKoord} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value" nameKey="name" stroke="#fff" strokeWidth={2}>{pieDataKoord.map((e,i) => <Cell key={i} fill={e.color} />)}</Pie><Tooltip formatter={(v,n) => [`${v} öğrenci`, n]} /><Legend verticalAlign="bottom" height={28} iconType="circle" /></PieChart></ResponsiveContainer></div></CardContent>
+                  </Card>
+                  {/* Öğrenci Sınıf Dağılımı — aktif öğrenciler (arşivli+mezun hariç), 1-8 + Belirsiz */}
+                  <Card className="border border-line shadow-sm">
+                    <CardHeader><CardTitle className="flex items-center justify-between">Öğrenci Sınıf Dağılımı <BilgiIkonu k="sinif_dagilimi" /></CardTitle></CardHeader>
+                    <CardContent><div className="h-64" role="img" aria-label="Aktif öğrencilerin sınıf seviyesine göre dağılımı">
+                      {(sinifDagilimi?.dagilim || []).some(d => d.sayi > 0) ? (
+                        <ResponsiveContainer width="100%" height="100%"><BarChart data={sinifDagilimi.dagilim}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                          <XAxis dataKey="sinif" />
+                          <YAxis allowDecimals={false} />
+                          <Tooltip formatter={(v) => [`${v} öğrenci`, "Sayı"]}
+                            labelFormatter={(l) => { const d = (sinifDagilimi?.dagilim || []).find(x => x.sinif === l); return d ? `${d.etiket} · toplam içinde %${d.yuzde}` : l; }} />
+                          <Bar dataKey="sayi" name="Öğrenci" radius={[4,4,0,0]}>
+                            {sinifDagilimi.dagilim.map((e,i) => <Cell key={i} fill={e.sinif === "?" ? "#94a3b8" : "#6366f1"} />)}
+                          </Bar>
+                        </BarChart></ResponsiveContainer>
+                      ) : <div className="h-full flex items-center justify-center text-sm text-subtle">Veri yok.</div>}
+                    </div></CardContent>
                   </Card>
                   {/* "Aylık Kur Atlayan Öğrenci" grafiği kaldırıldı — Kur Yenileme Hunisi
                       + aylık yenileme trendi (DashboardAnalitik) bunu kapsıyor. */}
@@ -869,6 +898,16 @@ function AppContent() {
                     <div><Label>Soyad</Label><Input value={teacherForm.soyad} onChange={e => setTeacherForm({...teacherForm, soyad:e.target.value})} required /></div>
                     <div><Label>Branş</Label><Input value={teacherForm.brans} onChange={e => setTeacherForm({...teacherForm, brans:e.target.value})} required /></div>
                     <div><Label>Telefon</Label><Input value={teacherForm.telefon} onChange={e => setTeacherForm({...teacherForm, telefon:e.target.value})} required /></div>
+                    <IlIlceSecici il={teacherForm.il} ilce={teacherForm.ilce}
+                      onIl={v => setTeacherForm(p => ({...p, il:v}))} onIlce={v => setTeacherForm(p => ({...p, ilce:v}))} />
+                    <div><Label>Kargo Adresi <span className="text-xs text-subtle">(opsiyonel — kitap/materyal gönderimi)</span></Label>
+                      <textarea rows={2} value={teacherForm.kargo_adresi} onChange={e => setTeacherForm({...teacherForm, kargo_adresi:e.target.value})}
+                        className="w-full px-3 py-2 rounded-md border border-line text-sm outline-none focus:border-primary" /></div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div><Label>Üniversite</Label><Input value={teacherForm.universite} onChange={e => setTeacherForm({...teacherForm, universite:e.target.value})} /></div>
+                      <div><Label>Fakülte</Label><Input value={teacherForm.fakulte} onChange={e => setTeacherForm({...teacherForm, fakulte:e.target.value})} /></div>
+                      <div><Label>Bölüm</Label><Input value={teacherForm.bolum} onChange={e => setTeacherForm({...teacherForm, bolum:e.target.value})} /></div>
+                    </div>
                     <div><Label>Seviye</Label>
                       <Select value={teacherForm.seviye} onValueChange={v => setTeacherForm({...teacherForm, seviye:v})}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
@@ -12115,6 +12154,7 @@ function TurkiyeOkumaHaritasi({ apiBase }) {
     return siralama === "kitap" ? d.kitap_sayisi
          : siralama === "kelime" ? d.kelime_sayisi
          : siralama === "ogrenci" ? (d.ogrenci_sayisi || 0)
+         : siralama === "ogretmen" ? (d.ogretmen_sayisi || 0)
          : d.avg_streak;
   };
 
@@ -12124,6 +12164,7 @@ function TurkiyeOkumaHaritasi({ apiBase }) {
       siralama === "kitap" ? i.kitap_sayisi
     : siralama === "kelime" ? i.kelime_sayisi
     : siralama === "ogrenci" ? (i.ogrenci_sayisi || 0)
+    : siralama === "ogretmen" ? (i.ogretmen_sayisi || 0)
     : i.avg_streak
     ));
   }, [haritaData, siralama]);
@@ -12149,17 +12190,32 @@ function TurkiyeOkumaHaritasi({ apiBase }) {
   const toplamOkuyan = haritaData?.toplam_okuyucu || 0;
   const toplamKelime = haritaData?.toplam_kelime || 0;
   const secilenData = secilen ? getIlData(secilen) : null;
+  // Özet kartlar: aktif sekmeye göre (öğrenci/öğretmen → toplam · il sayısı · en yoğun il)
+  const ilSayisi = (alan) => (haritaData?.iller || []).filter(i => (i[alan] || 0) > 0).length;
+  const enYogunIl = (alan) => {
+    const list = (haritaData?.iller || []).filter(i => (i[alan] || 0) > 0).sort((a, b) => (b[alan] || 0) - (a[alan] || 0));
+    return list[0] ? `${list[0].il} (${list[0][alan]})` : "—";
+  };
+  const ozetKartlar = siralama === "ogretmen"
+    ? [[haritaData?.toplam_ogretmen || 0, "Öğretmen"], [ilSayisi("ogretmen_sayisi"), "İl Sayısı"], [enYogunIl("ogretmen_sayisi"), "En Yoğun İl"]]
+    : siralama === "ogrenci"
+      ? [[haritaData?.toplam_ogrenci || 0, "Öğrenci"], [ilSayisi("ogrenci_sayisi"), "İl Sayısı"], [enYogunIl("ogrenci_sayisi"), "En Yoğun İl"]]
+      : [[toplamOkuyan, "Okuyucu"], [toplamKelime, "Kelime"], [haritaData?.aktif_il || 0, "Aktif İl"]];
 
   return (
     <div className="space-y-4">
       <div className="bg-gradient-to-r from-red-600 to-red-800 rounded-2xl p-4 text-white relative overflow-hidden">
         <div className="absolute right-3 top-2 text-5xl opacity-10">🗺️</div>
-        <div className="font-bold text-base">🇹🇷 Türkiye Okuma Haritası</div>
+        <div className="font-bold text-base flex items-center gap-1.5">🇹🇷 Türkiye {siralama === "ogretmen" ? "Öğretmen" : siralama === "ogrenci" ? "Öğrenci" : "Okuma"} Haritası
+          {(siralama === "ogretmen" || siralama === "ogrenci") && (
+            <span className="text-white"><BilgiIkonu k={siralama === "ogretmen" ? "harita_ogretmen" : "harita_ogrenci"} /></span>
+          )}
+        </div>
         <p className="text-xs opacity-80 mb-3">İl bazında anonim · KVKK uyumlu</p>
         <div className="flex gap-3">
-          {[[toplamOkuyan,"Okuyucu"],[toplamKelime,"Kelime"],[haritaData?.aktif_il||0,"Aktif İl"]].map(([v,l],i) => (
+          {ozetKartlar.map(([v,l],i) => (
             <div key={i} className="bg-white/20 rounded-xl px-3 py-1.5 text-center">
-              <div className="font-bold text-sm">{Number(v).toLocaleString("tr-TR")}</div>
+              <div className="font-bold text-sm">{typeof v === "number" ? v.toLocaleString("tr-TR") : v}</div>
               <div className="text-[10px] opacity-80">{l}</div>
             </div>
           ))}
@@ -12167,7 +12223,7 @@ function TurkiyeOkumaHaritasi({ apiBase }) {
       </div>
 
       <div className="flex gap-2 flex-wrap">
-        {[["kitap","📚 Kitap"],["kelime","🧠 Kelime"],["streak","🔥 Streak"],["ogrenci","👥 Öğrenci Dağılımı"]].map(([k,l]) => (
+        {[["kitap","📚 Kitap"],["kelime","🧠 Kelime"],["streak","🔥 Streak"],["ogrenci","👥 Öğrenci Dağılımı"],["ogretmen","👨‍🏫 Öğretmen Dağılımı"]].map(([k,l]) => (
           <button key={k} onClick={() => { setSiralama(k); setSecilen(null); }}
             className={"flex-1 min-w-[90px] py-2 rounded-xl text-xs font-medium transition-all " +
               (siralama===k ? "bg-red-600 text-white shadow" : "bg-surface border border-line text-subtle hover:border-red-300")}>
@@ -12227,7 +12283,7 @@ function TurkiyeOkumaHaritasi({ apiBase }) {
                   <text x={tx+7} y={ty+30} fontSize={7.5} fill="#374151">📚 {d?.kitap_sayisi||0} kitap okundu</text>
                   <text x={tx+7} y={ty+43} fontSize={7.5} fill="#374151">🧠 {d?.kelime_sayisi||0} kelime öğrenildi</text>
                   <text x={tx+7} y={ty+56} fontSize={7.5} fill="#374151">🔥 {d?.avg_streak||0} gün streak ort.</text>
-                  <text x={tx+7} y={ty+67} fontSize={6.5} fill="#9ca3af">👥 {d?.ogrenci_sayisi||0} öğrenci · {d?.okuyucu_sayisi||0} okuyucu</text>
+                  <text x={tx+7} y={ty+67} fontSize={6.5} fill="#9ca3af">👥 {d?.ogrenci_sayisi||0} öğrenci · 👨‍🏫 {d?.ogretmen_sayisi||0} öğretmen</text>
                 </g>
               );
             })()}
@@ -12250,7 +12306,7 @@ function TurkiyeOkumaHaritasi({ apiBase }) {
       {haritaData?.iller?.length > 0 && (
         <div className="bg-surface rounded-2xl border shadow-sm p-4">
           <div className="text-xs font-bold text-content mb-3">
-            🏆 {siralama==="ogrenci"?"En Yoğun 5 İl":"En Aktif 5 İl"} — {siralama==="kitap"?"Kitap":siralama==="kelime"?"Kelime":siralama==="ogrenci"?"Öğrenci Sayısı":"Streak"}
+            🏆 {(siralama==="ogrenci"||siralama==="ogretmen")?"En Yoğun 5 İl":"En Aktif 5 İl"} — {siralama==="kitap"?"Kitap":siralama==="kelime"?"Kelime":siralama==="ogrenci"?"Öğrenci Sayısı":siralama==="ogretmen"?"Öğretmen Sayısı":"Streak"}
           </div>
           <div className="space-y-2.5">
             {[...haritaData.iller]
@@ -12273,7 +12329,7 @@ function TurkiyeOkumaHaritasi({ apiBase }) {
                       </div>
                     </div>
                     <div className="text-xs font-bold text-red-600 w-20 text-right">
-                      {deger} {siralama==="kitap"?"kitap":siralama==="kelime"?"kelime":"gün"}
+                      {deger} {siralama==="kitap"?"kitap":siralama==="kelime"?"kelime":siralama==="ogrenci"?"öğrenci":siralama==="ogretmen"?"öğretmen":"gün"}
                     </div>
                   </div>
                 );

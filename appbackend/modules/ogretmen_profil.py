@@ -53,10 +53,13 @@ VARSAYILAN_GORUNURLUK = {
 }
 
 # Teacher'ın düzenleyebileceği alanlar (email/seviye/ödeme/katılım HARİÇ)
+# NOT: il/ilce/kargo_adresi/universite/fakulte/bolum bilinçli olarak VARSAYILAN_GORUNURLUK'a
+# EKLENMEZ → profil-public ucundan öğrenci/veliye sızmaz (kargo+mezuniyet gizli kalır).
 DUZENLENEBILIR = {
     "ad", "soyad", "brans", "telefon", "dogum_tarihi", "adres", "sehir",
     "kisa_biyografi", "egitim_gecmisi", "deneyim_yili", "sertifikalar",
     "bildirim_tercihleri", "profil_fotografi",
+    "il", "ilce", "kargo_adresi", "universite", "fakulte", "bolum",
 }
 # users koleksiyonuna da yansıtılacak kimlik alanları
 USERS_SENKRON = {"ad", "soyad", "telefon"}
@@ -92,6 +95,13 @@ def _profil_birlestir(teacher: dict, email: str) -> dict:
         "sertifikalar": t.get("sertifikalar") or [],
         "katilim_tarihi": t.get("katilim_tarihi") or t.get("olusturma_tarihi"),
         "bildirim_tercihleri": {**VARSAYILAN_BILDIRIM, **(t.get("bildirim_tercihleri") or {})},
+        # ── Opsiyonel profil alanları (öğrenci/veliye gösterilmez — bkz. DUZENLENEBILIR notu) ──
+        "il": t.get("il", ""),
+        "ilce": t.get("ilce", ""),
+        "kargo_adresi": t.get("kargo_adresi", ""),
+        "universite": t.get("universite", ""),
+        "fakulte": t.get("fakulte", ""),
+        "bolum": t.get("bolum", ""),
     }
 
 

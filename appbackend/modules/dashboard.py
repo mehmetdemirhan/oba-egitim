@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from core.db import db
 from core.auth import require_role, UserRole
+from core.kayit_normalize import normalize_sinif
 
 router = APIRouter()
 
@@ -459,3 +460,27 @@ async def dashboard_analitik(current_user=Depends(require_role(UserRole.ADMIN)))
         "ogretmen_performans": performans,
         "guncel_donem": f"{dy:04d}-{dm:02d}-15",
     }
+
+
+@router.get("/dashboard/sinif-dagilimi")
+async def sinif_dagilimi(current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+    """Aktif öğrencilerin (arşivli + mezun HARİÇ) sınıf seviyesine göre dağılımı.
+    1-8. sınıf ayrı kova; parse edilemeyen/boş/aralık dışı sınıf → '?' kovası.
+    normalize_sinif ile ayrıştırılır (ilk rakam grubu, 1-12 aralığı). Anonim: yalnız sayı."""
+    ogrenciler = await db.students.find(
+        {"arsivli": {"$ne": True}, "mezun": {"$ne": True}},
+        {"_id": 0, "sinif": 1},
+    ).to_list(length=None)
+    kovalar = {str(i): 0 for i in range(1, 9)}
+    kovalar["?"] = 0
+    for s in ogrenciler:
+        n = normalize_sinif(s.get("sinif"))
+        anahtar = str(n) if isinstance(n, int) and 1 <= n <= 8 else "?"
+        kovalar[anahtar] += 1
+    toplam = sum(kovalar.values())
+    dagilim = [
+        {"sinif": k, "etiket": (f"{k}. Sınıf" if k != "?" else "Belirsiz"),
+         "sayi": v, "yuzde": round(v * 100 / toplam, 1) if toplam else 0.0}
+        for k, v in kovalar.items()
+    ]
+    return {"dagilim": dagilim, "toplam": toplam}
