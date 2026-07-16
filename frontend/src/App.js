@@ -387,10 +387,14 @@ function AppContent() {
 
   const fetchAll = useCallback(async () => {
     try { const r = await axios.get(`${API}/dashboard`); setDashboardStats(r.data); } catch(e) {}
-    try { if ((user?.role === 'admin' || user?.role === 'coordinator')) { const r = await axios.get(`${API}/dashboard/bekleyenler`); setBekleyenler(r.data); } } catch(e) { setBekleyenler({ metin_bekleyen:[], metin_oylama:[], gelisim_bekleyen:[], gelisim_oylama:[], kitap_bekleyen:[], kitap_oylama:[], toplam:0 }); }
+    // Yetki backend'de zorlanır; rol koşulu KOYMA — boş-deps closure'ında user bayat (null) kalıp
+    // admin'e "Onay Bekleyenler"i hiç yüklemiyordu. Yetkisizse 403 → catch varsayılanı kurar.
+    try { const r = await axios.get(`${API}/dashboard/bekleyenler`); setBekleyenler(r.data); } catch(e) { setBekleyenler({ metin_bekleyen:[], metin_oylama:[], gelisim_bekleyen:[], gelisim_oylama:[], kitap_bekleyen:[], kitap_oylama:[], toplam:0 }); }
     try { const r = await axios.get(`${API}/stats/weekly`); setWeeklyStats(Array.isArray(r.data) ? r.data : []); } catch(e) {}
     try { const r = await axios.get(`${API}/stats/monthly`); setMonthlyStats(Array.isArray(r.data) ? r.data : []); } catch(e) {}
-    try { if ((user?.role === 'admin' || user?.role === 'coordinator')) { const r = await axios.get(`${API}/dashboard/sinif-dagilimi`); setSinifDagilimi(r.data); } } catch(e) {}
+    // Yetki backend'de zorlanır (admin/koordinatör); rol koşulu KOYMA — fetchAll'ın boş-deps
+    // closure'ında user (null) bayat kalıyor ve grafik "veri yok" gösteriyordu. 403 ise sessizce geçer.
+    try { const r = await axios.get(`${API}/dashboard/sinif-dagilimi`); setSinifDagilimi(r.data); } catch(e) {}
     try { const r = await axios.get(`${API}/teachers`); setTeachers(Array.isArray(r.data) ? r.data : []); } catch(e) {}
     try { const r = await axios.get(`${API}/students`); setStudents(Array.isArray(r.data) ? r.data : []); } catch(e) {}
     try { const r = await axios.get(`${API}/courses`); setCourses(Array.isArray(r.data) ? r.data : []); } catch(e) {}
