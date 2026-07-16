@@ -212,6 +212,10 @@
     "active": true
   },
   {
+    "name": "ai_ceo",
+    "active": true
+  },
+  {
     "name": "altyapi",
     "active": true
   }
