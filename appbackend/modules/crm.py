@@ -880,6 +880,10 @@ async def create_payment(payment_data: PaymentCreate,
     await db.payments.insert_one(prepare_for_mongo({**doc}))
     if payment.tip == "ogrenci":
         await db.students.update_one({"id": payment.kisi_id}, {"$inc": {"yapilan_odeme": payment.miktar}})
+        # Ödeme satırı ekleme de muhasebe PATCH ile AYNI hakediş zincirinden geçer:
+        # kalan=0 → tamamlanma damgası/tetik; ortak kural tek fonksiyonda (kopya yok).
+        from modules.muhasebe import _odeme_sonrasi_islem
+        await _odeme_sonrasi_islem(payment.kisi_id, current_user)
     elif payment.tip == "ogretmen":
         await db.teachers.update_one({"id": payment.kisi_id}, {"$inc": {"yapilan_odeme": payment.miktar}})
     return Payment(**doc)
@@ -900,6 +904,11 @@ async def delete_payment(payment_id: str,
     elif payment['tip'] == "ogretmen":
         await db.teachers.update_one({"id": payment['kisi_id']}, {"$inc": {"yapilan_odeme": -payment['miktar']}})
     await db.payments.delete_one({"id": payment_id})
+    if payment['tip'] == "ogrenci":
+        # Silme kalan'ı >0'a çıkarabilir → aynı geri-alma kuralı (ödenmiş döneme girmiş
+        # kur otomatik geri alınmaz, uyarı loglanır). Ortak fonksiyon.
+        from modules.muhasebe import _odeme_sonrasi_islem
+        await _odeme_sonrasi_islem(payment['kisi_id'], current_user)
     return {"message": "Ödeme başarıyla silindi"}
 
 @router.put("/payments/{payment_id}", response_model=Payment)
@@ -929,6 +938,10 @@ async def update_payment(payment_id: str, data: PaymentUpdate,
     if data.tarih is not None:
         guncelle["tarih"] = data.tarih.isoformat()
     await db.payments.update_one({"id": payment_id}, {"$set": guncelle})
+    if delta and eski.get("tip") == "ogrenci":
+        # Miktar değişimi kalan'ı hem 0'a indirebilir hem >0'a çıkarabilir → aynı zincir.
+        from modules.muhasebe import _odeme_sonrasi_islem
+        await _odeme_sonrasi_islem(eski["kisi_id"], current_user)
     guncel = await db.payments.find_one({"id": payment_id})
     return Payment(**parse_from_mongo(guncel))
 
