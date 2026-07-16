@@ -361,6 +361,52 @@ async def son_fotograf() -> dict | None:
 
 
 # ─────────────────────────── endpointler ───────────────────────────
+def saglik_skoru(fotograf: dict) -> dict:
+    """Fotoğraftan 0-100 bileşenli genel sağlık skoru (deterministik, AI'sız)."""
+    if not fotograf:
+        return {"skor": None, "bilesenler": []}
+    m = fotograf.get("muhasebe", {}) or {}
+    o = fotograf.get("ogretmen", {}) or {}
+    k = fotograf.get("kullanim", {}) or {}
+
+    def _clamp(v):
+        return max(0.0, min(100.0, v))
+
+    bilesenler = []
+    # 1) Tahsilat sağlığı = tahsil / beklenen
+    bek = _num(m.get("beklenen_tahsilat")); tah = _num(m.get("tahsil_edilen"))
+    tahsilat = _clamp(tah * 100 / bek) if bek > 0 else 100.0
+    bilesenler.append({"ad": "Tahsilat", "puan": round(tahsilat, 0), "agirlik": 0.25})
+    # 2) Yenileme oranı (0-100 zaten)
+    yen = o.get("yenileme_orani_yuzde")
+    if yen is not None:
+        bilesenler.append({"ad": "Yenileme", "puan": round(_clamp(_num(yen)), 0), "agirlik": 0.25})
+    # 3) Veli memnuniyeti (5 üzerinden → 100)
+    mem = o.get("veli_memnuniyeti_5uzerinden")
+    if mem is not None:
+        bilesenler.append({"ad": "Memnuniyet", "puan": round(_clamp(_num(mem) * 20), 0), "agirlik": 0.25})
+    # 4) Gecikme sağlığı (geciken kur ne kadar azsa o kadar iyi)
+    gec = _num(o.get("geciken_kur_sayisi"))
+    aktif_ogr = _num((fotograf.get("ogrenci", {}) or {}).get("aktif")) or 1
+    gecikme = _clamp(100 - (gec * 100 / max(1, aktif_ogr)))
+    bilesenler.append({"ad": "Zamanında Kur", "puan": round(gecikme, 0), "agirlik": 0.15})
+    # 5) Görev tamamlama (kullanım)
+    gt = k.get("gorev_tamamlama_yuzde")
+    if gt is not None:
+        bilesenler.append({"ad": "Katılım", "puan": round(_clamp(_num(gt)), 0), "agirlik": 0.10})
+
+    tw = sum(b["agirlik"] for b in bilesenler) or 1
+    skor = round(sum(b["puan"] * b["agirlik"] for b in bilesenler) / tw, 0)
+    return {"skor": skor, "bilesenler": bilesenler}
+
+
+@router.get("/ai/ceo/saglik")
+async def saglik_endpoint(current_user=Depends(_ADMIN)):
+    foto = await son_fotograf()
+    return {"saglik": saglik_skoru(foto) if foto else {"skor": None, "bilesenler": []},
+            "fotograf_tarih": foto.get("tarih") if foto else None}
+
+
 @router.post("/ai/ceo/fotograf/cek")
 async def fotograf_cek(current_user=Depends(_ADMIN)):
     foto = await sistem_fotografi()
