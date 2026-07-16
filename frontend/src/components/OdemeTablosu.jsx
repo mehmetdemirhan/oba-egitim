@@ -29,7 +29,7 @@ const formatTarih = (t) => {
 const isoGun = (t) => { try { return (t || "").slice(0, 10); } catch { return ""; } };
 
 // Tek hücre — tıkla-düzenle; Enter/blur kaydeder, Esc iptal.
-function EditableCell({ value, kind = "text", format, align = "left", editable = true, onSave, placeholder }) {
+function EditableCell({ value, kind = "text", format, align = "left", editable = true, onSave, placeholder, baslik }) {
   const [editing, setEditing] = useState(false);
   const [taslak, setTaslak] = useState(value ?? "");
   const ref = useRef(null);
@@ -50,7 +50,7 @@ function EditableCell({ value, kind = "text", format, align = "left", editable =
   }
   if (!editing) {
     return (
-      <td onClick={() => setEditing(true)} title="Düzenlemek için tıklayın"
+      <td onClick={() => setEditing(true)} title={baslik || "Düzenlemek için tıklayın"}
         className={`px-3 py-2 ${hiza} cursor-pointer hover:bg-blue-50 hover:ring-1 hover:ring-inset hover:ring-blue-200 ${kind === "number" ? "tabular-nums" : ""}`}>
         {format ? format(value) : (value || <span className="text-slate-300">{placeholder || "—"}</span>)}
       </td>
@@ -175,6 +175,19 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
     k.kur_ucreti_id
       ? req(() => axios.patch(`${apiBase}/muhasebe/kur-ucreti/${k.kur_ucreti_id}`, { tutar: parseFloat(yeniTutar) || 0 }))
       : alanKaydet(k.kisi_id, "yapilmasi_gereken_odeme", yeniTutar);
+  // Öğrenci satırında "Ödenen" — öğrencinin TOPLAM ödemesini (yapilan_odeme) düzenler;
+  // FIFO en-eski-borç-önce dağıtır. Backend kalan/vergi/hakediş zincirini yeniden hesaplar
+  // (kalan=0 → hakediş tetiği; geri alınırsa damga kaldırılır — logla). Bekleneni aşarsa
+  // UYAR ama engelleme (fazla ödeme vakası olabilir).
+  const odenenKaydet = (k, yeniOdenen) => {
+    const v = parseFloat(yeniOdenen) || 0;
+    const beklenen = Number(k.beklenen_toplam ?? k.yapilmasi_gereken_odeme ?? 0);
+    if (v > beklenen + 0.01) {
+      toast({ title: "Fazla ödeme uyarısı",
+        description: `Ödenen (${formatTL(v)}) bekleneni (${formatTL(beklenen)}) aşıyor — yine de kaydedildi.` });
+    }
+    return alanKaydet(k.kisi_id, "yapilan_odeme", v);
+  };
 
   const odemeSil = async () => {
     if (await req(() => axios.delete(`${apiBase}/payments/${silDialog.id}`), "Silinemedi")) {
@@ -317,7 +330,9 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
                           onSave={(v) => alanKaydet(k.kisi_id, "veli_telefon", v)} />
                         <EditableCell value={k.yapilmasi_gereken_odeme} kind="number" align="right" format={formatTL}
                           onSave={(v) => beklenenKaydet(k, v)} />
-                        <td className="px-3 py-2 text-right tabular-nums text-subtle">{formatTL(k.yapilan_odeme)}</td>
+                        <EditableCell value={k.yapilan_odeme} kind="number" align="right" format={formatTL}
+                          baslik="Öğrencinin TOPLAM ödemesi — FIFO en eski borçtan dağıtılır"
+                          onSave={(v) => odenenKaydet(k, v)} />
                         <td className={`px-3 py-2 text-right tabular-nums font-medium ${k.kalan > 0 ? "text-amber-600" : "text-subtle"}`}>{formatTL(k.kalan)}</td>
                         <EditableCell value={k.ogretmen_pay} kind="number" align="right" format={formatTL}
                           editable={!!k.kur_ucreti_id} placeholder="Pay"
