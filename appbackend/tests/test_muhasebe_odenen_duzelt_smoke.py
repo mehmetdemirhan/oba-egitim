@@ -59,6 +59,9 @@ async def run():
     # sA: Ödenen düzeltme + tetik/geri-al senaryosu; sB: Öğr.Payı + yetki senaryosu
     await db.students.insert_one(ogr("sA", 1000))
     await db.students.insert_one(ogr("sB", 1000))
+    # sC: KUR KAYDI OLMAYAN (eski) öğrenci — "Öğr. Payı" student.ogretmene_yapilacak_odeme'yi hedefler
+    sC = ogr("sC", 800); sC["ogretmene_yapilacak_odeme"] = 300
+    await db.students.insert_one(sC)
     await db.kur_ucretleri.insert_one({"id": "kA", "ogrenci_id": "sA", "kur_adi": "1",
                                        "tutar": 1000, "egitim_turu": "Genel", "ogretmen_pay": 500, "durum": "acik"})
     await db.kur_ucretleri.insert_one({"id": "kB", "ogrenci_id": "sB", "kur_adi": "1",
@@ -123,6 +126,20 @@ async def run():
         check(r.status_code == 403, f"öğretmen Öğr. Payı düzeltemez → 403 ({r.status_code})")
         r = await ac.patch("/api/muhasebe/kisi/ogrenci/sB", headers=H("t1"), json={"yapilan_odeme": 999})
         check(r.status_code == 403, f"öğretmen Ödenen düzeltemez → 403 ({r.status_code})")
+
+        # 8) KUR KAYDI OLMAYAN öğrencide "Öğr. Payı" satırı da düzenlenebilir olmalı
+        r = await ac.get("/api/muhasebe/kisiler", headers=H("acc"))
+        satirC = next((o for o in r.json().get("ogrenciler", []) if o.get("kisi_id") == "sC"), None)
+        check(satirC is not None and satirC.get("kur_ucreti_id") is None, "sC tek satır (kur kaydı yok)")
+        check(satirC and abs(float((satirC or {}).get("ogretmen_pay") or 0) - 300) < 0.01, f"sC Öğr. Payı = ogretmene_yapilacak_odeme (300) ({satirC and satirC.get('ogretmen_pay')})")
+        r = await ac.patch("/api/muhasebe/kisi/ogrenci/sC", headers=H("acc"), json={"ogretmene_yapilacak_odeme": 450})
+        check(r.status_code == 200, "sC Öğr. Payı (ogretmene_yapilacak_odeme) elle düzenlendi")
+        s = await db.students.find_one({"id": "sC"})
+        check(abs(float(s.get("ogretmene_yapilacak_odeme") or 0) - 450) < 0.01, "sC ogretmene_yapilacak_odeme 450 oldu")
+        check(await db.islem_log.find_one({"hedef_id": "sC", "alan": "ogretmene_yapilacak_odeme"}) is not None,
+              "sC pay değişikliği audit'e düştü")
+        r = await ac.patch("/api/muhasebe/kisi/ogrenci/sC", headers=H("t1"), json={"ogretmene_yapilacak_odeme": 1})
+        check(r.status_code == 403, f"öğretmen sC payını düzeltemez → 403 ({r.status_code})")
 
     await server.client.drop_database(TEST_DB)
 
