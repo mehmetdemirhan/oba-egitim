@@ -71,6 +71,13 @@ async def turkiye_okuma_haritasi():
         ]).to_list(length=None)
         ogr_map = {g["_id"]: g["sayi"] for g in ogr_dagilim if g.get("_id")}
 
+        # Öğretmen Dağılımı: db.teachers il bazlı sayı — anonim (arşivli hariç, kimlik sızmaz).
+        ogt_dagilim = await db.teachers.aggregate([
+            {"$match": {"il": {"$exists": True, "$nin": [None, ""]}, "arsivli": {"$ne": True}}},
+            {"$group": {"_id": "$il", "sayi": {"$sum": 1}}},
+        ]).to_list(length=None)
+        ogt_map = {g["_id"]: g["sayi"] for g in ogt_dagilim if g.get("_id")}
+
         iller = []
         toplam_okuyucu = 0
         toplam_kelime_genel = 0
@@ -113,14 +120,17 @@ async def turkiye_okuma_haritasi():
                 "kitap_sayisi": kitap_sayisi,
                 "kelime_sayisi": kelime_sayisi,
                 "avg_streak": avg_streak,
-                "ogrenci_sayisi": ogr_map.pop(il_adi, 0),  # CRM il dağılımı
+                "ogrenci_sayisi": ogr_map.pop(il_adi, 0),   # CRM öğrenci il dağılımı
+                "ogretmen_sayisi": ogt_map.pop(il_adi, 0),  # CRM öğretmen il dağılımı
             })
 
-        # Yalnız CRM'de (db.students) il'i olan ama users haritasında olmayan iller
-        for il_adi, sayi in ogr_map.items():
+        # Yalnız CRM'de (db.students / db.teachers) il'i olan ama users haritasında olmayan iller
+        for il_adi in set(ogr_map) | set(ogt_map):
             iller.append({
                 "il": il_adi, "okuyucu_sayisi": 0, "kitap_sayisi": 0,
-                "kelime_sayisi": 0, "avg_streak": 0, "ogrenci_sayisi": sayi,
+                "kelime_sayisi": 0, "avg_streak": 0,
+                "ogrenci_sayisi": ogr_map.get(il_adi, 0),
+                "ogretmen_sayisi": ogt_map.get(il_adi, 0),
             })
 
         # Sırala: kitap sayısına göre
@@ -129,6 +139,9 @@ async def turkiye_okuma_haritasi():
         toplam_ogrenci = sum(i["ogrenci_sayisi"] for i in iller)
         en_yogun = sorted([i for i in iller if i["ogrenci_sayisi"] > 0],
                           key=lambda x: x["ogrenci_sayisi"], reverse=True)[:3]
+        toplam_ogretmen = sum(i.get("ogretmen_sayisi", 0) for i in iller)
+        en_yogun_ogt = sorted([i for i in iller if i.get("ogretmen_sayisi", 0) > 0],
+                              key=lambda x: x["ogretmen_sayisi"], reverse=True)[:3]
 
         return {
             "iller": iller,
@@ -137,9 +150,12 @@ async def turkiye_okuma_haritasi():
             "aktif_il": aktif_il_sayisi,
             "toplam_ogrenci": toplam_ogrenci,
             "en_yogun_iller": [{"il": i["il"], "ogrenci_sayisi": i["ogrenci_sayisi"]} for i in en_yogun],
+            "toplam_ogretmen": toplam_ogretmen,
+            "en_yogun_iller_ogretmen": [{"il": i["il"], "ogretmen_sayisi": i["ogretmen_sayisi"]} for i in en_yogun_ogt],
             "guncelleme": datetime.utcnow().isoformat(),
         }
 
     except Exception as e:
         logging.error(f"[TURKİYE-HARİTA] Hata: {e}")
-        return {"iller": [], "toplam_okuyucu": 0, "toplam_kelime": 0, "aktif_il": 0}
+        return {"iller": [], "toplam_okuyucu": 0, "toplam_kelime": 0, "aktif_il": 0,
+                "toplam_ogrenci": 0, "toplam_ogretmen": 0}

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { GraduationCap, Phone, Calendar, Bell, Lock, X } from "lucide-react";
+import IlIlceSecici from "../IlIlceSecici";
 
 /**
  * OgretmenProfil — öğretmenin kendi profilini görüntüleyip düzenlediği sayfa.
@@ -13,6 +14,7 @@ const ALANLAR_DUZENLENEBILIR = [
   "ad", "soyad", "brans", "telefon", "dogum_tarihi", "adres", "sehir",
   "kisa_biyografi", "egitim_gecmisi", "deneyim_yili", "sertifikalar",
   "bildirim_tercihleri", "profil_fotografi",
+  "il", "ilce", "kargo_adresi", "universite", "fakulte", "bolum",
 ];
 
 const BILDIRIM_ETIKET = {
@@ -193,6 +195,15 @@ export default function OgretmenProfil({ apiBase }) {
             <textarea value={form.adres || ""} onChange={(e) => alan("adres", e.target.value)} rows={2}
               className="w-full mt-1 px-3 py-2 rounded-xl border border-line text-sm focus:border-primary outline-none" />
           </div>
+          <div className="md:col-span-2">
+            <IlIlceSecici il={form.il || ""} ilce={form.ilce || ""}
+              onIl={(v) => alan("il", v)} onIlce={(v) => alan("ilce", v)} />
+          </div>
+          <div className="md:col-span-2">
+            <label className="text-xs font-medium text-subtle">Kargo Adresi <span className="text-subtle">(kitap/materyal gönderimi için)</span></label>
+            <textarea value={form.kargo_adresi || ""} onChange={(e) => alan("kargo_adresi", e.target.value)} rows={2}
+              className="w-full mt-1 px-3 py-2 rounded-xl border border-line text-sm focus:border-primary outline-none" />
+          </div>
         </div>
       )}
 
@@ -208,6 +219,15 @@ export default function OgretmenProfil({ apiBase }) {
             <textarea value={bio} maxLength={500} rows={3}
               onChange={(e) => alan("kisa_biyografi", e.target.value)}
               className="w-full mt-1 px-3 py-2 rounded-xl border border-line text-sm focus:border-primary outline-none" />
+          </div>
+
+          <div>
+            <div className="text-xs font-semibold text-subtle mb-2">Mezuniyet Bilgisi</div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {girdi("Üniversite", "universite")}
+              {girdi("Fakülte", "fakulte")}
+              {girdi("Bölüm", "bolum")}
+            </div>
           </div>
 
           <DinamikListe
