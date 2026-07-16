@@ -32,10 +32,10 @@ _ERISIM = require_role(UserRole.ADMIN, UserRole.ACCOUNTANT)
 # Satır içi düzenlemede izin verilen alanlar (whitelist) — tip bazlı.
 _DUZENLENEBILIR = {
     "ogrenci": {"ad", "soyad", "veli_ad", "veli_soyad", "veli_telefon", "sinif", "kur",
-                "yapilmasi_gereken_odeme", "yapilan_odeme", "muhasebe_notu"},
+                "yapilmasi_gereken_odeme", "yapilan_odeme", "ogretmene_yapilacak_odeme", "muhasebe_notu"},
     "ogretmen": {"ad", "soyad", "yapilmasi_gereken_odeme", "yapilan_odeme", "muhasebe_notu"},
 }
-_PARA_ALANLAR = {"yapilmasi_gereken_odeme", "yapilan_odeme"}
+_PARA_ALANLAR = {"yapilmasi_gereken_odeme", "yapilan_odeme", "ogretmene_yapilacak_odeme"}
 _KOLEKSIYON = {"ogrenci": "students", "ogretmen": "teachers"}
 
 
@@ -250,6 +250,9 @@ async def muhasebe_kisiler(current_user=Depends(_ERISIM)):
                     "kur_ucreti_id": None,
                     "kur": s.get("kur", ""),
                     "kayit_zamani": s.get("olusturma_tarihi") or "",
+                    # Kur kaydı olmayan (eski) öğrencide "Öğr. Payı" = student.ogretmene_yapilacak_odeme;
+                    # satır-içi düzenleme bu alanı hedefler (kur snapshot yok → hakedişe girmez).
+                    "ogretmen_pay": round(_num(s.get("ogretmene_yapilacak_odeme")), 2),
                     "yapilmasi_gereken_odeme": round(gereken, 2),
                     "yapilan_odeme": round(yapilan, 2),
                     "kalan": round(max(0.0, gereken - yapilan), 2),

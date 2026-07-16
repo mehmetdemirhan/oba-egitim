@@ -188,6 +188,13 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
     }
     return alanKaydet(k.kisi_id, "yapilan_odeme", v);
   };
+  // "Öğr. Payı" — admin/muhasebeci elle girer. Kur kaydı varsa o kurun snapshot payını
+  // (hakedişe yansır) düzenler; kur kaydı olmayan (eski) öğrencide öğrenci düzeyindeki
+  // ogretmene_yapilacak_odeme'yi düzenler — böylece her satır düzenlenebilir.
+  const ogretmenPayKaydet = (k, v) =>
+    k.kur_ucreti_id
+      ? req(() => axios.patch(`${apiBase}/muhasebe/kur-ucreti/${k.kur_ucreti_id}/pay`, { ogretmen_pay: parseFloat(v) || 0 }), "Pay güncellenemedi")
+      : alanKaydet(k.kisi_id, "ogretmene_yapilacak_odeme", v);
 
   const odemeSil = async () => {
     if (await req(() => axios.delete(`${apiBase}/payments/${silDialog.id}`), "Silinemedi")) {
@@ -335,8 +342,9 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
                           onSave={(v) => odenenKaydet(k, v)} />
                         <td className={`px-3 py-2 text-right tabular-nums font-medium ${k.kalan > 0 ? "text-amber-600" : "text-subtle"}`}>{formatTL(k.kalan)}</td>
                         <EditableCell value={k.ogretmen_pay} kind="number" align="right" format={formatTL}
-                          editable={!!k.kur_ucreti_id} placeholder="Pay"
-                          onSave={(v) => k.kur_ucreti_id ? req(() => axios.patch(`${apiBase}/muhasebe/kur-ucreti/${k.kur_ucreti_id}/pay`, { ogretmen_pay: parseFloat(v) || 0 }), "Pay güncellenemedi") : false} />
+                          placeholder="Pay"
+                          baslik={k.kur_ucreti_id ? "Bu kur için öğretmen payı (hakedişe yansır)" : "Öğrenci için öğretmen payı (kur kaydı yok)"}
+                          onSave={(v) => ogretmenPayKaydet(k, v)} />
                         <EditableCell value={k.muhasebe_notu} placeholder="Not ekle" kind="text"
                           onSave={(v) => alanKaydet(k.kisi_id, "muhasebe_notu", v)} />
                       </>
