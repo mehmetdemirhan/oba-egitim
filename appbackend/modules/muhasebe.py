@@ -84,13 +84,19 @@ def _kur_gizli(satir: dict) -> bool:
     return satir.get("durum") == "tamamlandi" and _num(satir.get("kalan")) <= 0.01
 
 
-async def _odeme_sonrasi_islem(ogrenci_id: str) -> None:
+async def _odeme_sonrasi_islem(ogrenci_id: str, user: dict | None = None) -> None:
     """Ödeme kaydı sonrası tetiklenir (SPEC B + SPEC A). Asla exception fırlatmaz.
     (1) Veli ödemesi TAMAMLANAN (kalan=0) kur kayıtlarına `odeme_tamamlanma_tarihi`
         damgalar — ödeme-bazlı öğretmen hakedişi bu tarihe göre döneme girer. Damga
         yalnız yoksa konur (idempotent, ileriye dönük; kısmi ödeme damga doğurmaz).
+        TERS YÖN: "Ödenen" elle azaltılıp kalan tekrar >0 olursa, HENÜZ hakedişe
+        girmemiş (odendi_donem boş) kurun tamamlanma damgası kaldırılır → hakediş
+        tetiği geri alınır (audit'e düşer). Zaten ödenmiş döneme (odendi_donem)
+        girmiş kur otomatik geri alınamaz; yalnız uyarı loglanır (elle düzeltme).
     (2) SPEC A: mezun + borçlu öğrenci borcunu kapattıysa otomatik arşivlenir + admin/
-        muhasebeye bildirim (borç kapanınca normal arşiv + son ödeme hakediş kuralı)."""
+        muhasebeye bildirim (borç kapanınca normal arşiv + son ödeme hakediş kuralı).
+
+    user verilirse hakediş tetik/geri-alma değişiklikleri audit'e (kim/ne zaman) düşer."""
     try:
         s = await db.students.find_one({"id": ogrenci_id})
         if not s:
@@ -100,11 +106,34 @@ async def _odeme_sonrasi_islem(ogrenci_id: str) -> None:
         now = datetime.now(timezone.utc).isoformat()
         for d in _kur_dagilimi(kurlar, _num(s.get("yapilan_odeme"))):
             kid = d.get("kur_ucreti_id")
-            if kid and d.get("kalan", 1) <= 0.01:
-                k = next((x for x in kurlar if x.get("id") == kid), None)
-                if k and not k.get("odeme_tamamlanma_tarihi"):
+            if not kid:
+                continue
+            k = next((x for x in kurlar if x.get("id") == kid), None)
+            if not k:
+                continue
+            tamamlandi = _num(d.get("kalan")) <= 0.01
+            damgali = bool(k.get("odeme_tamamlanma_tarihi"))
+            if tamamlandi and not damgali:
+                # Hakediş tetiği: tam ödenen kura tamamlanma damgası koy
+                await db.kur_ucretleri.update_one(
+                    {"id": kid}, {"$set": {"odeme_tamamlanma_tarihi": now}})
+                if user:
+                    await _log(user, "kur_ucreti", kid, "odeme_tamamlanma", None, now)
+            elif not tamamlandi and damgali:
+                # "Ödenen" geri alındı → kalan tekrar >0. Hakedişe girmemişse damgayı kaldır.
+                if k.get("odendi_donem"):
+                    logging.warning(
+                        f"[muhasebe] kur {kid} '{k.get('odendi_donem')}' dönemine ödenmiş; "
+                        f"kalan tekrar >0 oldu — hakediş kaydı elle düzeltilmeli.")
+                    if user:
+                        await _log(user, "kur_ucreti", kid, "hakedis_uyari",
+                                   k.get("odendi_donem"), "kalan>0 (ödenmiş dönem)")
+                else:
                     await db.kur_ucretleri.update_one(
-                        {"id": kid}, {"$set": {"odeme_tamamlanma_tarihi": now}})
+                        {"id": kid}, {"$unset": {"odeme_tamamlanma_tarihi": ""}})
+                    if user:
+                        await _log(user, "kur_ucreti", kid, "odeme_tamamlanma_geri",
+                                   k.get("odeme_tamamlanma_tarihi"), None)
         # SPEC A: mezun + borç kapandı → otomatik arşiv
         if s.get("mezun") and not s.get("arsivli"):
             borc = max(0.0, _num(s.get("yapilmasi_gereken_odeme")) - _num(s.get("yapilan_odeme")))
@@ -185,6 +214,11 @@ async def muhasebe_kisiler(current_user=Depends(_ERISIM)):
                 "ogretmen_ad": ogretmen_ad.get(s.get("ogretmen_id"), ""),
                 "ogretmen_id": s.get("ogretmen_id"),
                 "ogretmene_yapilacak_odeme": _num(s.get("ogretmene_yapilacak_odeme")),
+                # "Ödenen" satır-içi düzenlemesi öğrencinin TOPLAM ödemesini (yapilan_odeme)
+                # hedefler; FIFO en-eski-borç-önce dağıtır. Frontend aşım uyarısını bu
+                # toplam beklenene göre verir (per-kur tutara göre değil).
+                "beklenen_toplam": round(_num(s.get("yapilmasi_gereken_odeme")), 2),
+                "odenen_toplam": round(_num(s.get("yapilan_odeme")), 2),
             }
             kurlar = kur_map.get(s.get("id")) or []
             if kurlar:
@@ -344,9 +378,9 @@ async def muhasebe_kisi_duzenle(tip: str, kisi_id: str, data: dict, current_user
     for alan, yeni in guncelle.items():
         await _log(current_user, tip, kisi_id, alan, kayit.get(alan), yeni)
 
-    # Ödeme değiştiyse: kur ödeme-tamamlanma damgası + mezun borç kapanış kontrolü
+    # Ödeme değiştiyse: kur ödeme-tamamlanma damgası (tetik/geri-al) + mezun borç kapanış
     if tip == "ogrenci" and "yapilan_odeme" in guncelle:
-        await _odeme_sonrasi_islem(kisi_id)
+        await _odeme_sonrasi_islem(kisi_id, current_user)
 
     guncel = await koleksiyon.find_one({"id": kisi_id}, {"_id": 0})
     gereken = _num(guncel.get("yapilmasi_gereken_odeme"))
