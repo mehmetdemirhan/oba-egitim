@@ -21,7 +21,8 @@ from core.ai import call_claude
 from core.config import GEMINI_API_KEY
 from core.zaman import simdi, aware as _aware, iso as _iso
 
-from .personalar import sistem_promptu, MIRAN_YASAK_ORUNTULER, MIRAN_PARA_ORUNTULER
+from .personalar import (sistem_promptu, MIRAN_YASAK_ORUNTULER, MIRAN_PARA_ORUNTULER,
+                         MIRAN_MUHASEBE_PROMPTU, MIRAN_PEDAGOJIK_ORUNTULER)
 
 router = APIRouter()
 _ADMIN = require_role(UserRole.ADMIN, UserRole.COORDINATOR)
@@ -202,6 +203,121 @@ async def miran_geri_bildirim(miran_id: str, govde: dict, current_user=Depends(g
                   "tarih": _iso()}},
         upsert=True)
     return {"ok": True}
+
+
+# ═══════════════════════ MUHASEBE ROLÜNE ÖZEL MİRAN (S7) ═══════════════════════
+# Veri kapsamı: finansal (tutar SERBEST); öğrenci PEDAGOJİK verisi YOK (ters guard).
+
+async def _muhasebe_veri() -> dict:
+    """Deterministik finansal tespit girdisi (tutar içerir, pedagojik veri İÇERMEZ)."""
+    kurlar = await db.kur_ucretleri.find({}, {"_id": 0}).to_list(length=50000)
+    now = simdi()
+    yas60_sayi = 0
+    yas60_tutar = 0.0
+    damgasiz_tamamlanan = 0
+    yaklasan_hakedis_tutar = 0.0
+    yaklasan_hakedis_ogretmen = set()
+    for k in kurlar:
+        kalan = float(k.get("tutar") or 0) - float(k.get("yapilan_odeme") or 0)
+        bitmis = bool(k.get("odeme_tamamlanma_tarihi"))
+        # 60+ gün yaşlanan açık alacak
+        if kalan > 0.01 and not bitmis:
+            bas = _aware(k.get("baslangic_tarihi") or k.get("tarih"))
+            if bas and (now - bas).days > 60:
+                yas60_sayi += 1
+                yas60_tutar += kalan
+        # Tamamlanmış (kalan≈0) ama tamamlanma damgası YOK → dönem kapanışına işaretsiz
+        if kalan <= 0.01 and not bitmis:
+            damgasiz_tamamlanan += 1
+        # Damgalı ama henüz döneme ödenmemiş → yaklaşan hakediş
+        if bitmis and not k.get("odendi_donem"):
+            yaklasan_hakedis_tutar += float(k.get("ogretmen_pay") or 0)
+            if k.get("ogretmen_id"):
+                yaklasan_hakedis_ogretmen.add(k.get("ogretmen_id"))
+    return {
+        "yaslanan_60_sayi": yas60_sayi,
+        "yaslanan_60_tutar": round(yas60_tutar, 2),
+        "damgasiz_tamamlanan": damgasiz_tamamlanan,
+        "yaklasan_hakedis_tutar": round(yaklasan_hakedis_tutar, 2),
+        "yaklasan_hakedis_ogretmen_sayisi": len(yaklasan_hakedis_ogretmen),
+    }
+
+
+def _guard_muhasebe(metin: str) -> str | None:
+    """Muhasebe Miran'ı için TERS guard: kıyas/ceza YASAK + pedagojik veri sızıntısı YASAK
+    (tutar SERBEST)."""
+    dusuk = (metin or "").lower()
+    for p in MIRAN_YASAK_ORUNTULER:
+        if p in dusuk:
+            return f"kıyas/ceza dili: '{p}'"
+    for p in MIRAN_PEDAGOJIK_ORUNTULER:
+        if p in dusuk:
+            return f"pedagojik veri sızıntısı: '{p}'"
+    return None
+
+
+def _deterministik_muhasebe(veri: dict) -> dict:
+    oneriler = []
+    if veri["yaslanan_60_sayi"] > 0:
+        oneriler.append({"baslik": "60+ gün yaşlanan alacaklar",
+                         "aciklama": f"{veri['yaslanan_60_sayi']} alacak 60 günü aştı "
+                                     f"(toplam {veri['yaslanan_60_tutar']:.0f}₺) — bu hafta aranmalı."})
+    if veri["damgasiz_tamamlanan"] > 0:
+        oneriler.append({"baslik": "Dönem kapanışına işaretsiz ödemeler",
+                         "aciklama": f"{veri['damgasiz_tamamlanan']} ödeme tamamlandı ama tamamlanma "
+                                     "damgası yok; hakediş için işaretlenmeli."})
+    if veri["yaklasan_hakedis_tutar"] > 0:
+        oneriler.append({"baslik": "Yaklaşan hakediş",
+                         "aciklama": f"{veri['yaklasan_hakedis_ogretmen_sayisi']} öğretmene "
+                                     f"{veri['yaklasan_hakedis_tutar']:.0f}₺ hakediş hazır — dönem kapanışına hazırla."})
+    if not oneriler:
+        oneriler.append({"baslik": "Tablo temiz",
+                         "aciklama": "Yaşlanan alacak, işaretsiz ödeme veya bekleyen hakediş görünmüyor. Harika!"})
+    return {"selam": "Merhaba! Bu haftanın finansal iş listesi hazır 👋",
+            "oneriler": oneriler, "kapanis": "Küçük düzenli adımlar kasayı güçlü tutar!"}
+
+
+async def miran_muhasebe_uret() -> dict:
+    veri = await _muhasebe_veri()
+    icerik = None
+    kaynak = "deterministik"
+    if GEMINI_API_KEY:
+        try:
+            system = MIRAN_MUHASEBE_PROMPTU
+            user = ("Aşağıda finansal veri var. Muhasebeciye özel, pratik, iş listesi çıkaran 2-3 öneri "
+                    "yaz. Tutar belirtebilirsin; öğrenci pedagojik verisinden BAHSETME.\n\n"
+                    f"Veri: {veri}\n\nSADECE JSON: "
+                    '{"selam":"...","oneriler":[{"baslik":"...","aciklama":"..."}],"kapanis":"..."}')
+            res = await call_claude(system, user, max_tokens=1200)
+            p = res.get("parsed")
+            if isinstance(p, dict) and p.get("oneriler"):
+                blob = " ".join([str(p.get("selam", "")), str(p.get("kapanis", ""))] +
+                                [f"{o.get('baslik','')} {o.get('aciklama','')}" for o in p.get("oneriler", [])])
+                if _guard_muhasebe(blob):
+                    logging.warning(f"[ai_ceo] Miran muhasebe guard ihlali → deterministik")
+                else:
+                    icerik, kaynak = p, "ai"
+        except Exception as e:
+            logging.warning(f"[ai_ceo] Miran muhasebe AI hatası: {e}")
+    if not icerik:
+        icerik = _deterministik_muhasebe(veri)
+    kayit = {"id": str(uuid.uuid4()), "ogretmen_id": "_muhasebe", "rol": "accountant",
+             "icerik": icerik, "kaynak": kaynak, "tarih": _iso()}
+    await db.ai_ceo_miran.insert_one({**kayit})
+    kayit.pop("_id", None)
+    return kayit
+
+
+@router.get("/ai/ceo/miran/muhasebe")
+async def miran_muhasebe(current_user=Depends(get_current_user)):
+    if current_user.get("role") not in ("accountant", "admin"):
+        raise HTTPException(status_code=403, detail="Bu danışmanlık muhasebe içindir.")
+    doc = await db.ai_ceo_miran.find_one({"ogretmen_id": "_muhasebe"}, {"_id": 0}, sort=[("tarih", -1)])
+    if doc:
+        d = _aware(doc.get("tarih"))
+        if not (d and (simdi() - d).days >= HAFTA_GUN):
+            return {"miran": doc}
+    return {"miran": await miran_muhasebe_uret()}
 
 
 # ─────────────────────────── admin: hiyerarşi görünürlüğü ───────────────────────────

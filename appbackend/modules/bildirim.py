@@ -42,7 +42,7 @@ BILDIRIM_TURLERI = {
     "ai_ceo_haftalik":  {"baslik": "📊 AI CEO Haftalık Brifing", "oncelik": "normal", "kategori": "ogretmen", "onem": "bilgi", "cooldown_saat": 24},
     "ai_ceo_anomali":   {"baslik": "⚠️ AI CEO Anomali", "oncelik": "yuksek", "kategori": "ogretmen", "onem": "kritik", "cooldown_saat": 12},
     "ai_ceo_mektup":    {"baslik": "📩 Performans Mektubu", "oncelik": "yuksek", "kategori": "ogretmen", "onem": "orta", "cooldown_saat": 0},
-    "ai_ceo_miran":     {"baslik": "🧭 Koçum Miran", "oncelik": "normal", "kategori": "ogretmen", "onem": "bilgi", "cooldown_saat": 24},
+    "ai_ceo_miran":     {"baslik": "🧭 Sistem Danışmanı Miran", "oncelik": "normal", "kategori": "ogretmen", "onem": "bilgi", "cooldown_saat": 24},
 }
 
 VARSAYILAN_TERCIH = {"ogrenci": True, "ogretmen": True, "veli": True}

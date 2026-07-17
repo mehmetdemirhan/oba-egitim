@@ -10,6 +10,37 @@ import OgretmenDonemOdeme from "./admin/OgretmenDonemOdeme";
 import GecikenKurlar from "./admin/GecikenKurlar";
 import FunnelPanel from "./admin/FunnelPanel";
 import BilgiIkonu from "./BilgiIkonu";
+import { PersonaBalon, PERSONA_UI } from "./aiceo/Personalar";
+
+// Muhasebe rolüne özel "Sistem Danışmanı Miran" kartı (finansal; pedagojik veri YOK)
+function MuhasebeMiran({ apiBase }) {
+  const [miran, setMiran] = React.useState(null);
+  const [gb, setGb] = React.useState(null);
+  const p = PERSONA_UI.miran;
+  React.useEffect(() => { axios.get(`${apiBase}/ai/ceo/miran/muhasebe`).then(r => setMiran(r.data.miran)).catch(() => {}); }, [apiBase]);
+  const bildir = async (f) => { if (!miran) return; try { await axios.post(`${apiBase}/ai/ceo/miran/${miran.id}/geri-bildirim`, { faydali: f }); setGb(f); } catch (e) {} };
+  if (!miran) return null;
+  return (
+    <div className="rounded-2xl border p-4 shadow-sm mb-4" style={{ borderColor: p.renkAcik, background: p.renkAcik + "33" }}>
+      <PersonaBalon persona="miran" mesaj={miran.icerik?.selam} size={56} />
+      <div className="mt-3 space-y-2">
+        {(miran.icerik?.oneriler || []).map((o, i) => (
+          <div key={i} className="rounded-xl bg-surface border border-line p-3">
+            <div className="font-semibold text-content text-sm">{o.baslik}</div>
+            <div className="text-sm text-subtle mt-0.5">{o.aciklama}</div>
+          </div>
+        ))}
+      </div>
+      {miran.icerik?.kapanis && <div className="mt-2 text-sm font-medium" style={{ color: p.renk }}>{miran.icerik.kapanis}</div>}
+      <div className="mt-2 pt-2 border-t flex items-center gap-3" style={{ borderColor: p.renkAcik }}>
+        <span className="text-xs text-subtle">Faydalı mı?</span>
+        <button onClick={() => bildir(true)} className={`text-xs px-2 py-1 rounded-lg border ${gb === true ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "border-line"}`}>👍 Faydalı</button>
+        <button onClick={() => bildir(false)} className={`text-xs px-2 py-1 rounded-lg border ${gb === false ? "bg-red-100 text-red-600 border-red-200" : "border-line"}`}>👎 Faydasız</button>
+        {gb !== null && <span className="text-xs" style={{ color: p.renk }}>Teşekkürler!</span>}
+      </div>
+    </div>
+  );
+}
 
 /**
  * MuhasebePaneli — "accountant" rolüne özel SADE ödeme paneli.
@@ -117,6 +148,8 @@ export default function MuhasebePaneli({ user, logout }) {
           <KpiKart Ikon={Wallet} etiket="Öğretmene Ödenen" tutar={ogt.odenen} vurgu="green" bilgi="m_ogretmene_odenen" />
           <KpiKart Ikon={PiggyBank} etiket="Net Kasa (vergi düşülmüş)" tutar={ozet?.kasa_net} vurgu="green" bilgi="m_net_kasa" />
         </div>
+
+        <MuhasebeMiran apiBase={API} />
 
         <GecikenKurlar apiBase={API} />
 

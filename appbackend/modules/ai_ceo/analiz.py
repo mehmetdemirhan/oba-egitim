@@ -9,7 +9,7 @@ AI yoksa/başarısızsa UYDURMA yapılmaz — sebep döndürülür.
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -17,6 +17,7 @@ from core.db import db
 from core.auth import require_role, UserRole
 from core.ai import call_claude
 from core.config import GEMINI_API_KEY
+from core.zaman import simdi, iso as _iso
 
 from .fotograf import sistem_fotografi, son_fotograf, fotograf_kaydet, ai_payload
 from .personalar import sistem_promptu
@@ -24,19 +25,31 @@ from .personalar import sistem_promptu
 router = APIRouter()
 _ADMIN = require_role(UserRole.ADMIN, UserRole.COORDINATOR)
 
-KATEGORILER = ["ogretmen_gelisimi", "tahsilat", "urun_iyilestirme", "ogrenci_memnuniyeti", "buyume"]
-DURUMLAR = ["yeni", "uygulaniyor", "uygulandi", "reddedildi"]
+KATEGORILER = ["ogretmen_gelisimi", "tahsilat", "urun_iyilestirme", "ogrenci_memnuniyeti", "buyume", "strateji"]
+DURUMLAR = ["yeni", "uygulaniyor", "uygulandi", "reddedildi", "ertelendi"]
+# Karara bağlanınca kuyruktan düşen durumlar (ertelendi geçici, ötelenir)
+KARARLI_DURUMLAR = {"uygulaniyor", "uygulandi", "reddedildi"}
 
 
 # ─────────────────────────── prompt ───────────────────────────
-def _analiz_prompt(payload: dict) -> tuple:
+def _analiz_prompt(payload: dict, plan: dict | None = None, denetim_notu: str = "") -> tuple:
     system = sistem_promptu("ayda")
+    plan_metni = ""
+    if plan and plan.get("hedefler"):
+        hedef_ozet = "; ".join(f"Hedef {i+1}: {h.get('ad')} ({h.get('metrik')} {h.get('mevcut')}→{h.get('hedef')})"
+                               for i, h in enumerate(plan["hedefler"]))
+        plan_metni = (f"\n\nONAYLI STRATEJİK PLAN (referans al; uygun önerilerde hangi hedefe hizmet "
+                      f"ettiğini 'plan_hedef' alanında belirt): {hedef_ozet}")
+    denetim_metni = f"\n\nDENETÇİ NOTU (Deniz — dikkate al): {denetim_notu}" if denetim_notu else ""
     user = (
         "Aşağıda kurumun güncel SİSTEM FOTOĞRAFI (agregat metrikler) var. Bunu bir CEO gibi "
         "360° analiz et. Öğrenci memnuniyetini ve kur yenilemesini artıracak, VERİ TEMELLİ "
         "öneriler üret. Ayrıca hazır metriklerin DIŞINDA envanterde dikkat çeken örüntüleri "
-        "(atıl özellik, tema yoğunlaşması, anomali) bir KEŞİF TURU olarak raporla.\n\n"
-        f"SİSTEM FOTOĞRAFI (JSON):\n{json.dumps(payload, ensure_ascii=False)}\n\n"
+        "(atıl özellik, tema yoğunlaşması, anomali) bir KEŞİF TURU olarak raporla. "
+        "STRATEJİK öneriler (yeni özellik/uygulama, büyüme, süreç) için kategori 'strateji' "
+        "kullan; bunlar trend/sektör mantığına dayanabilir."
+        + plan_metni + denetim_metni +
+        f"\n\nSİSTEM FOTOĞRAFI (JSON):\n{json.dumps(payload, ensure_ascii=False)}\n\n"
         "SADECE şu JSON'u döndür (markdown yok):\n"
         "{\n"
         '  "ozet": "1-2 cümle genel durum",\n'
@@ -118,7 +131,8 @@ def _dayanak_dogrula(dayanaklar: list, fotograf: dict) -> tuple:
 
 # ─────────────────────────── ana analiz ───────────────────────────
 async def calistir_analiz(tetik: str = "manuel", fotograf: dict | None = None) -> dict:
-    """Fotoğraf → Gemini → öneriler + dayanak doğrulama → sakla. AI yoksa sebep döndürür."""
+    """Fotoğraf → Gemini → öneriler + dayanak doğrulama → sakla. AI yoksa sebep döndürür.
+    Onaylı stratejik plan + onaylı denetim notu (Deniz) referans olarak prompt'a girer."""
     if fotograf is None:
         fotograf = await son_fotograf()
         if not fotograf:
@@ -128,7 +142,19 @@ async def calistir_analiz(tetik: str = "manuel", fotograf: dict | None = None) -
     if not GEMINI_API_KEY:
         return {"ok": False, "sebep": "AI yapılandırılmadı (GEMINI_API_KEY yok).", "fotograf_tarih": fotograf.get("tarih")}
 
-    system, user = _analiz_prompt(ai_payload(fotograf))
+    # Referanslar: onaylı plan + admin ONAYLI denetim notu (oto self-modifikasyon YOK)
+    try:
+        from .plan import onayli_plan
+        plan = await onayli_plan()
+    except Exception:
+        plan = None
+    denetim_notu = ""
+    try:
+        dn = await db.ai_ceo_denetim_notlari.find_one({"onayli": True}, sort=[("onay_tarih", -1)])
+        denetim_notu = (dn or {}).get("metin", "")
+    except Exception:
+        pass
+    system, user = _analiz_prompt(ai_payload(fotograf), plan, denetim_notu)
     parsed = None
     for _ in range(2):
         res = await call_claude(system, user, max_tokens=4000)
@@ -141,7 +167,7 @@ async def calistir_analiz(tetik: str = "manuel", fotograf: dict | None = None) -
     if not isinstance(parsed, dict) or not parsed.get("oneriler"):
         return {"ok": False, "sebep": "AI yanıtı ayrıştırılamadı.", "fotograf_tarih": fotograf.get("tarih")}
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = _iso()
     analiz_id = str(uuid.uuid4())
     oneri_kayitlari = []
     for o in parsed.get("oneriler", []):
@@ -149,6 +175,8 @@ async def calistir_analiz(tetik: str = "manuel", fotograf: dict | None = None) -
             continue
         dayanaklar, zayif = _dayanak_dogrula(o.get("dayanak_metrikler") or [], fotograf)
         kategori = o.get("kategori") if o.get("kategori") in KATEGORILER else "urun_iyilestirme"
+        # Stratejik öneri + sert dayanağı yoksa "vizyon önerisi" (meşru tür; zayıf dayanaktan farklı)
+        vizyon = (kategori == "strateji" and zayif)
         oneri_kayitlari.append({
             "id": str(uuid.uuid4()),
             "analiz_id": analiz_id,
@@ -157,8 +185,10 @@ async def calistir_analiz(tetik: str = "manuel", fotograf: dict | None = None) -
             "oncelik": o.get("oncelik") if o.get("oncelik") in ("yuksek", "orta", "dusuk") else "orta",
             "ozet": str(o.get("ozet", "")).strip()[:1000],
             "beklenen_etki": str(o.get("beklenen_etki", "")).strip()[:500],
+            "plan_hedef": str(o.get("plan_hedef", "")).strip()[:120],
             "dayanaklar": dayanaklar,
-            "zayif_dayanak": zayif,
+            "zayif_dayanak": zayif and not vizyon,   # vizyon önerisi zayıf sayılmaz
+            "vizyon_onerisi": vizyon,
             "durum": "yeni",
             "durum_notu": "",
             "tarih": now,
@@ -216,13 +246,21 @@ async def oneri_durum(oneri_id: str, govde: dict, current_user=Depends(_ADMIN)):
     durum = govde.get("durum")
     if durum not in DURUMLAR:
         raise HTTPException(status_code=400, detail="Geçersiz durum")
+    onceki = await db.ai_ceo_oneriler.find_one({"id": oneri_id}, {"_id": 0, "durum": 1, "oncelik": 1})
+    if not onceki:
+        raise HTTPException(status_code=404, detail="Öneri bulunamadı")
     guncelle = {"durum": durum, "durum_notu": str(govde.get("not", ""))[:500],
-                "durum_tarih": datetime.now(timezone.utc).isoformat()}
+                "durum_tarih": _iso()}
+    # Ertele: belirlenen tarihte kuyruğa geri gelir (varsayılan +7 gün)
+    if durum == "ertelendi":
+        guncelle["ertele_tarih"] = str(govde.get("ertele_tarih") or (simdi() + timedelta(days=7)).isoformat())
     # 'uygulandi' işaretlenince, etki ölçümü için o anki fotoğrafı referansla
     if durum == "uygulandi":
         foto = await son_fotograf()
         guncelle["uygulama_fotograf_tarih"] = foto.get("tarih") if foto else None
-    r = await db.ai_ceo_oneriler.update_one({"id": oneri_id}, {"$set": guncelle})
-    if r.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Öneri bulunamadı")
+    await db.ai_ceo_oneriler.update_one({"id": oneri_id}, {"$set": guncelle})
+    # Yönetim skoru: yalnız KARARLI durum (ertele PUAN VERMEZ), ilk kez karara bağlanınca
+    if durum in KARARLI_DURUMLAR and onceki.get("durum") not in KARARLI_DURUMLAR:
+        from .yonetim import puan_kaydet
+        await puan_kaydet(current_user.get("id"), "karar", onceki.get("oncelik", "orta"), oneri_id)
     return {"ok": True, "durum": durum}
