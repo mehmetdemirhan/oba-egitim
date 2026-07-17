@@ -104,7 +104,7 @@ async def run():
         analiz_mod.GEMINI_API_KEY = "k"
         deniz_mod.GEMINI_API_KEY = "k"
 
-        async def sahte(system, user, max_tokens=4000):
+        async def sahte(system, user, max_tokens=4000, **kw):
             # Sınav fotoğraflarındaki sorunları YAKALAYAN Ayda cevabı
             kat = "ogrenci_memnuniyeti" if "nps" in user.lower() or "-40" in user else "strateji"
             return {"error": None, "parsed": {"ozet": "s", "oneriler": [

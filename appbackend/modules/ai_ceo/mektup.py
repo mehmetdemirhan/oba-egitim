@@ -77,7 +77,7 @@ async def _mektup_uret(ogretmen_id: str) -> dict:
     if GEMINI_API_KEY:
         try:
             system, user = _mektup_prompt(perf)
-            res = await call_claude(system, user, max_tokens=1500)
+            res = await call_claude(system, user, max_tokens=1500, ozellik="ceo_brifing")
             p = res.get("parsed")
             if isinstance(p, dict) and p.get("kapanis"):
                 icerik = p

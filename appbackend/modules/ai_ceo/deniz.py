@@ -108,7 +108,7 @@ async def _ai_denetim(det_bulgular: list) -> dict:
         f"FOTOĞRAF ÖZET: {json.dumps(ai_payload(foto or {}), ensure_ascii=False)[:2500]}\n\n"
         'SADECE JSON: {"ozet":"...","ek_bulgular":[{"tur":"...","onem":"orta","ozet":"...","kanit":"..."}],"iyilestirme_plani":"..."}'
     )
-    res = await call_claude(system, user, max_tokens=2000)
+    res = await call_claude(system, user, max_tokens=2000, ozellik="denetim")
     p = res.get("parsed")
     if isinstance(p, dict):
         return {"ozet": str(p.get("ozet", ""))[:1000],

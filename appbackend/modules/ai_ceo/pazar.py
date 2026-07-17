@@ -33,7 +33,7 @@ async def pazar_arastirma(govde: dict = None, current_user=Depends(_ADMIN)):
         "farklılaşma noktaları ve bizim (bir okuma/eğitim platformu) için 3 somut fırsatı kısaca "
         "özetle. İddiaları web kaynaklarına dayandır."
     )
-    sonuc = await gemini_grounded_call(prompt, system, max_tokens=3000)
+    sonuc = await gemini_grounded_call(prompt, system, max_tokens=3000, ozellik="pazar_arastirma")
     if sonuc.get("error") or not sonuc.get("text"):
         # UYDURMA YOK — durumu dürüstçe bildir
         return {"ok": False, "durum": "yapilandirilmadi",

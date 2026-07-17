@@ -6,6 +6,7 @@ import { PersonaBalon } from "./Personalar";
 
 const ONEM_RENK = { kritik: "border-red-300 bg-red-50 text-red-700", orta: "border-amber-300 bg-amber-50 text-amber-700", dusuk: "border-slate-300 bg-slate-50 text-slate-600" };
 const DURUM_ET = { yeni: "Yeni", admin_gecerli: "Geçerli", admin_gecersiz: "Geçersiz", cozuldu: "Çözüldü" };
+const OZELLIK_AD = { ceo_analiz: "Ayda analiz", ceo_brifing: "Ayda brifing", ceo_sohbet: "Ayda sohbet", miran_kocluk: "Miran koçluk", miran_muhasebe: "Miran muhasebe", denetim: "Deniz denetim", pazar_arastirma: "Pazar araştırma", etiketsiz: "Etiketsiz (eski)", diger: "Diğer" };
 
 /**
  * Deniz — Denetçi AI (yalnız admin). Ayda'nın çıktılarını bağımsız denetler.
@@ -192,6 +193,19 @@ export default function Deniz({ apiBase, onNavigate }) {
                           {onNavigate && (o.tip === "kur" || o.tip === "ogrenci" || o.tip === "kayit") && (
                             <button onClick={() => ornekGit(o)} className="inline-flex items-center gap-0.5 text-[11px] text-indigo-600 shrink-0"><ExternalLink className="h-3 w-3" />Git</button>
                           )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Maliyet: özellik-bazlı çağrı kırılımı (hangi AI özelliği kaç çağrı) */}
+                {detay.bulgu.kanit?.ozellik_dagilimi && Object.keys(detay.bulgu.kanit.ozellik_dagilimi).length > 0 && (
+                  <div className="mt-3">
+                    <div className="text-xs font-semibold text-content mb-1">Özellik bazlı çağrı</div>
+                    <div className="rounded border border-line overflow-hidden">
+                      {Object.entries(detay.bulgu.kanit.ozellik_dagilimi).map(([oz, n]) => (
+                        <div key={oz} className="flex items-center justify-between text-xs px-2 py-1 odd:bg-app">
+                          <span>{OZELLIK_AD[oz] || oz}</span><span className="tabular-nums font-medium">{n}</span>
                         </div>
                       ))}
                     </div>

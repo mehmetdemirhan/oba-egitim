@@ -157,7 +157,7 @@ async def calistir_analiz(tetik: str = "manuel", fotograf: dict | None = None, p
     system, user = _analiz_prompt(ai_payload(fotograf), plan, denetim_notu)
     parsed = None
     for _ in range(2):
-        res = await call_claude(system, user, max_tokens=4000)
+        res = await call_claude(system, user, max_tokens=4000, ozellik="ceo_analiz")
         if res.get("error"):
             logging.warning(f"[ai_ceo] analiz AI hatası: {res.get('error')}")
             continue
