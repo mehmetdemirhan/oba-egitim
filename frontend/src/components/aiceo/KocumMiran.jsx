@@ -8,7 +8,7 @@ import { PersonaBalon, MiranAvatar, PERSONA_UI } from "./Personalar";
  * verisine dayalı koçluk + faydalı/faydasız geri bildirim + onaylı performans mektupları.
  * (Ayda burada HİÇ görünmez — persona sızıntısı yok.)
  */
-export default function KocumMiran({ apiBase }) {
+export default function KocumMiran({ apiBase, onNavigate }) {
   const [miran, setMiran] = useState(null);
   const [mektuplar, setMektuplar] = useState([]);
   const [deneyim, setDeneyim] = useState(null);
@@ -48,19 +48,22 @@ export default function KocumMiran({ apiBase }) {
           </div>
           <div className="h-2 bg-app rounded-full overflow-hidden mb-2"><div className="h-full rounded-full" style={{ width: `${deneyim.ilerleme_yuzde}%`, background: p.renk }} /></div>
           {deneyim.siradaki && (
-            <div className="rounded-xl p-3 mb-2" style={{ background: p.renkAcik + "55" }}>
-              <div className="text-xs font-semibold" style={{ color: p.renk }}>Sıradaki adımın hazır! ✨</div>
+            <button onClick={() => onNavigate && deneyim.siradaki.hedef && onNavigate(deneyim.siradaki.hedef)}
+              className="w-full text-left rounded-xl p-3 mb-2 hover:ring-2 hover:ring-amber-200 transition" style={{ background: p.renkAcik + "55" }}>
+              <div className="text-xs font-semibold flex items-center justify-between" style={{ color: p.renk }}>Sıradaki adımın hazır! ✨ {deneyim.siradaki.hedef && <span className="text-[11px]">→ git</span>}</div>
               <div className="text-sm font-medium text-content mt-0.5">{deneyim.siradaki.baslik}</div>
               <div className="text-xs text-subtle">{deneyim.siradaki.aciklama} · +{deneyim.siradaki.xp} XP</div>
-            </div>
+            </button>
           )}
           <div className="space-y-1">
             {deneyim.gorevler.map(g => (
-              <div key={g.id} className="flex items-center gap-2 text-sm">
+              <button key={g.id} onClick={() => onNavigate && g.hedef && onNavigate(g.hedef)}
+                className={`w-full flex items-center gap-2 text-sm text-left rounded px-1 py-0.5 ${g.hedef ? "hover:bg-app" : ""}`}>
                 <span className={g.tamamlandi ? "text-emerald-600" : "text-slate-300"}>{g.tamamlandi ? "✅" : "⬜"}</span>
                 <span className={g.tamamlandi ? "text-subtle line-through" : "text-content"}>{g.baslik}</span>
+                {g.hedef && <span className="text-[10px] text-indigo-500">↗</span>}
                 <span className="ml-auto text-[11px] text-subtle">+{g.xp} XP</span>
-              </div>
+              </button>
             ))}
           </div>
         </div>

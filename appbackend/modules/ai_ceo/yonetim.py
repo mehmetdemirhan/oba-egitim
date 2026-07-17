@@ -27,6 +27,7 @@ ETKINLIK_PUAN = {
     "bulgu_degerlendirildi": 4,
     "plan_onaylandi": 15,
     "sinav_degerlendirme": 4,
+    "kurulum": 8,  # yönetici kurulum/deneyim görevi (XP değil Yönetim Skoru)
 }
 SEVIYELER = [(0, "Acemi Yönetici"), (100, "Stratejist"), (300, "Vizyoner")]
 
