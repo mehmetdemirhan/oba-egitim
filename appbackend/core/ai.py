@@ -9,6 +9,7 @@ import httpx
 from datetime import datetime, timedelta
 
 from core.db import db
+from core.zaman import iso as _zaman_iso
 from core.config import (
     GEMINI_API_KEY, GEMINI_API_KEY_2, GEMINI_API_KEY_3,
     GEMINI_MODELS, AI_MODEL, AI_MAX_DAILY_REQUESTS,
@@ -59,6 +60,66 @@ async def _gemini_call(prompt: str, system: str = "", max_tokens: int = 4000) ->
                 continue
 
     raise Exception(f"Tüm Gemini modelleri başarısız. Son hata: {last_error}")
+
+
+# Grounding'i destekleyen tam flash modelleri (lite/alias'lar arama aracını reddedebilir)
+GROUNDING_MODELS = [m for m in GEMINI_MODELS if ("2.0-flash" in m or "2.5-flash" in m) and "lite" not in m] or ["gemini-2.0-flash"]
+
+
+async def gemini_grounded_call(prompt: str, system: str = "", max_tokens: int = 3000) -> dict:
+    """Google Search GROUNDING'li Gemini çağrısı — SEYREK/elle tetiklenen kullanım için.
+
+    Yanıt web'de temellendirilir; kaynak linkleri döndürülür. Grounding yoksa/desteklenmiyorsa
+    UYDURMA yapılmaz → {"error": ...} döner (çağıran "yapılandırılmadı" gösterir).
+
+    Dönüş: {"text": str, "kaynaklar": [{"baslik","url"}], "model": str, "error": str|None}
+    """
+    all_keys = [k for k in [GEMINI_API_KEY, GEMINI_API_KEY_2, GEMINI_API_KEY_3] if k]
+    if not all_keys:
+        return {"text": "", "kaynaklar": [], "model": None, "error": "GEMINI_API_KEY tanımlı değil"}
+
+    full_prompt = f"{system}\n\n{prompt}" if system else prompt
+    last_error = "Bilinmeyen hata"
+    for key in all_keys:
+        for model in GROUNDING_MODELS:
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
+                payload = {
+                    "contents": [{"parts": [{"text": full_prompt}]}],
+                    "tools": [{"google_search": {}}],  # Gemini 2.x arama grounding aracı
+                    "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.4},
+                }
+                async with httpx.AsyncClient(timeout=90.0) as c:
+                    r = await c.post(url, json=payload)
+                    data = r.json()
+                if "candidates" in data:
+                    cand = data["candidates"][0]
+                    parcalar = cand.get("content", {}).get("parts", [])
+                    text = "".join(p.get("text", "") for p in parcalar)
+                    # Kaynakları groundingMetadata'dan topla
+                    kaynaklar = []
+                    gm = cand.get("groundingMetadata", {}) or {}
+                    for ch in (gm.get("groundingChunks", []) or []):
+                        web = ch.get("web", {}) or {}
+                        if web.get("uri"):
+                            kaynaklar.append({"baslik": web.get("title", web["uri"]), "url": web["uri"]})
+                    logging.info(f"[GEMINI-GROUNDED] ✅ model={model}, {len(kaynaklar)} kaynak")
+                    await db.ai_request_log.insert_one({"id": str(uuid.uuid4()), "model": model,
+                                                        "tarih": _zaman_iso(), "grounded": True})
+                    return {"text": text, "kaynaklar": kaynaklar, "model": model, "error": None}
+                err = data.get("error", {})
+                err_code, err_msg = err.get("code", 0), str(err.get("message", data))[:200]
+                last_error = f"{model}: {err_msg}"
+                is_quota = (err_code == 429 or "RESOURCE_EXHAUSTED" in err_msg or "quota" in err_msg.lower())
+                if is_quota:
+                    continue  # sonraki model/key
+                # tool desteklenmiyor vb. kalıcı hata → sonraki key denenir
+                logging.warning(f"[GEMINI-GROUNDED] hata {err_code}: {err_msg[:100]}")
+                break
+            except Exception as ex:
+                last_error = str(ex)[:200]
+                continue
+    return {"text": "", "kaynaklar": [], "model": None, "error": f"Grounding başarısız: {last_error}"}
 
 
 async def _gemini_call_multimodal(prompt: str, images: list, system: str = "",

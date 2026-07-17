@@ -194,6 +194,26 @@ async def run():
         r = await ac.get("/api/ai/ceo/rapor/gunluk", headers=H("adm"))
         check(r.status_code == 200 and r.json()["rapor"]["yorum"], "günlük rapor + yorum üretildi")
 
+        # ── 13) PAZAR ARAŞTIRMASI (grounding) — başarı + 'yapılandırılmadı' + 403 ──
+        import modules.ai_ceo.pazar as pazar_mod
+
+        async def sahte_grounded_ok(prompt, system="", max_tokens=3000):
+            return {"text": "Rakip X 199₺/ay; fırsat: fiyat esnekliği.", "model": "gemini-2.0-flash", "error": None,
+                    "kaynaklar": [{"baslik": "Rakip X", "url": "https://ornek.com/x"}]}
+        pazar_mod.gemini_grounded_call = sahte_grounded_ok
+        r = await ac.post("/api/ai/ceo/pazar-arastirma", headers=H("adm"), json={})
+        check(r.status_code == 200 and r.json().get("ok"), "pazar araştırması (grounding) başarılı")
+        check(len(r.json()["arastirma"]["kaynaklar"]) == 1 and r.json()["arastirma"]["kaynaklar"][0]["url"].startswith("http"), "kaynak linkleri döndü")
+
+        async def sahte_grounded_yok(prompt, system="", max_tokens=3000):
+            return {"text": "", "kaynaklar": [], "model": None, "error": "Grounding başarısız: tool desteklenmiyor"}
+        pazar_mod.gemini_grounded_call = sahte_grounded_yok
+        r = await ac.post("/api/ai/ceo/pazar-arastirma", headers=H("adm"), json={})
+        check(r.status_code == 200 and r.json().get("ok") is False and r.json().get("durum") == "yapilandirilmadi",
+              "grounding yoksa 'yapılandırılmadı' (uydurma YOK)")
+        r = await ac.post("/api/ai/ceo/pazar-arastirma", headers=H("t1"), json={})
+        check(r.status_code == 403, "öğretmen pazar araştırması yapamaz → 403")
+
     await server.client.drop_database(TEST_DB)
 
 
