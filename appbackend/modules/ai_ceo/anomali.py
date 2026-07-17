@@ -73,7 +73,42 @@ def anomalileri_hesapla(fotograf: dict) -> list:
                 "mesaj": f"Son 7 gün sistem hareketi beklenene göre %{dusus} düşük.",
                 "deger": dusus,
             })
+
+    # 4) Konsantrasyon riski (S6c): tek öğretmen/tür bağımlılığı eşik aşımı
+    kons = metrik_al(fotograf, "konsantrasyon", {}) or {}
+    esik = kons.get("esik_yuzde", 25.0)
+    for anahtar, etiket in (("en_buyuk_ogretmen_ogrenci_payi", "Tek öğretmen öğrenci payı"),
+                            ("en_buyuk_ogretmen_gelir_payi", "Tek öğretmen gelir payı"),
+                            ("en_buyuk_tur_payi", "Tek eğitim türü payı")):
+        v = kons.get(anahtar)
+        if v is not None and v > esik:
+            uyarilar.append({"tip": "konsantrasyon_riski", "seviye": "orta",
+                             "mesaj": f"{etiket} %{v} — eşiği (%{esik:.0f}) aşıyor; bağımlılık riski.",
+                             "deger": v})
     return uyarilar
+
+
+async def konsantrasyon_gorevi(fotograf: dict):
+    """Konsantrasyon eşiği aşılırsa Ayda'nın karar kuyruğuna risk azaltma önerisi ekler
+    (deterministik; açık aynı öneri varsa tekrar eklemez)."""
+    kons = metrik_al(fotograf, "konsantrasyon", {}) or {}
+    esik = kons.get("esik_yuzde", 25.0)
+    en_buyuk = kons.get("en_buyuk_ogretmen_ogrenci_payi") or 0
+    if en_buyuk <= esik:
+        return
+    var = await db.ai_ceo_oneriler.find_one({"kaynak": "konsantrasyon", "durum": {"$in": ["yeni", "ertelendi"]}})
+    if var:
+        return
+    import uuid
+    from core.zaman import iso
+    await db.ai_ceo_oneriler.insert_one({
+        "id": str(uuid.uuid4()), "analiz_id": "sistem", "baslik": "Konsantrasyon riskini azalt",
+        "kategori": "strateji", "oncelik": "yuksek", "kaynak": "konsantrasyon",
+        "ozet": f"En büyük öğretmenin öğrenci payı %{en_buyuk} (eşik %{esik:.0f}). Öğrenci/gelir "
+                "dağılımını çeşitlendirecek adımlar planla.",
+        "beklenen_etki": "Tek noktaya bağımlılığın azalması.",
+        "dayanaklar": [{"metrik": "en_buyuk_ogretmen_ogrenci_payi", "deger": en_buyuk, "dogrulandi": True, "guven": "guclu"}],
+        "zayif_dayanak": False, "vizyon_onerisi": False, "durum": "yeni", "durum_notu": "", "tarih": iso()})
 
 
 async def anomali_bildirim_gonder(uyarilar: list):

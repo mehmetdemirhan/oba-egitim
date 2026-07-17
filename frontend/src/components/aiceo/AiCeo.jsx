@@ -59,6 +59,10 @@ export default function AiCeo({ apiBase }) {
   const [planlar, setPlanlar] = useState([]);
   const [planForm, setPlanForm] = useState({ baslik: "", donem: "", h: [{ ad: "", metrik: "", mevcut: "", hedef: "" }, { ad: "", metrik: "", mevcut: "", hedef: "" }, { ad: "", metrik: "", mevcut: "", hedef: "" }] });
   const [planAcik, setPlanAcik] = useState(false);
+  const [kurulFoto, setKurulFoto] = useState(null);
+  const [kohort, setKohort] = useState([]);
+  const [senForm, setSenForm] = useState({ kur_ucreti_degisim_yuzde: "", ogretmen_payi_degisim_yuzde: "", esneklik: "" });
+  const [senSonuc, setSenSonuc] = useState(null);
   const [fotoTarih, setFotoTarih] = useState(null);
 
   const api = (p) => `${apiBase}${p}`;
@@ -87,6 +91,12 @@ export default function AiCeo({ apiBase }) {
       if (sk) setSkor(sk.data.skor);
       if (ku) setKuyrukVeri(ku.data);
       if (pl) setPlanlar(pl.data.planlar || []);
+      const [ff, kh] = await Promise.all([
+        axios.get(api("/ai/ceo/fotograf/son")).catch(() => null),
+        axios.get(api("/ai/ceo/kohort")).catch(() => null),
+      ]);
+      if (ff) setKurulFoto(ff.data.fotograf);
+      if (kh) setKohort(kh.data.kohortlar || []);
     } catch (e) { /* sessiz */ }
   }, [apiBase]);
 
@@ -132,6 +142,12 @@ export default function AiCeo({ apiBase }) {
     setGenelCevap({ bekliyor: true });
     try { const r = await axios.post(api("/ai/ceo/sor"), { soru: genelSoru }); setGenelCevap(r.data.mesaj || { hata: r.data.sebep }); }
     catch (e) { setGenelCevap({ hata: "Cevap alınamadı" }); }
+  };
+
+  const senaryoCalistir = async () => {
+    const body = {};
+    ["kur_ucreti_degisim_yuzde", "ogretmen_payi_degisim_yuzde", "esneklik"].forEach(k => { if (senForm[k] !== "") body[k] = parseFloat(senForm[k]); });
+    try { const r = await axios.post(api("/ai/ceo/senaryo"), body); setSenSonuc(r.data.senaryo); } catch (e) {}
   };
 
   const pazarAra = async () => {
@@ -391,6 +407,56 @@ export default function AiCeo({ apiBase }) {
             {genelCevap.bekliyor ? "Ayda düşünüyor…" : genelCevap.hata ? <span className="text-red-600">{genelCevap.hata}</span> : (
               <><div className="text-content whitespace-pre-wrap">{genelCevap.cevap}</div>{genelCevap.zayif_dayanak && <div className="text-[11px] text-amber-600 mt-1">⚠ Bu cevaptaki bazı sayılar fotoğrafta doğrulanamadı.</div>}</>
             )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Kurul Analitiği (S6) ── */}
+      {(kurulFoto?.konsantrasyon || kurulFoto?.birim_ekonomi) && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-1"><h3 className="font-bold text-content text-sm">Konsantrasyon Riski</h3><BilgiIkonu nasil="En büyük öğretmenin öğrenci/gelir payı, ilk 3 toplamı ve tek eğitim türü bağımlılığı; eşik %25." ne="Tek noktaya bağımlılık riskini görüp dağılımı çeşitlendirmek için." /></div>
+            {kurulFoto.konsantrasyon && (
+              <div className="space-y-1 text-sm">
+                {[["En büyük öğretmen (öğrenci)", kurulFoto.konsantrasyon.en_buyuk_ogretmen_ogrenci_payi], ["İlk 3 öğretmen", kurulFoto.konsantrasyon.ilk3_ogretmen_ogrenci_payi], ["En büyük öğretmen (gelir)", kurulFoto.konsantrasyon.en_buyuk_ogretmen_gelir_payi], ["En büyük eğitim türü", kurulFoto.konsantrasyon.en_buyuk_tur_payi]].map(([l, v], i) => (
+                  <div key={i} className="flex justify-between"><span className="text-subtle">{l}</span><span className={`tabular-nums font-medium ${v > (kurulFoto.konsantrasyon.esik_yuzde || 25) ? "text-red-600" : "text-content"}`}>%{v}</span></div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-1"><h3 className="font-bold text-content text-sm">Birim Ekonomi</h3><BilgiIkonu nasil="Net = brüt tahsilat − vergi − öğretmen payı. LTV = net / aktif öğrenci; kur başı marj = net / kur sayısı." ne="Öğrenci/kur başına gerçek kârlılığı görmek için." /></div>
+            {kurulFoto.birim_ekonomi && (
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between"><span className="text-subtle">LTV (öğrenci/net)</span><span className="tabular-nums font-bold text-emerald-600">{fmt(kurulFoto.birim_ekonomi.ltv_ogrenci_basi_net)}₺</span></div>
+                <div className="flex justify-between"><span className="text-subtle">Kur başı net marj</span><span className="tabular-nums font-medium">{fmt(kurulFoto.birim_ekonomi.kur_basi_net_marj)}₺</span></div>
+                <div className="flex justify-between"><span className="text-subtle">Toplam net</span><span className="tabular-nums font-medium">{fmt(kurulFoto.birim_ekonomi.toplam_net)}₺</span></div>
+              </div>
+            )}
+          </div>
+          <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-1"><h3 className="font-bold text-content text-sm">Kohort Yenileme</h3><BilgiIkonu nasil="Kayıt ayına göre öğrenci kohortlarının bir üst kura geçme (yenileme) oranı." ne="Hangi dönem kayıtlarının daha iyi yenilediğini görmek için." /></div>
+            {kohort.length === 0 ? <div className="text-sm text-subtle">Veri yok.</div> : (
+              <div className="h-36"><ResponsiveContainer width="100%" height="100%"><LineChart data={kohort}><CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" /><XAxis dataKey="ay" tick={{ fontSize: 9 }} /><YAxis domain={[0, 100]} tick={{ fontSize: 9 }} /><Tooltip formatter={(v) => [`%${v}`, "Yenileme"]} /><Line dataKey="yenileme_orani" stroke="#2563eb" /></LineChart></ResponsiveContainer></div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Senaryo Simülasyonu (S6e) ── */}
+      <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+        <div className="flex items-center justify-between mb-2"><h3 className="font-bold text-content text-sm">Senaryo Simülasyonu</h3><BilgiIkonu nasil="Kur ücreti / öğretmen payı / vergi değişiminin gelir-marja deterministik etkisi. Esneklik girilirse hacim etkisi varsayım olarak eklenir (açıkça etiketli)." ne="Fiyat/pay/vergi kararlarının kâra etkisini uygulamadan önce görmek için." /></div>
+        <div className="flex flex-wrap gap-2 items-end">
+          {[["kur_ucreti_degisim_yuzde", "Kur ücreti %"], ["ogretmen_payi_degisim_yuzde", "Öğretmen payı %"], ["esneklik", "Esneklik (ops.)"]].map(([k, l]) => (
+            <div key={k}><label className="text-[10px] text-subtle block">{l}</label><input value={senForm[k]} onChange={e => setSenForm({ ...senForm, [k]: e.target.value })} className="w-28 px-2 py-1 rounded border border-line text-sm" placeholder="0" /></div>
+          ))}
+          <button onClick={senaryoCalistir} className="bg-indigo-600 text-white text-sm rounded-lg px-3 py-1.5">Hesapla</button>
+        </div>
+        {senSonuc && (
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="rounded-lg border border-line p-2"><div className="text-xs text-subtle mb-1">Mevcut</div><div className="text-sm tabular-nums">Net: <b>{fmt(senSonuc.mevcut.net)}₺</b></div></div>
+            <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-2"><div className="text-xs text-subtle mb-1">Senaryo</div><div className="text-sm tabular-nums">Net: <b>{fmt(senSonuc.senaryo.net)}₺</b> <span className={senSonuc.net_delta >= 0 ? "text-emerald-600" : "text-red-600"}>({senSonuc.net_delta >= 0 ? "+" : ""}{fmt(senSonuc.net_delta)}₺)</span></div></div>
+            <div className="sm:col-span-2 text-[11px] text-amber-600">⚠ {senSonuc.varsayim}</div>
           </div>
         )}
       </div>
