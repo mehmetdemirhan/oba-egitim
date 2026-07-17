@@ -130,7 +130,7 @@ def _dayanak_dogrula(dayanaklar: list, fotograf: dict) -> tuple:
 
 
 # ─────────────────────────── ana analiz ───────────────────────────
-async def calistir_analiz(tetik: str = "manuel", fotograf: dict | None = None) -> dict:
+async def calistir_analiz(tetik: str = "manuel", fotograf: dict | None = None, persist: bool = True) -> dict:
     """Fotoğraf → Gemini → öneriler + dayanak doğrulama → sakla. AI yoksa sebep döndürür.
     Onaylı stratejik plan + onaylı denetim notu (Deniz) referans olarak prompt'a girer."""
     if fotograf is None:
@@ -204,9 +204,11 @@ async def calistir_analiz(tetik: str = "manuel", fotograf: dict | None = None) -
         "oneri_sayisi": len(oneri_kayitlari),
         "zayif_dayanak_sayisi": sum(1 for o in oneri_kayitlari if o["zayif_dayanak"]),
     }
-    await db.ai_ceo_analizler.insert_one({**analiz})
-    if oneri_kayitlari:
-        await db.ai_ceo_oneriler.insert_many([{**o} for o in oneri_kayitlari])
+    # SINAV MODU (persist=False): sentetik değerlendirme gerçek kuyruğa/karneye KARIŞMAZ
+    if persist:
+        await db.ai_ceo_analizler.insert_one({**analiz})
+        if oneri_kayitlari:
+            await db.ai_ceo_oneriler.insert_many([{**o} for o in oneri_kayitlari])
     analiz.pop("_id", None)
     return {"ok": True, "analiz": analiz, "oneriler": [{k: v for k, v in o.items() if k != "_id"} for o in oneri_kayitlari]}
 
