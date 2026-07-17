@@ -18,12 +18,15 @@ import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from core.db import db
 from core.auth import get_current_user, require_role, UserRole
+from modules.timi_metin import (
+    timi_rapor_uret, get_rapor_metinleri, set_rapor_metinleri, _varsayilan_paket,
+)
 
 router = APIRouter()
 
@@ -271,6 +274,41 @@ async def timi_anahtar_varsayilana_don(current_user=Depends(require_role(UserRol
 
 
 # ─────────────────────────────────────────────
+# Rapor Metin Bankası (yalnız Yönetici/Koordinatör) — /timi/{sonuc_id} catch-all'ından ÖNCE
+# ─────────────────────────────────────────────
+@router.get("/timi/rapor-metinleri")
+async def get_timi_rapor_metinleri(current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+    """Canlı rapor metin bankası (DB → varsayılan) + varsayılan (sıfırlama için) + alan sözlüğü."""
+    metinler, tarih = await get_rapor_metinleri(db)
+    doc = await db.sistem_ayarlari.find_one({"tip": "timi_rapor_metinleri"})
+    return {
+        "metinler": metinler,
+        "varsayilan": _varsayilan_paket(),
+        "kategoriler": [{"key": TIMI_KATEGORILER[i]["key"], "tr": TIMI_KATEGORILER[i]["tr"]} for i in range(1, 8)],
+        "guncelleme_tarihi": tarih,
+        "guncelleyen": (doc or {}).get("guncelleyen", ""),
+    }
+
+
+@router.put("/timi/rapor-metinleri")
+async def put_timi_rapor_metinleri(data: dict = Body(...),
+                                   current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+    """Metin bankasını toplu kaydeder (alan bazlı; eksik alanlar üretimde varsayılana düşer)."""
+    metinler = data.get("metinler")
+    if not isinstance(metinler, dict):
+        raise HTTPException(status_code=400, detail="metinler (nesne) gerekli")
+    ad = f"{current_user.get('ad','')} {current_user.get('soyad','')}".strip()
+    tarih = await set_rapor_metinleri(db, metinler, guncelleyen=ad)
+    return {"ok": True, "guncelleme_tarihi": tarih, "guncelleyen": ad}
+
+
+@router.post("/timi/rapor-metinleri/varsayilana-don")
+async def timi_rapor_metinleri_varsayilana_don(current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+    await db.sistem_ayarlari.delete_one({"tip": "timi_rapor_metinleri"})
+    return {"ok": True, "metinler": _varsayilan_paket()}
+
+
+# ─────────────────────────────────────────────
 # Oturum / uygulama akışı
 # ─────────────────────────────────────────────
 @router.post("/timi/baslat")
@@ -372,6 +410,7 @@ async def timi_tamamla(sonuc_id: str, data: TimiTamamla, current_user=Depends(ge
 @router.get("/timi/sessions")
 async def timi_sessions(current_user=Depends(get_current_user)):
     """Panel listesi — öğretmen yalnızca kendi uyguladıklarını görür."""
+    await _taslak_temizlik_throttle()  # cron yoksa: günde bir kez taslak temizliği
     q = {}
     if current_user.get("role") == "teacher":
         q["ogretmen_id"] = current_user["id"]
@@ -404,6 +443,90 @@ async def timi_sonuc_getir(sonuc_id: str, current_user=Depends(get_current_user)
     return sonuc
 
 
+async def _rapor_bolumleri(sonuc: dict) -> dict:
+    """Sonuçtan deterministik anlatı raporu (metin bankası DB → varsayılan)."""
+    metinler, _ = await get_rapor_metinleri(db)
+    return timi_rapor_uret(sonuc.get("kategori_puanlari", {}) or {}, metinler)
+
+
+@router.get("/timi/{sonuc_id}/rapor")
+async def timi_rapor_getir(sonuc_id: str, current_user=Depends(get_current_user)):
+    """Tam anlatılı rapor (ekran görünümü) — PDF ile AYNI bölümler; deterministik, AI yok."""
+    if not _yetkili(current_user):
+        raise HTTPException(status_code=403, detail="Yetkisiz")
+    sonuc = await db.timi_sonuclar.find_one({"id": sonuc_id})
+    if not sonuc:
+        raise HTTPException(status_code=404, detail="TIMI sonucu bulunamadı")
+    sonuc.pop("_id", None)
+    return {"sonuc": sonuc, "rapor": await _rapor_bolumleri(sonuc)}
+
+
+# ── Taslak (yarım kalan) otomatik temizlik yardımcıları ──
+def _yas_gun(created_at, now) -> int | None:
+    if not created_at:
+        return None
+    try:
+        d = datetime.fromisoformat(str(created_at).replace("Z", "+00:00"))
+        if d.tzinfo is None:
+            d = d.replace(tzinfo=timezone.utc)
+        return (now - d).days
+    except Exception:
+        return None
+
+
+async def _taslak_temizlik() -> dict:
+    """15 günü geçmiş tamamlanmamış taslakları siler; 13-15 gün arası olanlara (silmeden ~2
+    gün önce) uygulayan öğretmene BİR KEZ uyarı gönderir. Her silme islem_log'a düşer."""
+    now = datetime.now(timezone.utc)
+    from core.audit import islem_kaydet
+    sistem = {"id": "system", "role": "system", "ad": "Sistem", "soyad": ""}
+    silinen = uyarilan = 0
+    taslaklar = await db.timi_sonuclar.find({"durum": {"$ne": "tamamlandi"}}).to_list(length=10000)
+    for s in taslaklar:
+        yas = _yas_gun(s.get("created_at"), now)
+        if yas is None:
+            continue
+        if yas >= 15:
+            await db.timi_sonuclar.delete_one({"id": s["id"]})
+            await islem_kaydet(sistem, "timi", "taslak_oto_sil", "timi_sonuc", s["id"], "yas_gun", yas, "silindi")
+            silinen += 1
+        elif yas >= 13 and not s.get("silme_uyari_tarihi"):
+            try:
+                from modules.bildirim import bildirim_olustur
+                await bildirim_olustur(s.get("ogretmen_id"), "timi_taslak_uyari",
+                                       "Yarım kalan bir TIMI taslağın ~2 gün içinde otomatik silinecek — devam etmek ister misin?", s["id"])
+            except Exception:
+                pass
+            await db.timi_sonuclar.update_one({"id": s["id"]}, {"$set": {"silme_uyari_tarihi": now.isoformat()}})
+            uyarilan += 1
+    return {"ok": True, "silinen": silinen, "uyarilan": uyarilan}
+
+
+async def _taslak_temizlik_throttle():
+    """Cron yoksa: ilk-istek tetikli, günde bir kez (sessions okumasından çağrılır)."""
+    try:
+        son = await db.sistem_ayarlari.find_one({"tip": "timi_taslak_temizlik_son"})
+        now = datetime.now(timezone.utc)
+        if son and son.get("zaman"):
+            d = _yas_gun(son["zaman"], now)
+            if d is not None and d < 1:
+                return
+        await db.sistem_ayarlari.update_one({"tip": "timi_taslak_temizlik_son"},
+            {"$set": {"tip": "timi_taslak_temizlik_son", "zaman": now.isoformat()}}, upsert=True)
+        await _taslak_temizlik()
+    except Exception:
+        pass
+
+
+@router.post("/timi/gunluk-temizlik")
+async def timi_gunluk_temizlik(anahtar: str = Query(default="")):
+    """Harici cron (günlük) — token korumalı (push.py deseni)."""
+    from core.config import PUSH_CRON_TOKEN
+    if PUSH_CRON_TOKEN and anahtar != PUSH_CRON_TOKEN:
+        raise HTTPException(status_code=403, detail="Geçersiz anahtar")
+    return await _taslak_temizlik()
+
+
 @router.get("/timi/{sonuc_id}/pdf")
 async def timi_pdf(sonuc_id: str, current_user=Depends(get_current_user)):
     """TIMI sonuç raporu PDF'i — grafik + baskın zeka vurgusu + öğrenci/tarih.
@@ -433,18 +556,25 @@ async def timi_pdf(sonuc_id: str, current_user=Depends(get_current_user)):
     VURGU = colors.HexColor('#F39C12'); BAR = colors.HexColor('#3B7DD8')
 
     styles = getSampleStyleSheet()
-    styles.add(ParagraphStyle(name='TT', fontSize=18, leading=22, alignment=TA_CENTER, spaceAfter=4, textColor=MAVI, fontName=FONTB))
-    styles.add(ParagraphStyle(name='TS', fontSize=11, leading=14, alignment=TA_CENTER, spaceAfter=14, textColor=colors.HexColor('#666'), fontName=FONT))
+    styles.add(ParagraphStyle(name='TT', fontSize=18, leading=22, alignment=TA_CENTER, spaceAfter=4, textColor=colors.white, fontName=FONTB))
+    styles.add(ParagraphStyle(name='TS', fontSize=11, leading=14, alignment=TA_CENTER, spaceAfter=2, textColor=colors.HexColor('#DCE9F7'), fontName=FONT))
     styles.add(ParagraphStyle(name='TSect', fontSize=12, leading=16, spaceBefore=14, spaceAfter=8, textColor=MAVI, fontName=FONTB))
-    styles.add(ParagraphStyle(name='TBody', fontSize=10, leading=14, fontName=FONT))
+    styles.add(ParagraphStyle(name='TBody', fontSize=10, leading=15, fontName=FONT, spaceAfter=3))
+    styles.add(ParagraphStyle(name='TListe', fontSize=10, leading=15, fontName=FONT, leftIndent=12, spaceAfter=2))
 
     kp = sonuc.get("kategori_puanlari", {}) or {}
     baskin = sonuc.get("baskin_zeka_alanlari", []) or []
     en_yuksek = max([kp.get(k, 0) for k in KATEGORI_SIRASI] + [1])
 
     el = []
-    el.append(RLPara("Okuma Becerileri Akademisi", styles['TT']))
-    el.append(RLPara("TIMI Çoklu Zeka Raporu", styles['TS']))
+    # Kapak başlığı — kurumsal renkli şerit (kurum adı + rapor adı)
+    kapak = RLTable([[RLPara("Okuma Becerileri Akademisi", styles['TT'])],
+                     [RLPara("TIMI Çoklu Zekâ Envanteri Raporu", styles['TS'])]], colWidths=[17*cm])
+    kapak.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), MAVI), ('TOPPADDING', (0,0), (-1,0), 16),
+        ('BOTTOMPADDING', (0,-1), (-1,-1), 14), ('LEFTPADDING', (0,0), (-1,-1), 8), ('RIGHTPADDING', (0,0), (-1,-1), 8),
+        ('ROUNDEDCORNERS', [6, 6, 6, 6])]))
+    el.append(kapak)
+    el.append(Spacer(1, 12))
     el.append(RLPara("Öğrenci Bilgileri", styles['TSect']))
     info = [
         ["Adı Soyadı:", f"{ogr.get('ad','')} {ogr.get('soyad','')}".strip() or "-", "Sınıfı:", sonuc.get("sinif_seviyesi") or ogr.get("sinif", "-")],
@@ -485,13 +615,34 @@ async def timi_pdf(sonuc_id: str, current_user=Depends(get_current_user)):
         d.add(String(bar_x + tam_gen + 6, y + 6, str(puan), fontName=FONTB, fontSize=9, fillColor=colors.HexColor('#333')))
     el.append(d)
 
+    # ── TAM ANLATILI RAPOR (deterministik metin bankasından — AI yok) ──
+    rapor = await _rapor_bolumleri(sonuc)
+    for b in rapor["bolumler"]:
+        el.append(RLPara(b["baslik"], styles['TSect']))
+        if b.get("tip") == "liste":
+            for m in b.get("maddeler", []):
+                el.append(RLPara("•&nbsp;&nbsp;" + str(m), styles['TListe']))
+        else:
+            el.append(RLPara(str(b.get("paragraf", "")), styles['TBody']))
+
     if sonuc.get("notlar"):
-        el.append(RLPara("Notlar", styles['TSect']))
+        el.append(RLPara("Uygulayan Öğretmen Notu", styles['TSect']))
         el.append(RLPara(str(sonuc.get("notlar")), styles['TBody']))
+
+    # Alt bilgi: uygulama tarihi + sayfa no
+    tarih_str = str(sonuc.get("uygulama_tarihi") or sonuc.get("created_at") or "")[:10]
+
+    def _footer(canvas, docx):
+        canvas.saveState()
+        canvas.setFont(FONT, 8)
+        canvas.setFillColor(colors.HexColor('#999999'))
+        canvas.drawString(2*cm, 1*cm, f"TIMI Çoklu Zekâ Envanteri Raporu · {tarih_str}")
+        canvas.drawRightString(A4[0] - 2*cm, 1*cm, f"Sayfa {docx.page}")
+        canvas.restoreState()
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=1.5*cm, bottomMargin=1.5*cm, leftMargin=2*cm, rightMargin=2*cm)
-    doc.build(el)
+    doc.build(el, onFirstPage=_footer, onLaterPages=_footer)
     buffer.seek(0)
     ad = f"{ogr.get('ad','')}_{ogr.get('soyad','')}".strip("_") or "TIMI"
     return StreamingResponse(buffer, media_type="application/pdf",
@@ -499,8 +650,25 @@ async def timi_pdf(sonuc_id: str, current_user=Depends(get_current_user)):
 
 
 @router.delete("/timi/{sonuc_id}")
-async def timi_sil(sonuc_id: str, current_user=Depends(get_current_user)):
-    if current_user.get("role") not in ["admin", "coordinator"]:
-        raise HTTPException(status_code=403, detail="Yetkisiz")
+async def timi_sil(sonuc_id: str, onay: bool = Query(default=False), current_user=Depends(get_current_user)):
+    """Taslak (yarım kalan) → uygulayan ÖĞRETMEN veya admin/koordinatör silebilir.
+    Tamamlanmış rapor → yalnız admin, ayrı onayla (onay=true). Her silme islem_log'a düşer."""
+    sonuc = await db.timi_sonuclar.find_one({"id": sonuc_id})
+    if not sonuc:
+        raise HTTPException(status_code=404, detail="TIMI sonucu bulunamadı")
+    rol = current_user.get("role")
+    taslak = sonuc.get("durum") != "tamamlandi"
+    if taslak:
+        sahip = sonuc.get("ogretmen_id") == current_user.get("id")
+        if not (sahip or rol in ("admin", "coordinator")):
+            raise HTTPException(status_code=403, detail="Bu taslağı silme yetkiniz yok")
+    else:
+        if rol != "admin":
+            raise HTTPException(status_code=403, detail="Tamamlanmış rapor yalnız yönetici tarafından silinebilir")
+        if not onay:
+            raise HTTPException(status_code=400, detail="Tamamlanmış raporu silmek için onay gerekli")
     await db.timi_sonuclar.delete_one({"id": sonuc_id})
-    return {"message": "Silindi"}
+    from core.audit import islem_kaydet
+    await islem_kaydet(current_user, "timi", "taslak_sil" if taslak else "rapor_sil",
+                       "timi_sonuc", sonuc_id, "durum", sonuc.get("durum"), "silindi")
+    return {"message": "Silindi", "taslak": taslak}
