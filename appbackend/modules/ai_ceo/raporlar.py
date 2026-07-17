@@ -10,11 +10,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
 from core.db import db
 from core.auth import require_role, UserRole
-from core.ai import call_claude
-from core.config import GEMINI_API_KEY
 
-from .fotograf import son_fotograf, sistem_fotografi, fotograf_kaydet, ai_payload
-from .personalar import sistem_promptu
+from .fotograf import son_fotograf, sistem_fotografi, fotograf_kaydet
 from .analiz import calistir_analiz
 from .anomali import anomalileri_hesapla, anomali_bildirim_gonder
 from .ortak import metrik_al
@@ -78,18 +75,8 @@ async def rapor_gunluk(current_user=Depends(_ADMIN)):
     m = await _gunluk_metrikler()
     foto = await son_fotograf()
     anomaliler = anomalileri_hesapla(foto) if foto else []
+    # MALİYET KURALI: günlük rapor deterministik + hafif yorum — sayfa açılışında AI çağrısı YOK.
     yorum = _gunluk_yorum_det(m, len(anomaliler))
-    # Kısa AI yorumu (opsiyonel — başarısızsa deterministik kalır)
-    if GEMINI_API_KEY:
-        try:
-            res = await call_claude(sistem_promptu("ayda"),
-                                    f"Günün özeti: {m}. Anomali sayısı: {len(anomaliler)}. "
-                                    "2-3 cümlelik kısa, net bir yönetici yorumu yaz (düz metin).",
-                                    max_tokens=300)
-            if res.get("text") and not res.get("error"):
-                yorum = res["text"].strip()[:600]
-        except Exception:
-            pass
     kayit = {"id": str(uuid.uuid4()), "tip": "gunluk", "tarih": datetime.now(timezone.utc).isoformat(),
              "gostergeler": m, "anomaliler": anomaliler, "yorum": yorum}
     await db.ai_ceo_raporlar.insert_one({**kayit})
