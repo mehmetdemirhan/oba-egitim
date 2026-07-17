@@ -51,7 +51,13 @@ COZUM_SABLONLARI = {
     },
     "maliyet_sicramasi": {
         "tip": "operasyonel", "oneri": "AI çağrı artışını incele (hangi özellik/tetik arttı?).",
-        "adim": "Maliyet Denetimi tablosundan ay/model kırılımına bak; beklenmeyen tetikleyiciyi (ör. sık analiz koşumu) durdur.",
+        "adim": "Maliyet Denetimi tablosundan ay/model/özellik kırılımına bak; beklenmeyen tetikleyiciyi (ör. sık analiz koşumu) durdur.",
+    },
+    "tekrarlanan_oneri": {
+        "tip": "operasyonel", "oneri": "Yinelenen açık önerileri tek örneğe indir (kök neden zaten engelli).",
+        "adim": "'Kontrol Et'e bas: aynı başlıklı açık öneriler en yenisi kalacak şekilde birleştirilir "
+                "(eskiler ertelenir). Analiz artık her koşuşunda aynı başlığı yeniden üretmiyor; bu, birikmiş "
+                "kopyaların tek tıkla temizliğidir.",
     },
 }
 
@@ -111,6 +117,12 @@ async def bulgu_yeniden_kontrol(bulgu: dict) -> tuple:
         guncel = await G.maliyet_bulgu()
     elif str(tur).startswith("ikinci_goz"):
         guncel = await G.ikinci_goz(await son_fotograf() or {})
+    elif tur == "tekrarlanan_oneri":
+        # Kök neden temizliği: yinelenen açık önerileri birleştir, sonra yeniden denetle
+        from .analiz import oneri_dedup
+        await oneri_dedup()
+        from .deniz import deterministik_kontroller
+        guncel = await deterministik_kontroller()
     else:
         from .deniz import deterministik_kontroller
         guncel = await deterministik_kontroller()

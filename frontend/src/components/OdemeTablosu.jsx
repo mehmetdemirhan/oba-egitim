@@ -105,7 +105,11 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
 
   const filtreli = useMemo(() => {
     let liste = kisiler;
-    if (odakKisiId) liste = liste.filter((k) => k.kisi_id === odakKisiId);  // bildirimden gelen öğrenci odağı
+    // Odak: tek öğrenci (bildirim/Deniz kanıtı) veya öğrenci listesi (Miran işaretsiz ödemeler)
+    if (odakKisiId && odakKisiId.length) {
+      const set = Array.isArray(odakKisiId) ? new Set(odakKisiId) : new Set([odakKisiId]);
+      liste = liste.filter((k) => set.has(k.kisi_id));
+    }
     if (sadeceBorclu) liste = liste.filter((k) => Number(k.kalan || 0) > 0);  // İŞ 4 — alınmayan
     if (yasKovasi) liste = liste.filter(kovaUyar);  // yaşlandırma kovası
     const q = arama.trim().toLocaleLowerCase("tr");
@@ -247,9 +251,10 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
         </div>
       )}
 
-      {odakKisiId && (
+      {odakKisiId && odakKisiId.length > 0 && (
         <div className="flex items-center gap-2 text-xs">
-          <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-medium">Filtre: bildirimdeki öğrenci ({filtreli.length} satır)</span>
+          <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-medium">
+            Filtre: {Array.isArray(odakKisiId) ? "işaretlenen ödemeler" : "bildirimdeki öğrenci"} ({filtreli.length} satır)</span>
           {onOdakTemizle && <button onClick={onOdakTemizle} className="text-primary hover:underline">Temizle</button>}
         </div>
       )}

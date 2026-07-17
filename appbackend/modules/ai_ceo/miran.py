@@ -217,6 +217,8 @@ async def _muhasebe_veri() -> dict:
     damgasiz_tamamlanan = 0
     yaklasan_hakedis_tutar = 0.0
     yaklasan_hakedis_ogretmen = set()
+    yas60_idler = []       # deep-link: yaşlanan alacaklı öğrenci id'leri
+    damgasiz_idler = []    # deep-link: işaretsiz tamamlanan öğrenci id'leri
     for k in kurlar:
         kalan = float(k.get("tutar") or 0) - float(k.get("yapilan_odeme") or 0)
         bitmis = bool(k.get("odeme_tamamlanma_tarihi"))
@@ -226,9 +228,13 @@ async def _muhasebe_veri() -> dict:
             if bas and (now - bas).days > 60:
                 yas60_sayi += 1
                 yas60_tutar += kalan
+                if k.get("ogrenci_id"):
+                    yas60_idler.append(k.get("ogrenci_id"))
         # Tamamlanmış (kalan≈0) ama tamamlanma damgası YOK → dönem kapanışına işaretsiz
         if kalan <= 0.01 and not bitmis:
             damgasiz_tamamlanan += 1
+            if k.get("ogrenci_id"):
+                damgasiz_idler.append(k.get("ogrenci_id"))
         # Damgalı ama henüz döneme ödenmemiş → yaklaşan hakediş
         if bitmis and not k.get("odendi_donem"):
             yaklasan_hakedis_tutar += float(k.get("ogretmen_pay") or 0)
@@ -240,7 +246,27 @@ async def _muhasebe_veri() -> dict:
         "damgasiz_tamamlanan": damgasiz_tamamlanan,
         "yaklasan_hakedis_tutar": round(yaklasan_hakedis_tutar, 2),
         "yaklasan_hakedis_ogretmen_sayisi": len(yaklasan_hakedis_ogretmen),
+        "yaslanan_idler": list(dict.fromkeys(yas60_idler)),
+        "damgasiz_idler": list(dict.fromkeys(damgasiz_idler)),
     }
+
+
+def _muhasebe_odak_ekle(icerik: dict, veri: dict) -> None:
+    """Miran muhasebe önerilerine tıklanınca gidilecek odağı ekler (deep-link): işaretsiz
+    ödemeler → o öğrencilerin ödemeleri; yaşlanan alacaklar → borçlu filtresi. Hem AI hem
+    deterministik varyantta başlık/açıklama anahtar kelimesine göre eşler."""
+    if not isinstance(icerik, dict):
+        return
+    dmg = [i for i in veri.get("damgasiz_idler", []) if i]
+    yas = [i for i in veri.get("yaslanan_idler", []) if i]
+    for o in icerik.get("oneriler", []) or []:
+        blob = f"{o.get('baslik', '')} {o.get('aciklama', '')}".lower()
+        if ("damga" in blob or "işaretsiz" in blob) and dmg:
+            o["hedef"] = "damgasiz"
+            o["odak_idler"] = dmg
+        elif ("yaşlan" in blob or "alacak" in blob) and yas:
+            o["hedef"] = "borclu"
+            o["odak_idler"] = yas
 
 
 def _guard_muhasebe(metin: str) -> str | None:
@@ -301,6 +327,7 @@ async def miran_muhasebe_uret() -> dict:
             logging.warning(f"[ai_ceo] Miran muhasebe AI hatası: {e}")
     if not icerik:
         icerik = _deterministik_muhasebe(veri)
+    _muhasebe_odak_ekle(icerik, veri)  # deep-link odaklarını ekle (tıkla → ilgili ödemeler)
     kayit = {"id": str(uuid.uuid4()), "ogretmen_id": "_muhasebe", "rol": "accountant",
              "icerik": icerik, "kaynak": kaynak, "tarih": _iso()}
     await db.ai_ceo_miran.insert_one({**kayit})
@@ -316,6 +343,8 @@ async def miran_muhasebe(current_user=Depends(get_current_user)):
     if doc:
         d = _aware(doc.get("tarih"))
         if not (d and (simdi() - d).days >= HAFTA_GUN):
+            # Cache'lenmiş not için de odakları GÜNCEL veriye göre tazele (id'ler değişmiş olabilir)
+            _muhasebe_odak_ekle(doc.get("icerik") or {}, await _muhasebe_veri())
             return {"miran": doc}
     return {"miran": await miran_muhasebe_uret()}
 
