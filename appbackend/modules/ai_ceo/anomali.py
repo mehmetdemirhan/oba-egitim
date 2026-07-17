@@ -74,6 +74,14 @@ def anomalileri_hesapla(fotograf: dict) -> list:
                 "deger": dusus,
             })
 
+    # NPS düşüşü (S6d): NPS negatifse (detractor ağırlıklı) uyarı
+    nps = metrik_al(fotograf, "nps.nps", None)
+    nps_sayi = metrik_al(fotograf, "nps.sayi", 0) or 0
+    if nps is not None and nps_sayi >= 3 and nps < 0:
+        uyarilar.append({"tip": "nps_dususu", "seviye": "orta",
+                         "mesaj": f"NPS negatif ({nps}) — memnuniyet riski, çıkış nedenlerini incele.",
+                         "deger": nps})
+
     # 4) Konsantrasyon riski (S6c): tek öğretmen/tür bağımlılığı eşik aşımı
     kons = metrik_al(fotograf, "konsantrasyon", {}) or {}
     esik = kons.get("esik_yuzde", 25.0)

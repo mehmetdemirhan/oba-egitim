@@ -83,3 +83,58 @@ async def kohort(current_user=Depends(_ADMIN)):
         egri.append({"ay": ay, "toplam": g["toplam"],
                      "yenileme_orani": round(g["yenileyen"] * 100 / g["toplam"], 1) if g["toplam"] else 0})
     return {"kohortlar": egri}
+
+
+@router.get("/ai/ceo/kurul-paketi/pdf")
+async def kurul_paketi_pdf(current_user=Depends(_ADMIN)):
+    """S6f: tek sayfa Kurul Özeti PDF — 6 KPI + 3 fırsat + 3 risk + plan ilerlemesi."""
+    import io
+    from fastapi import HTTPException, Response
+    foto = await son_fotograf() or {}
+    kpi = [
+        ("Gelir (tahsil)", f"{_num(metrik_al(foto,'muhasebe.tahsil_edilen')):.0f} TL"),
+        ("Net Marj (net kasa)", f"{_num(metrik_al(foto,'muhasebe.net_kasa')):.0f} TL"),
+        ("Yenileme", f"%{metrik_al(foto,'ogretmen.yenileme_orani_yuzde') or '-'}"),
+        ("NPS", f"{metrik_al(foto,'nps.nps') if metrik_al(foto,'nps.nps') is not None else '-'}"),
+        ("Kazanım (proxy)", f"{metrik_al(foto,'kazanim.ort_kazanim') or '-'}"),
+        ("Konsantrasyon (en büyük öğrt.)", f"%{metrik_al(foto,'konsantrasyon.en_buyuk_ogretmen_ogrenci_payi') or '-'}"),
+    ]
+    firsatlar = await db.ai_ceo_oneriler.find({"durum": {"$in": ["yeni", "uygulaniyor"]}}, {"_id": 0, "baslik": 1, "oncelik": 1}).sort("tarih", -1).to_list(length=3)
+    from .anomali import anomalileri_hesapla
+    riskler = anomalileri_hesapla(foto)[:3]
+    plan = await db.ai_ceo_planlar.find_one({"durum": "onayli"}, {"_id": 0}, sort=[("onay_tarih", -1)])
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import cm
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet
+        try:
+            from modules.diagnostic import _tr_font
+            FONT, FONTB = _tr_font()
+        except Exception:
+            FONT, FONTB = "Helvetica", "Helvetica-Bold"
+        buf = io.BytesIO()
+        doc = SimpleDocTemplate(buf, pagesize=A4, topMargin=1.5 * cm, bottomMargin=1.5 * cm)
+        st = getSampleStyleSheet(); st["Title"].fontName = FONTB; st["Normal"].fontName = FONT
+        ak = [Paragraph("Kurul Özeti — AI CEO (Ayda)", st["Title"]), Spacer(1, 0.4 * cm),
+              Paragraph("<b>6 Temel Gösterge</b>", st["Normal"])]
+        for a, v in kpi:
+            ak.append(Paragraph(f"• {a}: <b>{v}</b>", st["Normal"]))
+        ak.append(Spacer(1, 0.3 * cm)); ak.append(Paragraph("<b>3 Fırsat</b>", st["Normal"]))
+        for f in (firsatlar or [{"baslik": "—"}]):
+            ak.append(Paragraph(f"• {f.get('baslik')}", st["Normal"]))
+        ak.append(Spacer(1, 0.3 * cm)); ak.append(Paragraph("<b>3 Risk</b>", st["Normal"]))
+        for r in (riskler or [{"mesaj": "Belirgin risk yok"}]):
+            ak.append(Paragraph(f"• {r.get('mesaj')}", st["Normal"]))
+        ak.append(Spacer(1, 0.3 * cm)); ak.append(Paragraph("<b>Stratejik Plan İlerlemesi</b>", st["Normal"]))
+        if plan:
+            for h in plan.get("hedefler", []):
+                ak.append(Paragraph(f"• {h.get('ad')}: {h.get('mevcut')}→{h.get('hedef')} {h.get('metrik','')}", st["Normal"]))
+        else:
+            ak.append(Paragraph("• Onaylı plan yok", st["Normal"]))
+        doc.build(ak)
+        pdf = buf.getvalue(); buf.close()
+        return Response(content=pdf, media_type="application/pdf",
+                        headers={"Content-Disposition": 'attachment; filename="kurul_ozeti.pdf"'})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"PDF üretilemedi: {str(e)[:100]}")
