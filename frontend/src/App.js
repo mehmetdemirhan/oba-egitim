@@ -51,6 +51,7 @@ import DashboardAnalitik from "./components/admin/DashboardAnalitik";
 import BilgiIkonu from "./components/BilgiIkonu";
 import AiCeo from "./components/aiceo/AiCeo";
 import KocumMiran from "./components/aiceo/KocumMiran";
+import Deniz from "./components/aiceo/Deniz";
 import SinavYonetimi from "./components/admin/SinavYonetimi";
 import SinavCozum from "./components/SinavCozum";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
@@ -317,7 +318,7 @@ function SimpleEditForm({ item, teachers, courses, classes, onSave, onCancel, us
 }
 
 // Ayarlar/Gelişim altına taşınan sekmeler (üst çubuktan kaldırıldı; alt-nav ile erişilir)
-const AYARLAR_GRUP = ["ai-merkezi", "ai-ceo", "loglar", "sss-yonetimi", "tema-yonetimi", "rozet-yonetimi", "toplu-kayit", "moduller", "guncelleme", "yedekleme"];
+const AYARLAR_GRUP = ["ai-merkezi", "ai-ceo", "ai-deniz", "loglar", "sss-yonetimi", "tema-yonetimi", "rozet-yonetimi", "toplu-kayit", "moduller", "guncelleme", "yedekleme"];
 const GELISIM_GRUP = ["sinav", "meb-kelime", "ders-programi", "okuma-metinleri"];
 
 // Hata çeşitleri (kaynak: "Hata Çeşitleri.docx" — 4 kategori, 18 tür). Analiz hata
@@ -658,6 +659,7 @@ function AppContent() {
                 { v: "ayarlar", l: "Sistem Ayarları", g: true },
                 { v: "ai-merkezi", l: "AI Merkezi", g: true },
                 { v: "ai-ceo", l: "🧭 AI CEO", g: user.role === "admin" },
+                { v: "ai-deniz", l: "🔍 Denetim (Deniz)", g: user.role === "admin" },
                 { v: "loglar", l: "Loglar", g: true },
                 { v: "sss-yonetimi", l: `SSS Yönetimi${sssBekleyenSayi > 0 ? ` (${sssBekleyenSayi})` : ""}`, g: true },
                 { v: "tema-yonetimi", l: "Tema", g: true },
@@ -1588,6 +1590,13 @@ function AppContent() {
           {user.role === "admin" && (
             <TabsContent value="ai-ceo">
               <AiCeo apiBase={API} />
+            </TabsContent>
+          )}
+
+          {/* ═══ DENETİM (Deniz) — yalnız admin ═══ */}
+          {user.role === "admin" && (
+            <TabsContent value="ai-deniz">
+              <Deniz apiBase={API} />
             </TabsContent>
           )}
 

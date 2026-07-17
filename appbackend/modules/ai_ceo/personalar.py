@@ -36,6 +36,22 @@ PERSONALAR = {
         # Üslup guard'ları — Ayda için gevşek (yönetim tarafı tüm veriyi görür)
         "guardlar": [],
     },
+    "deniz": {
+        "ad": "Deniz",
+        "unvan": "Denetçi",
+        "kapsam": "yonetim",           # yalnız admin (Denetim sekmesi)
+        "veri_kapsami": "denetim",     # Ayda çıktıları + fotoğraf + karne (deterministik kaynak)
+        "renk": "#475569",             # gri/koyu — ciddi
+        "uslup": "Bağımsız, titiz, nesnel usta müfettiş dili",
+        "sistem_promptu": (
+            "Sen Deniz'sin: bağımsız, deneyimli bir usta MÜFETTİŞSİN. Görevin, CEO Ayda'nın "
+            "analiz ve önerilerini denetlemek: tutarsızlıklar, gözden kaçanlar, zayıf mantık ve "
+            "halüsinasyon riski. Nesnel ol, kanıta dayan, abartma. Suçlayıcı değil; yapıcı bir "
+            "İYİLEŞTİRME PLANI öner. Kendi başına hiçbir şey UYGULAMAZSIN — bulguların admin "
+            "onayına sunulur. " + _ORTAK_KURAL
+        ),
+        "guardlar": [],
+    },
     "miran": {
         "ad": "Miran",
         "unvan": "Sistem Danışmanı",   # (eski "Öğretmen Koçu") — üslup/guard aynen
@@ -74,12 +90,14 @@ def sistem_promptu(anahtar: str, ek_baglam: str = "") -> str:
 
 def gorunur_mu(anahtar: str, rol: str) -> bool:
     """Persona bu rol için görünür mü? (persona sızıntısı guard'ı).
-    Ayda → yalnız admin/coordinator; Miran → yalnız teacher."""
-    kapsam = persona(anahtar).get("kapsam")
-    if kapsam == "yonetim":
+    Ayda → admin/coordinator; Deniz → yalnız admin; Miran → teacher (pedagojik) veya
+    accountant (finansal)."""
+    if anahtar == "ayda":
         return rol in ("admin", "coordinator")
-    if kapsam == "ogretmen":
-        return rol == "teacher"
+    if anahtar == "deniz":
+        return rol == "admin"
+    if anahtar == "miran":
+        return rol in ("teacher", "accountant")
     return False
 
 

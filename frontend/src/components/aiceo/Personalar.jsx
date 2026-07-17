@@ -20,6 +20,14 @@ export const PERSONA_UI = {
     uslup: "Kurumsal, net, sayı veren yönetici dili",
     selam: "Merhaba, ben Ayda. Sistemi sizin için 360° analiz ediyorum.",
   },
+  deniz: {
+    ad: "Deniz",
+    unvan: "Denetçi",
+    renk: "#475569",        // gri/koyu — ciddi
+    renkAcik: "#e2e8f0",
+    uslup: "Bağımsız, titiz, nesnel müfettiş",
+    selam: "Ben Deniz. Ayda'nın çıktılarını bağımsız denetliyorum.",
+  },
   miran: {
     ad: "Miran",
     unvan: "Sistem Danışmanı",
@@ -101,8 +109,42 @@ export function MiranAvatar({ size = 48, ring = true, className = "" }) {
   );
 }
 
+// ── DENİZ — gri/koyu, gözlüklü, ciddi müfettiş ──
+export function DenizAvatar({ size = 48, ring = true, className = "" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" className={className}
+      role="img" aria-label="Deniz — Denetçi avatarı">
+      <defs>
+        <linearGradient id="deniz-bg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#f1f5f9" />
+          <stop offset="1" stopColor="#e2e8f0" />
+        </linearGradient>
+      </defs>
+      <circle cx="50" cy="50" r="49" fill="url(#deniz-bg)" stroke={ring ? "#475569" : "none"} strokeWidth={ring ? 2 : 0} />
+      {/* omuz + koyu ceket */}
+      <path d="M20 100 Q20 74 50 74 Q80 74 80 100 Z" fill="#334155" />
+      <path d="M42 76 L50 86 L58 76 L54 74 L46 74 Z" fill="#cbd5e1" />
+      <rect x="45" y="64" width="10" height="12" rx="4" fill="#d9b08c" />
+      {/* yüz */}
+      <circle cx="50" cy="50" r="17" fill="#e8c4a0" />
+      {/* kısa, düzenli gri saç */}
+      <path d="M32 48 Q31 30 50 29 Q69 30 68 48 Q66 40 50 39 Q34 40 32 48 Z" fill="#64748b" />
+      {/* gözlük — ciddi/analitik */}
+      <circle cx="43" cy="49" r="4.5" fill="none" stroke="#334155" strokeWidth="1.4" />
+      <circle cx="57" cy="49" r="4.5" fill="none" stroke="#334155" strokeWidth="1.4" />
+      <line x1="47.5" y1="49" x2="52.5" y2="49" stroke="#334155" strokeWidth="1.4" />
+      <circle cx="43" cy="49" r="1.6" fill="#2b2b2b" />
+      <circle cx="57" cy="49" r="1.6" fill="#2b2b2b" />
+      {/* düz, ölçülü ağız (ciddi) */}
+      <line x1="45" y1="59" x2="55" y2="59" stroke="#9a6a52" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function PersonaAvatar({ persona = "ayda", ...props }) {
-  return persona === "miran" ? <MiranAvatar {...props} /> : <AydaAvatar {...props} />;
+  if (persona === "miran") return <MiranAvatar {...props} />;
+  if (persona === "deniz") return <DenizAvatar {...props} />;
+  return <AydaAvatar {...props} />;
 }
 
 /**
