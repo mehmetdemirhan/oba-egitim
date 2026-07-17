@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Body, Request
 from pydantic import BaseModel
 
 from core.db import db
+from core.zaman import simdi, aware
 from core.config import SMTP_ENABLED, FRONTEND_URL, SIFRE_RESET_TOKEN_DK
 from core.mail import send_email
 from core.giris_log import giris_kaydet
@@ -281,7 +282,8 @@ async def reset_token_gecerli(token: str = ""):
     kayit = await db.sifre_reset_tokenlari.find_one({"token_hash": _token_hash(token), "kullanildi": False})
     if not kayit:
         return {"gecerli": False}
-    gecerli = datetime.now(timezone.utc) <= datetime.fromisoformat(kayit["gecerlilik"])
+    son = aware(kayit.get("gecerlilik"))
+    gecerli = bool(son) and simdi() <= son
     return {"gecerli": gecerli}
 
 
@@ -299,7 +301,8 @@ async def reset_password(request: Request, data: dict = Body(...)):
     kayit = await db.sifre_reset_tokenlari.find_one({"token_hash": _token_hash(token), "kullanildi": False})
     if not kayit:
         raise HTTPException(status_code=400, detail="Sıfırlama bağlantısı geçersiz veya kullanılmış.")
-    if datetime.now(timezone.utc) > datetime.fromisoformat(kayit["gecerlilik"]):
+    son = aware(kayit.get("gecerlilik"))
+    if not son or simdi() > son:
         raise HTTPException(status_code=400, detail="Sıfırlama bağlantısının süresi dolmuş.")
     # Şifreyi güncelle, token'ı tüket, kullanıcının diğer aktif token'larını iptal et.
     await db.users.update_one(

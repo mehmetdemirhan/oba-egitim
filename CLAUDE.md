@@ -37,6 +37,12 @@ konvansiyonlar; ayrıntı için ilgili dokümanlara bakın.
 
 ## Konvansiyonlar
 - Kod/yorum dili: mevcut dosyalardaki gibi **Türkçe** açıklamalar.
+- **Tarih/zaman (KURAL):** Tarih üretimi **yalnız `core.zaman`** üzerinden — `simdi()`
+  (aware UTC), `iso()` (aware UTC ISO string). **`datetime.utcnow()` YASAK** (naive üretir →
+  "can't compare offset-naive and offset-aware datetimes" + sessiz yanlış hesap). İki tarihi
+  karşılaştırmadan/çıkarmadan önce her iki tarafı `core.zaman.aware(x)` ile normalize et
+  (naive → UTC varsayılır; Mongo kayıtları UTC'dir). `parse_from_mongo` okunan tarih alanlarını
+  zaten aware UTC'ye çevirir (core/db.py).
 - Büyük her adımdan sonra commit; commit mesajları Türkçe ve açıklayıcı.
 - Frontend build doğrulaması: `cd frontend && CI=false npm run build` (react-scripts;
   Tailwind CRA'nın yerleşik desteğiyle `tailwind.config.js` üzerinden derlenir —
