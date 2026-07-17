@@ -111,7 +111,8 @@ async def run():
         # Rapor oluştur (RaporOlusturCreate: oturum_id + anlama + prozodik)
         r = await ac.post("/api/diagnostic/rapor", json={
             "oturum_id": oturum_id,
-            "anlama": {"genel_yuzde": 80},
+            "anlama": {"cumle_anlama": "iyi", "ana_fikir": "orta"},
+            "anlama_yuzde": 80,
             "prozodik": {"noktalama": 3, "vurgu": 3, "tonlama": 3, "akicilik": 3, "anlamli_gruplama": 3},
             "ogretmen_notu": "İyi gidiyor.",
         }, headers=H)

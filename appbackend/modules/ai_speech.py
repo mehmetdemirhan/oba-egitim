@@ -173,17 +173,22 @@ def _speech_mock_analiz(transkript: str, beklenen_metin: str, sure_sn: float, si
     }
 
 
+def _pool_to_speech(d, varsayilan_sinif):
+    ss = re.sub(r"\D", "", str(d.get("sinif_seviyesi") or ""))
+    return {"id": d["id"], "baslik": d.get("baslik", ""), "metin": d.get("icerik", ""),
+            "sinif": int(ss) if ss else varsayilan_sinif, "kelime_sayisi": d.get("kelime_sayisi")}
+
+
 @router.get("/ai/speech/metinler")
 async def speech_okuma_metinleri(sinif: int = 3, current_user=Depends(get_current_user)):
-    """Sınıfa göre sesli okuma metinleri getir."""
-    metinler = SPEECH_OKUMA_METİNLERİ.get(sinif, SPEECH_OKUMA_METİNLERİ.get(3, []))
-    if not metinler:
-        # En yakın sınıfı bul
-        for s in range(sinif, 0, -1):
-            if s in SPEECH_OKUMA_METİNLERİ:
-                metinler = SPEECH_OKUMA_METİNLERİ[s]
-                break
-    return {"metinler": metinler, "sinif": sinif}
+    """Sınıfa göre sesli okuma metinleri — TEK KAYNAK: 150'lik Akıcı Okuma havuzu (bolum=analiz)."""
+    proj = {"_id": 0, "id": 1, "baslik": 1, "icerik": 1, "sinif_seviyesi": 1, "kelime_sayisi": 1}
+
+    async def _q(extra):
+        return await db.analiz_metinler.find({"bolum": "analiz", "durum": "havuzda", **extra}, proj).to_list(length=None)
+
+    docs = await _q({"sinif_seviyesi": str(sinif)}) or await _q({})
+    return {"metinler": [_pool_to_speech(d, sinif) for d in docs], "sinif": sinif}
 
 
 @router.post("/ai/speech/analiz")
@@ -197,17 +202,17 @@ async def speech_analiz(
     current_user=Depends(get_current_user)
 ):
     """Sesli okuma kaydını analiz et: WPM + telaffuz + tonlama + duraklama."""
-    # Hedef metni bul
+    # Hedef metni TEK KAYNAK'tan (Akıcı Okuma havuzu) bul
     beklenen_metin = ""
     metin_baslik = ""
-    for s_list in SPEECH_OKUMA_METİNLERİ.values():
-        for m in s_list:
-            if m["id"] == metin_id:
-                beklened_metin = m["metin"]
-                beklenen_metin = m["metin"]
-                metin_baslik = m["baslik"]
-                sinif = m.get("sinif", sinif)
-                break
+    if metin_id:
+        d = await db.analiz_metinler.find_one({"id": metin_id}, {"_id": 0, "icerik": 1, "baslik": 1, "sinif_seviyesi": 1})
+        if d:
+            beklenen_metin = d.get("icerik", "")
+            metin_baslik = d.get("baslik", "")
+            ss = re.sub(r"\D", "", str(d.get("sinif_seviyesi") or ""))
+            if ss:
+                sinif = int(ss)
 
     transkript = transkript_input.strip()  # Web Speech API'den gelen
     whisper_kullanildi = False

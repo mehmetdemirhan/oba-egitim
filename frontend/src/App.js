@@ -54,6 +54,7 @@ import KocumMiran from "./components/aiceo/KocumMiran";
 import Deniz from "./components/aiceo/Deniz";
 import YoneticiAdimlar from "./components/aiceo/YoneticiAdimlar";
 import GorevTanimYonetimi from "./components/aiceo/GorevTanimYonetimi";
+import AnalizHavuzBakim from "./components/admin/AnalizHavuzBakim";
 import SinavYonetimi from "./components/admin/SinavYonetimi";
 import SinavCozum from "./components/SinavCozum";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
@@ -1552,6 +1553,7 @@ function AppContent() {
                 <SistemAyarlari user={user} />
                 <EgitimTurleriYonetimi apiBase={API} />
                 {user.role === "admin" && <GorevTanimYonetimi apiBase={API} />}
+                {user.role === "admin" && <AnalizHavuzBakim apiBase={API} />}
               </div>
             </TabsContent>
           )}
@@ -3021,6 +3023,40 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, onAnasayfayaD
             {/* Adım 1: Anlama */}
             {raporAdim === 1 && (
               <div className="space-y-3">
+                {/* Okuduğunu Anlama Soruları — seçili metne bağlı (ÇSS + açık uçlu) */}
+                {((metin?.sorular?.length || 0) > 0 || (metin?.acik_sorular?.length || 0) > 0) && (
+                  <div className="border border-line rounded-xl p-3 bg-app/40">
+                    <div className="text-xs font-semibold text-primary mb-2">Okuduğunu Anlama Soruları</div>
+                    {(metin?.sorular || []).map((s, i) => (
+                      <div key={s.id || i} className="mb-2.5">
+                        <div className="text-sm font-medium text-content flex items-start gap-1">
+                          <span className="text-subtle">{i + 1}.</span>
+                          <span>{s.soru}</span>
+                          {s.kontrol_gerekli && <span className="text-[10px] bg-amber-100 text-amber-700 rounded px-1 py-0.5 shrink-0" title="Doğru cevap düşük güvenli — kontrol edilmeli">kontrol</span>}
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 mt-1 pl-4">
+                          {["A","B","C","D"].filter(L => s.secenekler?.[L]).map(L => {
+                            const dogru = s.dogru_cevap === L;
+                            return (
+                              <div key={L} className={`text-xs rounded px-2 py-1 border ${dogru ? "border-emerald-300 bg-emerald-50 text-emerald-800 font-semibold" : "border-line text-content"}`}>
+                                <b>{L})</b> {s.secenekler[L]} {dogru && "✓"}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                    {(metin?.acik_sorular?.length || 0) > 0 && (
+                      <div className="mt-2 pt-2 border-t border-line">
+                        <div className="text-xs font-semibold text-subtle mb-1">Açık Uçlu Sorular</div>
+                        <ol className="list-decimal pl-6 space-y-0.5 text-sm text-content">
+                          {(metin.acik_sorular || []).map((a, j) => <li key={a.id || j}>{a.soru}</li>)}
+                        </ol>
+                      </div>
+                    )}
+                    <div className="text-[11px] text-subtle mt-2">Doğru cevaplar öğretmene gösterilir; öğrenci ekranında gizlidir. Metin Yönetimi'nden düzenlenebilir.</div>
+                  </div>
+                )}
                 {[
                   ["4.1 Sözcük Düzeyi", [["cumle_anlama","Cümle anlamı"],["bilinmeyen_sozcuk","Bilinmeyen sözcük"],["baglac_zamir","Bağlaç/zamir"]]],
                   ["4.2 Ana Yapı", [["ana_fikir","Ana fikir"],["yardimci_fikir","Yardımcı fikir"],["konu","Konu"],["baslik_onerme","Başlık önerme"]]],

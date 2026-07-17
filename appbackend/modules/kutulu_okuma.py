@@ -78,6 +78,8 @@ async def kutulu_okuma_metin(
     hedef_zorluk = zorluk or (_kur_to_zorluk(ogr_kur) if ogr_kur is not None else None)
 
     async def _sec(query: dict):
+        # TEK KAYNAK: yalnız 150'lik Akıcı Okuma havuzundan (bolum=analiz) seç
+        query = {"bolum": "analiz", **query}
         adaylar = await db.analiz_metinler.find(query).to_list(length=None)
         return random.choice(adaylar) if adaylar else None
 
