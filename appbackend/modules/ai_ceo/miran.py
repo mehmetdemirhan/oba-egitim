@@ -230,8 +230,10 @@ async def _muhasebe_veri() -> dict:
                 yas60_tutar += kalan
                 if k.get("ogrenci_id"):
                     yas60_idler.append(k.get("ogrenci_id"))
-        # Tamamlanmış (kalan≈0) ama tamamlanma damgası YOK → dönem kapanışına işaretsiz
-        if kalan <= 0.01 and not bitmis:
+        # KALİBRE: Eğitim tamamlandı (durum=tamamlandi; yeni kur / eğitim-tamamla) VE ödemesi
+        # bitti (kalan≈0) olduğu HALDE hakediş damgası yoksa işaretsiz say. Yalnız ödeme bitmesi
+        # (öğretmen henüz yeni kur/eğitim-tamamlandı işaretlememişse) hata DEĞİL — normal bekleme.
+        if kalan <= 0.01 and k.get("durum") == "tamamlandi" and not bitmis:
             damgasiz_tamamlanan += 1
             if k.get("ogrenci_id"):
                 damgasiz_idler.append(k.get("ogrenci_id"))
@@ -290,8 +292,8 @@ def _deterministik_muhasebe(veri: dict) -> dict:
                                      f"(toplam {veri['yaslanan_60_tutar']:.0f}₺) — bu hafta aranmalı."})
     if veri["damgasiz_tamamlanan"] > 0:
         oneriler.append({"baslik": "Dönem kapanışına işaretsiz ödemeler",
-                         "aciklama": f"{veri['damgasiz_tamamlanan']} ödeme tamamlandı ama tamamlanma "
-                                     "damgası yok; hakediş için işaretlenmeli."})
+                         "aciklama": f"{veri['damgasiz_tamamlanan']} kur eğitimi tamamlandı ve ödemesi bittiği "
+                                     "halde hakediş damgası yok; damgalanmalı (backfill)."})
     if veri["yaklasan_hakedis_tutar"] > 0:
         oneriler.append({"baslik": "Yaklaşan hakediş",
                          "aciklama": f"{veri['yaklasan_hakedis_ogretmen_sayisi']} öğretmene "

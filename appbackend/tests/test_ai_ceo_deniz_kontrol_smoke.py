@@ -65,7 +65,7 @@ async def run():
 
         # ── FIX 2: Miran muhasebe notu deep-link (odak_idler + hedef) ──
         miran_mod.GEMINI_API_KEY = ""  # deterministik → öngörülebilir başlıklar
-        await db.kur_ucretleri.insert_one({"id": "k1", "ogrenci_id": "s1", "tutar": 1000, "yapilan_odeme": 1000})  # damgasız
+        await db.kur_ucretleri.insert_one({"id": "k1", "ogrenci_id": "s1", "durum": "tamamlandi", "tutar": 1000, "yapilan_odeme": 1000})  # eğitim tamamlandı + ödendi, damga yok
         await db.kur_ucretleri.insert_one({"id": "k2", "ogrenci_id": "s2", "tutar": 1000, "yapilan_odeme": 0, "baslangic_tarihi": "2026-01-01T00:00:00"})  # 60+ yaşlanan
         r = await ac.get("/api/ai/ceo/miran/muhasebe", headers=H("acc"))
         oneriler = r.json()["miran"]["icerik"]["oneriler"]

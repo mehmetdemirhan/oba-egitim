@@ -36,9 +36,15 @@ async def veri_kalitesi_kontrol() -> list:
         b.append({"tur": "arsivli_acik_alacak", "onem": "orta", "ozet": f"{len(ars_borc)} arşivli öğrencide açık alacak.",
                   "kanit": {"sayi": len(ars_borc), "ornekler": [{"tip": "ogrenci", "ogrenci_id": s.get("id"),
                             "kalan": round(_num(s.get("yapilmasi_gereken_odeme")) - _num(s.get("yapilan_odeme")), 2)} for s in ars_borc[:10]]}})
-    damgasiz = [k for k in kurlar if k.get("durum") == "tamamlandi" and not k.get("odeme_tamamlanma_tarihi")]
+    # KALİBRE: Hakediş öğretmenin "yeni kur / eğitim tamamlandı" işaretiyle (durum=tamamlandi)
+    # + ödemenin bitmesiyle (kalan≈0) oluşur. Yalnız ödeme bitmesi ya da yalnız eğitim
+    # tamamlanması (biri eksik) NORMAL bekleme durumudur → hata DEĞİL. Sadece İKİSİ de olduğu
+    # halde damga (odeme_tamamlanma_tarihi) yoksa gerçek eksiktir (backfill ile giderilir).
+    damgasiz = [k for k in kurlar if k.get("durum") == "tamamlandi"
+                and (_num(k.get("tutar")) - _num(k.get("yapilan_odeme"))) <= 0.01
+                and not k.get("odeme_tamamlanma_tarihi")]
     if damgasiz:
-        b.append({"tur": "damgasiz_hakedis", "onem": "orta", "ozet": f"{len(damgasiz)} tamamlanmış kurda hakediş damgası yok.",
+        b.append({"tur": "damgasiz_hakedis", "onem": "orta", "ozet": f"{len(damgasiz)} tamamlanmış+ödemesi biten kurda hakediş damgası eksik.",
                   "kanit": {"sayi": len(damgasiz), "ornekler": [{"tip": "kur", "kur_id": k.get("id"), "ogrenci_id": k.get("ogrenci_id")} for k in damgasiz[:10]]}})
     try:
         pay_novergi = await db.payments.count_documents({"tip": "ogrenci", "vergi": {"$in": [None]}})

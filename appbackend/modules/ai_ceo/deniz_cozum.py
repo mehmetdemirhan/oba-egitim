@@ -46,8 +46,10 @@ COZUM_SABLONLARI = {
         "adim": "Muhasebe → Öğrenci Ödemeleri'nde arşivli+borçlu kayıtları aç; tahsilat/mahsup uygula veya kaydı düzelt.",
     },
     "damgasiz_hakedis": {
-        "tip": "operasyonel", "oneri": "Tamamlanmış kurların hakediş damgasını backfill ile tamamla.",
-        "adim": "AI CEO/Muhasebe: 'ödeme-tarihi-backfill' işlemini çalıştır; tamamlanmış kurlara tamamlanma damgası konur.",
+        "tip": "operasyonel", "oneri": "Eğitimi tamamlanmış + ödemesi biten kurların hakediş damgasını backfill ile tamamla.",
+        "adim": "Muhasebe: 'ödeme-tarihi-backfill' işlemini çalıştır (POST /muhasebe/gecis/odeme-tarihi-backfill). "
+                "Yalnız eğitimi tamamlanmış (yeni kur / eğitim-tamamlandı) VE ödemesi bitmiş kurlara damga konur; "
+                "sadece ödeme bitmesi ya da sadece eğitim tamamlanması damga doğurmaz (normal bekleme).",
     },
     "maliyet_sicramasi": {
         "tip": "operasyonel", "oneri": "AI çağrı artışını incele (hangi özellik/tetik arttı?).",
