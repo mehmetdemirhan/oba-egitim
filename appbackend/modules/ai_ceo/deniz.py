@@ -42,9 +42,11 @@ async def deterministik_kontroller() -> list:
                              "ozet": f"Önerilerin %{oran:.0f}'i zayıf dayanaklı (halüsinasyon riski).",
                              "kanit": {"zayif": zayif, "toplam": toplam}})
 
-    # 2) Tekrarlanan öneriler (aynı başlık ≥3)
+    # 2) Tekrarlanan öneriler: yalnız AÇIK (yeni) başlıklar ≥3 (uygulanan/reddedilen geçmiş meşru)
     baslik_say = {}
     for o in oneriler:
+        if o.get("durum") != "yeni":
+            continue
         b = (o.get("baslik") or "").strip().lower()
         if b:
             baslik_say[b] = baslik_say.get(b, 0) + 1

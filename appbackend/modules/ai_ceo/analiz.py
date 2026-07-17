@@ -204,6 +204,39 @@ async def calistir_analiz(tetik: str = "manuel", fotograf: dict | None = None, p
         "oneri_sayisi": len(oneri_kayitlari),
         "zayif_dayanak_sayisi": sum(1 for o in oneri_kayitlari if o["zayif_dayanak"]),
     }
+    # KÖK NEDEN (tekrarlanan_oneri): aynı başlık, hâlâ açık/uygulanan bir öneri olarak varsa
+    # YENİDEN ÜRETME — kuyrukta birikmesin. Tetik: analiz her koşuşunda aynı öneri eklenmesin.
+    def _norm(b):
+        return " ".join(str(b or "").lower().split())
+    if persist:
+        # Mevcut AÇIK (yeni) kopyaları tek örneğe indir (en yenisini bırak, eskileri ertele)
+        acik = await db.ai_ceo_oneriler.find({"durum": "yeni"}, {"_id": 0, "id": 1, "baslik": 1, "tarih": 1}).to_list(length=10000)
+        gruplar = {}
+        for o in acik:
+            gruplar.setdefault(_norm(o.get("baslik")), []).append(o)
+        for grup in gruplar.values():
+            if len(grup) > 1:
+                grup.sort(key=lambda o: o.get("tarih", ""), reverse=True)
+                eski_idler = [o["id"] for o in grup[1:]]
+                await db.ai_ceo_oneriler.update_many(
+                    {"id": {"$in": eski_idler}},
+                    {"$set": {"durum": "ertelendi", "ertele_tarih": (simdi() + timedelta(days=3650)).isoformat(),
+                              "durum_notu": "Otomatik: tekrarlanan başlık birleştirildi."}})
+    if persist and oneri_kayitlari:
+        mevcut = await db.ai_ceo_oneriler.find(
+            {"durum": {"$in": ["yeni", "ertelendi", "uygulaniyor"]}}, {"_id": 0, "baslik": 1}).to_list(length=5000)
+        mevcut_set = {_norm(o.get("baslik")) for o in mevcut}
+        benzersiz, gorulen = [], set()
+        for o in oneri_kayitlari:
+            nb = _norm(o["baslik"])
+            if nb in mevcut_set or nb in gorulen:  # DB'de açık kopya ya da aynı batch'te tekrar
+                continue
+            gorulen.add(nb)
+            benzersiz.append(o)
+        oneri_kayitlari = benzersiz
+        analiz["oneri_sayisi"] = len(oneri_kayitlari)
+        analiz["zayif_dayanak_sayisi"] = sum(1 for o in oneri_kayitlari if o["zayif_dayanak"])
+
     # SINAV MODU (persist=False): sentetik değerlendirme gerçek kuyruğa/karneye KARIŞMAZ
     if persist:
         await db.ai_ceo_analizler.insert_one({**analiz})

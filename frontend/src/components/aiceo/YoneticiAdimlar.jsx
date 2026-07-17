@@ -30,12 +30,12 @@ export default function YoneticiAdimlar({ apiBase, onNavigate }) {
   };
 
   return (
-    <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm mb-4">
+    <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
       <div className="flex items-center justify-between mb-2">
         <PersonaBalon persona="ayda" mesaj={veri.mesaj} size={44} />
         {veri.kurulum_toplam > 0 && <span className="text-xs text-subtle shrink-0">Kurulum {veri.kurulum_biten}/{veri.kurulum_toplam}</span>}
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+      <div className="grid grid-cols-1 gap-2 mt-2 max-h-64 overflow-auto">
         {dinamik.map((d, i) => (
           <button key={"d" + i} onClick={() => git(d.hedef)} className="flex items-center justify-between text-left rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 hover:ring-2 hover:ring-amber-200">
             <span className="text-sm text-amber-800">{d.baslik}</span><ChevronRight className="h-4 w-4 text-amber-500" />

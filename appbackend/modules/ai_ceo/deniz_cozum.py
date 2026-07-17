@@ -33,9 +33,8 @@ COZUM_SABLONLARI = {
         "test": "Negatif tutar reddedilir (400) + mevcut negatif kayıt kalmaz (smoke).",
     },
     "vergi_snapshot_eksik": {
-        "tip": "prompt", "oneri": "Ödeme kaydında vergi snapshot'ı zorunlu/geri-doldurulur.",
-        "beklenen": "vergi alanı boş öğrenci ödemelerine güncel vergi oranıyla vergi snapshot'ı ekleyen backfill + yeni ödemelerde vergi hesaplanmasını garanti et.",
-        "test": "Backfill sonrası vergi'siz ödeme 0; yeni ödeme vergi ile kaydedilir (smoke).",
+        "tip": "operasyonel", "oneri": "Vergi backfill'ini çalıştır (vergi'siz ödemeleri geri-doldurur).",
+        "adim": "Muhasebe: 'Vergi backfill' işlemini çalıştır (POST /muhasebe/gecis/vergi-backfill). Vergi'siz öğrenci ödemelerine güncel/kayıtlı oranla snapshot eklenir. Yeni ödemeler zaten tahsilat anındaki oranla vergilenir.",
     },
     "dogrulanamayan_sayi": {
         "tip": "prompt", "oneri": "Ayda öneri promptunu/dayanak doğrulamasını sıkılaştır.",
