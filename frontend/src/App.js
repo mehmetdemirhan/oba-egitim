@@ -740,8 +740,14 @@ function AppContent() {
           <TabsContent value="dashboard">
             {dashboardStats && (
               <div className="space-y-6">
-                {/* Yönetici "Sıradaki Adımlar" (Ayda) — yalnız admin */}
-                {user.role === "admin" && <YoneticiAdimlar apiBase={API} onNavigate={setActiveTab} />}
+                {/* Ayda (Sıradaki Adımlar) + Geciken Kurlar + Onay Bekleyenler — yan yana, kompakt */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+                  {user.role === "admin" && <YoneticiAdimlar apiBase={API} onNavigate={setActiveTab} />}
+                  <GecikenKurlar apiBase={API} />
+                  {adminVeyaKoord && bekleyenler?.toplam > 0 && (
+                    <BekleyenlerKarti bekleyenler={bekleyenler} onRefresh={fetchAll} onTabChange={setActiveTab} />
+                  )}
+                </div>
                 {/* KPI: Risk Durumu + Okuma Aktivitesi */}
                 {ogrenciRiskler.length > 0 && (
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -768,9 +774,6 @@ function AppContent() {
                   </div>
                 )}
 
-                {/* İŞ 2 — Geciken Kurlar (5 haftayı aşan aktif kurlar) */}
-                <GecikenKurlar apiBase={API} />
-
                 {/* Riskli öğrenciler uyarısı */}
                 {ogrenciRiskler.filter(r => r.risk_seviye === "yuksek").length > 0 && (
                   <Card className="border border-line shadow-sm border-l-4 border-l-red-500">
@@ -788,11 +791,6 @@ function AppContent() {
                       ))}
                     </div></CardContent>
                   </Card>
-                )}
-
-                {/* Onay Bekleyenler — en yüksek aksiyon değeri (admin + koordinatör) */}
-                {adminVeyaKoord && bekleyenler?.toplam > 0 && (
-                  <BekleyenlerKarti bekleyenler={bekleyenler} onRefresh={fetchAll} onTabChange={setActiveTab} />
                 )}
 
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

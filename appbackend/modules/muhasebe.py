@@ -814,6 +814,26 @@ async def odeme_tarihi_backfill(current_user=Depends(require_role(UserRole.ADMIN
             "not": "Bu kurlar içinde bulunulan döneme girecek; geçmiş yeniden hesaplanmadı."}
 
 
+@router.post("/muhasebe/gecis/vergi-backfill")
+async def vergi_backfill(current_user=Depends(require_role(UserRole.ADMIN, UserRole.ACCOUNTANT))):
+    """Vergi snapshot'ı OLMAYAN öğrenci ödemelerine vergi/brut/net'i geri-doldurur. Kayıtta
+    vergi_orani varsa o, yoksa GÜNCEL oran kullanılır (idempotent; mevcut vergi'ye dokunmaz).
+    Yeni ödemeler zaten tahsilat anındaki oranla vergilendirilir (create_payment)."""
+    guncel_oran = await get_vergi_orani()
+    eksikler = await db.payments.find(
+        {"tip": "ogrenci", "$or": [{"vergi": None}, {"vergi": {"$exists": False}}]}, {"_id": 0}).to_list(length=200000)
+    guncellenen = 0
+    for p in eksikler:
+        m = round(_num(p.get("miktar") or p.get("brut")), 2)
+        oran = _num(p.get("vergi_orani")) or guncel_oran
+        vergi = round(m * oran / 100.0, 2)
+        await db.payments.update_one({"id": p.get("id")}, {"$set": {
+            "brut": m, "vergi_orani": oran, "vergi": vergi, "net": round(m - vergi, 2)}})
+        guncellenen += 1
+    return {"ok": True, "guncellenen_odeme": guncellenen, "kullanilan_guncel_oran": guncel_oran,
+            "not": "Yeni ödemeler tahsilat anındaki oranla otomatik vergilendirilir."}
+
+
 @router.get("/muhasebe/ogretmen-gruplu")
 async def muhasebe_ogretmen_gruplu(current_user=Depends(_ERISIM)):
     """SPEC B: Öğrenci ödemelerinin öğretmen bazlı gruplu görünümü. Her öğretmen satırı:
