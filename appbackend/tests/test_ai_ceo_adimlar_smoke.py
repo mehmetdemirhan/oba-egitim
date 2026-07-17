@@ -81,6 +81,13 @@ async def run():
         check(dinamik.get("bulgu", {}).get("hedef") == "ai-deniz", "dinamik: değerlendirilmemiş bulgu → ai-deniz")
         check("Sıradaki" in r.json()["mesaj"] or "hazır" in r.json()["mesaj"], "Ayda sesiyle mesaj")
 
+        # E3: 7 gün+ bekleyen öğe ayrı dinamik madde olarak yüzeye çıkar (kuyruk ile aynı kaynak)
+        await db.ai_ceo_oneriler.insert_one({"id": "eski1", "durum": "yeni", "kategori": "buyume", "oncelik": "orta", "ozet": "x", "tarih": "2026-06-01T00:00:00"})
+        r = await ac.get("/api/ai/ceo/yonetici-adimlar", headers=H("adm"))
+        dinamik2 = {d["tip"]: d for d in r.json()["dinamik"]}
+        gk = dinamik2.get("gozden_kaciyor", {})
+        check(gk.get("hedef") == "ai-ceo" and "7+" in gk.get("baslik", ""), f"dinamik: 7 gün+ bekleyen öğe yüzeye çıktı ({gk.get('baslik')})")
+
         # ── yetki: öğretmen yönetici adımlarına giremez ──
         r = await ac.get("/api/ai/ceo/yonetici-adimlar", headers=H("t1"))
         check(r.status_code == 403, "öğretmen yönetici adımlarına erişemez → 403")

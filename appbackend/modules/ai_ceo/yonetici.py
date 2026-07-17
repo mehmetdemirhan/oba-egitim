@@ -97,6 +97,14 @@ async def _dinamik_isler() -> list:
         isler.append({"tip": "bulgu", "baslik": f"{b['degerlendirilmemis_bulgu']} değerlendirilmemiş denetim bulgusu", "hedef": "ai-deniz"})
     if b.get("okunmamis_brifing"):
         isler.append({"tip": "brifing", "baslik": f"{b['okunmamis_brifing']} okunmamış brifing", "hedef": "ai-ceo"})
+    # 7 gün+ bekleyen (gözden kaçıyor olabilir) — kuyruktaki eski açık öğeler
+    try:
+        from .kuyruk import kuyruk as _kuyruk_fn  # aynı deterministik kaynak
+        k = await _kuyruk_fn()
+        if isinstance(k, dict) and k.get("gozden_kacan_sayi"):
+            isler.append({"tip": "gozden_kaciyor", "baslik": f"{k['gozden_kacan_sayi']} öğe 7+ gündür bekliyor", "hedef": "ai-ceo"})
+    except Exception:
+        pass
     return isler
 
 
