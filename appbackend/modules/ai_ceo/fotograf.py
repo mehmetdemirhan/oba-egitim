@@ -272,6 +272,60 @@ async def _birim_ekonomi_metrikleri(ref: datetime) -> dict:
     }
 
 
+async def _kazanim_metrikleri(ref: datetime) -> dict:
+    """S6a: öğrenme kazanımı — MEVCUT veriden türetilen proxy (kur ilerlemesi + kazanılan
+    rozet). Gerçek okuma-hızı/anlama deltaları ayrı ölçüm gerektirir; burada dürüst bir
+    proxy kullanılır ('yontem' etiketli)."""
+    students = await db.students.find(
+        {"arsivli": {"$ne": True}, "mezun": {"$ne": True}},
+        {"_id": 0, "id": 1, "kur": 1, "ogretmen_id": 1, "aldigi_egitim": 1}).to_list(length=100000)
+    if not students:
+        return {"ort_kazanim": None, "yontem": "veri yok"}
+    # Rozet sayıları (öğrenci bazında) — tek sorguda
+    rozet_say = {}
+    try:
+        for r in await db.kazanilan_rozetler.find({}, {"_id": 0, "kullanici_id": 1}).to_list(length=200000):
+            rozet_say[r.get("kullanici_id")] = rozet_say.get(r.get("kullanici_id"), 0) + 1
+    except Exception:
+        pass
+
+    def _kur_no(k):
+        import re
+        m = re.search(r"\d+", str(k or ""))
+        return int(m.group()) if m else 1
+
+    per_ogretmen, per_tur, skorlar = {}, {}, []
+    for s in students:
+        kn = _kur_no(s.get("kur"))
+        rz = rozet_say.get(s.get("id"), 0)
+        skor = min(100.0, kn * 15 + rz * 5)  # proxy kazanım skoru
+        skorlar.append(skor)
+        oid = s.get("ogretmen_id") or "?"
+        per_ogretmen.setdefault(oid, []).append(skor)
+        tur = (s.get("aldigi_egitim") or "?").strip() or "?"
+        per_tur.setdefault(tur, []).append(skor)
+    ort = lambda lst: round(sum(lst) / len(lst), 1) if lst else 0
+    return {
+        "ort_kazanim": ort(skorlar),
+        "ogretmen_kazanim": {k: ort(v) for k, v in per_ogretmen.items() if k != "?"},
+        "tur_kazanim": {k: ort(v) for k, v in per_tur.items() if k != "?"},
+        "yontem": "Proxy: kur ilerlemesi + kazanılan rozet (mevcut veriden türetildi).",
+    }
+
+
+async def _nps_metrikleri(ref: datetime) -> dict:
+    """S6d: NPS özeti (sağlık skoru bileşeni)."""
+    kayitlar = await db.ai_ceo_nps.find({}, {"_id": 0, "puan": 1}).to_list(length=50000)
+    puanlar = [int(k["puan"]) for k in kayitlar if isinstance(k.get("puan"), (int, float))]
+    n = len(puanlar)
+    if n == 0:
+        return {"nps": None, "sayi": 0}
+    promoter = sum(1 for p in puanlar if p >= 9)
+    detractor = sum(1 for p in puanlar if p <= 6)
+    return {"nps": round((promoter - detractor) * 100 / n, 1), "sayi": n,
+            "promoter": promoter, "detractor": detractor}
+
+
 async def _ogrenci_metrikleri(ref: datetime) -> dict:
     students = await db.students.find(
         {}, {"_id": 0, "id": 1, "sinif": 1, "il": 1, "arsivli": 1, "mezun": 1}
@@ -379,7 +433,8 @@ async def sistem_fotografi() -> dict:
     bloklar = {}
     for ad, fn in (("ogretmen", _ogretmen_metrikleri), ("muhasebe", _muhasebe_metrikleri),
                    ("ogrenci", _ogrenci_metrikleri), ("kullanim", _kullanim_metrikleri),
-                   ("konsantrasyon", _konsantrasyon_metrikleri), ("birim_ekonomi", _birim_ekonomi_metrikleri)):
+                   ("konsantrasyon", _konsantrasyon_metrikleri), ("birim_ekonomi", _birim_ekonomi_metrikleri),
+                   ("kazanim", _kazanim_metrikleri), ("nps", _nps_metrikleri)):
         try:
             bloklar[ad] = await fn(ref)
         except Exception as e:
@@ -451,6 +506,10 @@ def saglik_skoru(fotograf: dict) -> dict:
     gt = k.get("gorev_tamamlama_yuzde")
     if gt is not None:
         bilesenler.append({"ad": "Katılım", "puan": round(_clamp(_num(gt)), 0), "agirlik": 0.10})
+    # 6) NPS (S6d) — (-100..100) → (0..100)
+    nps = (fotograf.get("nps", {}) or {}).get("nps")
+    if nps is not None:
+        bilesenler.append({"ad": "NPS", "puan": round(_clamp((_num(nps) + 100) / 2), 0), "agirlik": 0.15})
 
     tw = sum(b["agirlik"] for b in bilesenler) or 1
     skor = round(sum(b["puan"] * b["agirlik"] for b in bilesenler) / tw, 0)

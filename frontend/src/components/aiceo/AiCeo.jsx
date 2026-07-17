@@ -63,6 +63,7 @@ export default function AiCeo({ apiBase }) {
   const [kohort, setKohort] = useState([]);
   const [senForm, setSenForm] = useState({ kur_ucreti_degisim_yuzde: "", ogretmen_payi_degisim_yuzde: "", esneklik: "" });
   const [senSonuc, setSenSonuc] = useState(null);
+  const [nps, setNps] = useState(null);
   const [fotoTarih, setFotoTarih] = useState(null);
 
   const api = (p) => `${apiBase}${p}`;
@@ -91,12 +92,14 @@ export default function AiCeo({ apiBase }) {
       if (sk) setSkor(sk.data.skor);
       if (ku) setKuyrukVeri(ku.data);
       if (pl) setPlanlar(pl.data.planlar || []);
-      const [ff, kh] = await Promise.all([
+      const [ff, kh, np] = await Promise.all([
         axios.get(api("/ai/ceo/fotograf/son")).catch(() => null),
         axios.get(api("/ai/ceo/kohort")).catch(() => null),
+        axios.get(api("/ai/ceo/nps/ozet")).catch(() => null),
       ]);
       if (ff) setKurulFoto(ff.data.fotograf);
       if (kh) setKohort(kh.data.kohortlar || []);
+      if (np) setNps(np.data);
     } catch (e) { /* sessiz */ }
   }, [apiBase]);
 
@@ -409,6 +412,20 @@ export default function AiCeo({ apiBase }) {
             )}
           </div>
         )}
+      </div>
+
+      {/* ── Kurul Özeti PDF + NPS (S6d/S6f) ── */}
+      <div className="rounded-2xl border border-line bg-surface p-3 shadow-sm flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-4">
+          <h3 className="font-bold text-content text-sm">Kurul Paketi</h3>
+          {nps?.nps && (
+            <span className="text-sm flex items-center gap-1">NPS: <b className={`tabular-nums ${nps.nps.nps < 0 ? "text-red-600" : nps.nps.nps >= 30 ? "text-emerald-600" : "text-amber-600"}`}>{nps.nps.nps ?? "—"}</b>
+              <span className="text-xs text-subtle">({nps.nps.sayi} yanıt)</span>
+              <BilgiIkonu nasil="NPS = %promoter (9-10) − %detractor (0-6). Sağlık skorunun bir bileşeni; negatifse anomali üretir." ne="Müşteri memnuniyetinin genel eğilimini görmek için." />
+            </span>
+          )}
+        </div>
+        <a href={api("/ai/ceo/kurul-paketi/pdf")} className="inline-flex items-center gap-1 text-sm text-indigo-600 hover:underline"><FileDown className="h-4 w-4" />Kurul Özeti PDF</a>
       </div>
 
       {/* ── Kurul Analitiği (S6) ── */}
