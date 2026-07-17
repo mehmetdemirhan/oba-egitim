@@ -22,10 +22,10 @@ export const PERSONA_UI = {
   },
   miran: {
     ad: "Miran",
-    unvan: "Öğretmen Koçu",
+    unvan: "Sistem Danışmanı",
     renk: "#d97706",        // amber-sıcak
     renkAcik: "#fef3c7",
-    uslup: "Sıcak, motive edici, kırıcı olmayan koç dili",
+    uslup: "Sıcak, motive edici, kırıcı olmayan sistem danışmanı dili",
     selam: "Selam, ben Miran! Bu hafta sana özel birkaç önerim var.",
   },
 };

@@ -5617,7 +5617,7 @@ function OgretmenPaneli({ user, logout }) {
     ozellikAktif("ogretmen_gelisim")       && { id: "gelisim",      label: "Gelişim",      icon: "🎓" },
     { id: "program", label: "Program", icon: "📅" },
     ozellikAktif("ogretmen_mesajlar")      && { id: "mesajlar",     label: "Mesajlar",     icon: "✉️", badge: okunmamisSayisi || null },
-    { id: "kocum-miran", label: "Koçum Miran", icon: "🧭" },
+    { id: "kocum-miran", label: "Danışmanım Miran", icon: "🧭" },
     { id: "profilim", label: "Profilim", icon: "👤" },
     { id: "sss", label: "Yardım", icon: "❓" },
   ].filter(Boolean);

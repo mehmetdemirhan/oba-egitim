@@ -54,13 +54,18 @@ export default function AiCeo({ apiBase }) {
   const [genelCevap, setGenelCevap] = useState(null);
   const [pazar, setPazar] = useState(null);
   const [pazarYukleniyor, setPazarYukleniyor] = useState(false);
+  const [skor, setSkor] = useState(null);
+  const [kuyrukVeri, setKuyrukVeri] = useState(null);
+  const [planlar, setPlanlar] = useState([]);
+  const [planForm, setPlanForm] = useState({ baslik: "", donem: "", h: [{ ad: "", metrik: "", mevcut: "", hedef: "" }, { ad: "", metrik: "", mevcut: "", hedef: "" }, { ad: "", metrik: "", mevcut: "", hedef: "" }] });
+  const [planAcik, setPlanAcik] = useState(false);
   const [fotoTarih, setFotoTarih] = useState(null);
 
   const api = (p) => `${apiBase}${p}`;
 
   const yukle = useCallback(async () => {
     try {
-      const [s, a, k, an, h, m, o] = await Promise.all([
+      const [s, a, k, an, h, m, o, sk, ku, pl] = await Promise.all([
         axios.get(api("/ai/ceo/saglik")).catch(() => null),
         axios.get(api("/ai/ceo/analiz/son")).catch(() => null),
         axios.get(api("/ai/ceo/karne")).catch(() => null),
@@ -68,6 +73,9 @@ export default function AiCeo({ apiBase }) {
         axios.get(api("/ai/ceo/hedefler")).catch(() => null),
         axios.get(api("/ai/ceo/mektuplar")).catch(() => null),
         axios.get(api("/ai/ceo/miran/odaklar")).catch(() => null),
+        axios.get(api("/ai/ceo/yonetim-skoru")).catch(() => null),
+        axios.get(api("/ai/ceo/kuyruk")).catch(() => null),
+        axios.get(api("/ai/ceo/planlar")).catch(() => null),
       ]);
       if (s) { setSaglik(s.data.saglik); setFotoTarih(s.data.fotograf_tarih); }
       if (a) { setAnaliz(a.data.analiz); setOneriler(a.data.oneriler || []); }
@@ -76,6 +84,9 @@ export default function AiCeo({ apiBase }) {
       if (h) setHedefler(h.data.hedefler || []);
       if (m) setMektuplar(m.data.mektuplar || []);
       if (o) setOdaklar(o.data.odaklar || []);
+      if (sk) setSkor(sk.data.skor);
+      if (ku) setKuyrukVeri(ku.data);
+      if (pl) setPlanlar(pl.data.planlar || []);
     } catch (e) { /* sessiz */ }
   }, [apiBase]);
 
@@ -94,11 +105,20 @@ export default function AiCeo({ apiBase }) {
   };
 
   const durumGuncelle = async (oneri, durum) => {
-    const not = durum === "reddedildi" ? (window.prompt("Red notu (opsiyonel):") || "") : "";
+    const not = (durum === "reddedildi" || durum === "ertelendi") ? (window.prompt(durum === "ertelendi" ? "Erteleme notu (opsiyonel):" : "Red notu (opsiyonel):") || "") : "";
     await axios.put(api(`/ai/ceo/oneri/${oneri.id}/durum`), { durum, not });
     await yukle();
     setSecili(s => s && s.id === oneri.id ? { ...s, durum } : s);
   };
+
+  const planOnayla = async (id) => { await axios.post(api(`/ai/ceo/plan/${id}/onayla`)); await yukle(); };
+  const planKaydet = async () => {
+    const hedefler = planForm.h.filter(x => x.ad.trim()).map(x => ({ ad: x.ad, metrik: x.metrik, mevcut: parseFloat(x.mevcut) || 0, hedef: parseFloat(x.hedef) || 0 }));
+    if (hedefler.length < 3) { alert("En az 3 hedef girin."); return; }
+    try { await axios.post(api("/ai/ceo/plan"), { baslik: planForm.baslik || "Üç Aylık Stratejik Plan", donem: planForm.donem, hedefler }); setPlanAcik(false); setPlanForm({ baslik: "", donem: "", h: [{ ad: "", metrik: "", mevcut: "", hedef: "" }, { ad: "", metrik: "", mevcut: "", hedef: "" }, { ad: "", metrik: "", mevcut: "", hedef: "" }] }); await yukle(); }
+    catch (e) { alert("Plan kaydedilemedi (3-5 hedef gerekli)."); }
+  };
+  const briefingOku = async (raporId) => { try { await axios.post(api("/ai/ceo/yonetim/etkinlik"), { tur: "brifing_okundu", ref: raporId }); await yukle(); } catch (e) {} };
 
   const raporYukle = async (tip) => {
     setRaporTip(tip);
@@ -164,6 +184,52 @@ export default function AiCeo({ apiBase }) {
           ))}
         </div>
       )}
+
+      {/* ── Yönetim Skoru + Karar Bekleyenler (S3/S4) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="font-bold text-content text-sm">Yönetim Skoru</h3>
+            <BilgiIkonu nasil="Önerilere karar vermek (ERTELE hariç), haftalık brifing/aylık rapor okumak, stratejik plan onaylamak deterministik puan kazandırır; öncelik ağırlıklıdır." ne="Yönetimin Ayda'nın önerilerini ne kadar takip ettiğini ölçmek için." />
+          </div>
+          {skor ? (
+            <>
+              <div className="text-3xl font-bold tabular-nums text-indigo-600">{skor.puan}</div>
+              <div className="text-xs text-subtle">{skor.seviye} · 🔥 {skor.seri_hafta} hafta seri</div>
+              <div className="mt-2">
+                {skor.gozden_kacan_yok
+                  ? <span className="text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 font-medium">🏅 Gözden Kaçan Yok</span>
+                  : <span className="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-500">Bekleyen işler var</span>}
+              </div>
+            </>
+          ) : <div className="text-sm text-subtle">—</div>}
+        </div>
+        <div className="lg:col-span-2 rounded-2xl border border-line bg-surface p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-bold text-content text-sm">Karar Bekleyenler {kuyrukVeri ? `(${kuyrukVeri.bekleyen_sayi})` : ""}</h3>
+            {kuyrukVeri?.gozden_kacan_sayi > 0 && <span className="text-xs text-red-600 font-medium">⚠ {kuyrukVeri.gozden_kacan_sayi} gözden kaçıyor olabilir</span>}
+          </div>
+          {(kuyrukVeri?.kuyruk || []).length === 0 ? <div className="text-sm text-subtle py-3">Kuyruk boş — tüm kararlar verildi 🎉</div> : (
+            <div className="space-y-2 max-h-80 overflow-auto">
+              {kuyrukVeri.kuyruk.map(o => (
+                <div key={o.id} className={`rounded-lg border p-2 ${o.gozden_kaciyor ? "border-red-300 bg-red-50" : "border-line"}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium text-content">{o.baslik}</span>
+                    <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded border ${ONCELIK_RENK[o.oncelik] || ""}`}>{o.oncelik}</span>
+                  </div>
+                  <div className="text-xs text-subtle mt-0.5">{o.ozet}</div>
+                  <div className="flex items-center gap-3 mt-1.5">
+                    <button onClick={() => durumGuncelle(o, "uygulaniyor")} className="text-[11px] font-medium text-emerald-700 hover:underline">Uygulanacak</button>
+                    <button onClick={() => durumGuncelle(o, "reddedildi")} className="text-[11px] font-medium text-red-600 hover:underline">Reddet</button>
+                    <button onClick={() => durumGuncelle(o, "ertelendi")} className="text-[11px] font-medium text-slate-500 hover:underline">Ertele</button>
+                    <button onClick={() => setSecili(o)} className="text-[11px] text-indigo-600 hover:underline ml-auto">Detay</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* ── Kategori radar ── */}
@@ -232,7 +298,9 @@ export default function AiCeo({ apiBase }) {
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-app border border-line text-subtle">{KAT_ETIKET[o.kategori] || o.kategori}</span>
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{DURUM_ETIKET[o.durum] || o.durum}</span>
+                  {o.vizyon_onerisi && <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">🔭 vizyon önerisi</span>}
                   {o.zayif_dayanak && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">⚠ zayıf dayanak</span>}
+                  {o.plan_hedef && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">🎯 {o.plan_hedef}</span>}
                 </div>
               </button>
             ))}
@@ -323,6 +391,52 @@ export default function AiCeo({ apiBase }) {
             {genelCevap.bekliyor ? "Ayda düşünüyor…" : genelCevap.hata ? <span className="text-red-600">{genelCevap.hata}</span> : (
               <><div className="text-content whitespace-pre-wrap">{genelCevap.cevap}</div>{genelCevap.zayif_dayanak && <div className="text-[11px] text-amber-600 mt-1">⚠ Bu cevaptaki bazı sayılar fotoğrafta doğrulanamadı.</div>}</>
             )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Stratejik Plan (S5) ── */}
+      <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-bold text-content text-sm flex items-center gap-2">Üç Aylık Stratejik Plan
+            <BilgiIkonu nasil="3-5 ölçülebilir hedef; onaylı plan sonraki Ayda analizlerinde referans olur (öneriler hangi hedefe hizmet ettiğini belirtir)." ne="Kurumun yönünü net hedeflere bağlamak ve önerileri bu hedeflere hizalamak için." />
+          </h3>
+          <button onClick={() => setPlanAcik(v => !v)} className="text-xs bg-app border border-line rounded-lg px-2 py-1 hover:bg-surface">{planAcik ? "Kapat" : "Yeni Plan"}</button>
+        </div>
+        {planAcik && (
+          <div className="mb-3 rounded-lg border border-line p-3 space-y-2">
+            <div className="flex gap-2">
+              <input value={planForm.baslik} onChange={e => setPlanForm({ ...planForm, baslik: e.target.value })} placeholder="Plan başlığı" className="flex-1 px-2 py-1 rounded border border-line text-sm" />
+              <input value={planForm.donem} onChange={e => setPlanForm({ ...planForm, donem: e.target.value })} placeholder="Dönem (2026-Q3)" className="w-40 px-2 py-1 rounded border border-line text-sm" />
+            </div>
+            {planForm.h.map((hd, i) => (
+              <div key={i} className="grid grid-cols-4 gap-1.5">
+                <input value={hd.ad} onChange={e => { const h = [...planForm.h]; h[i] = { ...h[i], ad: e.target.value }; setPlanForm({ ...planForm, h }); }} placeholder={`Hedef ${i + 1}`} className="px-2 py-1 rounded border border-line text-xs" />
+                <input value={hd.metrik} onChange={e => { const h = [...planForm.h]; h[i] = { ...h[i], metrik: e.target.value }; setPlanForm({ ...planForm, h }); }} placeholder="metrik (%)" className="px-2 py-1 rounded border border-line text-xs" />
+                <input value={hd.mevcut} onChange={e => { const h = [...planForm.h]; h[i] = { ...h[i], mevcut: e.target.value }; setPlanForm({ ...planForm, h }); }} placeholder="mevcut" className="px-2 py-1 rounded border border-line text-xs" />
+                <input value={hd.hedef} onChange={e => { const h = [...planForm.h]; h[i] = { ...h[i], hedef: e.target.value }; setPlanForm({ ...planForm, h }); }} placeholder="hedef" className="px-2 py-1 rounded border border-line text-xs" />
+              </div>
+            ))}
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setPlanForm({ ...planForm, h: [...planForm.h, { ad: "", metrik: "", mevcut: "", hedef: "" }].slice(0, 5) })} className="text-xs text-indigo-600">+ Hedef</button>
+              <button onClick={planKaydet} className="text-xs bg-indigo-600 text-white rounded-lg px-3 py-1">Kaydet (taslak)</button>
+            </div>
+          </div>
+        )}
+        {planlar.length === 0 ? <div className="text-sm text-subtle">Henüz plan yok.</div> : (
+          <div className="space-y-2">
+            {planlar.map(p => (
+              <div key={p.id} className="rounded-lg border border-line p-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">{p.baslik} <span className="text-xs text-subtle">{p.donem}</span></span>
+                  {p.durum === "onayli" ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">Onaylı</span>
+                    : <button onClick={() => planOnayla(p.id)} className="text-[11px] text-emerald-700 font-medium">Onayla</button>}
+                </div>
+                <div className="flex flex-wrap gap-1 mt-1">{(p.hedefler || []).map((h, i) => (
+                  <span key={i} className="text-[11px] px-1.5 py-0.5 rounded bg-app border border-line text-subtle">{h.ad}: {h.mevcut}→{h.hedef} {h.metrik}</span>
+                ))}</div>
+              </div>
+            ))}
           </div>
         )}
       </div>

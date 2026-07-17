@@ -16,8 +16,10 @@ Tüm alt-router'lar tek `router` altında toplanır; registry.json `ai_ceo` yük
 """
 from fastapi import APIRouter
 
-from . import fotograf, analiz, raporlar, sohbet, mektup, miran, karne, anomali, hedef, pazar
+from . import (fotograf, analiz, raporlar, sohbet, mektup, miran, karne, anomali, hedef,
+               pazar, kuyruk, yonetim, plan)
 
 router = APIRouter()
-for _alt in (fotograf, analiz, raporlar, sohbet, mektup, miran, karne, anomali, hedef, pazar):
+for _alt in (fotograf, analiz, raporlar, sohbet, mektup, miran, karne, anomali, hedef,
+             pazar, kuyruk, yonetim, plan):
     router.include_router(_alt.router)
