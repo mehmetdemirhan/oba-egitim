@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 
 from core.db import db
+from core.zaman import aware as _zaman_aware
 from core.auth import require_role, UserRole
 from core.audit import islem_kaydet, islem_listele
 from core.sistem import (
@@ -898,11 +899,9 @@ async def _geciken_kur_kontrol(zorla: bool = False):
     if not zorla:
         son = await db.sistem_ayarlari.find_one({"tip": "gecikme_son_kontrol"})
         if son and son.get("zaman"):
-            try:
-                if (simdi - datetime.fromisoformat(son["zaman"])).total_seconds() < 20 * 3600:
-                    return
-            except (TypeError, ValueError):
-                pass
+            _d = _zaman_aware(son["zaman"])  # naive/aware karışımını normalize et
+            if _d and (simdi - _d).total_seconds() < 20 * 3600:
+                return
     await db.sistem_ayarlari.update_one({"tip": "gecikme_son_kontrol"},
                                         {"$set": {"tip": "gecikme_son_kontrol", "zaman": simdi.isoformat()}}, upsert=True)
     try:

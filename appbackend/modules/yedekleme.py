@@ -18,6 +18,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from core.db import db, backup_fs
+from core.zaman import aware as _zaman_aware
 from core.auth import require_role, UserRole
 from core.config import (
     APP_VERSION,
@@ -254,8 +255,8 @@ async def admin_updates_check(
     cache = await db.sistem_ayarlari.find_one({"tip": "updates_check_cache"})
     if not force and cache and cache.get("checked_at"):
         try:
-            checked_at = datetime.fromisoformat(cache["checked_at"])
-            if (now - checked_at).total_seconds() < UPDATE_CHECK_MIN_INTERVAL_SECONDS:
+            checked_at = _zaman_aware(cache["checked_at"])  # naive/aware normalize
+            if checked_at and (now - checked_at).total_seconds() < UPDATE_CHECK_MIN_INTERVAL_SECONDS:
                 cached_payload = cache.get("payload", {})
                 cached_payload["from_cache"] = True
                 return cached_payload

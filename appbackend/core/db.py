@@ -2,7 +2,7 @@
 
 server.py'daki orijinal tanımların birebir aynısı; sadece tek bir yere taşındı.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorGridFSBucket
 
@@ -34,8 +34,12 @@ def parse_from_mongo(item):
             if key.endswith('_tarihi') or key in ('olusturma_tarihi', 'tarih'):
                 if isinstance(value, str):
                     try:
-                        item[key] = datetime.fromisoformat(value)
-                    except:
+                        # KÖK GUARD: Mongo'da tarihler karışık saklanmış olabilir (utcnow → naive
+                        # ISO, now(utc) → aware ISO). Karşılaştırmalarda naive/aware karışmasın diye
+                        # DAİMA timezone-aware UTC'ye normalize et (naive = UTC varsayılır).
+                        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+                        item[key] = dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
+                    except Exception:
                         pass
             elif isinstance(value, dict):
                 item[key] = parse_from_mongo(value)
