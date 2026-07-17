@@ -57,7 +57,9 @@ export default function Deniz({ apiBase, onNavigate }) {
     try { const r = await axios.post(api(`/ai/ceo/deniz/bulgu/${seciliBulgu.id}/kontrol`)); setKontrolSonuc(r.data); await yukle(); if (r.data.durum === "cozuldu") setSeciliBulgu(s => ({ ...s, durum: "cozuldu" })); }
     catch (e) {} finally { setKontrolCalisiyor(false); }
   };
-  const ornekGit = (o) => { if (onNavigate && (o.tip === "kur" || o.tip === "ogrenci" || o.tip === "kayit")) onNavigate("payments"); };
+  // Kanıttan derin link: öğrenci id varsa (yetim kur / arşivli borç / damgasız) Muhasebe'yi o
+  // öğrenciye ODAKLAR (satırı süzer+vurgular); yoksa yalnız sekmeye götürür.
+  const ornekGit = (o) => { if (onNavigate) onNavigate("payments", o.ogrenci_id || ""); };
 
   useEffect(() => { yukle(); }, [yukle]);
 
