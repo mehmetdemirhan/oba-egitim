@@ -17,19 +17,28 @@ export default function Deniz({ apiBase }) {
   const [bulgular, setBulgular] = useState([]);
   const [karne, setKarne] = useState(null);
   const [notlar, setNotlar] = useState([]);
+  const [maliyet, setMaliyet] = useState(null);
+  const [ret, setRet] = useState(null);
+  const [sinav, setSinav] = useState(null);
   const [calisiyor, setCalisiyor] = useState(false);
   const api = (p) => `${apiBase}${p}`;
 
   const yukle = useCallback(async () => {
-    const [s, k, n] = await Promise.all([
+    const [s, k, n, m, r] = await Promise.all([
       axios.get(api("/ai/ceo/deniz/son")).catch(() => null),
       axios.get(api("/ai/ceo/deniz/karne")).catch(() => null),
       axios.get(api("/ai/ceo/deniz/notlar")).catch(() => null),
+      axios.get(api("/ai/ceo/deniz/maliyet")).catch(() => null),
+      axios.get(api("/ai/ceo/deniz/ret-otopsisi")).catch(() => null),
     ]);
     if (s) { setDenetim(s.data.denetim); setBulgular(s.data.bulgular || []); }
     if (k) setKarne(k.data.karne);
     if (n) setNotlar(n.data.notlar || []);
+    if (m) setMaliyet(m.data.maliyet);
+    if (r) setRet(r.data.ret_otopsisi);
   }, [apiBase]);
+
+  const sinavYap = async () => { try { const r = await axios.post(api("/ai/ceo/deniz/sinav")); setSinav(r.data.ok ? r.data.sinav : { hata: r.data.sebep }); await yukle(); } catch (e) { setSinav({ hata: "Sınav çalışmadı" }); } };
 
   useEffect(() => { yukle(); }, [yukle]);
 
@@ -66,9 +75,9 @@ export default function Deniz({ apiBase }) {
         {karne ? (
           <>
             <div className="text-sm text-content mb-2">{karne.ozet}</div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
-              {[["Bulgu Doğruluğu", karne.bulgu_dogrulugu, "%"], ["Kritik Yakalama", karne.yakalama_degeri, "%"], ["Toplam Bulgu", karne.toplam_bulgu, ""], ["Kaçırma", karne.kacirilan_bildirilen, ""]].map(([l, v, u], i) => (
-                <div key={i} className="rounded-lg bg-app border border-line p-2"><div className="text-lg font-bold tabular-nums">{v == null ? "—" : `${u === "%" ? "%" : ""}${v}`}</div><div className="text-[10px] text-subtle">{l}</div></div>
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-center">
+              {[["Bulgu Doğruluğu", karne.bulgu_dogrulugu, "%"], ["Kritik Yakalama", karne.yakalama_degeri, "%"], ["Sınav Kalitesi", karne.sinav_skoru, "%"], ["Doğrulanamayan Sayı", karne.sayi_dogrulanamayan_orani, "%"], ["Toplam Bulgu", karne.toplam_bulgu, ""], ["Kaçırma", karne.kacirilan_bildirilen, ""]].map(([l, v, u], i) => (
+                <div key={i} className="rounded-lg bg-app border border-line p-2"><div className="text-base font-bold tabular-nums">{v == null ? "—" : `${u === "%" ? "%" : ""}${v}`}</div><div className="text-[10px] text-subtle">{l}</div></div>
               ))}
             </div>
           </>
@@ -100,6 +109,23 @@ export default function Deniz({ apiBase }) {
             ))}
           </div>
         )}
+      </div>
+
+      {/* S9 güçlendirme: sınav + maliyet + ret otopsisi */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-1"><h3 className="font-bold text-content text-sm">Sınav Düzeni</h3><BilgiIkonu nasil="Doğru cevabı bilinen sentetik durumlar Ayda'ya habersiz verilir; yakalama oranı skorlanır. Sonuçlar gerçek kuyruğa/karneye KARIŞMAZ." ne="Ayda'nın gerçekten doğru teşhis koyup koymadığını sınamak için." /></div>
+          <button onClick={sinavYap} className="text-xs bg-slate-700 text-white rounded-lg px-3 py-1.5">Sınav Yap</button>
+          {sinav && (sinav.hata ? <div className="text-xs text-amber-600 mt-2">{sinav.hata}</div> : <div className="text-sm mt-2">Skor: <b className="tabular-nums">%{sinav.skor}</b> ({sinav.yakalanan}/{sinav.toplam})</div>)}
+        </div>
+        <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-1"><h3 className="font-bold text-content text-sm">Maliyet Denetimi</h3><BilgiIkonu nasil="Tüm AI çağrıları merkezi sayaçtan (model + ay); son ay ≥%100 artış anormal sıçrama sayılır." ne="AI maliyetini izleyip anormal artışları erken görmek için." /></div>
+          {maliyet ? <div className="text-sm space-y-0.5"><div>Toplam çağrı: <b className="tabular-nums">{maliyet.toplam_cagri}</b></div><div className="text-xs text-subtle">Grounded: {maliyet.grounded_cagri}</div>{maliyet.anormal_sicrama_yuzde && <div className="text-xs text-red-600">⚠ Son ay +%{maliyet.anormal_sicrama_yuzde} sıçrama</div>}</div> : <div className="text-sm text-subtle">—</div>}
+        </div>
+        <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-1"><h3 className="font-bold text-content text-sm">Ret Otopsisi</h3><BilgiIkonu nasil="Reddedilen öneriler 30+ gün sonra ilgili metriğe göre yeniden değerlendirilir: metrik kötüleştiyse 'ret sonrası haklı çıktı', iyiyse 'ret isabetliydi'." ne="Reddetme kararlarının kalibrasyonunu ölçmek için (çift yönlü)." /></div>
+          {ret ? <div className="text-sm space-y-0.5"><div>Reddedilen: <b className="tabular-nums">{ret.reddedilen}</b></div><div className="text-xs text-emerald-600">Haklı çıktı: {ret.ret_sonrasi_hakli_cikti}</div><div className="text-xs text-subtle">Ret isabetliydi: {ret.ret_isabetliydi} · Beklemede: {ret.beklemede}</div></div> : <div className="text-sm text-subtle">—</div>}
+        </div>
       </div>
 
       {/* İyileştirme planı → onaylı not (guard) */}

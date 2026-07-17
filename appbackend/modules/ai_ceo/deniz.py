@@ -116,7 +116,16 @@ async def _ai_denetim(det_bulgular: list) -> dict:
 
 
 async def denetle(tetik: str = "manuel") -> dict:
+    from . import deniz_guc as G
     det = await deterministik_kontroller()
+    foto = await son_fotograf()
+    # S9 güçlendirme: veri kalitesi + sayı doğrulama + insan çıktısı + maliyet + ikinci göz
+    det += await G.veri_kalitesi_kontrol()
+    sayi_bulgu, sayi_oran = await G.sayi_dogrulama_kontrol(foto or {})
+    det += sayi_bulgu
+    det += await G.insan_ciktisi_ornek()
+    det += await G.maliyet_bulgu()
+    det += await G.ikinci_goz(foto or {})
     ai = await _ai_denetim(det)
     now = iso()
     denetim_id = str(uuid.uuid4())
@@ -135,7 +144,8 @@ async def denetle(tetik: str = "manuel") -> dict:
         await db.ai_ceo_deniz_bulgular.insert_many([{**k} for k in kayitlar])
     denetim = {"id": denetim_id, "tarih": now, "tetik": tetik, "ozet": ai.get("ozet", ""),
                "iyilestirme_plani": ai.get("iyilestirme_plani", ""), "bulgu_sayisi": len(kayitlar),
-               "kritik_sayi": sum(1 for k in kayitlar if k["onem"] == "kritik")}
+               "kritik_sayi": sum(1 for k in kayitlar if k["onem"] == "kritik"),
+               "sayi_dogrulama_orani": sayi_oran}
     await db.ai_ceo_denetimler.insert_one({**denetim})
     denetim.pop("_id", None)
     # Kritik bulgu → admin bildirimi
@@ -228,6 +238,9 @@ async def deniz_karne(current_user=Depends(_ADMIN)):
     yakalama_degeri = _oran(len(cozulen_kritik), len(kritikler))
     # Kaçırma oranı: admin "Deniz kaçırdı" kayıtları
     kacirma = await db.ai_ceo_deniz_kacirma.count_documents({})
+    # S9a Sınav kalitesi (son sınav skoru) + S9c sayı doğrulama (son denetim)
+    son_sinav = await db.ai_ceo_deniz_sinav.find_one({}, {"_id": 0, "skor": 1}, sort=[("tarih", -1)])
+    son_denetim = await db.ai_ceo_denetimler.find_one({}, {"_id": 0, "sayi_dogrulama_orani": 1}, sort=[("tarih", -1)])
     return {"karne": {
         "toplam_bulgu": len(bulgular),
         "degerlendirilen": len(degerlendirilen),
@@ -235,6 +248,8 @@ async def deniz_karne(current_user=Depends(_ADMIN)):
         "yakalama_degeri": yakalama_degeri,
         "kritik_toplam": len(kritikler),
         "kacirilan_bildirilen": kacirma,
+        "sinav_skoru": (son_sinav or {}).get("skor"),
+        "sayi_dogrulanamayan_orani": (son_denetim or {}).get("sayi_dogrulama_orani"),
         "ozet": (f"{len(bulgular)} bulgu; doğruluk %{bulgu_dogrulugu if bulgu_dogrulugu is not None else 0}, "
                  f"kritik yakalama %{yakalama_degeri if yakalama_degeri is not None else 0}."),
     }}
@@ -245,3 +260,55 @@ async def deniz_kacirma(govde: dict, current_user=Depends(_ADMIN)):
     """Admin: 'Deniz bunu kaçırdı' — kaçırma oranına işlenir (kalibrasyon)."""
     await db.ai_ceo_deniz_kacirma.insert_one({"id": str(uuid.uuid4()), "aciklama": str(govde.get("aciklama", ""))[:400], "tarih": iso()})
     return {"ok": True}
+
+
+# ─────────────────────── S9f: Maliyet denetimi ───────────────────────
+@router.get("/ai/ceo/deniz/maliyet")
+async def deniz_maliyet(current_user=Depends(_ADMIN)):
+    from .deniz_guc import maliyet_ozet
+    return {"maliyet": await maliyet_ozet()}
+
+
+# ─────────────────────── S9d: Ret otopsisi ───────────────────────
+@router.get("/ai/ceo/deniz/ret-otopsisi")
+async def deniz_ret_otopsisi(current_user=Depends(_ADMIN)):
+    from .deniz_guc import ret_otopsisi
+    return {"ret_otopsisi": await ret_otopsisi()}
+
+
+# ─────────────────────── S9a: Sınav düzeni ───────────────────────
+# Sentetik fotoğraflar (doğru cevabı bilinen) — Ayda'ya habersiz verilir; sonuç gerçek
+# kuyruğa/karneye KARIŞMAZ (persist=False). Yakalama → skor.
+_SINAV_SETI = [
+    {"ad": "konsantrasyon", "foto": {"tarih": "2000-01-01T00:00:00", "ogrenci": {"aktif": 10},
+      "konsantrasyon": {"en_buyuk_ogretmen_ogrenci_payi": 80.0, "esik_yuzde": 25.0}},
+     "beklenen_kategori": ["strateji", "buyume"], "beklenen_kelime": ["konsantrasyon", "bağımlılık", "dağıt", "çeşitlen"]},
+    {"ad": "nps_dususu", "foto": {"tarih": "2000-01-02T00:00:00", "ogrenci": {"aktif": 10},
+      "nps": {"nps": -40, "sayi": 20}},
+     "beklenen_kategori": ["ogrenci_memnuniyeti"], "beklenen_kelime": ["memnuniyet", "nps", "şikayet", "kayıp"]},
+]
+
+
+@router.post("/ai/ceo/deniz/sinav")
+async def deniz_sinav(current_user=Depends(_ADMIN)):
+    if not GEMINI_API_KEY:
+        return {"ok": False, "sebep": "AI yapılandırılmadı — sınav Ayda'yı test eder."}
+    from .analiz import calistir_analiz
+    sonuclar = []
+    yakalanan = 0
+    for s in _SINAV_SETI:
+        res = await calistir_analiz("sinav", s["foto"], persist=False)  # KARIŞMAZ
+        oneriler = res.get("oneriler", []) if res.get("ok") else []
+        blob = " ".join(f"{o.get('baslik','')} {o.get('ozet','')} {o.get('kategori','')}" for o in oneriler).lower()
+        kat_ok = any(o.get("kategori") in s["beklenen_kategori"] for o in oneriler)
+        kelime_ok = any(k in blob for k in s["beklenen_kelime"])
+        basarili = bool(kat_ok or kelime_ok)
+        if basarili:
+            yakalanan += 1
+        sonuclar.append({"ad": s["ad"], "yakalandi": basarili, "kategori_uydu": kat_ok, "kelime_uydu": kelime_ok})
+    skor = round(yakalanan * 100 / len(_SINAV_SETI), 1) if _SINAV_SETI else 0
+    kayit = {"id": str(uuid.uuid4()), "tarih": iso(), "skor": skor, "toplam": len(_SINAV_SETI),
+             "yakalanan": yakalanan, "sonuclar": sonuclar}
+    await db.ai_ceo_deniz_sinav.insert_one({**kayit})  # AYRI koleksiyon — gerçek karneye karışmaz
+    kayit.pop("_id", None)
+    return {"ok": True, "sinav": kayit}
