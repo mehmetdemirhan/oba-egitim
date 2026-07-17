@@ -53,6 +53,7 @@ import AiCeo from "./components/aiceo/AiCeo";
 import KocumMiran from "./components/aiceo/KocumMiran";
 import Deniz from "./components/aiceo/Deniz";
 import YoneticiAdimlar from "./components/aiceo/YoneticiAdimlar";
+import GorevTanimYonetimi from "./components/aiceo/GorevTanimYonetimi";
 import SinavYonetimi from "./components/admin/SinavYonetimi";
 import SinavCozum from "./components/SinavCozum";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
@@ -1550,6 +1551,7 @@ function AppContent() {
               <div className="space-y-6">
                 <SistemAyarlari user={user} />
                 <EgitimTurleriYonetimi apiBase={API} />
+                {user.role === "admin" && <GorevTanimYonetimi apiBase={API} />}
               </div>
             </TabsContent>
           )}
