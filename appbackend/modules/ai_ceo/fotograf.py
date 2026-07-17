@@ -212,6 +212,66 @@ async def _muhasebe_metrikleri(ref: datetime) -> dict:
     }
 
 
+async def _konsantrasyon_metrikleri(ref: datetime) -> dict:
+    """S6c: en büyük öğretmen/eğitim türü bağımlılığı — konsantrasyon riski."""
+    students = await db.students.find(
+        {"arsivli": {"$ne": True}}, {"_id": 0, "ogretmen_id": 1, "aldigi_egitim": 1, "yapilan_odeme": 1}).to_list(length=100000)
+    toplam_ogr = len(students)
+    ogr_say, gelir_say, tur_say = {}, {}, {}
+    for s in students:
+        oid = s.get("ogretmen_id") or "?"
+        ogr_say[oid] = ogr_say.get(oid, 0) + 1
+        gelir_say[oid] = gelir_say.get(oid, 0.0) + _num(s.get("yapilan_odeme"))
+        tur = (s.get("aldigi_egitim") or "?").strip() or "?"
+        tur_say[tur] = tur_say.get(tur, 0) + 1
+    toplam_gelir = sum(gelir_say.values()) or 1
+
+    def _pay(d, toplam, n=1):
+        # Bilinmeyen ("?") atanmamış kayıtlar konsantrasyon riski sayılmaz → hariç
+        vals = sorted((v for k, v in d.items() if k != "?"), reverse=True)
+        return round(sum(vals[:n]) * 100 / (toplam or 1), 1) if vals else 0.0
+
+    return {
+        "en_buyuk_ogretmen_ogrenci_payi": _pay(ogr_say, toplam_ogr, 1),
+        "ilk3_ogretmen_ogrenci_payi": _pay(ogr_say, toplam_ogr, 3),
+        "en_buyuk_ogretmen_gelir_payi": _pay(gelir_say, toplam_gelir, 1),
+        "en_buyuk_tur_payi": _pay(tur_say, toplam_ogr, 1),
+        "tur_dagilimi": tur_say,
+        "esik_yuzde": 25.0,
+    }
+
+
+async def _birim_ekonomi_metrikleri(ref: datetime) -> dict:
+    """S6b: LTV + kur başına net marj (net = brüt tahsilat − vergi − öğretmen payı)."""
+    students = await db.students.find({"arsivli": {"$ne": True}}, {"_id": 0, "yapilan_odeme": 1, "aldigi_egitim": 1}).to_list(length=100000)
+    ogr_sayi = len(students) or 1
+    brut = sum(_num(s.get("yapilan_odeme")) for s in students)
+    vergi = 0.0
+    try:
+        pays = await db.payments.find({"tip": "ogrenci"}, {"_id": 0, "vergi": 1}).to_list(length=200000)
+        vergi = sum(_num(p.get("vergi")) for p in pays)
+    except Exception:
+        pass
+    ogt_odenen = 0.0
+    for t in await db.teachers.find({}, {"_id": 0, "yapilan_odeme": 1}).to_list(length=5000):
+        ogt_odenen += _num(t.get("yapilan_odeme"))
+    net = brut - vergi - ogt_odenen
+    kur_sayi = await db.kur_ucretleri.estimated_document_count() or 1
+    # Tür kırılımı (net ∝ brüt payı — varsayım etiketli)
+    tur_brut = {}
+    for s in students:
+        tur = (s.get("aldigi_egitim") or "?").strip() or "?"
+        tur_brut[tur] = tur_brut.get(tur, 0.0) + _num(s.get("yapilan_odeme"))
+    tur_net = {t: round(net * (b / (brut or 1)), 2) for t, b in tur_brut.items()}
+    return {
+        "ltv_ogrenci_basi_net": round(net / ogr_sayi, 2),
+        "kur_basi_net_marj": round(net / kur_sayi, 2),
+        "toplam_net": round(net, 2),
+        "tur_net_kirilim": tur_net,
+        "varsayim": "Tür net kırılımı brüt tahsilat oranına göre dağıtılmıştır (yaklaşık).",
+    }
+
+
 async def _ogrenci_metrikleri(ref: datetime) -> dict:
     students = await db.students.find(
         {}, {"_id": 0, "id": 1, "sinif": 1, "il": 1, "arsivli": 1, "mezun": 1}
@@ -318,7 +378,8 @@ async def sistem_fotografi() -> dict:
     ref = simdi()
     bloklar = {}
     for ad, fn in (("ogretmen", _ogretmen_metrikleri), ("muhasebe", _muhasebe_metrikleri),
-                   ("ogrenci", _ogrenci_metrikleri), ("kullanim", _kullanim_metrikleri)):
+                   ("ogrenci", _ogrenci_metrikleri), ("kullanim", _kullanim_metrikleri),
+                   ("konsantrasyon", _konsantrasyon_metrikleri), ("birim_ekonomi", _birim_ekonomi_metrikleri)):
         try:
             bloklar[ad] = await fn(ref)
         except Exception as e:
@@ -407,6 +468,12 @@ async def saglik_endpoint(current_user=Depends(_ADMIN)):
 async def fotograf_cek(current_user=Depends(_ADMIN)):
     foto = await sistem_fotografi()
     await fotograf_kaydet(foto)
+    # S6c: konsantrasyon eşiği aşılırsa Ayda kuyruğuna risk azaltma görevi ekle
+    try:
+        from .anomali import konsantrasyon_gorevi
+        await konsantrasyon_gorevi(foto)
+    except Exception as e:
+        logging.warning(f"[ai_ceo] konsantrasyon görevi hatası: {e}")
     return {"ok": True, "tarih": foto["tarih"], "fotograf": foto}
 
 
