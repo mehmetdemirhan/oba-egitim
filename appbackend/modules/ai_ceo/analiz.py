@@ -31,6 +31,31 @@ DURUMLAR = ["yeni", "uygulaniyor", "uygulandi", "reddedildi", "ertelendi"]
 KARARLI_DURUMLAR = {"uygulaniyor", "uygulandi", "reddedildi"}
 
 
+def _baslik_norm(b):
+    return " ".join(str(b or "").lower().split())
+
+
+async def oneri_dedup() -> int:
+    """Aynı başlıklı AÇIK (yeni) önerileri tek örneğe indirir (en yenisi kalır, eskiler
+    3650 gün ertelenir). Döner: birleştirilen (ertelenen) kayıt sayısı. Hem analiz koşumunda
+    hem Deniz 'Kontrol Et'te çağrılır — böylece 'tekrarlanan_oneri' bulgusu tek tıkla çözülür."""
+    acik = await db.ai_ceo_oneriler.find({"durum": "yeni"}, {"_id": 0, "id": 1, "baslik": 1, "tarih": 1}).to_list(length=10000)
+    gruplar = {}
+    for o in acik:
+        gruplar.setdefault(_baslik_norm(o.get("baslik")), []).append(o)
+    birlesen = 0
+    for grup in gruplar.values():
+        if len(grup) > 1:
+            grup.sort(key=lambda o: o.get("tarih", ""), reverse=True)
+            eski_idler = [o["id"] for o in grup[1:]]
+            await db.ai_ceo_oneriler.update_many(
+                {"id": {"$in": eski_idler}},
+                {"$set": {"durum": "ertelendi", "ertele_tarih": (simdi() + timedelta(days=3650)).isoformat(),
+                          "durum_notu": "Otomatik: tekrarlanan başlık birleştirildi."}})
+            birlesen += len(eski_idler)
+    return birlesen
+
+
 # ─────────────────────────── prompt ───────────────────────────
 def _analiz_prompt(payload: dict, plan: dict | None = None, denetim_notu: str = "") -> tuple:
     system = sistem_promptu("ayda")
@@ -206,22 +231,10 @@ async def calistir_analiz(tetik: str = "manuel", fotograf: dict | None = None, p
     }
     # KÖK NEDEN (tekrarlanan_oneri): aynı başlık, hâlâ açık/uygulanan bir öneri olarak varsa
     # YENİDEN ÜRETME — kuyrukta birikmesin. Tetik: analiz her koşuşunda aynı öneri eklenmesin.
-    def _norm(b):
-        return " ".join(str(b or "").lower().split())
+    _norm = _baslik_norm
     if persist:
         # Mevcut AÇIK (yeni) kopyaları tek örneğe indir (en yenisini bırak, eskileri ertele)
-        acik = await db.ai_ceo_oneriler.find({"durum": "yeni"}, {"_id": 0, "id": 1, "baslik": 1, "tarih": 1}).to_list(length=10000)
-        gruplar = {}
-        for o in acik:
-            gruplar.setdefault(_norm(o.get("baslik")), []).append(o)
-        for grup in gruplar.values():
-            if len(grup) > 1:
-                grup.sort(key=lambda o: o.get("tarih", ""), reverse=True)
-                eski_idler = [o["id"] for o in grup[1:]]
-                await db.ai_ceo_oneriler.update_many(
-                    {"id": {"$in": eski_idler}},
-                    {"$set": {"durum": "ertelendi", "ertele_tarih": (simdi() + timedelta(days=3650)).isoformat(),
-                              "durum_notu": "Otomatik: tekrarlanan başlık birleştirildi."}})
+        await oneri_dedup()
     if persist and oneri_kayitlari:
         mevcut = await db.ai_ceo_oneriler.find(
             {"durum": {"$in": ["yeni", "ertelendi", "uygulaniyor"]}}, {"_id": 0, "baslik": 1}).to_list(length=5000)

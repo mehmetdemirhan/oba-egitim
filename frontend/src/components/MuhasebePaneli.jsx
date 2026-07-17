@@ -13,7 +13,7 @@ import BilgiIkonu from "./BilgiIkonu";
 import { PersonaBalon, PERSONA_UI } from "./aiceo/Personalar";
 
 // Muhasebe rolüne özel "Sistem Danışmanı Miran" kartı (finansal; pedagojik veri YOK)
-function MuhasebeMiran({ apiBase }) {
+function MuhasebeMiran({ apiBase, onOdak }) {
   const [miran, setMiran] = React.useState(null);
   const [gb, setGb] = React.useState(null);
   const p = PERSONA_UI.miran;
@@ -24,12 +24,19 @@ function MuhasebeMiran({ apiBase }) {
     <div className="rounded-2xl border p-4 shadow-sm mb-4" style={{ borderColor: p.renkAcik, background: p.renkAcik + "33" }}>
       <PersonaBalon persona="miran" mesaj={miran.icerik?.selam} size={56} />
       <div className="mt-3 space-y-2">
-        {(miran.icerik?.oneriler || []).map((o, i) => (
-          <div key={i} className="rounded-xl bg-surface border border-line p-3">
-            <div className="font-semibold text-content text-sm">{o.baslik}</div>
-            <div className="text-sm text-subtle mt-0.5">{o.aciklama}</div>
-          </div>
-        ))}
+        {(miran.icerik?.oneriler || []).map((o, i) => {
+          const tiklanabilir = !!(o.hedef && onOdak);
+          return (
+            <div key={i} onClick={tiklanabilir ? () => onOdak(o) : undefined}
+              className={`rounded-xl bg-surface border p-3 ${tiklanabilir ? "border-primary/40 cursor-pointer hover:ring-2 hover:ring-primary/30 transition" : "border-line"}`}>
+              <div className="flex items-center justify-between gap-2">
+                <div className="font-semibold text-content text-sm">{o.baslik}</div>
+                {tiklanabilir && <span className="text-xs text-primary shrink-0 whitespace-nowrap">Ödemelere git →</span>}
+              </div>
+              <div className="text-sm text-subtle mt-0.5">{o.aciklama}</div>
+            </div>
+          );
+        })}
       </div>
       {miran.icerik?.kapanis && <div className="mt-2 text-sm font-medium" style={{ color: p.renk }}>{miran.icerik.kapanis}</div>}
       <div className="mt-2 pt-2 border-t flex items-center gap-3" style={{ borderColor: p.renkAcik }}>
@@ -80,6 +87,14 @@ export default function MuhasebePaneli({ user, logout }) {
   const [payments, setPayments] = useState([]);
   const [sekme, setSekme] = useState("ogrenci");
   const [sadeceBorclu, setSadeceBorclu] = useState(false);
+  const [odakIdler, setOdakIdler] = useState(null);  // Miran deep-link: işaretsiz ödeme öğrenci id'leri
+
+  // Miran notuna tıklama → ilgili ödemelere git (öğrenci sekmesi + odak/filtre)
+  const miranOdak = (o) => {
+    setSekme("ogrenci");
+    if (o.hedef === "borclu") { setSadeceBorclu(true); setOdakIdler(null); }
+    else if (o.hedef === "damgasiz") { setSadeceBorclu(false); setOdakIdler(o.odak_idler || []); }
+  };
 
   const veriYukle = useCallback(async () => {
     try {
@@ -149,7 +164,7 @@ export default function MuhasebePaneli({ user, logout }) {
           <KpiKart Ikon={PiggyBank} etiket="Net Kasa (vergi düşülmüş)" tutar={ozet?.kasa_net} vurgu="green" bilgi="m_net_kasa" />
         </div>
 
-        <MuhasebeMiran apiBase={API} />
+        <MuhasebeMiran apiBase={API} onOdak={miranOdak} />
 
         <GecikenKurlar apiBase={API} />
 
@@ -161,7 +176,8 @@ export default function MuhasebePaneli({ user, logout }) {
 
         {(sekme === "ogrenci" || sekme === "ogretmen") && (
           <OdemeTablosu tip={sekme} kisiler={liste} payments={payments} apiBase={API} onDegisim={veriYukle}
-            sadeceBorclu={sekme === "ogrenci" && sadeceBorclu} onBorcluTemizle={() => setSadeceBorclu(false)} />
+            sadeceBorclu={sekme === "ogrenci" && sadeceBorclu} onBorcluTemizle={() => setSadeceBorclu(false)}
+            odakKisiId={sekme === "ogrenci" ? (odakIdler || "") : ""} onOdakTemizle={() => setOdakIdler(null)} />
         )}
 
         {/* Öğretmen sekmesinde dönem bazlı ödeme (ayın 15'i) */}
