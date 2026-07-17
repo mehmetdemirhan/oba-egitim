@@ -52,7 +52,7 @@ def _serialize_metin(item: dict, role: str) -> dict:
         s = dict(s)
         if not egitici:
             # Öğrenciye doğru cevap ve iç işaretler sızmasın
-            for gizli in ("dogru_cevap", "dogru_cevap_kaynak", "guven",
+            for gizli in ("dogru_cevap", "dogru_cevap_kaynak", "guven", "dayanak",
                           "kontrol_gerekli", "ilk_duzelten_id",
                           "son_duzelten_id", "son_duzelten_tarih"):
                 s.pop(gizli, None)
@@ -345,8 +345,9 @@ def _cevap_prompt(metin: dict):
         for L in "ABCD":
             if sec.get(L):
                 sat.append(f"   {L}) {sec[L]}")
-    sat.append('\nHer soru için SADECE metne dayanarak doğru şıkkı (A/B/C/D) ve güveni belirt.')
-    sat.append('YALNIZ JSON dizi: [{"no":1,"dogru":"B","guven":"high"}, ...]')
+    sat.append('\nHer soru için SADECE metne dayanarak doğru şıkkı (A/B/C/D), güveni ve metindeki')
+    sat.append('DAYANAK cümleyi (kararı destekleyen tümce, metinden birebir alıntı) belirt.')
+    sat.append('YALNIZ JSON dizi: [{"no":1,"dogru":"B","guven":"high","dayanak":"metinden cümle"}, ...]')
     return "\n".join(sat)
 
 
@@ -364,7 +365,8 @@ def _cevap_parse(txt: str, n: int):
         x = by.get(i, {})
         d = str(x.get("dogru", "")).strip().upper()[:1]
         g = str(x.get("guven", "low")).strip().lower()
-        out.append((d if d in "ABCD" else None, "high" if g == "high" else "low"))
+        day = str(x.get("dayanak", "")).strip()[:300]
+        out.append((d if d in "ABCD" else None, "high" if g == "high" else "low", day))
     return out
 
 
@@ -393,14 +395,15 @@ async def analiz_havuz_cevap_uret(limit: int = 30, yeniden: bool = False,
                                     _cevap_prompt(m), max_tokens=700, ozellik="analiz_cevap")
             cevaplar = _cevap_parse(res.get("text", ""), len(sorular))
         except Exception:
-            cevaplar = [(None, "low")] * len(sorular)
-        for s, (d, g) in zip(sorular, cevaplar):
+            cevaplar = [(None, "low", "")] * len(sorular)
+        for s, (d, g, day) in zip(sorular, cevaplar):
             if s.get("dogru_cevap_kaynak") == "manuel":
                 continue
             if d:
                 s["dogru_cevap"] = d
                 s["dogru_cevap_kaynak"] = "otomatik"
                 s["guven"] = g
+                s["dayanak"] = day
                 s["kontrol_gerekli"] = (g != "high")
                 high += 1 if g == "high" else 0
                 low += 1 if g != "high" else 0
@@ -412,6 +415,31 @@ async def analiz_havuz_cevap_uret(limit: int = 30, yeniden: bool = False,
     kalan = len(bekleyen) - islenen
     return {"ok": True, "islenen_metin": islenen, "kalan_metin": kalan,
             "yuksek_guven": high, "dusuk_guven": low, "cevaplanamayan": bos}
+
+
+@router.get("/diagnostic/analiz-havuz/cevap-ornek")
+async def analiz_havuz_cevap_ornek(n: int = 10, seed: int = 0,
+                                   current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+    """Denetim örneklemi: RASTGELE n metnin ÇSS'leri + AI'nın seçtiği doğru şık + güven +
+    metindeki DAYANAK cümle. İnsan gözden geçirmesi için (silme öncesi doğrulama)."""
+    import random as _random
+    metinler = await db.analiz_metinler.find(
+        {"kaynak": AKICI_KAYNAK, "sorular.0": {"$exists": True}}, {"_id": 0}).to_list(length=100000)
+    rnd = _random.Random(seed or None)
+    sec = rnd.sample(metinler, min(max(1, n), len(metinler))) if metinler else []
+    ornek = []
+    for m in sec:
+        ornek.append({
+            "id": m["id"], "baslik": m["baslik"], "kelime_sayisi": m.get("kelime_sayisi"),
+            "sorular": [{
+                "soru": s.get("soru"), "secenekler": s.get("secenekler", {}),
+                "dogru_cevap": s.get("dogru_cevap"), "guven": s.get("guven"),
+                "kaynak": s.get("dogru_cevap_kaynak"), "kontrol_gerekli": s.get("kontrol_gerekli"),
+                "dayanak": s.get("dayanak", ""),
+            } for s in (m.get("sorular") or [])],
+        })
+    toplam_soru = sum(len(m["sorular"]) for m in ornek)
+    return {"metin_sayisi": len(ornek), "toplam_soru": toplam_soru, "ornekler": ornek}
 
 
 @router.post("/diagnostic/texts")
