@@ -197,6 +197,7 @@ async def muhasebe_kisiler(current_user=Depends(_ERISIM)):
     for _oid in kur_map:
         kur_map[_oid].sort(key=lambda k: str(k.get("baslangic_tarihi") or k.get("tarih") or ""))
 
+    ogretmen_avans = {}  # öğretmen_id → kur-bazlı 'Öğr. Ödenen' toplamı (özet kırılımı)
     ogrenciler = []
     try:
         async for s in db.students.find({}, {
@@ -224,11 +225,17 @@ async def muhasebe_kisiler(current_user=Depends(_ERISIM)):
             kurlar = kur_map.get(s.get("id")) or []
             if kurlar:
                 pay_map = {k.get("id"): k.get("ogretmen_pay") for k in kurlar}  # SPEC B — kur snapshot payı
+                odenen_map = {k.get("id"): _num(k.get("ogretmen_odenen")) for k in kurlar}  # kur-bazlı avans
+                _tid = s.get("ogretmen_id")
+                if _tid:
+                    ogretmen_avans[_tid] = round(ogretmen_avans.get(_tid, 0.0) + sum(odenen_map.values()), 2)
                 # FIFO dağılımı (paylaşımlı helper) → satırlar; geçilmiş VE tam ödenmiş
                 # kur ana listede GİZLENİR (öğrenci detayında yine görünür).
                 for d in _kur_dagilimi(kurlar, _num(s.get("yapilan_odeme"))):
                     if _kur_gizli(d):
                         continue
+                    _pay = _num(pay_map.get(d["kur_ucreti_id"]))
+                    _odn = odenen_map.get(d["kur_ucreti_id"], 0.0)
                     ogrenciler.append({
                         **ortak,
                         "id": d["kur_ucreti_id"],  # satır kimliği = kur kaydı (React key)
@@ -237,6 +244,8 @@ async def muhasebe_kisiler(current_user=Depends(_ERISIM)):
                         "kayit_zamani": d["kayit_zamani"] or s.get("olusturma_tarihi") or "",
                         "durum": d["durum"],
                         "ogretmen_pay": pay_map.get(d["kur_ucreti_id"]),
+                        "ogretmen_odenen": round(_odn, 2),           # kur-bazlı avans (öğr. ödenen)
+                        "ogretmen_kalan": round(max(0.0, _pay - _odn), 2),  # kalan (öğretmene) = pay − ödenen
                         "yapilmasi_gereken_odeme": d["yapilmasi_gereken_odeme"],
                         "yapilan_odeme": d["yapilan_odeme"],
                         "kalan": d["kalan"],
@@ -254,6 +263,8 @@ async def muhasebe_kisiler(current_user=Depends(_ERISIM)):
                     # Kur kaydı olmayan (eski) öğrencide "Öğr. Payı" = student.ogretmene_yapilacak_odeme;
                     # satır-içi düzenleme bu alanı hedefler (kur snapshot yok → hakedişe girmez).
                     "ogretmen_pay": round(_num(s.get("ogretmene_yapilacak_odeme")), 2),
+                    "ogretmen_odenen": 0.0,  # kur kaydı yok → kur-bazlı avans girilemez
+                    "ogretmen_kalan": round(_num(s.get("ogretmene_yapilacak_odeme")), 2),
                     "yapilmasi_gereken_odeme": round(gereken, 2),
                     "yapilan_odeme": round(yapilan, 2),
                     "kalan": round(max(0.0, gereken - yapilan), 2),
@@ -275,7 +286,8 @@ async def muhasebe_kisiler(current_user=Depends(_ERISIM)):
                 "telefon": t.get("telefon", ""),
                 "muhasebe_notu": t.get("muhasebe_notu", ""),
                 "yapilmasi_gereken_odeme": gereken,
-                "yapilan_odeme": yapilan,
+                "yapilan_odeme": yapilan,             # TEK KAYNAK 'Ödenen' (salt-okunur, avans dahil)
+                "avans_toplam": round(ogretmen_avans.get(t.get("id"), 0.0), 2),  # kur-bazlı avans kırılım toplamı
                 "kalan": max(0.0, gereken - yapilan),
             })
     except Exception as ex:
@@ -692,6 +704,10 @@ async def _donem_kalemleri(donem: str, ogretmen_id: str = None):
         if pay is None:
             pay = await get_ogretmen_payi(k.get("egitim_turu") or s.get("aldigi_egitim"))
         pay = _num(pay)
+        # AVANS/ERKEN ÖDEME: bu kur için öğretmene fiilen ödenmiş tutar hakedişten DÜŞÜLÜR
+        # (mükerrer ödeme engeli). Hakedişe yalnız kalan (pay − avans) eklenir.
+        avans = _num(k.get("ogretmen_odenen"))
+        net = round(max(0.0, pay - avans), 2)
         g = gruplar.setdefault(oid, {"ogretmen_id": oid, "ogretmen_ad": ogretmen_ad.get(oid, ""),
                                      "kurlar": [], "toplam": 0.0})
         g["kurlar"].append({
@@ -703,8 +719,10 @@ async def _donem_kalemleri(donem: str, ogretmen_id: str = None):
             "tamamlanma_tarihi": k.get("tamamlanma_tarihi"),
             "odeme_tamamlanma_tarihi": k.get("odeme_tamamlanma_tarihi"),
             "pay": pay,
+            "avans_odenen": avans,
+            "net": net,
         })
-        g["toplam"] = round(g["toplam"] + pay, 2)
+        g["toplam"] = round(g["toplam"] + net, 2)
     return gruplar
 
 
@@ -749,8 +767,13 @@ async def ogretmen_donem_ode(data: dict, current_user=Depends(_ERISIM)):
         "odeyen_id": current_user.get("id"),
     }
     await db.ogretmen_donem_odemeleri.insert_one(kayit)
-    # Kurları döneme mühürle (idempotency) + mevcut bakiye katmanına yansıt
-    await db.kur_ucretleri.update_many({"id": {"$in": kur_ids}}, {"$set": {"odendi_donem": donem}})
+    # Kurları döneme mühürle (idempotency) + kur-bazlı öğr. ödeneni TAM paya çıkar (fully paid).
+    # Skalere yalnız NET (pay − avans) $inc edilir; avans girişinde zaten $inc edilmişti → mükerrer yok.
+    for c in grup["kurlar"]:
+        kid = c.get("kur_ucreti_id")
+        if kid:
+            await db.kur_ucretleri.update_one(
+                {"id": kid}, {"$set": {"odendi_donem": donem, "ogretmen_odenen": _num(c.get("pay"))}})
     await db.teachers.update_one({"id": ogretmen_id}, {"$inc": {"yapilan_odeme": toplam}})
     await islem_kaydet(current_user, "muhasebe", "ogretmen_donem_ode", "ogretmen", ogretmen_id,
                        "donem", None, f"{donem}: ₺{toplam} ({len(kur_ids)} kur)")
@@ -785,6 +808,35 @@ async def kur_ogretmen_pay_duzelt(kur_id: str, data: dict, current_user=Depends(
     await db.kur_ucretleri.update_one({"id": kur_id}, {"$set": {"ogretmen_pay": yeni_pay}})
     await _log(current_user, "kur_ucreti", kur_id, "ogretmen_pay", eski, yeni_pay)
     return {"ok": True, "ogretmen_pay": yeni_pay}
+
+
+@router.patch("/muhasebe/kur-ucreti/{kur_id}/odenen")
+async def kur_ogretmen_odenen_duzelt(kur_id: str, data: dict, current_user=Depends(_ERISIM)):
+    """Kur-bazlı 'Öğr. Ödenen' (avans/erken ödeme) satır-içi düzeltir — kur açık/kapalı fark
+    etmez, otomatik tetikten BAĞIMSIZ. Öğretmenin genel 'Ödenen'i (teachers.yapilan_odeme) TEK
+    KAYNAK kalsın diye DELTA kadar $inc edilir. Hakediş tetiğinde avans, paydan düşülür (mükerrer
+    ödeme engeli). Yalnız admin/muhasebe; audit'e düşer. Hakedişe girmiş kur düzeltilemez."""
+    kur = await db.kur_ucretleri.find_one({"id": kur_id})
+    if not kur:
+        raise HTTPException(status_code=404, detail="Kur kaydı bulunamadı")
+    if kur.get("odendi_donem"):
+        raise HTTPException(status_code=400, detail="Bu kur hakedişe girmiş, öğretmen ödemesi değiştirilemez")
+    try:
+        yeni = round(float(data.get("ogretmen_odenen")), 2)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Geçersiz değer")
+    if yeni < 0:
+        raise HTTPException(status_code=400, detail="Negatif olamaz")
+    eski = _num(kur.get("ogretmen_odenen"))
+    delta = round(yeni - eski, 2)
+    await db.kur_ucretleri.update_one({"id": kur_id}, {"$set": {"ogretmen_odenen": yeni}})
+    # Öğretmenin genel 'Ödenen' skalerine yansıt (tek kaynak korunur)
+    ogr = await db.students.find_one({"id": kur.get("ogrenci_id")}, {"_id": 0, "ogretmen_id": 1})
+    tid = (ogr or {}).get("ogretmen_id")
+    if tid and delta:
+        await db.teachers.update_one({"id": tid}, {"$inc": {"yapilan_odeme": delta}})
+    await _log(current_user, "kur_ucreti", kur_id, "ogretmen_odenen", eski, yeni)
+    return {"ok": True, "ogretmen_odenen": yeni, "ogretmen_id": tid, "delta": delta}
 
 
 @router.post("/muhasebe/gecis/odeme-tarihi-backfill")

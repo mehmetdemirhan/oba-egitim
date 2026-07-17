@@ -29,7 +29,7 @@ const formatTarih = (t) => {
 const isoGun = (t) => { try { return (t || "").slice(0, 10); } catch { return ""; } };
 
 // Tek hücre — tıkla-düzenle; Enter/blur kaydeder, Esc iptal.
-function EditableCell({ value, kind = "text", format, align = "left", editable = true, onSave, placeholder, baslik }) {
+function EditableCell({ value, kind = "text", format, align = "left", editable = true, onSave, placeholder, baslik, alt }) {
   const [editing, setEditing] = useState(false);
   const [taslak, setTaslak] = useState(value ?? "");
   const ref = useRef(null);
@@ -53,6 +53,7 @@ function EditableCell({ value, kind = "text", format, align = "left", editable =
       <td onClick={() => setEditing(true)} title={baslik || "Düzenlemek için tıklayın"}
         className={`px-3 py-2 ${hiza} cursor-pointer hover:bg-blue-50 hover:ring-1 hover:ring-inset hover:ring-blue-200 ${kind === "number" ? "tabular-nums" : ""}`}>
         {format ? format(value) : (value || <span className="text-slate-300">{placeholder || "—"}</span>)}
+        {alt && <div className="text-[10px] text-subtle mt-0.5 font-normal">{alt}</div>}
       </td>
     );
   }
@@ -77,6 +78,8 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
   const { toast } = useToast();
   const [arama, setArama] = useState("");
   const [acik, setAcik] = useState(null);
+  const [acikGruplar, setAcikGruplar] = useState(() => new Set()); // Öğretmene Göre: açık gruplar (varsayılan hepsi KAPALI)
+  const grupTikla = (gid) => setAcikGruplar(prev => { const n = new Set(prev); n.has(gid) ? n.delete(gid) : n.add(gid); return n; });
   const [silDialog, setSilDialog] = useState(null);
   const [kurForm, setKurForm] = useState({ kur_adi: "", tutar: "", baslangic_tarihi: "" });
   const [hakedisMap, setHakedisMap] = useState({}); // ogretmen_id → bu dönem hakediş (grupla)
@@ -200,6 +203,12 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
       ? req(() => axios.patch(`${apiBase}/muhasebe/kur-ucreti/${k.kur_ucreti_id}/pay`, { ogretmen_pay: parseFloat(v) || 0 }), "Pay güncellenemedi")
       : alanKaydet(k.kisi_id, "ogretmene_yapilacak_odeme", v);
 
+  // "Öğr. Ödenen" — kur-bazlı avans/erken ödeme; yalnız kur kaydı olan satırda girilebilir.
+  const ogretmenOdenenKaydet = (k, v) =>
+    k.kur_ucreti_id
+      ? req(() => axios.patch(`${apiBase}/muhasebe/kur-ucreti/${k.kur_ucreti_id}/odenen`, { ogretmen_odenen: parseFloat(v) || 0 }), "Öğr. ödenen güncellenemedi")
+      : null;
+
   const odemeSil = async () => {
     if (await req(() => axios.delete(`${apiBase}/payments/${silDialog.id}`), "Silinemedi")) {
       setSilDialog(null); toast({ title: "Ödeme silindi" });
@@ -220,7 +229,7 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
     if (ok) { setKurForm({ kur_adi: "", tutar: "", baslangic_tarihi: "" }); toast({ title: "Kur ücreti eklendi", description: "Yeni satır olarak eklendi." }); }
   };
 
-  const kolonSayisi = ogrenciMi ? 13 : 7;
+  const kolonSayisi = ogrenciMi ? 14 : 7;
 
   return (
     <div className="space-y-3">
@@ -277,6 +286,7 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
                   <th className="px-3 py-2 text-right">Ödenen</th>
                   <th className="px-3 py-2 text-right">Kalan</th>
                   <th className="px-3 py-2 text-right" title="Öğretmen payı — öğretmen bu sütunu görmez">Öğr. Payı</th>
+                  <th className="px-3 py-2 text-right" title="Öğretmene bu kur için fiilen ödenen (avans/erken); kalan=Pay−Ödenen. Öğretmen bu sütunu görmez">Öğr. Ödenen</th>
                   <th className="px-3 py-2">Açıklama</th>
                 </>
               ) : (
@@ -299,15 +309,20 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
               // İŞ 3 — satır renklendirme KUR NUMARASINA göre: kur 1 = mor (yeni), kur >1 = yeşil (üst kur)
               const satirRenk = ogrenciMi ? kurRenkSinifi(k.kur) : "";
               // Öğretmene göre gruplu: yeni öğretmen grubu başlıyorsa özet başlık satırı
-              const grupBasi = grupla && ogrenciMi && (_idx === 0 || (siraliListe[_idx - 1].ogretmen_id || "_yok") !== (k.ogretmen_id || "_yok"));
-              const oz = grupBasi ? grupOzet[k.ogretmen_id || "_yok"] : null;
-              const hakedis = grupBasi ? (hakedisMap[k.ogretmen_id || "_yok"] ?? 0) : 0;
+              const gruplama = grupla && ogrenciMi;
+              const gid = k.ogretmen_id || "_yok";
+              const grupBasi = gruplama && (_idx === 0 || (siraliListe[_idx - 1].ogretmen_id || "_yok") !== gid);
+              const oz = grupBasi ? grupOzet[gid] : null;
+              const hakedis = grupBasi ? (hakedisMap[gid] ?? 0) : 0;
+              // Öğretmene Göre: varsayılan KAPALI accordion. Arama yazılınca eşleşenler otomatik açılır.
+              const grupAcik = !gruplama || acikGruplar.has(gid) || !!arama.trim();
               return (
                 <React.Fragment key={k.id}>
                   {grupBasi && oz && (
-                    <tr className="bg-indigo-50/60 border-b border-indigo-200">
+                    <tr className="bg-indigo-50/60 border-b border-indigo-200 cursor-pointer hover:bg-indigo-100/60" onClick={() => grupTikla(gid)}>
                       <td colSpan={kolonSayisi} className="px-3 py-2">
                         <div className="flex items-center gap-3 flex-wrap text-sm">
+                          {grupAcik ? <ChevronDown className="h-4 w-4 text-indigo-700 shrink-0" /> : <ChevronRight className="h-4 w-4 text-indigo-700 shrink-0" />}
                           <span className="font-bold text-indigo-800 inline-flex items-center gap-1"><Users className="h-4 w-4" />{oz.ad}</span>
                           <span className="text-subtle">{oz.sayi} kayıt</span>
                           <span className="text-subtle">Beklenen <b className="text-content">{formatTL(oz.beklenen)}</b></span>
@@ -318,6 +333,7 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
                       </td>
                     </tr>
                   )}
+                  {grupAcik && (
                   <tr className={`border-b border-line ${satirRenk}`}>
                     <td className="px-3 py-2">
                       <button onClick={() => { setAcik(acikMi ? null : k.id); setKurForm({ kur_adi: "", tutar: "", baslangic_tarihi: "" }); }}
@@ -350,6 +366,14 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
                           placeholder="Pay"
                           baslik={k.kur_ucreti_id ? "Bu kur için öğretmen payı (hakedişe yansır)" : "Öğrenci için öğretmen payı (kur kaydı yok)"}
                           onSave={(v) => ogretmenPayKaydet(k, v)} />
+                        {k.kur_ucreti_id ? (
+                          <EditableCell value={k.ogretmen_odenen} kind="number" align="right" format={formatTL}
+                            placeholder="0" baslik="Öğretmene bu kur için fiilen ödenen (avans/erken). Genel 'Ödenen'e eklenir; hakedişten düşülür."
+                            alt={`kalan ${formatTL(k.ogretmen_kalan)}`}
+                            onSave={(v) => ogretmenOdenenKaydet(k, v)} />
+                        ) : (
+                          <td className="px-3 py-2 text-right text-subtle text-xs">—</td>
+                        )}
                         <EditableCell value={k.muhasebe_notu} placeholder="Not ekle" kind="text"
                           onSave={(v) => alanKaydet(k.kisi_id, "muhasebe_notu", v)} />
                       </>
@@ -360,16 +384,21 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
                         <td className="px-3 py-2 text-subtle whitespace-nowrap">{k.telefon || "—"}</td>
                         <EditableCell value={k.yapilmasi_gereken_odeme} kind="number" align="right" format={formatTL}
                           onSave={(v) => alanKaydet(k.kisi_id, "yapilmasi_gereken_odeme", v)} />
-                        <EditableCell value={k.yapilan_odeme} kind="number" align="right" format={formatTL}
-                          onSave={(v) => alanKaydet(k.kisi_id, "yapilan_odeme", v)} />
+                        {/* Ödenen: TEK KAYNAK (dönem ödemeleri+doğrudan+avans). Salt-okunur;
+                            kur-bazlı 'Öğr. Ödenen' avansları buraya $inc ile yansır. */}
+                        <td className="px-3 py-2 text-right tabular-nums" title="Dönem hakedişi + doğrudan ödemeler + kur-bazlı avanslar. Düzenleme kur satırındaki 'Öğr. Ödenen' üzerinden yapılır.">
+                          {formatTL(k.yapilan_odeme)}
+                          {k.avans_toplam > 0 && <div className="text-[10px] text-subtle mt-0.5">avans {formatTL(k.avans_toplam)}</div>}
+                        </td>
                         <td className={`px-3 py-2 text-right tabular-nums font-medium ${k.kalan > 0 ? "text-amber-600" : "text-subtle"}`}>{formatTL(k.kalan)}</td>
                         <EditableCell value={k.muhasebe_notu} placeholder="Not ekle" kind="text"
                           onSave={(v) => alanKaydet(k.kisi_id, "muhasebe_notu", v)} />
                       </>
                     )}
                   </tr>
+                  )}
 
-                  {acikMi && (
+                  {grupAcik && acikMi && (
                     <tr className="bg-app/40">
                       <td colSpan={kolonSayisi} className="px-4 py-3 space-y-4">
                         {/* Kur Geçmişi — TÜM kurlar (ana listede gizlenen tamamlanmış+ödenmiş dahil) */}
