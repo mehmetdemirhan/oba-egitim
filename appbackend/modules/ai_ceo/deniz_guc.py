@@ -24,17 +24,22 @@ async def veri_kalitesi_kontrol() -> list:
 
     yetim = [k for k in kurlar if k.get("ogrenci_id") not in ogr_ids]
     if yetim:
-        b.append({"tur": "yetim_kayit", "onem": "kritik", "ozet": f"{len(yetim)} yetim kur kaydı (öğrencisi yok).", "kanit": {"sayi": len(yetim)}})
+        b.append({"tur": "yetim_kayit", "onem": "kritik", "ozet": f"{len(yetim)} yetim kur kaydı (öğrencisi yok).",
+                  "kanit": {"sayi": len(yetim), "ornekler": [{"tip": "kur", "kur_id": k.get("id"), "ogrenci_id": k.get("ogrenci_id")} for k in yetim[:10]]}})
     neg = [k for k in kurlar if _num(k.get("tutar")) < 0 or _num(k.get("yapilan_odeme")) < 0]
     neg += [s for s in students if _num(s.get("yapilan_odeme")) < 0]
     if neg:
-        b.append({"tur": "negatif_kayit", "onem": "kritik", "ozet": f"{len(neg)} negatif tutarlı kayıt.", "kanit": {"sayi": len(neg)}})
+        b.append({"tur": "negatif_kayit", "onem": "kritik", "ozet": f"{len(neg)} negatif tutarlı kayıt.",
+                  "kanit": {"sayi": len(neg), "ornekler": [{"tip": "kayit", "id": r.get("id")} for r in neg[:10]]}})
     ars_borc = [s for s in students if s.get("arsivli") and (_num(s.get("yapilmasi_gereken_odeme")) - _num(s.get("yapilan_odeme"))) > 0.01]
     if ars_borc:
-        b.append({"tur": "arsivli_acik_alacak", "onem": "orta", "ozet": f"{len(ars_borc)} arşivli öğrencide açık alacak.", "kanit": {"sayi": len(ars_borc)}})
+        b.append({"tur": "arsivli_acik_alacak", "onem": "orta", "ozet": f"{len(ars_borc)} arşivli öğrencide açık alacak.",
+                  "kanit": {"sayi": len(ars_borc), "ornekler": [{"tip": "ogrenci", "ogrenci_id": s.get("id"),
+                            "kalan": round(_num(s.get("yapilmasi_gereken_odeme")) - _num(s.get("yapilan_odeme")), 2)} for s in ars_borc[:10]]}})
     damgasiz = [k for k in kurlar if k.get("durum") == "tamamlandi" and not k.get("odeme_tamamlanma_tarihi")]
     if damgasiz:
-        b.append({"tur": "damgasiz_hakedis", "onem": "orta", "ozet": f"{len(damgasiz)} tamamlanmış kurda hakediş damgası yok.", "kanit": {"sayi": len(damgasiz)}})
+        b.append({"tur": "damgasiz_hakedis", "onem": "orta", "ozet": f"{len(damgasiz)} tamamlanmış kurda hakediş damgası yok.",
+                  "kanit": {"sayi": len(damgasiz), "ornekler": [{"tip": "kur", "kur_id": k.get("id"), "ogrenci_id": k.get("ogrenci_id")} for k in damgasiz[:10]]}})
     try:
         pay_novergi = await db.payments.count_documents({"tip": "ogrenci", "vergi": {"$in": [None]}})
         if pay_novergi > 0:
@@ -49,8 +54,9 @@ async def sayi_dogrulama_kontrol(fotograf: dict) -> tuple:
     """Son önerilerdeki sayıları fotoğrafla karşılaştırır. (bulgular, dogrulanamayan_oran)."""
     duz = _duz_degerler(ai_payload(fotograf or {}))
     sayilar = _sayisal_kume(duz)
-    oneriler = await db.ai_ceo_oneriler.find({}, {"_id": 0, "ozet": 1, "beklenen_etki": 1}).sort("tarih", -1).to_list(length=100)
+    oneriler = await db.ai_ceo_oneriler.find({}, {"_id": 0, "id": 1, "ozet": 1, "beklenen_etki": 1}).sort("tarih", -1).to_list(length=100)
     toplam = dogrulanamayan = 0
+    ornekler = []
     for o in oneriler:
         metin = f"{o.get('ozet','')} {o.get('beklenen_etki','')}"
         for ham in re.findall(r"\d+[.,]?\d*", metin):
@@ -63,12 +69,14 @@ async def sayi_dogrulama_kontrol(fotograf: dict) -> tuple:
             toplam += 1
             if not any(abs(n - x) <= max(0.5, abs(x) * 0.02) for x in sayilar):
                 dogrulanamayan += 1
+                if len(ornekler) < 10:
+                    ornekler.append({"tip": "oneri", "oneri_id": o.get("id"), "sayi": n, "cumle": metin.strip()[:160]})
     oran = round(dogrulanamayan * 100 / toplam, 1) if toplam else 0.0
     b = []
     if toplam >= 5 and oran > 30:
         b.append({"tur": "dogrulanamayan_sayi", "onem": "orta",
                   "ozet": f"Ayda metinlerindeki sayıların %{oran}'i fotoğrafla eşleşmiyor.",
-                  "kanit": {"dogrulanamayan": dogrulanamayan, "toplam": toplam}})
+                  "kanit": {"dogrulanamayan": dogrulanamayan, "toplam": toplam, "ornekler": ornekler}})
     return b, oran
 
 

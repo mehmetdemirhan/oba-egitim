@@ -171,6 +171,42 @@ async def deniz_son(current_user=Depends(_ADMIN)):
     return {"denetim": d, "bulgular": bulgular}
 
 
+@router.get("/ai/ceo/deniz/bulgu/{bulgu_id}")
+async def deniz_bulgu_detay(bulgu_id: str, current_user=Depends(_ADMIN)):
+    """P1+P2: bulgu + kanıt + çözüm önerisi (Claude Code prompt / operasyonel adım)."""
+    b = await db.ai_ceo_deniz_bulgular.find_one({"id": bulgu_id}, {"_id": 0})
+    if not b:
+        raise HTTPException(status_code=404, detail="Bulgu bulunamadı")
+    from .deniz_cozum import bulgu_cozum
+    return {"bulgu": b, "cozum": bulgu_cozum(b)}
+
+
+@router.post("/ai/ceo/deniz/bulgu/{bulgu_id}/kontrol")
+async def deniz_bulgu_kontrol(bulgu_id: str, current_user=Depends(_ADMIN)):
+    """P3: yalnız bu bulgunun deterministik kontrolünü yeniden çalıştırır (hızlı, AI yok)."""
+    b = await db.ai_ceo_deniz_bulgular.find_one({"id": bulgu_id}, {"_id": 0})
+    if not b:
+        raise HTTPException(status_code=404, detail="Bulgu bulunamadı")
+    from .deniz_cozum import bulgu_yeniden_kontrol
+    durum, guncel_kanit = await bulgu_yeniden_kontrol(b)
+    now = iso()
+    guncelle = {"son_kontrol_tarih": now}
+    if durum == "cozuldu":
+        guncelle.update({"durum": "cozuldu", "cozulme_tarihi": now})
+    elif durum == "devam" and guncel_kanit is not None:
+        guncelle["kanit"] = guncel_kanit
+    elif durum == "sonraki_tur":
+        guncelle["sonraki_tur_isaretli"] = True
+    await db.ai_ceo_deniz_bulgular.update_one({"id": bulgu_id}, {"$set": guncelle})
+    # islem_log
+    try:
+        from core.audit import islem_kaydet
+        await islem_kaydet(current_user, "ai_ceo", "deniz_kontrol", "deniz_bulgu", bulgu_id, "durum", b.get("durum"), durum)
+    except Exception:
+        pass
+    return {"ok": True, "durum": durum, "guncel_kanit": guncel_kanit, "bulgu_durum": guncelle.get("durum", b.get("durum"))}
+
+
 @router.put("/ai/ceo/deniz/bulgu/{bulgu_id}/durum")
 async def deniz_bulgu_durum(bulgu_id: str, govde: dict, current_user=Depends(_ADMIN)):
     durum = govde.get("durum")
