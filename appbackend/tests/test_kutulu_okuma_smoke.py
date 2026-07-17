@@ -61,7 +61,7 @@ async def run():
     async def metin_ekle(sinif, zorluk, baslik):
         await server.db.analiz_metinler.insert_one({
             "id": str(uuid.uuid4()), "baslik": baslik, "icerik": f"{baslik} icerik metni buraya.",
-            "kelime_sayisi": 4, "sinif_seviyesi": sinif, "tur": "hikaye",
+            "kelime_sayisi": 4, "sinif_seviyesi": sinif, "tur": "hikaye", "bolum": "analiz",
             "zorluk": zorluk, "durum": "havuzda", "olusturma_tarihi": "2026-01-01T00:00:00",
         })
     await metin_ekle("4", "kolay", "S4 Kolay")

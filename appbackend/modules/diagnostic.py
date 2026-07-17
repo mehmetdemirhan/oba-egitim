@@ -204,11 +204,42 @@ def _kelime_sinif(k: int) -> str:
     return "8"
 
 
+AKICI_KAYNAK = "akici_okuma_yeni"  # 150 Akıcı Okuma metninin kaynak etiketi (tek kaynak)
+
+
+def _ao_soru_kanon(s, eski=None):
+    """JSON sorusunu kanonik ÇSS şemasına çevirir; öğretmenin ELLE düzelttiği (manuel)
+    doğru cevabı korur (yeniden içe aktarımda ezilmez)."""
+    guven = "high" if str(s.get("guven", "")).lower() == "high" else "low"
+    kanon = {
+        "id": (eski or {}).get("id") or str(uuid.uuid4()),
+        "soru": s.get("soru", ""),
+        "secenekler": s.get("secenekler", {}),
+        "dogru_cevap": s.get("dogru"),
+        "dogru_cevap_kaynak": "otomatik",
+        "guven": guven,
+        "kontrol_gerekli": guven != "high" or not s.get("dogru"),
+    }
+    # Manuel düzeltmeyi koru
+    if eski and eski.get("dogru_cevap_kaynak") == "manuel":
+        kanon.update({"dogru_cevap": eski.get("dogru_cevap"), "dogru_cevap_kaynak": "manuel",
+                      "guven": "high", "kontrol_gerekli": False})
+    return kanon
+
+
+def _ao_acik_kanon(t, no, eski=None):
+    soru = t if isinstance(t, str) else (t or {}).get("soru", "")
+    return {"id": (eski or {}).get("id") or str(uuid.uuid4()), "no": no, "soru": soru,
+            "kategori": (eski or {}).get("kategori", "genel"), "model_cevap": (eski or {}).get("model_cevap", ""),
+            "subjektif": True}
+
+
 @router.post("/diagnostic/akici-okuma-goc")
 async def akici_okuma_goc(current_user=Depends(require_role(UserRole.ADMIN))):
-    """AKICI OKUMA metinlerini (150, sorularıyla) Analiz havuzuna yükler; DİĞER tüm
-    metinleri 'Okuma Parçaları' bölümüne taşır (SİLMEZ). Başlık eşleşmesinde mükerrer
-    oluşturmaz (mevcut kaydı günceller). İdempotent — tekrar çalıştırılabilir."""
+    """AKICI OKUMA metinlerini (150, sorularıyla) Analiz havuzuna yükler; DİĞER tüm metinleri
+    'Okuma Parçaları' bölümüne taşır (SİLMEZ — kalıcı silme için /analiz-havuz/temizle).
+    Başlık+kelime eşleşmesinde mükerrer oluşturmaz (günceller); öğretmenin manuel doğru-cevap
+    düzeltmelerini KORUR. İdempotent."""
     import json as _json
     import os as _os
     yol = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
@@ -219,38 +250,168 @@ async def akici_okuma_goc(current_user=Depends(require_role(UserRole.ADMIN))):
         metinler = _json.load(f)
 
     now = datetime.utcnow().isoformat()
-    # 1) TÜM mevcut metinleri geçici olarak 'okuma_parcalari'na al; 150 yeni metin
-    #    aşağıda (başlık+kelime eşleşmesiyle) 'analiz'e geri çekilir. Aynı başlıklı ama
-    #    farklı kelime sayılı metinler ayrı sayılır (docx'te tekrar eden başlıklar var).
     toplam_mevcut = await db.analiz_metinler.count_documents({})
     await db.analiz_metinler.update_many({}, {"$set": {"bolum": "okuma_parcalari"}})
 
-    eklenen, guncellenen = 0, 0
+    eklenen, guncellenen, dusuk_guven = 0, 0, 0
     for m in metinler:
+        mevcut = await db.analiz_metinler.find_one({"baslik": m["baslik"], "kelime_sayisi": m["kelime_sayisi"]})
+        eski_sorular = (mevcut or {}).get("sorular") or []
+        eski_acik = (mevcut or {}).get("acik_sorular") or []
+        sorular = [_ao_soru_kanon(s, eski_sorular[i] if i < len(eski_sorular) else None)
+                   for i, s in enumerate(m.get("sorular", []))]
+        acik = [_ao_acik_kanon(t, i + 1, eski_acik[i] if i < len(eski_acik) else None)
+                for i, t in enumerate(m.get("acik_uclu", m.get("acik_sorular", [])))]
+        dusuk_guven += sum(1 for s in sorular if s["kontrol_gerekli"])
         ortak = {
             "baslik": m["baslik"], "icerik": m["icerik"], "kelime_sayisi": m["kelime_sayisi"],
-            "sorular": m.get("sorular", []), "acik_uclu": m.get("acik_uclu", []),
-            "bolum": "analiz", "durum": "havuzda", "kaynak": "akici_okuma_yeni",
-            "sinif_seviyesi": _kelime_sinif(m["kelime_sayisi"]),  # öğrenci sınıfına göre gelsin
+            "sorular": sorular, "acik_sorular": acik,
+            "bolum": "analiz", "durum": "havuzda", "kaynak": AKICI_KAYNAK,
+            "sinif_seviyesi": _kelime_sinif(m["kelime_sayisi"]),
             "guncelleme_tarihi": now,
         }
-        # Bileşik anahtar: başlık + kelime sayısı (mükerrer başlıkları çökertmemek için)
-        mevcut = await db.analiz_metinler.find_one(
-            {"baslik": m["baslik"], "kelime_sayisi": m["kelime_sayisi"]})
+        ortak["$unset_acik_uclu"] = True  # eski yanlış alanı temizlemek için işaret
         if mevcut:
-            await db.analiz_metinler.update_one({"id": mevcut["id"]}, {"$set": ortak})
+            await db.analiz_metinler.update_one({"id": mevcut["id"]},
+                                                {"$set": {k: v for k, v in ortak.items() if k != "$unset_acik_uclu"},
+                                                 "$unset": {"acik_uclu": ""}})
             guncellenen += 1
         else:
             await db.analiz_metinler.insert_one({
-                "id": str(uuid.uuid4()), **ortak, "tur": "olcum", "zorluk": "orta",
-                "oylar": {}, "ekleyen_id": current_user["id"],
+                "id": str(uuid.uuid4()), **{k: v for k, v in ortak.items() if k != "$unset_acik_uclu"},
+                "tur": "olcum", "zorluk": "orta", "oylar": {}, "ekleyen_id": current_user["id"],
                 "olusturma_tarihi": now, "yayin_tarihi": now,
             })
             eklenen += 1
     okuma_parcalari_say = await db.analiz_metinler.count_documents({"bolum": "okuma_parcalari"})
     return {"ok": True, "eklenen": eklenen, "guncellenen": guncellenen,
-            "okuma_parcalarina_tasinan": okuma_parcalari_say, "onceki_toplam": toplam_mevcut,
-            "toplam_metin": len(metinler)}
+            "dusuk_guven_soru": dusuk_guven, "okuma_parcalarina_tasinan": okuma_parcalari_say,
+            "onceki_toplam": toplam_mevcut, "toplam_metin": len(metinler)}
+
+
+@router.post("/diagnostic/analiz-havuz/yedekle")
+async def analiz_havuz_yedekle(current_user=Depends(require_role(UserRole.ADMIN))):
+    """Geri dönüşsüz silme öncesi güvenlik ağı: TÜM analiz_metinler'i (soruları dahil) bir
+    arşiv koleksiyonuna (analiz_metinler_arsiv) tek partide kopyalar. Admin GET ile export edebilir."""
+    metinler = await db.analiz_metinler.find({}, {"_id": 0}).to_list(length=100000)
+    parti = str(uuid.uuid4())
+    now = datetime.utcnow().isoformat()
+    await db.analiz_metinler_arsiv.insert_one({
+        "id": parti, "tarih": now, "alan_id": current_user["id"],
+        "metin_sayisi": len(metinler), "metinler": metinler})
+    return {"ok": True, "parti_id": parti, "tarih": now, "yedeklenen_metin": len(metinler)}
+
+
+@router.get("/diagnostic/analiz-havuz/yedekler")
+async def analiz_havuz_yedekler(current_user=Depends(require_role(UserRole.ADMIN))):
+    """Arşiv partilerini listeler (metinler hariç — özet)."""
+    items = await db.analiz_metinler_arsiv.find({}, {"_id": 0, "metinler": 0}).sort("tarih", -1).to_list(length=200)
+    return {"yedekler": items}
+
+
+@router.get("/diagnostic/analiz-havuz/yedek/{parti_id}")
+async def analiz_havuz_yedek_export(parti_id: str, current_user=Depends(require_role(UserRole.ADMIN))):
+    """Bir arşiv partisini tam (metinler+sorular) JSON olarak indirir."""
+    doc = await db.analiz_metinler_arsiv.find_one({"id": parti_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Yedek bulunamadı")
+    return doc
+
+
+@router.post("/diagnostic/analiz-havuz/temizle")
+async def analiz_havuz_temizle(onay: bool = False, current_user=Depends(require_role(UserRole.ADMIN))):
+    """TAM SİLME (geri dönüşsüz): 150 Akıcı Okuma DIŞINDAKİ tüm metinleri kalıcı siler.
+    ÖNCE en az bir yedek partisi olmalı (yoksa reddeder). onay=true zorunlu. Geçmiş öğrenci
+    ilerlemesi diagnostic_oturumlar/diagnostic_raporlar içinde SNAPSHOT'landığı için bozulmaz."""
+    if not onay:
+        raise HTTPException(status_code=400, detail="onay=true gerekli (geri dönüşsüz silme)")
+    yedek_say = await db.analiz_metinler_arsiv.count_documents({})
+    if yedek_say == 0:
+        raise HTTPException(status_code=400, detail="Önce /analiz-havuz/yedekle çalıştırılmalı (güvenlik ağı yok)")
+    korunacak = await db.analiz_metinler.count_documents({"kaynak": AKICI_KAYNAK})
+    sonuc = await db.analiz_metinler.delete_many({"kaynak": {"$ne": AKICI_KAYNAK}})
+    from core.audit import islem_kaydet
+    await islem_kaydet(current_user, "diagnostic", "analiz_havuz_temizle", "analiz_metinler", None,
+                       "kaynak!=" + AKICI_KAYNAK, sonuc.deleted_count, "silindi")
+    kalan = await db.analiz_metinler.count_documents({})
+    return {"ok": True, "silinen": sonuc.deleted_count, "korunan_akici": korunacak, "kalan_toplam": kalan}
+
+
+def _cevap_prompt(metin: dict):
+    sat = [f"METİN: {metin.get('icerik','')}", "", "SORULAR:"]
+    for i, s in enumerate(metin.get("sorular", []), 1):
+        sec = s.get("secenekler", {})
+        sat.append(f"{i}) {s.get('soru','')}")
+        for L in "ABCD":
+            if sec.get(L):
+                sat.append(f"   {L}) {sec[L]}")
+    sat.append('\nHer soru için SADECE metne dayanarak doğru şıkkı (A/B/C/D) ve güveni belirt.')
+    sat.append('YALNIZ JSON dizi: [{"no":1,"dogru":"B","guven":"high"}, ...]')
+    return "\n".join(sat)
+
+
+def _cevap_parse(txt: str, n: int):
+    import json as _json
+    import re as _re
+    try:
+        mt = _re.search(r"\[.*\]", txt or "", _re.DOTALL)
+        arr = _json.loads(mt.group(0)) if mt else []
+        by = {int(x.get("no")): x for x in arr if str(x.get("no", "")).isdigit()}
+    except Exception:
+        by = {}
+    out = []
+    for i in range(1, n + 1):
+        x = by.get(i, {})
+        d = str(x.get("dogru", "")).strip().upper()[:1]
+        g = str(x.get("guven", "low")).strip().lower()
+        out.append((d if d in "ABCD" else None, "high" if g == "high" else "low"))
+    return out
+
+
+@router.post("/diagnostic/analiz-havuz/cevap-uret")
+async def analiz_havuz_cevap_uret(limit: int = 30, yeniden: bool = False,
+                                  current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+    """AI ile ÇSS DOĞRU CEVAPLARINI belirler — mevcut soruları metne göre YANITLAR (metin/soru
+    ÜRETMEZ). Öğretmenin MANUEL düzeltmesini korur; guven=low olanları öğretmen paneline bayraklar.
+    Zaman aşımına düşmemek için parti parti (limit) işler; 'kalan' 0 olana dek tekrar çağrılır.
+    yeniden=true tüm otomatik cevapları yeniden hesaplar."""
+    from core.ai import call_claude, GEMINI_API_KEY
+    if not GEMINI_API_KEY:
+        raise HTTPException(status_code=400, detail="GEMINI_API_KEY tanımlı değil (cevap üretimi prod'da çalışır)")
+
+    def _isli(s):
+        return s.get("dogru_cevap_kaynak") != "manuel" and (yeniden or not s.get("dogru_cevap") or s.get("kontrol_gerekli"))
+
+    metinler = await db.analiz_metinler.find({"kaynak": AKICI_KAYNAK}).to_list(length=100000)
+    bekleyen = [m for m in metinler if any(_isli(s) for s in (m.get("sorular") or []))]
+    islenecek = bekleyen[:max(1, limit)]
+    islenen = high = low = bos = 0
+    for m in islenecek:
+        sorular = m.get("sorular") or []
+        try:
+            res = await call_claude("Sen bir Türkçe okuma-anlama uzmanısın. Yalnız metne dayan.",
+                                    _cevap_prompt(m), max_tokens=700, ozellik="analiz_cevap")
+            cevaplar = _cevap_parse(res.get("text", ""), len(sorular))
+        except Exception:
+            cevaplar = [(None, "low")] * len(sorular)
+        for s, (d, g) in zip(sorular, cevaplar):
+            if s.get("dogru_cevap_kaynak") == "manuel":
+                continue
+            if d:
+                s["dogru_cevap"] = d
+                s["dogru_cevap_kaynak"] = "otomatik"
+                s["guven"] = g
+                s["kontrol_gerekli"] = (g != "high")
+                high += 1 if g == "high" else 0
+                low += 1 if g != "high" else 0
+            else:
+                s["kontrol_gerekli"] = True
+                bos += 1
+        await db.analiz_metinler.update_one({"id": m["id"]}, {"$set": {"sorular": sorular}})
+        islenen += 1
+    kalan = len(bekleyen) - islenen
+    return {"ok": True, "islenen_metin": islenen, "kalan_metin": kalan,
+            "yuksek_guven": high, "dusuk_guven": low, "cevaplanamayan": bos}
 
 
 @router.post("/diagnostic/texts")
@@ -750,6 +911,7 @@ async def baslat_oturum(data: AnalizOturumBaslat, current_user=Depends(get_curre
     d["metin_baslik"] = metin.get("baslik", "")
     d["metin_kelime_sayisi"] = metin.get("kelime_sayisi", 0)
     d["metin_icerik"] = metin.get("icerik", "")
+    d["metin_sinif_seviyesi"] = metin.get("sinif_seviyesi")  # snapshot (metin silinse de WPM doğru)
     ogr = await db.students.find_one({"id": data.ogrenci_id})
     d["ogrenci_ad"] = f"{(ogr or {}).get('ad','')} {(ogr or {}).get('soyad','')}".strip()
     d["ogrenci_sinif"] = (ogr or {}).get("sinif", "")
@@ -794,9 +956,11 @@ async def tamamla_oturum(oturum_id: str, data: AnalizTamamla, current_user=Depen
     if not oturum:
         raise HTTPException(status_code=404, detail="Oturum bulunamadı")
 
+    # Metin bilgisi ÖNCE oturum snapshot'ından (başlangıçta kaydedilir) — metin sonradan
+    # silinse/değişse bile WPM/doğruluk doğru hesaplanır. Snapshot yoksa havuza bak.
     metin = await db.analiz_metinler.find_one({"id": oturum["metin_id"]})
-    kelime_sayisi = metin.get("kelime_sayisi", 100) if metin else 100
-    sinif_seviyesi = metin.get("sinif_seviyesi", "4") if metin else "4"
+    kelime_sayisi = oturum.get("metin_kelime_sayisi") or (metin.get("kelime_sayisi", 100) if metin else 100)
+    sinif_seviyesi = (metin.get("sinif_seviyesi") if metin else None) or oturum.get("metin_sinif_seviyesi") or "4"
 
     # Hesaplamalar
     sure_dakika = data.sure_saniye / 60 if data.sure_saniye > 0 else 1
