@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends
 
 from core.db import db
 from core.auth import require_role, UserRole
+from core.zaman import simdi, aware as _aware
 
 from .ortak import metrik_al, KATEGORI_METRIK
 
@@ -31,32 +32,27 @@ async def _fotograf_by_tarih(tarih: str) -> dict | None:
 
 async def _isabet_olc(oneri: dict, son_foto: dict) -> str:
     """uygulandi önerinin etkisi: 'isabetli' | 'isabetsiz' | 'beklemede'."""
-    uyg_tarih = oneri.get("durum_tarih") or oneri.get("tarih")
-    d = None
-    try:
-        d = datetime.fromisoformat(str(uyg_tarih).replace("Z", "+00:00"))
-    except (ValueError, TypeError):
+    d = _aware(oneri.get("durum_tarih") or oneri.get("tarih"))
+    if not d:
         return "beklemede"
-    if d.tzinfo is None:
-        d = d.replace(tzinfo=timezone.utc)
-    if (datetime.now(timezone.utc) - d).days < ISABET_OLCUM_GUN:
+    if (simdi() - d).days < ISABET_OLCUM_GUN:
         return "beklemede"
     yol, yon = KATEGORI_METRIK.get(oneri.get("kategori"), (None, "artis"))
     if not yol:
         return "beklemede"
     onceki_foto = await _fotograf_by_tarih(oneri.get("uygulama_fotograf_tarih"))
     onceki = metrik_al(onceki_foto or {}, yol)
-    simdi = metrik_al(son_foto or {}, yol)
+    guncel = metrik_al(son_foto or {}, yol)
     try:
-        onceki = float(onceki); simdi = float(simdi)
+        onceki = float(onceki); guncel = float(guncel)
     except (TypeError, ValueError):
         return "beklemede"
-    iyilesme = (simdi > onceki) if yon == "artis" else (simdi < onceki)
+    iyilesme = (guncel > onceki) if yon == "artis" else (guncel < onceki)
     return "isabetli" if iyilesme else "isabetsiz"
 
 
 async def karne_hesapla(gun: int = 90) -> dict:
-    esik = (datetime.now(timezone.utc) - timedelta(days=gun)).isoformat()
+    esik = (simdi() - timedelta(days=gun)).isoformat()
     oneriler = await db.ai_ceo_oneriler.find({"tarih": {"$gte": esik}}, {"_id": 0}).to_list(length=5000)
     son_foto = await db.ai_ceo_fotograflar.find_one({}, {"_id": 0}, sort=[("tarih", -1)])
 

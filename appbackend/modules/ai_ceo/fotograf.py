@@ -21,6 +21,7 @@ from fastapi import APIRouter, Depends
 
 from core.db import db
 from core.auth import require_role, UserRole
+from core.zaman import simdi, aware as _aware
 
 try:
     from core.kayit_normalize import normalize_sinif
@@ -51,21 +52,16 @@ def _num(v) -> float:
 
 
 def _iso_parse(s):
-    if not s:
-        return None
-    try:
-        return datetime.fromisoformat(str(s).replace("Z", "+00:00"))
-    except (ValueError, TypeError):
-        return None
+    """ISO string/None → DAİMA aware UTC datetime (naive = UTC varsayılır) veya None.
+    Böylece iki tarih arasındaki fark/karşılaştırma naive/aware karışsa da patlamaz."""
+    return _aware(s)
 
 
 def _gun_farki(iso_str, ref: datetime) -> float | None:
     d = _iso_parse(iso_str)
     if not d:
         return None
-    if d.tzinfo is None:
-        d = d.replace(tzinfo=timezone.utc)
-    return (ref - d).total_seconds() / 86400.0
+    return (_aware(ref) - d).total_seconds() / 86400.0
 
 
 def takma_id(gercek_id: str) -> str:
@@ -319,7 +315,7 @@ async def _otonom_envanter(ref: datetime) -> dict:
 # ─────────────────────────── ana servis ───────────────────────────
 async def sistem_fotografi() -> dict:
     """Deterministik sistem fotoğrafı (agregat, KVKK-güvenli). AI'dan önce çalışır."""
-    ref = datetime.now(timezone.utc)
+    ref = simdi()
     bloklar = {}
     for ad, fn in (("ogretmen", _ogretmen_metrikleri), ("muhasebe", _muhasebe_metrikleri),
                    ("ogrenci", _ogrenci_metrikleri), ("kullanim", _kullanim_metrikleri)):

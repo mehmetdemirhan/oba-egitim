@@ -19,6 +19,7 @@ from core.db import db
 from core.auth import require_role, UserRole, get_current_user
 from core.ai import call_claude
 from core.config import GEMINI_API_KEY
+from core.zaman import simdi, aware as _aware, iso as _iso
 
 from .personalar import sistem_promptu, MIRAN_YASAK_ORUNTULER, MIRAN_PARA_ORUNTULER
 
@@ -35,24 +36,20 @@ async def ogretmen_odak(ogretmen_id: str) -> dict:
         return {}
     ogr_idler = t.get("atanan_ogrenciler") or []
     kurlar = await db.kur_ucretleri.find({"ogrenci_id": {"$in": ogr_idler}}, {"_id": 0}).to_list(length=10000)
-    now = datetime.now(timezone.utc)
+    now = simdi()
     yaklasan = 0   # 30. güne yaklaşan açık kur (25-35 gün)
     geciken = 0    # 35 günü aşmış açık kur
     acik = 0
     for k in kurlar:
         if k.get("durum") in (None, "acik", "aktif") and not (k.get("tamamlanma_tarihi") or k.get("odeme_tamamlanma_tarihi")):
             acik += 1
-            try:
-                bas = datetime.fromisoformat(str(k.get("baslangic_tarihi") or k.get("tarih")).replace("Z", "+00:00"))
-                if bas.tzinfo is None:
-                    bas = bas.replace(tzinfo=timezone.utc)
+            bas = _aware(k.get("baslangic_tarihi") or k.get("tarih"))
+            if bas:
                 gun = (now - bas).days
                 if gun > 35:
                     geciken += 1
                 elif gun >= 25:
                     yaklasan += 1
-            except (ValueError, TypeError):
-                continue
     if yaklasan >= 1 or geciken >= 1 or acik >= 3:
         odak, odak_etiket = "gecikme_riski", "Gecikme riski odaklı"
     else:
@@ -160,7 +157,7 @@ async def miran_uret(ogretmen_id: str) -> dict:
         "odak_etiket": odak["odak_etiket"],
         "icerik": icerik,
         "kaynak": kaynak,
-        "tarih": datetime.now(timezone.utc).isoformat(),
+        "tarih": _iso(),
     }
     await db.ai_ceo_miran.insert_one({**kayit})
     kayit.pop("_id", None)
@@ -171,14 +168,9 @@ async def _guncel_miran(ogretmen_id: str) -> dict | None:
     doc = await db.ai_ceo_miran.find_one({"ogretmen_id": ogretmen_id}, {"_id": 0}, sort=[("tarih", -1)])
     if not doc:
         return None
-    try:
-        d = datetime.fromisoformat(doc["tarih"].replace("Z", "+00:00"))
-        if d.tzinfo is None:
-            d = d.replace(tzinfo=timezone.utc)
-        if (datetime.now(timezone.utc) - d).days >= HAFTA_GUN:
-            return None  # bayat → yenilenmeli
-    except (ValueError, TypeError, KeyError):
-        pass
+    d = _aware(doc.get("tarih"))
+    if d and (simdi() - d).days >= HAFTA_GUN:
+        return None  # bayat → yenilenmeli
     return doc
 
 
@@ -207,7 +199,7 @@ async def miran_geri_bildirim(miran_id: str, govde: dict, current_user=Depends(g
     await db.ai_ceo_miran_geribildirim.update_one(
         {"miran_id": miran_id, "ogretmen_id": oid},
         {"$set": {"miran_id": miran_id, "ogretmen_id": oid, "faydali": bool(govde.get("faydali")),
-                  "tarih": datetime.now(timezone.utc).isoformat()}},
+                  "tarih": _iso()}},
         upsert=True)
     return {"ok": True}
 

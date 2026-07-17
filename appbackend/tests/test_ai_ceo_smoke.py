@@ -56,6 +56,12 @@ async def run():
     # gecikme riski: s1'in kuru 40 gün önce açılmış (geciken)
     await db.kur_ucretleri.insert_one({"id": "k1", "ogrenci_id": "s1", "kur_adi": "1", "tutar": 1000,
                                        "yapilan_odeme": 400, "durum": "acik", "baslangic_tarihi": "2026-06-01T00:00:00"})
+    # KARIŞIK tz kur: baslangic NAIVE + tamamlanma AWARE — fotoğraf ort_kur_suresi hesabı
+    # eskiden burada "offset-naive vs offset-aware" hatası fırlatıyordu.
+    await db.kur_ucretleri.insert_one({"id": "kmix", "ogrenci_id": "s2", "kur_adi": "1", "tutar": 1000,
+                                       "yapilan_odeme": 1000, "durum": "tamamlandi",
+                                       "baslangic_tarihi": "2026-05-01T00:00:00",            # naive
+                                       "tamamlanma_tarihi": "2026-05-20T00:00:00+00:00"})    # aware
     await db.veli_anketleri.insert_one({"puan": 4})
 
     def H(uid):
@@ -69,6 +75,9 @@ async def run():
         check(r.status_code == 200, f"fotograf/cek 200 ({r.status_code})")
         foto = r.json()["fotograf"]
         check(all(k in foto for k in ("ogretmen", "muhasebe", "ogrenci", "kullanim", "envanter")), "fotoğraf tüm blokları içeriyor")
+        # KARIŞIK tz kur → ort süre HATASIZ hesaplandı (naive/aware regresyonu)
+        check("_hata" not in foto["ogretmen"], "öğretmen bloğu hatasız (naive/aware karışımı fırlatmadı)")
+        check(abs((foto["ogretmen"].get("ort_kur_suresi_gun") or 0) - 19) < 0.6, f"karışık-tz kurdan ort süre ~19 gün ({foto['ogretmen'].get('ort_kur_suresi_gun')})")
         kol = foto["envanter"]["koleksiyonlar"]
         check("yepyeni_modul_verisi" in kol, "otonom envanter yeni koleksiyonu otomatik kapsadı")
         check(foto["ogrenci"]["aktif"] == 3, f"ogrenci.aktif=3 ({foto['ogrenci']['aktif']})")
