@@ -39,6 +39,7 @@ async def run():
     db = server.db
     await server.client.drop_database(TEST_DB)
     await db.users.insert_one({"id": "adm", "role": "admin", "ad": "Ad", "soyad": "Min"})
+    await db.users.insert_one({"id": "koord", "role": "coordinator", "ad": "Ko", "soyad": "Or"})
     await db.users.insert_one({"id": "t1", "role": "teacher", "ad": "Öğ", "soyad": "One"})
     await db.users.insert_one({"id": "ogr1", "role": "student", "ad": "Öğ", "soyad": "Renci", "sinif": "3"})
     # Eski/kaynağı belirsiz metin (silinecek)
@@ -122,6 +123,23 @@ async def run():
         r = await ac.post(f"/api/diagnostic/texts/{yid}/admin-karar", headers=H("adm"), json={"onay": True})
         durum2 = (await db.analiz_metinler.find_one({"id": yid}) or {}).get("durum")
         check(durum2 == "havuzda", f"admin onayı → havuzda ({durum2})")
+
+        # KOORDİNATÖR onayı: beklemede → havuzda (öğretmen ekledi)
+        r = await ac.post("/api/diagnostic/texts", headers=H("t1"), json={"baslik": "Koord Onaylı", "icerik": "Metin.", "sorular": [], "acik_sorular": []})
+        kid = r.json().get("id")
+        r = await ac.post(f"/api/diagnostic/texts/{kid}/admin-karar", headers=H("koord"), json={"onay": True})
+        dk = (await db.analiz_metinler.find_one({"id": kid}) or {}).get("durum")
+        check(r.status_code == 200 and dk == "havuzda", f"koordinatör onayı → havuzda ({dk})")
+        # KOORDİNATÖR, oylamadaki metni de onaylayabilir (admin eklerse durum=oylama)
+        r = await ac.post("/api/diagnostic/texts", headers=H("adm"), json={"baslik": "Oylamalık", "icerik": "Metin.", "sorular": [], "acik_sorular": []})
+        oid = r.json().get("id")
+        check(r.json().get("durum") == "oylama", f"admin eklediği metin oylamada ({r.json().get('durum')})")
+        r = await ac.post(f"/api/diagnostic/texts/{oid}/admin-karar", headers=H("koord"), json={"onay": True})
+        do = (await db.analiz_metinler.find_one({"id": oid}) or {}).get("durum")
+        check(do == "havuzda", f"koordinatör oylamadaki metni onayladı → havuzda ({do})")
+        # öğretmen onaylayamaz (403)
+        r = await ac.post("/api/diagnostic/texts", headers=H("t1"), json={"baslik": "Öğr2", "icerik": "M.", "sorular": [], "acik_sorular": []})
+        check((await ac.post(f"/api/diagnostic/texts/{r.json().get('id')}/admin-karar", headers=H("t1"), json={"onay": True})).status_code == 403, "öğretmen admin-karar veremez (403)")
 
         # ── 2+3) yedekle → temizle (geçmiş snapshot korunur) ──
         # eski metne referanslı bir oturum (snapshot'lı) oluştur

@@ -2398,7 +2398,7 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
       )}
 
       {/* Oylamadakiler */}
-      {oylamadakiler.length > 0 && (user?.role === "admin" || user?.role === "teacher") && (
+      {oylamadakiler.length > 0 && (user?.role === "admin" || user?.role === "coordinator" || user?.role === "teacher") && (
         <div>
           <h4 className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary mb-2"><Users className="h-4 w-4" />Oylamada ({oylamadakiler.length})</h4>
           {oylamadakiler.map(m => {
@@ -2423,7 +2423,13 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
                   </div>
                 )}
                 <p className="text-sm text-subtle mb-3 line-clamp-2">{m.icerik}</p>
-                {kullandi ? (
+                {(user?.role === "admin" || user?.role === "coordinator") ? (
+                  // Yönetici/Koordinatör: oylama beklemeden TEK onayla havuza al (ya da reddet)
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => adminKarar(m.id, true, true)} className="bg-green-600 hover:bg-green-700 text-white"><CheckCircle className="h-4 w-4 mr-1" />Onayla ve Havuza Al</Button>
+                    <Button size="sm" variant="destructive" onClick={() => adminKarar(m.id, false)}><XCircle className="h-4 w-4 mr-1" />Reddet</Button>
+                  </div>
+                ) : kullandi ? (
                   <div className="inline-flex items-center gap-1.5 text-sm bg-app p-2 rounded-lg text-subtle">
                     <Check className="h-4 w-4 shrink-0" /><span>Oyunuzu kullandınız: <strong>{kullandi.onay ? "Onay" : "Red"}</strong>
                     {!kullandi.onay && kullandi.sebep && <span> — {kullandi.sebep}</span>}</span>
