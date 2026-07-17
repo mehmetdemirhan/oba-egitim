@@ -52,6 +52,8 @@ export default function AiCeo({ apiBase }) {
   const [calisiyor, setCalisiyor] = useState(false);
   const [genelSoru, setGenelSoru] = useState("");
   const [genelCevap, setGenelCevap] = useState(null);
+  const [pazar, setPazar] = useState(null);
+  const [pazarYukleniyor, setPazarYukleniyor] = useState(false);
   const [fotoTarih, setFotoTarih] = useState(null);
 
   const api = (p) => `${apiBase}${p}`;
@@ -110,6 +112,13 @@ export default function AiCeo({ apiBase }) {
     setGenelCevap({ bekliyor: true });
     try { const r = await axios.post(api("/ai/ceo/sor"), { soru: genelSoru }); setGenelCevap(r.data.mesaj || { hata: r.data.sebep }); }
     catch (e) { setGenelCevap({ hata: "Cevap alınamadı" }); }
+  };
+
+  const pazarAra = async () => {
+    setPazarYukleniyor(true);
+    try { const r = await axios.post(api("/ai/ceo/pazar-arastirma"), {}); setPazar(r.data); }
+    catch (e) { setPazar({ ok: false, durum: "hata", sebep: "İstek başarısız" }); }
+    finally { setPazarYukleniyor(false); }
   };
 
   const radarVeri = Object.keys(KAT_ETIKET).map(k => ({
@@ -316,6 +325,33 @@ export default function AiCeo({ apiBase }) {
             )}
           </div>
         )}
+      </div>
+
+      {/* ── Pazar Araştırması (opsiyonel, grounding) ── */}
+      <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="font-bold text-content text-sm flex items-center gap-2"><AydaAvatar size={22} ring={false} />Pazar Araştırması</h3>
+          <button onClick={pazarAra} disabled={pazarYukleniyor} className="text-xs bg-indigo-600 disabled:opacity-60 text-white rounded-lg px-3 py-1.5">
+            {pazarYukleniyor ? "Araştırılıyor…" : "Web'de Araştır"}
+          </button>
+        </div>
+        <div className="text-[11px] text-subtle mb-2">Web araması (grounding) kullanır — seyrek/elle tetikleyin (maliyetli).</div>
+        {pazar && (pazar.ok ? (
+          <div className="text-sm space-y-2">
+            <div className="text-content whitespace-pre-wrap">{pazar.arastirma?.ozet}</div>
+            {(pazar.arastirma?.kaynaklar || []).length > 0 && (
+              <div><div className="text-xs font-semibold text-content mb-1">Kaynaklar</div>
+                <ul className="space-y-0.5">{pazar.arastirma.kaynaklar.map((k, i) => (
+                  <li key={i}><a href={k.url} target="_blank" rel="noreferrer" className="text-xs text-indigo-600 hover:underline break-all">🔗 {k.baslik}</a></li>
+                ))}</ul></div>
+            )}
+          </div>
+        ) : (
+          <div className="text-sm rounded-lg bg-amber-50 border border-amber-200 text-amber-700 p-3">
+            {pazar.durum === "yapilandirilmadi" ? "Grounding yapılandırılmadı / kullanılamıyor — uydurma analiz üretilmedi." : "Araştırma yapılamadı."}
+            {pazar.sebep && <div className="text-[11px] mt-1 opacity-80">{pazar.sebep}</div>}
+          </div>
+        ))}
       </div>
 
       {/* ── Öneri detay modalı ── */}
