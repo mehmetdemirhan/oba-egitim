@@ -20,14 +20,15 @@ _ADMIN = require_role(UserRole.ADMIN, UserRole.COORDINATOR)
 AYAR_TIP = "ogretmen_deneyim_gorevleri"
 
 # Varsayılan görev kataloğu (koşul = otomatik algılama anahtarı; GOREV_KOSULLARI'na bakar)
+# hedef = öğretmen panelindeki sekme id'si (tıkla → git). Admin görev eklerken hedef seçer.
 VARSAYILAN_GOREVLER = [
-    {"id": "ilk_ogrenci", "baslik": "İlk öğrencini ekle", "aciklama": "Sana atanmış en az bir öğrenci olsun.", "xp": 50, "sira": 1, "aktif": True},
-    {"id": "profil_tamam", "baslik": "Profilini tamamla", "aciklama": "İl/ilçe + mezuniyet bilgini gir.", "xp": 40, "sira": 2, "aktif": True},
-    {"id": "ders_plani", "baslik": "Haftalık ders planı gir", "aciklama": "Ders programına bir plan ekle.", "xp": 60, "sira": 3, "aktif": True},
-    {"id": "timi_uygula", "baslik": "Bir TIMI envanteri uygula", "aciklama": "Bir öğrencine TIMI uygula.", "xp": 70, "sira": 4, "aktif": True},
-    {"id": "sinav_ata", "baslik": "Öğrencine sınav görevi ata", "aciklama": "Bir sınav/ödev ata.", "xp": 60, "sira": 5, "aktif": True},
-    {"id": "miran_geri_bildirim", "baslik": "Miran'ın önerisini değerlendir", "aciklama": "Bir koçluk önerisini faydalı/faydasız işaretle.", "xp": 30, "sira": 6, "aktif": True},
-    {"id": "sss_bak", "baslik": "SSS'ye göz at", "aciklama": "Yardım/SSS bölümünü ziyaret et.", "xp": 20, "sira": 7, "aktif": True, "ziyaret": True},
+    {"id": "ilk_ogrenci", "baslik": "İlk öğrencini ekle", "aciklama": "Sana atanmış en az bir öğrenci olsun.", "xp": 50, "sira": 1, "aktif": True, "hedef": "ogrencilerim"},
+    {"id": "profil_tamam", "baslik": "Profilini tamamla", "aciklama": "İl/ilçe + mezuniyet bilgini gir.", "xp": 40, "sira": 2, "aktif": True, "hedef": "profilim"},
+    {"id": "ders_plani", "baslik": "Haftalık ders planı gir", "aciklama": "Ders programına bir plan ekle.", "xp": 60, "sira": 3, "aktif": True, "hedef": "program"},
+    {"id": "timi_uygula", "baslik": "Bir TIMI envanteri uygula", "aciklama": "Bir öğrencine TIMI uygula.", "xp": 70, "sira": 4, "aktif": True, "hedef": "giris-analizi"},
+    {"id": "sinav_ata", "baslik": "Öğrencine sınav görevi ata", "aciklama": "Bir sınav/ödev ata.", "xp": 60, "sira": 5, "aktif": True, "hedef": "gorevler"},
+    {"id": "miran_geri_bildirim", "baslik": "Miran'ın önerisini değerlendir", "aciklama": "Bir koçluk önerisini faydalı/faydasız işaretle.", "xp": 30, "sira": 6, "aktif": True, "hedef": "kocum-miran"},
+    {"id": "sss_bak", "baslik": "SSS'ye göz at", "aciklama": "Yardım/SSS bölümünü ziyaret et.", "xp": 20, "sira": 7, "aktif": True, "ziyaret": True, "hedef": "sss"},
 ]
 
 

@@ -52,6 +52,7 @@ import BilgiIkonu from "./components/BilgiIkonu";
 import AiCeo from "./components/aiceo/AiCeo";
 import KocumMiran from "./components/aiceo/KocumMiran";
 import Deniz from "./components/aiceo/Deniz";
+import YoneticiAdimlar from "./components/aiceo/YoneticiAdimlar";
 import SinavYonetimi from "./components/admin/SinavYonetimi";
 import SinavCozum from "./components/SinavCozum";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
@@ -739,6 +740,8 @@ function AppContent() {
           <TabsContent value="dashboard">
             {dashboardStats && (
               <div className="space-y-6">
+                {/* Yönetici "Sıradaki Adımlar" (Ayda) — yalnız admin */}
+                {user.role === "admin" && <YoneticiAdimlar apiBase={API} onNavigate={setActiveTab} />}
                 {/* KPI: Risk Durumu + Okuma Aktivitesi */}
                 {ogrenciRiskler.length > 0 && (
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -1821,6 +1824,12 @@ function BekleyenlerKarti({ bekleyenler, onRefresh, onTabChange }) {
   const { toast } = useToast();
   const [acikDetay, setAcikDetay] = useState(null);
   const [zekaModal, setZekaModal] = useState(null);
+  // Collapse (Geciken Kurlar deseni): varsayılan bekleyen varsa açık; tercih localStorage'da
+  const [acik, setAcik] = useState(() => {
+    const s = localStorage.getItem("onayBekleyenlerAcik");
+    return s === null ? (bekleyenler.toplam > 0) : s === "1";
+  });
+  const toggle = () => setAcik(v => { localStorage.setItem("onayBekleyenlerAcik", v ? "0" : "1"); return !v; });
 
   const adminKararMetin = async (id, onay, direkt = false) => {
     try { await axios.post(`${API}/diagnostic/texts/${id}/admin-karar`, { onay, direkt }); toast({ title: direkt ? "✅ Direkt havuza alındı" : onay ? "🗳️ Oylama başlatıldı" : "❌ Reddedildi" }); onRefresh(); }
@@ -1858,15 +1867,17 @@ function BekleyenlerKarti({ bekleyenler, onRefresh, onTabChange }) {
   return (
     <>
     <Card className="border border-line shadow-sm border-l-4 border-l-amber-400">
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-3 cursor-pointer" onClick={toggle}>
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center"><span className="text-white font-bold text-sm tabular-nums">{bekleyenler.toplam}</span></div>
             <div><div className="text-base font-bold">Onay Bekleyenler</div>
               <div className="text-xs text-subtle font-normal">{(bekleyenler.metin_bekleyen?.length||0) + (bekleyenler.gelisim_bekleyen?.length||0) + (bekleyenler.kitap_bekleyen?.length||0)} karar • {(bekleyenler.metin_oylama?.length||0) + (bekleyenler.gelisim_oylama?.length||0) + (bekleyenler.kitap_oylama?.length||0)} oylama</div></div>
           </div>
+          <span className="text-subtle text-sm select-none">{acik ? "▾" : "▸"}</span>
         </CardTitle>
       </CardHeader>
+      {acik && (
       <CardContent>
         {tumListe.length === 0 ? <p className="text-sm text-subtle text-center py-4">Bekleyen içerik yok</p> : (
           <div className="space-y-2">
@@ -1931,6 +1942,7 @@ function BekleyenlerKarti({ bekleyenler, onRefresh, onTabChange }) {
           </div>
         )}
       </CardContent>
+      )}
     </Card>
     {zekaModal && (
       <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-4" onClick={() => setZekaModal(null)}>
@@ -6604,7 +6616,7 @@ function OgretmenPaneli({ user, logout }) {
         )}
 
         {/* ═══ PROFİLİM ═══ */}
-        {aktifSekme === "kocum-miran" && (<KocumMiran apiBase={API} />)}
+        {aktifSekme === "kocum-miran" && (<KocumMiran apiBase={API} onNavigate={setAktifSekme} />)}
         {aktifSekme === "profilim" && (<OgretmenProfil apiBase={API} />)}
 
         {aktifSekme === "sss" && (<SSS apiBase={API} />)}
