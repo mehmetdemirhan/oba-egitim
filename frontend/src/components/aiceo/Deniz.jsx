@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
-import { ShieldCheck, Play, CheckCircle2, XCircle, RefreshCw } from "lucide-react";
+import { ShieldCheck, Play, CheckCircle2, XCircle, RefreshCw, Copy, Check, RotateCw, ExternalLink } from "lucide-react";
 import BilgiIkonu from "../BilgiIkonu";
 import { PersonaBalon } from "./Personalar";
 
@@ -12,7 +12,7 @@ const DURUM_ET = { yeni: "Yeni", admin_gecerli: "Geçerli", admin_gecersiz: "Ge�
  * Deterministik kontroller + AI denetim turu + admin onaylı iyileştirme notu + karne.
  * Sayfa açılışında AI çağrısı YOK (kayıtlı denetim gösterilir; "Denetle" ile tetiklenir).
  */
-export default function Deniz({ apiBase }) {
+export default function Deniz({ apiBase, onNavigate }) {
   const [denetim, setDenetim] = useState(null);
   const [bulgular, setBulgular] = useState([]);
   const [karne, setKarne] = useState(null);
@@ -39,6 +39,25 @@ export default function Deniz({ apiBase }) {
   }, [apiBase]);
 
   const sinavYap = async () => { try { const r = await axios.post(api("/ai/ceo/deniz/sinav")); setSinav(r.data.ok ? r.data.sinav : { hata: r.data.sebep }); await yukle(); } catch (e) { setSinav({ hata: "Sınav çalışmadı" }); } };
+
+  const [seciliBulgu, setSeciliBulgu] = useState(null);
+  const [detay, setDetay] = useState(null);
+  const [kopyalandi, setKopyalandi] = useState(false);
+  const [kontrolSonuc, setKontrolSonuc] = useState(null);
+  const [kontrolCalisiyor, setKontrolCalisiyor] = useState(false);
+
+  const bulguAc = async (b) => {
+    setSeciliBulgu(b); setDetay(null); setKontrolSonuc(null); setKopyalandi(false);
+    try { const r = await axios.get(api(`/ai/ceo/deniz/bulgu/${b.id}`)); setDetay(r.data); } catch (e) {}
+  };
+  const kopyala = (t) => { try { navigator.clipboard.writeText(t); setKopyalandi(true); setTimeout(() => setKopyalandi(false), 1500); } catch (e) {} };
+  const kontrolEt = async () => {
+    if (!seciliBulgu) return;
+    setKontrolCalisiyor(true);
+    try { const r = await axios.post(api(`/ai/ceo/deniz/bulgu/${seciliBulgu.id}/kontrol`)); setKontrolSonuc(r.data); await yukle(); if (r.data.durum === "cozuldu") setSeciliBulgu(s => ({ ...s, durum: "cozuldu" })); }
+    catch (e) {} finally { setKontrolCalisiyor(false); }
+  };
+  const ornekGit = (o) => { if (onNavigate && (o.tip === "kur" || o.tip === "ogrenci" || o.tip === "kayit")) onNavigate("payments"); };
 
   useEffect(() => { yukle(); }, [yukle]);
 
@@ -90,9 +109,9 @@ export default function Deniz({ apiBase }) {
         {bulgular.length === 0 ? <div className="text-sm text-subtle">Bulgu yok — "Denetle" ile tur başlat.</div> : (
           <div className="space-y-2">
             {bulgular.map(b => (
-              <div key={b.id} className={`rounded-lg border p-2 ${ONEM_RENK[b.onem] || "border-line"}`}>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium text-content">{b.ozet}</span>
+              <div key={b.id} className={`rounded-lg border p-2 ${b.durum === "cozuldu" ? "border-emerald-300 bg-emerald-50" : ONEM_RENK[b.onem] || "border-line"}`}>
+                <div className="flex items-center justify-between gap-2 cursor-pointer" onClick={() => bulguAc(b)}>
+                  <span className="text-sm font-medium text-content">{b.durum === "cozuldu" && "✅ "}{b.ozet}</span>
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/60 border border-current">{b.onem}</span>
                 </div>
                 <div className="flex items-center gap-3 mt-1">
@@ -147,6 +166,66 @@ export default function Deniz({ apiBase }) {
                 : <button onClick={() => notOnayla(n.id)} className="text-[11px] text-emerald-700 font-medium">Onayla</button>}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ── Bulgu detay modalı (kanıt + çözüm + Kontrol Et) ── */}
+      {seciliBulgu && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setSeciliBulgu(null)}>
+          <div className="bg-surface rounded-2xl max-w-2xl w-full max-h-[88vh] overflow-auto p-5" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-2">
+              <h3 className="font-bold text-content">{seciliBulgu.ozet}</h3>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded border ${ONEM_RENK[seciliBulgu.onem]}`}>{seciliBulgu.onem}</span>
+            </div>
+            {!detay ? <div className="text-sm text-subtle mt-3">Yükleniyor…</div> : (
+              <>
+                {/* Kanıt + derin link örnekleri */}
+                {(detay.bulgu.kanit?.ornekler || []).length > 0 && (
+                  <div className="mt-3">
+                    <div className="text-xs font-semibold text-content mb-1">Kanıt</div>
+                    <div className="space-y-1 max-h-40 overflow-auto">
+                      {detay.bulgu.kanit.ornekler.map((o, i) => (
+                        <div key={i} className="flex items-center justify-between text-xs bg-app border border-line rounded px-2 py-1">
+                          <span className="tabular-nums">{o.tip}: {o.kur_id || o.ogrenci_id || o.id || o.oneri_id}{o.kalan != null && ` · kalan ${o.kalan}`}{o.sayi != null && ` · sayı ${o.sayi}`}{o.cumle && ` — "${o.cumle}"`}</span>
+                          {onNavigate && (o.tip === "kur" || o.tip === "ogrenci" || o.tip === "kayit") && (
+                            <button onClick={() => ornekGit(o)} className="inline-flex items-center gap-0.5 text-[11px] text-indigo-600 shrink-0"><ExternalLink className="h-3 w-3" />Git</button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Çözüm önerisi */}
+                <div className="mt-3">
+                  <div className="text-xs font-semibold text-content mb-1">Çözüm Önerisi</div>
+                  <div className="text-sm text-content mb-2">{detay.cozum.oneri}</div>
+                  {detay.cozum.tip === "prompt" ? (
+                    <div className="relative">
+                      <pre className="text-[11px] bg-slate-900 text-slate-100 rounded-lg p-3 overflow-auto whitespace-pre-wrap max-h-56">{detay.cozum.prompt}</pre>
+                      <button onClick={() => kopyala(detay.cozum.prompt)} className="absolute top-2 right-2 inline-flex items-center gap-1 text-[11px] bg-slate-700 text-white rounded px-2 py-1">
+                        {kopyalandi ? <><Check className="h-3 w-3" />Kopyalandı</> : <><Copy className="h-3 w-3" />Kopyala</>}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm p-3">🛠️ Operasyonel adım: {detay.cozum.adim}</div>
+                  )}
+                </div>
+                {/* Kontrol Et */}
+                <div className="mt-4 flex items-center gap-3">
+                  <button onClick={kontrolEt} disabled={kontrolCalisiyor} className="inline-flex items-center gap-1.5 bg-indigo-600 disabled:opacity-60 text-white text-sm rounded-lg px-4 py-2">
+                    {kontrolCalisiyor ? <RefreshCw className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}Kontrol Et
+                  </button>
+                  {kontrolSonuc && (
+                    <span className="text-sm">
+                      {kontrolSonuc.durum === "cozuldu" ? <span className="text-emerald-600 font-medium">✅ Çözüldü</span>
+                        : kontrolSonuc.durum === "sonraki_tur" ? <span className="text-slate-500">Sonraki denetim turuna işaretlendi</span>
+                          : <span className="text-amber-600">Henüz çözülmedi — güncel kanıt: {JSON.stringify(kontrolSonuc.guncel_kanit?.sayi ?? kontrolSonuc.guncel_kanit)}</span>}
+                    </span>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>

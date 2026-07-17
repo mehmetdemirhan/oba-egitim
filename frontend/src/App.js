@@ -1596,7 +1596,7 @@ function AppContent() {
           {/* ═══ DENETİM (Deniz) — yalnız admin ═══ */}
           {user.role === "admin" && (
             <TabsContent value="ai-deniz">
-              <Deniz apiBase={API} />
+              <Deniz apiBase={API} onNavigate={(tab) => setActiveTab(tab)} />
             </TabsContent>
           )}
 
