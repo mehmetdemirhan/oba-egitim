@@ -126,7 +126,7 @@ async def run():
         # vizyon önerisi etiketi (strateji + zayıf dayanak → vizyon, zayıf sayılmaz)
         analiz_mod.GEMINI_API_KEY = "k"
 
-        async def sahte(system, user, max_tokens=4000):
+        async def sahte(system, user, max_tokens=4000, **kw):
             return {"error": None, "parsed": {"ozet": "s", "oneriler": [
                 {"baslik": "Yeni il aç", "kategori": "strateji", "oncelik": "orta", "ozet": "büyüme",
                  "beklenen_etki": "?", "dayanak_metrikler": [{"metrik": "sektör trendi", "deger": 999999}]}]}}
@@ -144,7 +144,7 @@ async def run():
                                            "ogretmen_id": "t1", "ogretmen_pay": 500,
                                            "odeme_tamamlanma_tarihi": _iso_gun_once(2)})  # damgalı, hakediş yaklaşan
 
-        async def sahte_ped(system, user, max_tokens=1200):  # pedagojik sızıntılı AI → guard deterministik'e düşürür
+        async def sahte_ped(system, user, max_tokens=1200, **kw):  # pedagojik sızıntılı AI → guard deterministik'e düşürür
             return {"error": None, "parsed": {"selam": "s", "kapanis": "k",
                     "oneriler": [{"baslik": "risk", "aciklama": "Öğrencinin risk skoru yüksek, 5000₺ alacak var."}]}}
         miran_mod.GEMINI_API_KEY = "k"

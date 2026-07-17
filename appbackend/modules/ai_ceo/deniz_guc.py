@@ -105,15 +105,18 @@ async def insan_ciktisi_ornek() -> list:
 
 # ─────────────────────── 9f: Maliyet Denetimi ───────────────────────
 async def maliyet_ozet() -> dict:
-    loglar = await db.ai_request_log.find({}, {"_id": 0, "model": 1, "tarih": 1, "grounded": 1}).to_list(length=200000)
+    loglar = await db.ai_request_log.find({}, {"_id": 0, "model": 1, "tarih": 1, "grounded": 1, "ozellik": 1}).to_list(length=200000)
     ay_say = {}
     model_say = {}
+    ozellik_say = {}  # özellik-bazlı çağrı kırılımı (merkezi sayaç etiketinden)
     grounded = 0
     for l in loglar:
         ay = str(l.get("tarih", ""))[:7]
         if ay:
             ay_say[ay] = ay_say.get(ay, 0) + 1
         model_say[l.get("model", "?")] = model_say.get(l.get("model", "?"), 0) + 1
+        oz = l.get("ozellik") or "etiketsiz"  # eski loglarda etiket yok
+        ozellik_say[oz] = ozellik_say.get(oz, 0) + 1
         if l.get("grounded"):
             grounded += 1
     aylar = sorted(ay_say.items())
@@ -122,8 +125,9 @@ async def maliyet_ozet() -> dict:
         artis = (aylar[-1][1] - aylar[-2][1]) * 100 / aylar[-2][1]
         if artis >= 100:
             sicrama = round(artis, 0)
+    ozellik_dagilimi = dict(sorted(ozellik_say.items(), key=lambda x: -x[1]))
     return {"toplam_cagri": len(loglar), "ay_dagilimi": dict(aylar[-6:]), "model_dagilimi": model_say,
-            "grounded_cagri": grounded, "anormal_sicrama_yuzde": sicrama}
+            "ozellik_dagilimi": ozellik_dagilimi, "grounded_cagri": grounded, "anormal_sicrama_yuzde": sicrama}
 
 
 async def maliyet_bulgu() -> list:
@@ -131,7 +135,7 @@ async def maliyet_bulgu() -> list:
     if m.get("anormal_sicrama_yuzde"):
         return [{"tur": "maliyet_sicramasi", "onem": "orta",
                  "ozet": f"AI çağrı sayısı son ay %{m['anormal_sicrama_yuzde']:.0f} arttı.",
-                 "kanit": {"ay_dagilimi": m["ay_dagilimi"]}}]
+                 "kanit": {"ay_dagilimi": m["ay_dagilimi"], "ozellik_dagilimi": m.get("ozellik_dagilimi", {})}}]
     return []
 
 

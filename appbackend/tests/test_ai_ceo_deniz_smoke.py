@@ -73,7 +73,7 @@ async def run():
         # ── S8: denetle (AI turu mock) ──
         deniz_mod.GEMINI_API_KEY = "k"
 
-        async def sahte(system, user, max_tokens=2000):
+        async def sahte(system, user, max_tokens=2000, **kw):
             return {"error": None, "parsed": {"ozet": "Genel tutarlılık orta.",
                     "ek_bulgular": [{"tur": "mantik_zayifligi", "onem": "orta", "ozet": "Bir öneri kanıtsız.", "kanit": "x"}],
                     "iyilestirme_plani": "Zayıf dayanaklı önerileri azalt; kategori çeşitliliğini artır."}}

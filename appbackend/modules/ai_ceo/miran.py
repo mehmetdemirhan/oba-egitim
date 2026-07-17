@@ -134,7 +134,7 @@ async def miran_uret(ogretmen_id: str) -> dict:
     if GEMINI_API_KEY:
         try:
             system, user = _miran_prompt(odak)
-            res = await call_claude(system, user, max_tokens=1200)
+            res = await call_claude(system, user, max_tokens=1200, ozellik="miran_kocluk")
             p = res.get("parsed")
             if isinstance(p, dict) and p.get("oneriler"):
                 # Üslup guard — tüm metni tara
@@ -288,7 +288,7 @@ async def miran_muhasebe_uret() -> dict:
                     "yaz. Tutar belirtebilirsin; öğrenci pedagojik verisinden BAHSETME.\n\n"
                     f"Veri: {veri}\n\nSADECE JSON: "
                     '{"selam":"...","oneriler":[{"baslik":"...","aciklama":"..."}],"kapanis":"..."}')
-            res = await call_claude(system, user, max_tokens=1200)
+            res = await call_claude(system, user, max_tokens=1200, ozellik="miran_muhasebe")
             p = res.get("parsed")
             if isinstance(p, dict) and p.get("oneriler"):
                 blob = " ".join([str(p.get("selam", "")), str(p.get("kapanis", ""))] +

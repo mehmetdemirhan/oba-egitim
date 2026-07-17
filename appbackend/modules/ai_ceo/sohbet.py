@@ -76,7 +76,7 @@ async def ayda_ya_sor(govde: dict, current_user=Depends(_ADMIN)):
         f"GÜNCEL SİSTEM FOTOĞRAFI:\n{json.dumps(ai_payload(fotograf or {}), ensure_ascii=False)[:6000]}\n\n"
         f"SORU: {soru}\n\nKısa, dayanaklı, düz metin cevap ver."
     )
-    res = await call_claude(system, user, max_tokens=1200)
+    res = await call_claude(system, user, max_tokens=1200, ozellik="ceo_sohbet")
     if res.get("error"):
         return {"ok": False, "sebep": res.get("error")}
     cevap = (res.get("text") or "").strip()

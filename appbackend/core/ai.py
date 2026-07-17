@@ -66,7 +66,7 @@ async def _gemini_call(prompt: str, system: str = "", max_tokens: int = 4000) ->
 GROUNDING_MODELS = [m for m in GEMINI_MODELS if ("2.0-flash" in m or "2.5-flash" in m) and "lite" not in m] or ["gemini-2.0-flash"]
 
 
-async def gemini_grounded_call(prompt: str, system: str = "", max_tokens: int = 3000) -> dict:
+async def gemini_grounded_call(prompt: str, system: str = "", max_tokens: int = 3000, ozellik: str = "") -> dict:
     """Google Search GROUNDING'li Gemini çağrısı — SEYREK/elle tetiklenen kullanım için.
 
     Yanıt web'de temellendirilir; kaynak linkleri döndürülür. Grounding yoksa/desteklenmiyorsa
@@ -105,7 +105,7 @@ async def gemini_grounded_call(prompt: str, system: str = "", max_tokens: int = 
                             kaynaklar.append({"baslik": web.get("title", web["uri"]), "url": web["uri"]})
                     logging.info(f"[GEMINI-GROUNDED] ✅ model={model}, {len(kaynaklar)} kaynak")
                     await db.ai_request_log.insert_one({"id": str(uuid.uuid4()), "model": model,
-                                                        "tarih": _zaman_iso(), "grounded": True})
+                                                        "ozellik": ozellik or "diger", "tarih": _zaman_iso(), "grounded": True})
                     return {"text": text, "kaynaklar": kaynaklar, "model": model, "error": None}
                 err = data.get("error", {})
                 err_code, err_msg = err.get("code", 0), str(err.get("message", data))[:200]
@@ -209,8 +209,13 @@ def _mock_bilgi_tabani_response(user_message: str) -> dict:
     return {"text": text, "parsed": parsed, "tokens": 0, "maliyet": 0, "error": None, "mock": True}
 
 
-async def call_claude(system_prompt: str, user_message: str, model: str = "sonnet", max_tokens: int = 2000) -> dict:
-    """AI API çağrısı — Gemini Flash kullanır."""
+async def call_claude(system_prompt: str, user_message: str, model: str = "sonnet", max_tokens: int = 2000, ozellik: str = "") -> dict:
+    """AI API çağrısı — Gemini Flash kullanır.
+
+    ozellik: çağrıyı yapan özelliğin etiketi (maliyet kırılımı için). MERKEZİ sayaç
+    burada olduğundan yeni özellik eklendiğinde tek yapılması gereken bu parametreyi
+    geçmektir; etiket ai_request_log'a otomatik düşer.
+    """
     if not GEMINI_API_KEY:
         if "hedef_kelimeler" in user_message or "METİN:" in user_message:
             return _mock_bilgi_tabani_response(user_message)
@@ -226,6 +231,7 @@ async def call_claude(system_prompt: str, user_message: str, model: str = "sonne
         await db.ai_request_log.insert_one({
             "id": str(uuid.uuid4()),
             "model": AI_MODEL,
+            "ozellik": ozellik or "diger",
             "tarih": datetime.utcnow().isoformat(),
         })
 

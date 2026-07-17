@@ -92,7 +92,7 @@ async def run():
         gercek_deger = foto["muhasebe"]["tahsil_edilen"]  # fotoğrafta GERÇEKTEN var
         analiz_mod.GEMINI_API_KEY = "test-key"
 
-        async def sahte_analiz(system, user, max_tokens=4000):
+        async def sahte_analiz(system, user, max_tokens=4000, **kw):
             return {"text": "", "error": None, "parsed": {
                 "ozet": "Genel durum iyi.",
                 "oneriler": [
@@ -151,7 +151,7 @@ async def run():
         # ── 7) MİRAN — üslup guard + yalnız kendi verisi ──
         miran_mod.GEMINI_API_KEY = "test-key"
 
-        async def sahte_miran_ihlal(system, user, max_tokens=1200):
+        async def sahte_miran_ihlal(system, user, max_tokens=1200, **kw):
             return {"text": "", "error": None, "parsed": {
                 "selam": "Selam", "kapanis": "Bitti",
                 "oneriler": [{"baslik": "Kıyas", "aciklama": "Diğer öğretmenler senden iyi, tahsilat 5000₺."}]}}
@@ -206,7 +206,7 @@ async def run():
         # ── 13) PAZAR ARAŞTIRMASI (grounding) — başarı + 'yapılandırılmadı' + 403 ──
         import modules.ai_ceo.pazar as pazar_mod
 
-        async def sahte_grounded_ok(prompt, system="", max_tokens=3000):
+        async def sahte_grounded_ok(prompt, system="", max_tokens=3000, **kw):
             return {"text": "Rakip X 199₺/ay; fırsat: fiyat esnekliği.", "model": "gemini-2.0-flash", "error": None,
                     "kaynaklar": [{"baslik": "Rakip X", "url": "https://ornek.com/x"}]}
         pazar_mod.gemini_grounded_call = sahte_grounded_ok
@@ -214,7 +214,7 @@ async def run():
         check(r.status_code == 200 and r.json().get("ok"), "pazar araştırması (grounding) başarılı")
         check(len(r.json()["arastirma"]["kaynaklar"]) == 1 and r.json()["arastirma"]["kaynaklar"][0]["url"].startswith("http"), "kaynak linkleri döndü")
 
-        async def sahte_grounded_yok(prompt, system="", max_tokens=3000):
+        async def sahte_grounded_yok(prompt, system="", max_tokens=3000, **kw):
             return {"text": "", "kaynaklar": [], "model": None, "error": "Grounding başarısız: tool desteklenmiyor"}
         pazar_mod.gemini_grounded_call = sahte_grounded_yok
         r = await ac.post("/api/ai/ceo/pazar-arastirma", headers=H("adm"), json={})

@@ -52,7 +52,7 @@ async def run():
                 "dayanaklar": [], "durum": "yeni", "tarih": f"2026-07-0{i+1}T00:00:00"})
         analiz_mod.GEMINI_API_KEY = "k"
 
-        async def sahte(system, user, max_tokens=4000):
+        async def sahte(system, user, max_tokens=4000, **kw):
             return {"error": None, "parsed": {"ozet": "s", "oneriler": [
                 {"baslik": "Yeni Öneri", "kategori": "buyume", "oncelik": "orta", "ozet": "y", "beklenen_etki": "?",
                  "dayanak_metrikler": [{"metrik": "aktif", "deger": 1}]}]}}
