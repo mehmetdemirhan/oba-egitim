@@ -5402,9 +5402,17 @@ function GirisAnaliziModul({ user, students, teachers }) {
 // ═══════════════════════════════════════════════
 
 function OgretmenPaneli({ user, logout }) {
+  // Deneyim görevi "SSS'ye göz at" — SSS sekmesi açılınca otomatik işaret (yaptım butonu yok)
+  const [_sssBeacon, _setSssBeacon] = useState(false);
   const { toast } = useToast();
   const { isFullscreen } = useFullscreenExercise();
   const [aktifSekme, setAktifSekme] = useState("dashboard");
+  useEffect(() => {
+    if (aktifSekme === "sss" && !_sssBeacon) {
+      _setSssBeacon(true);
+      axios.post(`${API}/ai/ceo/deneyim/ziyaret/sss_bak`).catch(() => {});
+    }
+  }, [aktifSekme, _sssBeacon]);
   const [ogrenciler, setOgrenciler] = useState([]);
   // ── Özellik Yönetimi ──
   const [ozellikAyarlari, setOzellikAyarlari] = useState({});

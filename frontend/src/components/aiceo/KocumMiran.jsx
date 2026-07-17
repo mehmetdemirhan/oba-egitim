@@ -11,6 +11,7 @@ import { PersonaBalon, MiranAvatar, PERSONA_UI } from "./Personalar";
 export default function KocumMiran({ apiBase }) {
   const [miran, setMiran] = useState(null);
   const [mektuplar, setMektuplar] = useState([]);
+  const [deneyim, setDeneyim] = useState(null);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [geriBildirim, setGeriBildirim] = useState(null);
   const p = PERSONA_UI.miran;
@@ -19,12 +20,14 @@ export default function KocumMiran({ apiBase }) {
   useEffect(() => {
     (async () => {
       try {
-        const [m, l] = await Promise.all([
+        const [m, l, d] = await Promise.all([
           axios.get(api("/ai/ceo/miran/benim")).catch(() => null),
           axios.get(api("/ai/ceo/mektuplarim")).catch(() => null),
+          axios.get(api("/ai/ceo/deneyim/benim")).catch(() => null),
         ]);
         if (m) setMiran(m.data.miran);
         if (l) setMektuplar(l.data.mektuplar || []);
+        if (d) setDeneyim(d.data.deneyim);
       } finally { setYukleniyor(false); }
     })();
   }, [apiBase]);
@@ -36,6 +39,33 @@ export default function KocumMiran({ apiBase }) {
 
   return (
     <div className="space-y-4 max-w-3xl">
+      {/* Sistem-Deneyim Görevleri (XP'li keşif yolu) */}
+      {deneyim && deneyim.toplam > 0 && (
+        <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-bold text-content text-sm">🎯 Keşif Yolu <span className="text-xs text-subtle">({deneyim.biten}/{deneyim.toplam})</span></h3>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: p.renkAcik, color: p.renk }}>⭐ {deneyim.kazanilan_xp} XP</span>
+          </div>
+          <div className="h-2 bg-app rounded-full overflow-hidden mb-2"><div className="h-full rounded-full" style={{ width: `${deneyim.ilerleme_yuzde}%`, background: p.renk }} /></div>
+          {deneyim.siradaki && (
+            <div className="rounded-xl p-3 mb-2" style={{ background: p.renkAcik + "55" }}>
+              <div className="text-xs font-semibold" style={{ color: p.renk }}>Sıradaki adımın hazır! ✨</div>
+              <div className="text-sm font-medium text-content mt-0.5">{deneyim.siradaki.baslik}</div>
+              <div className="text-xs text-subtle">{deneyim.siradaki.aciklama} · +{deneyim.siradaki.xp} XP</div>
+            </div>
+          )}
+          <div className="space-y-1">
+            {deneyim.gorevler.map(g => (
+              <div key={g.id} className="flex items-center gap-2 text-sm">
+                <span className={g.tamamlandi ? "text-emerald-600" : "text-slate-300"}>{g.tamamlandi ? "✅" : "⬜"}</span>
+                <span className={g.tamamlandi ? "text-subtle line-through" : "text-content"}>{g.baslik}</span>
+                <span className="ml-auto text-[11px] text-subtle">+{g.xp} XP</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="rounded-2xl border p-4 shadow-sm" style={{ borderColor: p.renkAcik, background: p.renkAcik + "40" }}>
         {yukleniyor ? <div className="text-sm text-subtle py-6 text-center">Miran koçluk notlarını hazırlıyor…</div> : miran ? (
           <>
