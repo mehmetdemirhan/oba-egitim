@@ -4643,8 +4643,17 @@ function TimiRapor({ sonuc, ogrenci }) {
   const { toast } = useToast();
   const [detayAcik, setDetayAcik] = useState(false);
   const [pdfYukleniyor, setPdfYukleniyor] = useState(false);
+  const [rapor, setRapor] = useState(null); // tam anlatılı rapor bölümleri (deterministik)
   const puanlar = sonuc?.kategori_puanlari || {};
   const baskin = sonuc?.baskin_zeka_alanlari || [];
+  useEffect(() => {
+    if (!sonuc?.id || sonuc?.durum !== "tamamlandi") { setRapor(null); return; }
+    let iptal = false;
+    axios.get(`${API}/timi/${sonuc.id}/rapor`)
+      .then(r => { if (!iptal) setRapor(r.data?.rapor || null); })
+      .catch(() => { if (!iptal) setRapor(null); });
+    return () => { iptal = true; };
+  }, [sonuc?.id, sonuc?.durum]);
   const timiPdfIndir = async () => {
     if (!sonuc?.id) return;
     setPdfYukleniyor(true);
@@ -4733,6 +4742,27 @@ function TimiRapor({ sonuc, ogrenci }) {
         </Card>
       </div>
 
+      {/* TAM ANLATILI RAPOR (deterministik metin bankası — PDF ile aynı bölümler) */}
+      {rapor?.bolumler?.length > 0 && (
+        <Card className="border border-line shadow-sm">
+          <CardHeader><CardTitle className="text-base">TIMI Envanter Raporu</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            {rapor.bolumler.map((b, i) => (
+              <div key={i}>
+                <div className="font-bold text-primary text-sm border-l-4 border-l-primary pl-2 mb-1.5">{b.baslik}</div>
+                {b.tip === "liste" ? (
+                  <ul className="list-disc pl-6 space-y-1 text-sm text-content">
+                    {(b.maddeler || []).map((m, j) => <li key={j}>{m}</li>)}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-content leading-relaxed">{b.paragraf}</p>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Yorumlayıcı metin */}
       <Card className="border border-line shadow-sm">
         <CardHeader><CardTitle className="text-base">Zeka Alanları — Kısa Açıklama</CardTitle></CardHeader>
@@ -4792,37 +4822,84 @@ function TimiRapor({ sonuc, ogrenci }) {
   );
 }
 
-// Öğrenci profili için TIMI özet kartı (en son uygulama)
-function TimiOzetKart({ ogrenciId }) {
-  const [son, setSon] = useState(null);
-  const [yuklendi, setYuklendi] = useState(false);
+// Öğrenci profili için TIMI özet kartı — tamamlanmış rapor(lar): özet + Raporu Gör + PDF İndir
+function TimiOzetKart({ ogrenci, ogrenciId: ogrenciIdProp }) {
+  const ogrenciId = ogrenci?.id || ogrenciIdProp;
+  const [liste, setListe] = useState(null);
+  const [acikRapor, setAcikRapor] = useState(null); // modal için sonuç
+  const [pdfYuk, setPdfYuk] = useState("");
   useEffect(() => {
+    if (!ogrenciId) { setListe([]); return; }
     let iptal = false;
     axios.get(`${API}/timi/ogrenci/${ogrenciId}`)
-      .then(r => { if (!iptal) { setSon((r.data || [])[0] || null); setYuklendi(true); } })
-      .catch(() => { if (!iptal) setYuklendi(true); });
+      .then(r => { if (!iptal) setListe((r.data || []).filter(x => x.durum === "tamamlandi")); })
+      .catch(() => { if (!iptal) setListe([]); });
     return () => { iptal = true; };
   }, [ogrenciId]);
 
-  if (!yuklendi) return null;
+  const pdfIndir = async (sonuc) => {
+    setPdfYuk(sonuc.id);
+    try {
+      const r = await axios.get(`${API}/timi/${sonuc.id}/pdf`, { responseType: "blob" });
+      const url = URL.createObjectURL(r.data);
+      const a = document.createElement("a"); a.href = url;
+      a.download = `TIMI_Raporu_${(ogrenci?.ad || "ogrenci").trim()}.pdf`; a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {} finally { setPdfYuk(""); }
+  };
+
+  if (liste === null) return null;
+  const son = liste[0];
   const baskin = son?.baskin_zeka_alanlari || [];
+  const gTarih = (s) => s?.uygulama_tarihi ? new Date(s.uygulama_tarihi).toLocaleDateString("tr-TR") : "-";
   return (
     <Card className="border border-line shadow-sm">
       <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><Brain className="h-4 w-4" />TIMI — Çoklu Zeka</CardTitle></CardHeader>
       <CardContent>
         {son ? (
-          <div className="space-y-1.5">
-            <div className="text-xs text-subtle">Son uygulama: {son.uygulama_tarihi ? new Date(son.uygulama_tarihi).toLocaleDateString("tr-TR") : "-"}</div>
+          <div className="space-y-2">
+            <div className="text-xs text-subtle">Son uygulama: {gTarih(son)}</div>
             <div className="flex flex-wrap gap-1.5">
               {baskin.length ? baskin.map(k => (
                 <span key={k} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-semibold">{TIMI_IKON[k]} {TIMI_KISA[k]}</span>
               )) : <span className="text-xs text-subtle">Baskın alan yok</span>}
             </div>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setAcikRapor(son)}><Eye className="h-3.5 w-3.5 mr-1" />Raporu Gör</Button>
+              <Button size="sm" variant="outline" className="h-7 text-xs" disabled={pdfYuk === son.id} onClick={() => pdfIndir(son)}><Download className="h-3.5 w-3.5 mr-1" />PDF İndir</Button>
+            </div>
+            {liste.length > 1 && (
+              <div className="pt-2 mt-1 border-t border-line">
+                <div className="text-xs font-semibold text-subtle mb-1">Geçmiş uygulamalar ({liste.length})</div>
+                <div className="space-y-1">
+                  {liste.map(s => (
+                    <div key={s.id} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="text-subtle">{gTarih(s)}</span>
+                      <span className="flex flex-wrap gap-1 flex-1 justify-center">
+                        {(s.baskin_zeka_alanlari || []).map(k => <span key={k} title={TIMI_KISA[k]}>{TIMI_IKON[k]}</span>)}
+                      </span>
+                      <span className="flex gap-1">
+                        <button onClick={() => setAcikRapor(s)} className="text-primary hover:underline">Gör</button>
+                        <button onClick={() => pdfIndir(s)} className="text-primary hover:underline">PDF</button>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="text-xs text-subtle">Henüz TIMI uygulanmadı</div>
         )}
       </CardContent>
+      {acikRapor && (
+        <Dialog open={true} onOpenChange={() => setAcikRapor(null)}>
+          <DialogContent className="max-w-3xl max-h-[85vh] overflow-auto">
+            <DialogHeader><DialogTitle>TIMI Raporu — {ogrenci?.ad} {ogrenci?.soyad}</DialogTitle></DialogHeader>
+            <TimiRapor sonuc={acikRapor} ogrenci={ogrenci} />
+          </DialogContent>
+        </Dialog>
+      )}
     </Card>
   );
 }
@@ -4852,6 +4929,30 @@ function TimiModul({ user, students }) {
       const r = await axios.post(`${API}/timi/baslat`, { ogrenci_id: seciliOgrenci.id });
       setSonucId(r.data.id); setYanitlar({}); setKartIndex(0); setNotlar(""); setSonuc(null); setAdim("uygulama");
     } catch (e) { toast({ title: "Hata", description: e.response?.data?.detail || "Başlatılamadı", variant: "destructive" }); }
+  };
+
+  // Yarım kalan taslağı kaldığı yerden sürdür
+  const devamEt = (g) => {
+    const ym = {};
+    (g.yanitlar || []).forEach(y => { ym[y.kart_no] = y.secim; });
+    setSonucId(g.id); setYanitlar(ym);
+    setKartIndex(Math.min((g.yanitlar || []).length, TIMI_KART_SAYISI - 1));
+    setNotlar(g.notlar || ""); setSonuc(null);
+    setSeciliOgrenci(students.find(s => s.id === g.ogrenci_id) || null);
+    setAdim("uygulama");
+  };
+
+  // Taslak → uygulayan öğretmen/admin/koord; tamamlanmış rapor → yalnız admin (onaylı)
+  const sil = async (g) => {
+    const tamam = g.durum === "tamamlandi";
+    if (!window.confirm(tamam
+      ? "Bu TAMAMLANMIŞ raporu kalıcı olarak silmek istediğinize emin misiniz?"
+      : "Bu yarım kalan taslağı silmek istediğinize emin misiniz?")) return;
+    try {
+      await axios.delete(`${API}/timi/${g.id}${tamam ? "?onay=true" : ""}`);
+      toast({ title: "Silindi" });
+      fetchGecmis();
+    } catch (e) { toast({ title: "Silinemedi", description: e.response?.data?.detail || "", variant: "destructive" }); }
   };
 
   const secYap = (secim) => {
@@ -4989,6 +5090,32 @@ function TimiModul({ user, students }) {
         </CardContent>
       </Card>
 
+      {/* Yarım kalan taslaklar */}
+      {gecmis.filter(g => g.durum !== "tamamlandi").length > 0 && (
+        <Card className="border border-amber-200 shadow-sm">
+          <CardHeader><CardTitle className="text-base flex items-center gap-2"><Pause className="h-4 w-4 text-amber-600" />Yarım Kalan Uygulamalar</CardTitle></CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {gecmis.filter(g => g.durum !== "tamamlandi").map(g => (
+                <div key={g.id} className="flex items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                  <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                    <span className="text-[10px] font-bold uppercase bg-amber-200 text-amber-800 rounded px-1.5 py-0.5">Taslak</span>
+                    <span className="text-sm font-medium truncate">{ogrenciAd(g.ogrenci_id)}</span>
+                    <span className="text-xs text-subtle">{(g.yanitlar || []).length}/{TIMI_KART_SAYISI}</span>
+                    {g.created_at && <span className="text-xs text-subtle">· {new Date(g.created_at).toLocaleDateString("tr-TR")}</span>}
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => devamEt(g)}><Play className="h-3.5 w-3.5 mr-1" />Devam Et</Button>
+                    <Button size="sm" variant="outline" className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50" onClick={() => sil(g)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] text-subtle mt-2">15 günü geçen yarım kalan taslaklar otomatik silinir (silmeden ~2 gün önce bildirim gönderilir).</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Geçmiş Uygulamalar */}
       <Card className="border border-line shadow-sm">
         <CardHeader><CardTitle className="text-base">Geçmiş Uygulamalar</CardTitle></CardHeader>
@@ -5018,6 +5145,7 @@ function TimiModul({ user, students }) {
                     </TableCell>
                     <TableCell>
                       <Button size="sm" variant="outline" onClick={() => { setSonuc(g); setSeciliOgrenci(students.find(s => s.id === g.ogrenci_id) || null); setAdim("sonuc"); }}>📄 Rapor</Button>
+                      {user?.role === "admin" && <Button size="sm" variant="outline" className="ml-2 text-red-600 border-red-200 hover:bg-red-50" onClick={() => sil(g)} title="Raporu sil (yalnız yönetici)"><Trash2 className="h-4 w-4" /></Button>}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -5721,7 +5849,7 @@ function OgretmenPaneli({ user, logout }) {
             {d.risk?.faktorler?.length > 0 && (<div className="bg-red-50 rounded-xl p-3 border border-red-100"><div className="text-xs font-medium text-red-700 mb-1">⚠️ Risk Faktörleri:</div>{d.risk.faktorler.map((f,i) => <div key={i} className="text-xs text-red-600">• {f}</div>)}</div>)}
 
             {/* TIMI Çoklu Zeka özeti */}
-            <TimiOzetKart ogrenciId={seciliOgrenci.id} />
+            <TimiOzetKart ogrenci={seciliOgrenci} />
 
             {/* 🤖 AI Koçluk Butonu + Sonuçlar */}
             {(() => {
@@ -9384,6 +9512,99 @@ function GuncellemeKontrol() {
 // TIMI Puanlama Anahtarı Yönetimi — /timi/anahtar (yalnız Koordinatör/Yönetici)
 // 28 kartın A/B görselinin hangi zekâ alanına puan yazdığı düzenlenir.
 // ═══════════════════════════════════════════════
+// TIMI Rapor Metin Bankası editörü (admin/koordinatör) — deterministik rapor metinleri
+const TIMI_METIN_LISTE_ALAN = ["guclu", "oneri"];
+function TimiRaporMetinPaneli() {
+  const { toast } = useToast();
+  const [meta, setMeta] = useState(null);   // {varsayilan, kategoriler, guncelleme_tarihi, guncelleyen}
+  const [duzen, setDuzen] = useState(null);  // düzenlenebilir birleşik metinler (liste alanları = satırlı metin)
+  const [kayit, setKayit] = useState(false);
+
+  const birlesikStr = (metinler, varsayilan, kategoriler) => {
+    const o = {};
+    kategoriler.forEach(k => {
+      const src = { ...(varsayilan[k.key] || {}), ...((metinler || {})[k.key] || {}) };
+      const c = { ...src };
+      TIMI_METIN_LISTE_ALAN.forEach(f => { if (Array.isArray(c[f])) c[f] = c[f].join("\n"); });
+      o[k.key] = c;
+    });
+    if ((metinler || {})._kaliplar) o._kaliplar = metinler._kaliplar; // özel kalıpları koru
+    return o;
+  };
+
+  const yukle = useCallback(async () => {
+    try {
+      const r = await axios.get(`${API}/timi/rapor-metinleri`);
+      setMeta(r.data);
+      setDuzen(birlesikStr(r.data.metinler, r.data.varsayilan, r.data.kategoriler));
+    } catch (e) { hataBildir(toast, "Rapor metinleri yüklenemedi"); }
+  }, [toast]);
+  useEffect(() => { yukle(); }, [yukle]);
+
+  const alan = (key, f, val) => setDuzen(d => ({ ...d, [key]: { ...(d[key] || {}), [f]: val } }));
+
+  const kaydet = async () => {
+    setKayit(true);
+    try {
+      const gonder = {};
+      meta.kategoriler.forEach(k => {
+        const c = { ...(duzen[k.key] || {}) };
+        TIMI_METIN_LISTE_ALAN.forEach(f => {
+          if (typeof c[f] === "string") c[f] = c[f].split("\n").map(x => x.trim()).filter(Boolean);
+        });
+        gonder[k.key] = c;
+      });
+      if (duzen._kaliplar) gonder._kaliplar = duzen._kaliplar;
+      await axios.put(`${API}/timi/rapor-metinleri`, { metinler: gonder });
+      toast({ title: "Rapor metinleri kaydedildi" });
+      yukle();
+    } catch (e) { hataBildir(toast, "Kaydedilemedi"); } finally { setKayit(false); }
+  };
+
+  const sifirla = async () => {
+    if (!window.confirm("Tüm TIMI rapor metinlerini varsayılana döndürmek istediğinize emin misiniz?")) return;
+    try {
+      await axios.post(`${API}/timi/rapor-metinleri/varsayilana-don`);
+      toast({ title: "Varsayılana dönüldü" });
+      yukle();
+    } catch (e) { hataBildir(toast, "Sıfırlanamadı"); }
+  };
+
+  if (!duzen || !meta) return <div className="text-sm text-subtle">Yükleniyor…</div>;
+  // Plain JSX-returning fonksiyon (bileşen DEĞİL) → her tuşta remount/focus kaybı olmaz
+  const fld = (label, k, f, satir = 2) => (
+    <label className="block">
+      <span className="text-xs font-medium text-subtle">{label}</span>
+      <textarea rows={satir} value={duzen[k]?.[f] ?? ""} onChange={e => alan(k, f, e.target.value)}
+        className="mt-1 w-full text-sm rounded-lg border border-line bg-surface px-2 py-1.5 resize-y" />
+    </label>
+  );
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="text-sm text-subtle max-w-2xl">Rapor bölümleri bu metinlerden <b>deterministik</b> derlenir (AI yok). Her zeka alanı × seviye (baskın/orta/düşük) için metin; liste alanlarında <b>her satır bir madde</b>dir.</div>
+        <div className="flex gap-2 shrink-0">
+          <Button size="sm" variant="outline" onClick={sifirla}>Varsayılana Dön</Button>
+          <Button size="sm" onClick={kaydet} disabled={kayit}><Save className="h-4 w-4 mr-1" />Kaydet</Button>
+        </div>
+      </div>
+      {meta.guncelleme_tarihi && <div className="text-[11px] text-subtle">Son güncelleme: {new Date(meta.guncelleme_tarihi).toLocaleString("tr-TR")}{meta.guncelleyen ? ` · ${meta.guncelleyen}` : ""}</div>}
+      {meta.kategoriler.map(k => (
+        <details key={k.key} className="rounded-xl border border-line bg-surface">
+          <summary className="cursor-pointer px-4 py-2 font-semibold text-sm">{k.tr}</summary>
+          <div className="px-4 pb-4 space-y-3">
+            {fld("Profil (genel değerlendirme — baskınsa)", k.key, "profil")}
+            {fld("Güçlü Yönler — her satır bir madde (baskınsa)", k.key, "guclu", 4)}
+            {fld("Orta düzey cümlesi", k.key, "orta")}
+            {fld("Düşük düzey (destek) cümlesi", k.key, "dusuk")}
+            {fld("Eğitimsel Öneriler — her satır bir madde", k.key, "oneri", 3)}
+          </div>
+        </details>
+      ))}
+    </div>
+  );
+}
+
 function TimiAnahtarPaneli() {
   const { toast } = useToast();
   const [veri, setVeri] = useState(null); // {kartlar, kategoriler, guncelleme_tarihi, guncelleyen}
@@ -9756,7 +9977,7 @@ function SistemAyarlari({ user }) {
       <p className="text-subtle text-sm">Rozet, XP, lig ve anket ayarlarını buradan yönetin. Değişiklikler anında uygulanır.</p>
 
       <div className="flex gap-2 flex-wrap">
-        {[{id:"ozellikler",l:"Özellik Yönetimi"},{id:"xp",l:"XP Değerleri"},{id:"ogretmen_xp",l:"Öğretmen XP"},{id:"lig",l:"Lig Eşikleri"},{id:"ogretmen_rozet",l:"Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"Öğrenci Rozetleri"},{id:"anket",l:"Anket Soruları"},{id:"kutulu_okuma",l:"Kutulu Okuma"},{id:"rapor_olcutleri",l:"Rapor Ölçütleri"},{id:"timi_anahtar",l:"TIMI Puanlama Anahtarı"},{id:"profil_gorunurluk",l:"Profil Görünürlüğü"},{id:"instagram",l:"Instagram"},{id:"kvkk",l:"Veri & KVKK"},{id:"sezon",l:"Sezonluk Reset"},...(user?.role === "admin" ? [{id:"duyurular",l:"✨ Yeni Ne Var"},{id:"altyapi",l:"☁️ Altyapı"},{id:"bakim",l:"🔧 Bakım Modu"}] : [])].map(s => (
+        {[{id:"ozellikler",l:"Özellik Yönetimi"},{id:"xp",l:"XP Değerleri"},{id:"ogretmen_xp",l:"Öğretmen XP"},{id:"lig",l:"Lig Eşikleri"},{id:"ogretmen_rozet",l:"Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"Öğrenci Rozetleri"},{id:"anket",l:"Anket Soruları"},{id:"kutulu_okuma",l:"Kutulu Okuma"},{id:"rapor_olcutleri",l:"Rapor Ölçütleri"},{id:"timi_anahtar",l:"TIMI Puanlama Anahtarı"},{id:"timi_metin",l:"TIMI Rapor Metinleri"},{id:"profil_gorunurluk",l:"Profil Görünürlüğü"},{id:"instagram",l:"Instagram"},{id:"kvkk",l:"Veri & KVKK"},{id:"sezon",l:"Sezonluk Reset"},...(user?.role === "admin" ? [{id:"duyurular",l:"✨ Yeni Ne Var"},{id:"altyapi",l:"☁️ Altyapı"},{id:"bakim",l:"🔧 Bakım Modu"}] : [])].map(s => (
           <button key={s.id} onClick={() => setAyarSekme(s.id)}
             className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${ayarSekme === s.id ? 'bg-primary text-white border-blue-600' : 'bg-surface text-subtle border-line'}`}>{s.l}</button>
         ))}
@@ -9873,6 +10094,7 @@ function SistemAyarlari({ user }) {
       {/* Özellik Yönetimi */}
       {ayarSekme === "rapor_olcutleri" && <RaporOlcutleriPaneli />}
       {ayarSekme === "timi_anahtar" && <TimiAnahtarPaneli />}
+      {ayarSekme === "timi_metin" && <TimiRaporMetinPaneli />}
 
       {ayarSekme === "ozellikler" && (
         <Card className="border border-line shadow-sm">
