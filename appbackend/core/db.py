@@ -12,8 +12,28 @@ from core.config import MONGO_URL, DB_NAME
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
 
-# Backup (GridFS) bucket
-backup_fs = AsyncIOMotorGridFSBucket(db, bucket_name="backups")
+
+# Backup (GridFS) bucket — TEMBEL (lazy) oluşturulur.
+# AsyncIOMotorGridFSBucket.__init__ import anında get_event_loop() çağırır; uvicorn app'i
+# çalışan loop OLMADAN import ettiğinden (Python 3.14 → RuntimeError) açılışta çökerdi.
+# Bucket'ı ilk KULLANIMDA (async endpoint içinde, loop hazırken) oluşturuyoruz.
+class _LazyGridFS:
+    def __init__(self, database, **kwargs):
+        self._database = database
+        self._kwargs = kwargs
+        self._bucket = None
+
+    def _get(self):
+        if self._bucket is None:
+            self._bucket = AsyncIOMotorGridFSBucket(self._database, **self._kwargs)
+        return self._bucket
+
+    def __getattr__(self, name):
+        # _database/_kwargs/_bucket __dict__'te bulunur; diğer her erişim gerçek bucket'a gider
+        return getattr(self._get(), name)
+
+
+backup_fs = _LazyGridFS(db, bucket_name="backups")
 
 
 def prepare_for_mongo(data):
