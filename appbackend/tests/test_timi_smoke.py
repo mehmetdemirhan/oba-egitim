@@ -195,10 +195,16 @@ async def api_kontroller():
     await server.client.drop_database(TEST_DB)
 
 
-def main():
+async def _hepsi():
+    # saf_kontroller modules.timi'yi import eder; core.db motor/gridfs bağlanması için
+    # bunun çalışan loop İÇİNDE olması gerekir (Python 3.14).
     saf_kontroller()
+    await api_kontroller()
+
+
+def main():
     try:
-        asyncio.run(api_kontroller())
+        asyncio.run(_hepsi())
     except Exception as e:
         print(f"  [UYARI] API aşaması çalıştırılamadı (MongoDB gerekli): {type(e).__name__}: {e}")
     print(f"\nSONUC: {_gecen}/{_gecen + _kalan} kontrol gecti")
