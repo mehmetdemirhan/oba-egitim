@@ -75,7 +75,7 @@ async def run():
         # ── 5) AI cevap üretimi (mock) ──
         ai_mod.GEMINI_API_KEY = "k"
         async def fake_cc(system, user, max_tokens=700, ozellik=""):
-            return {"text": '[{"no":1,"dogru":"B","guven":"high"},{"no":2,"dogru":"A","guven":"low"},{"no":3,"dogru":"C","guven":"high"},{"no":4,"dogru":"D","guven":"high"},{"no":5,"dogru":"A","guven":"high"}]', "parsed": None, "error": None}
+            return {"text": '[{"no":1,"dogru":"B","guven":"high","dayanak":"metindeki kanıt cümle"},{"no":2,"dogru":"A","guven":"low"},{"no":3,"dogru":"C","guven":"high"},{"no":4,"dogru":"D","guven":"high"},{"no":5,"dogru":"A","guven":"high"}]', "parsed": None, "error": None}
         ai_mod.call_claude = fake_cc
         # bir metnin ilk sorusunu MANUEL işaretle (korunmalı)
         man = await db.analiz_metinler.find_one({"bolum": "analiz", "sorular.0": {"$exists": True}})
@@ -88,6 +88,14 @@ async def run():
         check(man2["sorular"][0]["dogru_cevap"] == "C" and man2["sorular"][0]["dogru_cevap_kaynak"] == "manuel", "manuel doğru cevap korundu (AI ezmedi)")
         dolu = await db.analiz_metinler.find_one({"bolum": "analiz", "sorular.1": {"$exists": True}})
         check(any(s.get("dogru_cevap") for s in dolu["sorular"]), "AI otomatik doğru cevap yazdı")
+        check(any(s.get("dayanak") for m2 in [await db.analiz_metinler.find_one({"sorular.dayanak": "metindeki kanıt cümle"})] if m2 for s in m2["sorular"]), "AI dayanak cümlesi saklandı")
+        # Örneklem raporu ucu
+        r = await ac.get("/api/diagnostic/analiz-havuz/cevap-ornek?n=10", headers=H("adm"))
+        jo = r.json()
+        check(r.status_code == 200 and jo["metin_sayisi"] == 10 and jo["toplam_soru"] > 0, f"cevap örneklemi 10 metin döndü ({jo.get('metin_sayisi')}/{jo.get('toplam_soru')})")
+        check(all("dogru_cevap" in s and "dayanak" in s for m3 in jo["ornekler"] for s in m3["sorular"]), "örneklemde doğru cevap + dayanak var")
+        # öğrenci dayanağı görmez
+        check("dayanak" not in _ilk_soru(await ac.get("/api/diagnostic/texts?bolum=analiz", headers=H("ogr1"))), "öğrenci dayanak cümlesini GÖRMEZ")
 
         # ── 4) tek kaynak: kutulu-okuma + ai/speech yalnız bolum=analiz ──
         r = await ac.get("/api/kutulu-okuma/metin?sinif=3", headers=H("ogr1"))
