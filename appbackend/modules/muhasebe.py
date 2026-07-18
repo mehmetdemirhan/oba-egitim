@@ -205,6 +205,7 @@ async def muhasebe_kisiler(current_user=Depends(_ERISIM)):
             "veli_ad": 1, "veli_soyad": 1, "veli_telefon": 1, "muhasebe_notu": 1,
             "ogretmen_id": 1, "olusturma_tarihi": 1,
             "yapilmasi_gereken_odeme": 1, "yapilan_odeme": 1, "ogretmene_yapilacak_odeme": 1,
+            "ogretmen_odenen": 1,  # kur kaydı olmayan öğrencide öğr. avansı (fallback satır)
         }):
             ortak = {
                 "kisi_id": s.get("id"),  # PATCH hedefi (öğrenci alanları)
@@ -254,6 +255,9 @@ async def muhasebe_kisiler(current_user=Depends(_ERISIM)):
                 # Kur kaydı olmayan öğrenci → tek satır (güncel kur + toplam bakiye)
                 gereken = _num(s.get("yapilmasi_gereken_odeme"))
                 yapilan = _num(s.get("yapilan_odeme"))
+                _tid = s.get("ogretmen_id")
+                if _tid and _num(s.get("ogretmen_odenen")):
+                    ogretmen_avans[_tid] = round(ogretmen_avans.get(_tid, 0.0) + _num(s.get("ogretmen_odenen")), 2)
                 ogrenciler.append({
                     **ortak,
                     "id": s.get("id"),
@@ -263,8 +267,8 @@ async def muhasebe_kisiler(current_user=Depends(_ERISIM)):
                     # Kur kaydı olmayan (eski) öğrencide "Öğr. Payı" = student.ogretmene_yapilacak_odeme;
                     # satır-içi düzenleme bu alanı hedefler (kur snapshot yok → hakedişe girmez).
                     "ogretmen_pay": round(_num(s.get("ogretmene_yapilacak_odeme")), 2),
-                    "ogretmen_odenen": 0.0,  # kur kaydı yok → kur-bazlı avans girilemez
-                    "ogretmen_kalan": round(_num(s.get("ogretmene_yapilacak_odeme")), 2),
+                    "ogretmen_odenen": round(_num(s.get("ogretmen_odenen")), 2),  # öğrenci-seviyesi avans
+                    "ogretmen_kalan": round(max(0.0, _num(s.get("ogretmene_yapilacak_odeme")) - _num(s.get("ogretmen_odenen"))), 2),
                     "yapilmasi_gereken_odeme": round(gereken, 2),
                     "yapilan_odeme": round(yapilan, 2),
                     "kalan": round(max(0.0, gereken - yapilan), 2),
@@ -812,15 +816,15 @@ async def kur_ogretmen_pay_duzelt(kur_id: str, data: dict, current_user=Depends(
 
 @router.patch("/muhasebe/kur-ucreti/{kur_id}/odenen")
 async def kur_ogretmen_odenen_duzelt(kur_id: str, data: dict, current_user=Depends(_ERISIM)):
-    """Kur-bazlı 'Öğr. Ödenen' (avans/erken ödeme) satır-içi düzeltir — kur açık/kapalı fark
-    etmez, otomatik tetikten BAĞIMSIZ. Öğretmenin genel 'Ödenen'i (teachers.yapilan_odeme) TEK
-    KAYNAK kalsın diye DELTA kadar $inc edilir. Hakediş tetiğinde avans, paydan düşülür (mükerrer
-    ödeme engeli). Yalnız admin/muhasebe; audit'e düşer. Hakedişe girmiş kur düzeltilemez."""
+    """Kur-bazlı 'Öğr. Ödenen' (avans/erken ödeme) satır-içi düzeltir. Avansın var oluş amacı
+    tamamlanmadan/mühürlenmeden de ödeme yapılabilmesi olduğundan HER durumda düzenlenebilir —
+    kur açık/kapalı, ödeme tam/eksik, dönem mühürlü/değil fark etmez (Öğr. PAYI'nın mühür kuralıyla
+    KARIŞTIRILMAZ). Öğretmenin genel 'Ödenen'i (teachers.yapilan_odeme) TEK KAYNAK kalsın diye DELTA
+    kadar $inc edilir; hakediş tetiğinde avans paydan düşülür (mükerrer ödeme engeli). Yalnız
+    admin/muhasebe; audit'e düşer."""
     kur = await db.kur_ucretleri.find_one({"id": kur_id})
     if not kur:
         raise HTTPException(status_code=404, detail="Kur kaydı bulunamadı")
-    if kur.get("odendi_donem"):
-        raise HTTPException(status_code=400, detail="Bu kur hakedişe girmiş, öğretmen ödemesi değiştirilemez")
     try:
         yeni = round(float(data.get("ogretmen_odenen")), 2)
     except (TypeError, ValueError):
@@ -836,6 +840,29 @@ async def kur_ogretmen_odenen_duzelt(kur_id: str, data: dict, current_user=Depen
     if tid and delta:
         await db.teachers.update_one({"id": tid}, {"$inc": {"yapilan_odeme": delta}})
     await _log(current_user, "kur_ucreti", kur_id, "ogretmen_odenen", eski, yeni)
+    return {"ok": True, "ogretmen_odenen": yeni, "ogretmen_id": tid, "delta": delta}
+
+
+@router.patch("/muhasebe/ogrenci/{ogrenci_id}/ogretmen-odenen")
+async def ogrenci_ogretmen_odenen_duzelt(ogrenci_id: str, data: dict, current_user=Depends(_ERISIM)):
+    """Kur kaydı OLMAYAN (fallback) öğrenci satırında 'Öğr. Ödenen' (avans) — öğrenci-seviyesi.
+    Kur-bazlı ucun ikizi; teachers.yapilan_odeme'yi DELTA kadar $inc eder. Audit'e düşer."""
+    s = await db.students.find_one({"id": ogrenci_id})
+    if not s:
+        raise HTTPException(status_code=404, detail="Öğrenci bulunamadı")
+    try:
+        yeni = round(float(data.get("ogretmen_odenen")), 2)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Geçersiz değer")
+    if yeni < 0:
+        raise HTTPException(status_code=400, detail="Negatif olamaz")
+    eski = _num(s.get("ogretmen_odenen"))
+    delta = round(yeni - eski, 2)
+    await db.students.update_one({"id": ogrenci_id}, {"$set": {"ogretmen_odenen": yeni}})
+    tid = s.get("ogretmen_id")
+    if tid and delta:
+        await db.teachers.update_one({"id": tid}, {"$inc": {"yapilan_odeme": delta}})
+    await _log(current_user, "ogrenci", ogrenci_id, "ogretmen_odenen", eski, yeni)
     return {"ok": True, "ogretmen_odenen": yeni, "ogretmen_id": tid, "delta": delta}
 
 
