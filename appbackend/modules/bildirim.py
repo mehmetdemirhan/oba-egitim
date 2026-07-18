@@ -44,6 +44,7 @@ BILDIRIM_TURLERI = {
     "ai_ceo_mektup":    {"baslik": "📩 Performans Mektubu", "oncelik": "yuksek", "kategori": "ogretmen", "onem": "orta", "cooldown_saat": 0},
     "ai_ceo_miran":     {"baslik": "🧭 Sistem Danışmanı Miran", "oncelik": "normal", "kategori": "ogretmen", "onem": "bilgi", "cooldown_saat": 24},
     "timi_taslak_uyari": {"baslik": "🗑️ TIMI Taslağı Silinecek", "oncelik": "normal", "kategori": "ogretmen", "onem": "orta", "cooldown_saat": 24},
+    "analiz_taslak_uyari": {"baslik": "🗑️ Yarım Analiz Silinecek", "oncelik": "normal", "kategori": "ogretmen", "onem": "orta", "cooldown_saat": 24},
 }
 
 VARSAYILAN_TERCIH = {"ogrenci": True, "ogretmen": True, "veli": True}

@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import List, Optional, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Body
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Body, Query
 from fastapi.responses import StreamingResponse, Response
 from pydantic import BaseModel, Field
 
@@ -949,12 +949,59 @@ async def baslat_oturum(data: AnalizOturumBaslat, current_user=Depends(get_curre
 
 @router.get("/diagnostic/sessions")
 async def get_oturumlar(current_user=Depends(get_current_user)):
+    await _analiz_temizlik_throttle()  # cron yoksa: günde bir kez yarım-analiz temizliği
     q = {}
     if current_user.get("role") == "teacher":
         q["ogretmen_id"] = current_user["id"]
     items = await db.diagnostic_oturumlar.find(q).sort("olusturma_tarihi", -1).to_list(length=None)
     for i in items: i.pop("_id", None)
     return items
+
+
+@router.delete("/diagnostic/sessions/{oturum_id}")
+async def sil_oturum(oturum_id: str, current_user=Depends(get_current_user)):
+    """Yarım kalan (tamamlanmamış) analizi siler — başlatan öğretmen veya admin. Tamamlanmış
+    analiz bu yolla SİLİNMEZ (TIMI taslak deseni). islem_log'a düşer."""
+    oturum = await db.diagnostic_oturumlar.find_one({"id": oturum_id})
+    if not oturum:
+        raise HTTPException(status_code=404, detail="Analiz oturumu bulunamadı")
+    if oturum.get("durum") == "tamamlandi":
+        raise HTTPException(status_code=400, detail="Tamamlanmış analiz bu yolla silinemez")
+    rol = current_user.get("role")
+    sahip = oturum.get("ogretmen_id") == current_user.get("id")
+    if not (sahip or rol == "admin"):
+        raise HTTPException(status_code=403, detail="Bu analizi silme yetkiniz yok")
+    await db.diagnostic_oturumlar.delete_one({"id": oturum_id})
+    from core.audit import islem_kaydet
+    await islem_kaydet(current_user, "diagnostic", "analiz_taslak_sil", "diagnostic_oturum", oturum_id,
+                       "durum", oturum.get("durum"), "silindi")
+    return {"message": "Silindi", "taslak": True}
+
+
+async def _analiz_temizlik() -> dict:
+    """15 günü geçmiş tamamlanmamış analiz oturumlarını siler; 13-15 gün arasındakilere başlatan
+    öğretmene uyarı. Ortak temizleyici (core.temizlik) — TIMI taslak temizliğiyle aynı mekanizma."""
+    from core.temizlik import yarim_kayit_temizle
+    return await yarim_kayit_temizle(
+        koleksiyon="diagnostic_oturumlar", filtre={"durum": {"$ne": "tamamlandi"}},
+        tarih_alan="olusturma_tarihi", ogretmen_alan="ogretmen_id",
+        modul="diagnostic", silme_islem="analiz_oto_sil", hedef_tip="diagnostic_oturum",
+        bildirim_tur="analiz_taslak_uyari",
+        uyari_mesaj="Yarım kalan bir okuma analizin ~2 gün içinde otomatik silinecek — devam etmek ister misin?")
+
+
+async def _analiz_temizlik_throttle():
+    from core.temizlik import throttle_gunluk
+    await throttle_gunluk("analiz_taslak_temizlik_son", _analiz_temizlik)
+
+
+@router.post("/diagnostic/gunluk-temizlik")
+async def analiz_gunluk_temizlik(anahtar: str = Query(default="")):
+    """Harici cron (günlük) — token korumalı (push.py deseni)."""
+    from core.config import PUSH_CRON_TOKEN
+    if PUSH_CRON_TOKEN and anahtar != PUSH_CRON_TOKEN:
+        raise HTTPException(status_code=403, detail="Geçersiz anahtar")
+    return await _analiz_temizlik()
 
 @router.get("/diagnostic/sessions/student/{ogrenci_id}")
 async def get_ogrenci_oturumlari(ogrenci_id: str, current_user=Depends(get_current_user)):
