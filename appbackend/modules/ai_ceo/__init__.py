@@ -18,10 +18,10 @@ from fastapi import APIRouter
 
 from . import (fotograf, analiz, raporlar, sohbet, mektup, miran, karne, anomali, hedef,
                pazar, kuyruk, yonetim, plan, deniz, deneyim, analitik, nps, yonetici, karar_zekasi,
-               ayaz_v1)
+               ayaz_v1, atlas_motoru)
 
 router = APIRouter()
 for _alt in (fotograf, analiz, raporlar, sohbet, mektup, miran, karne, anomali, hedef,
              pazar, kuyruk, yonetim, plan, deniz, deneyim, analitik, nps, yonetici, karar_zekasi,
-             ayaz_v1):
+             ayaz_v1, atlas_motoru):
     router.include_router(_alt.router)
