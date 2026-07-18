@@ -11,6 +11,8 @@ ayrıştırılamazsa deterministik taslak (uydurma sayı YOK). Tarih daima core.
 iso()). AI'a yalnız fotograf.ai_payload (agregat, takma-id) gider. Yollar /ai/ceo/karar/*.
 """
 import json
+import random
+import re
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Body
@@ -239,12 +241,72 @@ async def karar_teklifi_uret() -> dict:
     return teklif
 
 
-# ─────────────────────────── Kontrollü deney: otomatik checkpoint ölçümü ───────────────────────────
+# ─────────────────────── Faz 3: otonom deney grupları + segment ölçüm ───────────────────────
+def _hedef_kur_regex(teklif: dict):
+    """Teklif başlığı/probleminden 'Kur N' segmentini çıkarır → students.kur (serbest string) için
+    tam-sayı token regex'i. Segment yoksa None (tüm aktif kitle)."""
+    metin = f"{teklif.get('title', '')} {teklif.get('problem', {}).get('statement', '')}".lower()
+    m = re.search(r"kur\s*(\d+)", metin)
+    if not m:
+        return None
+    return {"$regex": rf"(^|[^0-9]){m.group(1)}([^0-9]|$)"}
+
+
+async def _deney_gruplarini_olustur(teklif: dict) -> dict:
+    """Onaylanan teklifin segmentine uyan AKTİF öğrencileri (arsivli/mezun değil) rastgele ~%50
+    pilot / %50 kontrol olarak böler ve db.students.ai_experiments'e teklif_id ile mühürler.
+    Idempotent ($addToSet). Segment yoksa tüm aktif kitle. GERÇEK alanlar; uydurma yok."""
+    teklif_id = teklif["id"]
+    filtre = {"arsivli": {"$ne": True}, "mezun": {"$ne": True}}
+    kur_regex = _hedef_kur_regex(teklif)
+    if kur_regex:
+        filtre["kur"] = kur_regex
+    ogrenciler = await db.students.find(filtre, {"id": 1}).to_list(length=100000)
+    if not ogrenciler:
+        return {"pilot": 0, "kontrol": 0}
+    random.shuffle(ogrenciler)
+    hedef = teklif.get("implementation", {}).get("pilot_size")
+    hedef = int(hedef) if isinstance(hedef, (int, float)) and hedef else len(ogrenciler) // 2
+    sinir = max(1, min(hedef, len(ogrenciler) // 2)) if len(ogrenciler) > 1 else 1
+    pilot_ids = [s["id"] for s in ogrenciler[:sinir]]
+    kontrol_ids = [s["id"] for s in ogrenciler[sinir:sinir * 2]]
+    if pilot_ids:
+        await db.students.update_many({"id": {"$in": pilot_ids}}, {"$addToSet": {"ai_experiments.pilot_groups": teklif_id}})
+    if kontrol_ids:
+        await db.students.update_many({"id": {"$in": kontrol_ids}}, {"$addToSet": {"ai_experiments.control_groups": teklif_id}})
+    return {"pilot": len(pilot_ids), "kontrol": len(kontrol_ids)}
+
+
+async def _segment_bazli_metrik_hesapla(ogrenci_ids: list, m: dict, global_foto: dict):
+    """Bir öğrenci kümesinin (pilot/kontrol) birincil metriğini deterministik hesaplar. Şimdilik
+    yalnız YENİLEME segment-hesaplanabilir (kur seviyesi); segment kaynağı olmayan metrikler
+    dürüstçe kurum-geneli değere düşer (pilot=kontrol → net etki 0; UYDURMA YOK)."""
+    if not ogrenci_ids or not m:
+        return None
+    if m["key"] == "ogretmen.yenileme_orani":
+        toplam = yenileyen = 0
+        async for s in db.students.find({"id": {"$in": ogrenci_ids}}, {"kur": 1}):
+            toplam += 1
+            mt = re.search(r"\d+", str(s.get("kur") or ""))
+            if mt and int(mt.group()) > 1:
+                yenileyen += 1
+        return round(yenileyen * 100 / toplam, 1) if toplam else None
+    return _metrik_deger(global_foto, m)  # segment kaynağı yok → kurum-geneli (dürüst)
+
+
+def _ilerleme(deg, b, tg):
+    try:
+        if deg is not None and b is not None and tg is not None and (float(tg) - float(b)) != 0:
+            return round((float(deg) - float(b)) / (float(tg) - float(b)) * 100, 1)
+    except (TypeError, ValueError):
+        pass
+    return None
+
+
 async def olcum_calistir() -> dict:
-    """Uygulamadaki (implemented) tekliflerde, uygulama tarihinden geçen güne göre kontrol
-    noktalarında (checkpoints) birincil metriğin GERÇEK güncel değerini fotoğraftan okuyup
-    kaydeder + hedefe ilerlemeyi hesaplar. Sistem-seviyesi ölçümdür (pilot/kontrol segmentasyonu
-    henüz yok — ölçümler primary_metric'in kurum genelindeki gidişatını izler)."""
+    """Uygulamadaki (implemented) tekliflerde, kontrol noktalarında (checkpoints) birincil metriği
+    kurum-geneli + PİLOT + KONTROL segmentlerinde GERÇEK ver'den ölçer; hedefe ilerlemeyi ve net
+    deney etkisini (pilot−kontrol) kaydeder. Idempotent (gün tekrar ölçülmez). Uydurma yok."""
     foto = await F.sistem_fotografi()
     katalog = await _katalog()
     kmap = {m["key"]: m for m in katalog}
@@ -259,19 +321,31 @@ async def olcum_calistir() -> dict:
         olcumler = meas.get("olcumler") or []
         olculen_gunler = {o.get("gun") for o in olcumler}
         m = kmap.get(meas.get("primary_metric"))
-        deger = _metrik_deger(foto, m) if m else None
         b = meas.get("baseline"); tg = meas.get("target")
+        pilot_ids = [s["id"] async for s in db.students.find({"ai_experiments.pilot_groups": t["id"]}, {"id": 1})]
+        kontrol_ids = [s["id"] async for s in db.students.find({"ai_experiments.control_groups": t["id"]}, {"id": 1})]
+        genel = _metrik_deger(foto, m) if m else None
+        pilot = await _segment_bazli_metrik_hesapla(pilot_ids, m, foto) if m else None
+        kontrol = await _segment_bazli_metrik_hesapla(kontrol_ids, m, foto) if m else None
+        net = None
+        try:
+            if pilot is not None and kontrol is not None:
+                net = round(float(pilot) - float(kontrol), 1)
+        except (TypeError, ValueError):
+            net = None
         yeni = False
         for c in sorted(checkpoints):
             if c <= yas and c not in olculen_gunler:
-                ilerleme = None
-                try:
-                    if deger is not None and b is not None and tg is not None and (float(tg) - float(b)) != 0:
-                        ilerleme = round((float(deger) - float(b)) / (float(tg) - float(b)) * 100, 1)
-                except (TypeError, ValueError):
-                    ilerleme = None
-                olcumler.append({"gun": c, "tarih": iso(), "deger": deger, "baseline": b,
-                                 "target": tg, "ilerleme_yuzde": ilerleme, "fotograf_id": foto.get("id")})
+                olcumler.append({
+                    "gun": c, "tarih": iso(),
+                    "genel_deger": genel, "pilot_deger": pilot, "kontrol_deger": kontrol,
+                    "genel_ilerleme_yuzde": _ilerleme(genel, b, tg),
+                    "pilot_ilerleme_yuzde": _ilerleme(pilot, b, tg),
+                    "kontrol_ilerleme_yuzde": _ilerleme(kontrol, b, tg),
+                    "net_etki": net, "baseline": b, "target": tg,
+                    "deger": genel, "ilerleme_yuzde": _ilerleme(genel, b, tg),  # geriye-uyum (Faz 2)
+                    "fotograf_id": foto.get("id"),
+                })
                 yeni = True
         if yeni:
             await db.ai_ceo_proposals.update_one({"id": t["id"]}, {"$set": {"measurement.olcumler": olcumler}})
@@ -361,15 +435,19 @@ async def teklif_karar(teklif_id: str, data: dict = Body(...), current_user=Depe
 
 @router.post("/ai/ceo/karar/teklif/{teklif_id}/uygula")
 async def teklif_uygula(teklif_id: str, current_user=Depends(_ADMIN)):
-    """Onaylı teklifi UYGULAMAYA al (pilot/deney başlar) → status=implemented."""
+    """Onaylı teklifi UYGULAMAYA al: segmentine göre pilot/kontrol gruplarını (db.students'e)
+    kilitler ve deneyi başlatır → status=implemented."""
     t = await db.ai_ceo_proposals.find_one({"id": teklif_id})
     if not t:
         raise HTTPException(status_code=404, detail="Teklif bulunamadı")
     if t.get("status") != "approved":
         raise HTTPException(status_code=400, detail="Yalnız onaylı (approved) teklif uygulamaya alınır")
-    await db.ai_ceo_proposals.update_one({"id": teklif_id}, {"$set": {"status": "implemented", "uygulama_tarihi": iso()}})
-    await islem_kaydet(current_user, "ai_ceo", "karar_teklif_uygula", "ai_ceo_proposal", teklif_id, "status", "approved", "implemented")
-    return {"ok": True, "status": "implemented"}
+    gruplar = await _deney_gruplarini_olustur(t)  # FAZ 3: pilot/kontrol mühürle
+    await db.ai_ceo_proposals.update_one({"id": teklif_id},
+        {"$set": {"status": "implemented", "uygulama_tarihi": iso(), "deney_gruplari": gruplar}})
+    await islem_kaydet(current_user, "ai_ceo", "karar_teklif_uygula", "ai_ceo_proposal", teklif_id,
+                       "status", "approved", f"implemented (pilot {gruplar['pilot']}/kontrol {gruplar['kontrol']})")
+    return {"ok": True, "status": "implemented", "gruplar": gruplar}
 
 
 @router.post("/ai/ceo/karar/teklif/{teklif_id}/ogrenme")

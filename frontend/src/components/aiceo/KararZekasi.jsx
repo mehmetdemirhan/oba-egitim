@@ -194,24 +194,43 @@ export default function KararZekasi({ apiBase, user }) {
                     </div>
                     {t.status === "implemented" && (
                       <div>
-                        <div className="text-[11px] font-bold uppercase text-subtle mb-1.5">Otomatik Checkpoint Ölçümleri (gerçek metrik)</div>
+                        <div className="text-[11px] font-bold uppercase text-subtle mb-1.5 flex items-center gap-1"><Activity className="h-3.5 w-3.5 text-indigo-500" />Otomatik Segment Ölçümleri (Pilot / Kontrol · gerçek metrik)</div>
+                        {t.deney_gruplari && <div className="text-[11px] text-subtle mb-1.5">Kilitli deney kitlesi: 🚀 {t.deney_gruplari.pilot} pilot · ⚖️ {t.deney_gruplari.kontrol} kontrol</div>}
                         {(t.measurement?.olcumler || []).length === 0 ? (
-                          <div className="text-xs text-subtle">Henüz ölçüm yok — kontrol noktası günü geldiğinde otomatik kaydedilir (ya da "Ölçümü Çalıştır").</div>
+                          <div className="text-xs text-subtle">Henüz ölçüm yok — kontrol noktası günü geldikçe segment farkları otomatik kilitlenir (ya da "Ölçümü Çalıştır").</div>
                         ) : (
-                          <div className="space-y-1.5">
-                            {(t.measurement.olcumler || []).map((o, i) => (
-                              <div key={i} className="text-xs bg-app border border-line rounded-lg px-2 py-1.5">
-                                <div className="flex items-center justify-between">
-                                  <span><b>Gün {o.gun}</b> · değer <b>{o.deger ?? "—"}</b> {o.baseline != null && <span className="text-subtle">(baz {o.baseline} → hedef {o.target ?? "—"})</span>}</span>
-                                  {o.ilerleme_yuzde != null && <span className={o.ilerleme_yuzde >= 100 ? "text-emerald-700 font-semibold" : o.ilerleme_yuzde >= 0 ? "text-amber-700" : "text-red-600"}>hedefe %{o.ilerleme_yuzde}</span>}
+                          <div className="space-y-2.5">
+                            {(t.measurement.olcumler || []).map((o, i) => {
+                              const bar = (yuzde, renk) => yuzde == null ? null : (
+                                <div className="mt-1 flex items-center gap-2">
+                                  <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden"><div className={`h-1.5 rounded-full ${renk}`} style={{ width: `${Math.max(0, Math.min(100, yuzde))}%` }} /></div>
+                                  <span className="shrink-0 text-[10px] font-bold text-subtle">%{yuzde}</span>
                                 </div>
-                                {o.ilerleme_yuzde != null && (
-                                  <div className="w-full bg-slate-200 h-1 rounded-full mt-1 overflow-hidden">
-                                    <div className={`h-1 rounded-full ${o.ilerleme_yuzde >= 100 ? "bg-emerald-500" : "bg-amber-400"}`} style={{ width: `${Math.max(0, Math.min(100, o.ilerleme_yuzde))}%` }} />
+                              );
+                              return (
+                                <div key={i} className="text-xs bg-app border border-line rounded-xl p-2.5 space-y-2">
+                                  <div className="flex items-center justify-between font-semibold text-content border-b border-line pb-1">
+                                    <span>🎯 Gün {o.gun} {o.baseline != null && <span className="text-subtle font-normal">(baz {o.baseline} → hedef {o.target ?? "—"})</span>}</span>
+                                    <span className="text-[10px] text-subtle font-normal">{o.tarih ? new Date(o.tarih).toLocaleDateString("tr-TR") : ""}</span>
                                   </div>
-                                )}
-                              </div>
-                            ))}
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                                    <div className="p-2 rounded bg-emerald-50 border border-emerald-100">
+                                      <div className="flex justify-between font-medium text-emerald-800"><span>🚀 Pilot</span><b>{o.pilot_deger ?? "—"}</b></div>
+                                      {bar(o.pilot_ilerleme_yuzde, "bg-emerald-500")}
+                                    </div>
+                                    <div className="p-2 rounded bg-app border border-line">
+                                      <div className="flex justify-between font-medium text-subtle"><span>⚖️ Kontrol</span><b>{o.kontrol_deger ?? "—"}</b></div>
+                                      {bar(o.kontrol_ilerleme_yuzde, "bg-slate-400")}
+                                    </div>
+                                  </div>
+                                  {o.net_etki != null ? (
+                                    <div className="text-[11px] pt-0.5 flex justify-between font-medium"><span className="text-subtle">Net deney etkisi (pilot − kontrol):</span><b className={o.net_etki >= 0 ? "text-indigo-700" : "text-red-600"}>{o.net_etki > 0 ? "+" : ""}{o.net_etki} puan</b></div>
+                                  ) : (
+                                    <div className="text-[10px] text-subtle">Bu metrik için segment kaynağı yok — kurum-geneli değer gösterildi (net etki hesaplanamaz).</div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                       </div>

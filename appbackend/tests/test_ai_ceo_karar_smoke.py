@@ -28,6 +28,11 @@ def check(k, m):
         _kalan += 1; print(f"  [KALDI] {m}")
 
 
+def _iso_gun_once(n):
+    from datetime import datetime, timezone, timedelta
+    return (datetime.now(timezone.utc) - timedelta(days=n)).isoformat()
+
+
 AI_TEKLIF = {
     "title": "Yenileme iyileştirme pilotu",
     "problem": {"statement": "Yenileme düşük.", "severity_score": 70, "affected_population": 100, "estimated_annual_loss": 500000.0},
@@ -128,6 +133,31 @@ async def run():
         await kz.olcum_calistir()
         p2 = await db.ai_ceo_proposals.find_one({"id": "imp1"})
         check(sum(1 for o in p2["measurement"]["olcumler"] if o["gun"] == 14) == 1, "idempotent: gün 14 tekrar eklenmez")
+
+        # ── FAZ 3: otonom deney grupları (pilot/kontrol) + segment ölçümü ──
+        teklif_f3 = dict(AI_TEKLIF)
+        teklif_f3["id"] = "imp_faz3"
+        teklif_f3["title"] = "Kur 1 Öğrencileri İçin Yoğunlaştırılmış Sezon"
+        teklif_f3["status"] = "approved"
+        teklif_f3["measurement"] = dict(AI_TEKLIF["measurement"])  # kopya (olcumler paylaşımını önle)
+        await db.ai_ceo_proposals.insert_one(teklif_f3)
+        for i in range(4):  # 4 aktif Kur 1 öğrencisi → 2 pilot / 2 kontrol
+            await db.students.insert_one({"id": f"f3_s{i}", "kur": "Kur 1", "arsivli": False, "mezun": False})
+        r = await ac.post("/api/ai/ceo/karar/teklif/imp_faz3/uygula", headers=H("adm"))
+        check(r.status_code == 200 and r.json()["status"] == "implemented", "Faz 3: onaylı teklif uygulandı (implemented)")
+        pilots = await db.students.count_documents({"ai_experiments.pilot_groups": "imp_faz3"})
+        controls = await db.students.count_documents({"ai_experiments.control_groups": "imp_faz3"})
+        check(pilots == 2 and controls == 2, f"Faz 3: öğrenciler %50/%50 otonom bölündü (pilot {pilots}/kontrol {controls}, db.students'e mühürlendi)")
+        # 15 gün geçmiş gibi yap → gün 14 checkpoint tetiklensin
+        await db.ai_ceo_proposals.update_one({"id": "imp_faz3"}, {"$set": {"uygulama_tarihi": _iso_gun_once(15)}})
+        res_f3 = await kz.olcum_calistir()
+        check(res_f3["guncellenen_teklif"] >= 1, "Faz 3: ölçüm motoru çalıştı")
+        pf3 = await db.ai_ceo_proposals.find_one({"id": "imp_faz3"})
+        o14 = next((o for o in pf3["measurement"]["olcumler"] if o["gun"] == 14), None)
+        check(o14 is not None and o14["pilot_deger"] is not None and o14["kontrol_deger"] is not None,
+              "Faz 3: gün 14 pilot+kontrol segment değerleri hesaplandı (uydurma yok)")
+        check(o14 is not None and "net_etki" in o14 and "genel_deger" in o14,
+              "Faz 3: net deney etkisi (pilot−kontrol) + kurum-geneli değer kaydedildi")
 
     await server.client.drop_database(TEST_DB)
 
