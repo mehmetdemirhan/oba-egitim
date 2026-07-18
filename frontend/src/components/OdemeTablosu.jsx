@@ -203,11 +203,12 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
       ? req(() => axios.patch(`${apiBase}/muhasebe/kur-ucreti/${k.kur_ucreti_id}/pay`, { ogretmen_pay: parseFloat(v) || 0 }), "Pay güncellenemedi")
       : alanKaydet(k.kisi_id, "ogretmene_yapilacak_odeme", v);
 
-  // "Öğr. Ödenen" — kur-bazlı avans/erken ödeme; yalnız kur kaydı olan satırda girilebilir.
+  // "Öğr. Ödenen" — avans/erken ödeme; HER satırda girilebilir (Öğr. Payı gibi çift yol):
+  // kur kaydı varsa kur-bazlı uç, yoksa öğrenci-seviyesi uç. Mühür/tamamlanma fark etmez.
   const ogretmenOdenenKaydet = (k, v) =>
     k.kur_ucreti_id
       ? req(() => axios.patch(`${apiBase}/muhasebe/kur-ucreti/${k.kur_ucreti_id}/odenen`, { ogretmen_odenen: parseFloat(v) || 0 }), "Öğr. ödenen güncellenemedi")
-      : null;
+      : req(() => axios.patch(`${apiBase}/muhasebe/ogrenci/${k.kisi_id}/ogretmen-odenen`, { ogretmen_odenen: parseFloat(v) || 0 }), "Öğr. ödenen güncellenemedi");
 
   const odemeSil = async () => {
     if (await req(() => axios.delete(`${apiBase}/payments/${silDialog.id}`), "Silinemedi")) {
@@ -366,14 +367,10 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
                           placeholder="Pay"
                           baslik={k.kur_ucreti_id ? "Bu kur için öğretmen payı (hakedişe yansır)" : "Öğrenci için öğretmen payı (kur kaydı yok)"}
                           onSave={(v) => ogretmenPayKaydet(k, v)} />
-                        {k.kur_ucreti_id ? (
-                          <EditableCell value={k.ogretmen_odenen} kind="number" align="right" format={formatTL}
-                            placeholder="0" baslik="Öğretmene bu kur için fiilen ödenen (avans/erken). Genel 'Ödenen'e eklenir; hakedişten düşülür."
-                            alt={`kalan ${formatTL(k.ogretmen_kalan)}`}
-                            onSave={(v) => ogretmenOdenenKaydet(k, v)} />
-                        ) : (
-                          <td className="px-3 py-2 text-right text-subtle text-xs">—</td>
-                        )}
+                        <EditableCell value={k.ogretmen_odenen} kind="number" align="right" format={formatTL}
+                          placeholder="0" baslik="Öğretmene bu satır için fiilen ödenen (avans/erken). Her satırda girilebilir; genel 'Ödenen'e eklenir, hakedişten düşülür."
+                          alt={`kalan ${formatTL(k.ogretmen_kalan)}`}
+                          onSave={(v) => ogretmenOdenenKaydet(k, v)} />
                         <EditableCell value={k.muhasebe_notu} placeholder="Not ekle" kind="text"
                           onSave={(v) => alanKaydet(k.kisi_id, "muhasebe_notu", v)} />
                       </>

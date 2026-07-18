@@ -82,8 +82,10 @@ async def run():
         check(abs(t["yapilan_odeme"] - 1000) < 0.01, f"skaler Ödenen = avans 300 + net 700 = 1000 (mükerrer yok) ({t['yapilan_odeme']})")
         k = await db.kur_ucretleri.find_one({"id": "s1k1"})
         check(k.get("odendi_donem") == donem and abs(_num(k.get("ogretmen_odenen")) - 1000) < 0.01, f"kur mühürlendi + ogretmen_odenen=pay 1000 ({k.get('ogretmen_odenen')})")
-        # mühürlü kurda avans düzeltilemez
-        check((await ac.patch("/api/muhasebe/kur-ucreti/s1k1/odenen", headers=H("acc"), json={"ogretmen_odenen": 50})).status_code == 400, "hakedişe girmiş kurda avans düzeltilemez → 400")
+        # ITEM 3: mühürlü kurda da avans DÜZENLENEBİLİR (avans mühürden bağımsız; Öğr. PAYI mühür
+        # kuralıyla KARIŞTIRILMAZ). Aynı değere set → delta 0, skaler değişmez.
+        r = await ac.patch("/api/muhasebe/kur-ucreti/s1k1/odenen", headers=H("acc"), json={"ogretmen_odenen": 1000})
+        check(r.status_code == 200, "mühürlü kurda avans YİNE düzenlenebilir → 200")
 
         # ── 5) Avans azaltma DELTA'sı skalere doğru yansır (yeni kur) ──
         await db.kur_ucretleri.insert_one({"id": "s1k2", "ogrenci_id": "s1", "kur_adi": "2", "tutar": 1000, "egitim_turu": "Genel", "ogretmen_pay": 1000, "durum": "acik"})
@@ -91,6 +93,18 @@ async def run():
         await ac.patch("/api/muhasebe/kur-ucreti/s1k2/odenen", headers=H("acc"), json={"ogretmen_odenen": 100})  # 400→100, delta -300
         t = await db.teachers.find_one({"id": "t1"})
         check(abs(t["yapilan_odeme"] - 1100) < 0.01, f"delta doğru: 1000 + (400) + (-300) = 1100 ({t['yapilan_odeme']})")
+
+        # ── 6) KUR KAYDI OLMAYAN (fallback) öğrenci satırında da avans girilebilir ──
+        await db.students.insert_one({"id": "s2", "ad": "Ö", "soyad": "s2", "sinif": "5", "aldigi_egitim": "Genel",
+                                      "ogretmen_id": "t1", "ogretmene_yapilacak_odeme": 500, "yapilmasi_gereken_odeme": 0, "yapilan_odeme": 0})
+        r = await ac.patch("/api/muhasebe/ogrenci/s2/ogretmen-odenen", headers=H("acc"), json={"ogretmen_odenen": 200})
+        check(r.status_code == 200, f"kur kaydı OLMAYAN öğrencide avans girilebilir → 200 ({r.status_code})")
+        t = await db.teachers.find_one({"id": "t1"})
+        check(abs(t["yapilan_odeme"] - 1300) < 0.01, f"kursuz avans skalere yansıdı 1100+200=1300 ({t['yapilan_odeme']})")
+        r = await ac.get("/api/muhasebe/kisiler", headers=H("adm"))
+        row = next((x for x in r.json()["ogrenciler"] if x.get("kisi_id") == "s2" and not x.get("kur_ucreti_id")), None)
+        check(row and abs(row["ogretmen_odenen"] - 200) < 0.01 and abs(row["ogretmen_kalan"] - 300) < 0.01, f"kursuz satır: ödenen 200, kalan 300 ({row and (row.get('ogretmen_odenen'), row.get('ogretmen_kalan'))})")
+        check((await ac.patch("/api/muhasebe/ogrenci/s2/ogretmen-odenen", headers=H("t1"), json={"ogretmen_odenen": 100})).status_code == 403, "öğretmen kursuz avans düzeltemez → 403")
 
     await server.client.drop_database(TEST_DB)
 
