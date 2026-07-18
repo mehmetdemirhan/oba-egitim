@@ -51,6 +51,7 @@ import DashboardAnalitik from "./components/admin/DashboardAnalitik";
 import BilgiIkonu from "./components/BilgiIkonu";
 import AiCeo from "./components/aiceo/AiCeo";
 import KararZekasi from "./components/aiceo/KararZekasi";
+import AyazV1Panel from "./components/aiceo/AyazV1Panel";
 import KocumMiran from "./components/aiceo/KocumMiran";
 import Deniz from "./components/aiceo/Deniz";
 import YoneticiAdimlar from "./components/aiceo/YoneticiAdimlar";
@@ -1596,6 +1597,7 @@ function AppContent() {
             <TabsContent value="ai-ceo">
               <AiCeo apiBase={API} />
               <div className="mt-6"><KararZekasi apiBase={API} user={user} /></div>
+              <div className="mt-6"><AyazV1Panel apiBase={API} user={user} /></div>
             </TabsContent>
           )}
 
