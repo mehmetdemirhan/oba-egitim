@@ -2977,10 +2977,45 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, onAnasayfayaD
       {/* Ana içerik: sol metin, sağ panel */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* Sol: Metin */}
+        {/* Sol: Metin + altında Okuduğunu Anlama Soruları (geniş, ferah) */}
         <div className="flex-1 overflow-y-auto bg-amber-50 p-6">
           <h3 className="text-xl font-bold text-content mb-4 text-center">{metin.baslik}</h3>
           <MetinGorseli />
+          {((metin?.sorular?.length || 0) > 0 || (metin?.acik_sorular?.length || 0) > 0) && (
+            <div className="mt-8 max-w-3xl mx-auto">
+              <h3 className="text-lg font-bold text-content mb-4 flex items-center gap-2"><HelpCircle className="h-5 w-5 text-primary" />Okuduğunu Anlama Soruları</h3>
+              <div className="space-y-4">
+                {(metin?.sorular || []).map((s, i) => (
+                  <div key={s.id || i} className="bg-surface border border-line rounded-2xl p-4 shadow-sm">
+                    <div className="font-semibold text-content text-base flex items-start gap-2">
+                      <span className="text-primary font-bold">{i + 1}.</span>
+                      <span>{s.soru}</span>
+                      {s.kontrol_gerekli && <span className="text-[10px] bg-amber-100 text-amber-700 rounded px-1.5 py-0.5 shrink-0" title="Doğru cevap düşük güvenli — kontrol edilmeli">kontrol</span>}
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
+                      {["A","B","C","D"].filter(L => s.secenekler?.[L]).map(L => {
+                        const dogru = s.dogru_cevap === L;
+                        return (
+                          <div key={L} className={`text-sm rounded-xl px-3 py-2 border ${dogru ? "border-emerald-300 bg-emerald-50 text-emerald-800 font-semibold" : "border-line bg-app/40 text-content"}`}>
+                            <b>{L})</b> {s.secenekler[L]}{dogru && " ✓"}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+                {(metin?.acik_sorular?.length || 0) > 0 && (
+                  <div className="bg-surface border border-line rounded-2xl p-4 shadow-sm">
+                    <div className="font-semibold text-content text-base mb-2">Açık Uçlu Sorular</div>
+                    <ol className="list-decimal pl-6 space-y-1.5 text-sm text-content">
+                      {(metin.acik_sorular || []).map((a, j) => <li key={a.id || j}>{a.soru}</li>)}
+                    </ol>
+                  </div>
+                )}
+              </div>
+              <div className="text-xs text-subtle mt-3">Doğru cevaplar öğretmene gösterilir; öğrenci ekranında gizlidir. Metin Yönetimi'nden düzenlenebilir.</div>
+            </div>
+          )}
         </div>
 
         {/* Sağ panel: sekmeli form */}
@@ -3028,38 +3063,9 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, onAnasayfayaD
             {/* Adım 1: Anlama */}
             {raporAdim === 1 && (
               <div className="space-y-3">
-                {/* Okuduğunu Anlama Soruları — seçili metne bağlı (ÇSS + açık uçlu) */}
                 {((metin?.sorular?.length || 0) > 0 || (metin?.acik_sorular?.length || 0) > 0) && (
-                  <div className="border border-line rounded-xl p-3 bg-app/40">
-                    <div className="text-xs font-semibold text-primary mb-2">Okuduğunu Anlama Soruları</div>
-                    {(metin?.sorular || []).map((s, i) => (
-                      <div key={s.id || i} className="mb-2.5">
-                        <div className="text-sm font-medium text-content flex items-start gap-1">
-                          <span className="text-subtle">{i + 1}.</span>
-                          <span>{s.soru}</span>
-                          {s.kontrol_gerekli && <span className="text-[10px] bg-amber-100 text-amber-700 rounded px-1 py-0.5 shrink-0" title="Doğru cevap düşük güvenli — kontrol edilmeli">kontrol</span>}
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 mt-1 pl-4">
-                          {["A","B","C","D"].filter(L => s.secenekler?.[L]).map(L => {
-                            const dogru = s.dogru_cevap === L;
-                            return (
-                              <div key={L} className={`text-xs rounded px-2 py-1 border ${dogru ? "border-emerald-300 bg-emerald-50 text-emerald-800 font-semibold" : "border-line text-content"}`}>
-                                <b>{L})</b> {s.secenekler[L]} {dogru && "✓"}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                    {(metin?.acik_sorular?.length || 0) > 0 && (
-                      <div className="mt-2 pt-2 border-t border-line">
-                        <div className="text-xs font-semibold text-subtle mb-1">Açık Uçlu Sorular</div>
-                        <ol className="list-decimal pl-6 space-y-0.5 text-sm text-content">
-                          {(metin.acik_sorular || []).map((a, j) => <li key={a.id || j}>{a.soru}</li>)}
-                        </ol>
-                      </div>
-                    )}
-                    <div className="text-[11px] text-subtle mt-2">Doğru cevaplar öğretmene gösterilir; öğrenci ekranında gizlidir. Metin Yönetimi'nden düzenlenebilir.</div>
+                  <div className="text-xs text-subtle bg-app/40 border border-line rounded-lg px-3 py-2">
+                    📖 Okuduğunu Anlama Soruları metnin <b>altında</b> (soldaki geniş alanda) gösterilir.
                   </div>
                 )}
                 {[
@@ -5274,6 +5280,16 @@ function GirisAnaliziModul({ user, students, teachers }) {
     setAdim("canli");
   };
 
+  // Yarım kalan (tamamlanmamış) analizi sil — başlatan öğretmen veya admin (backend doğrular)
+  const silAnaliz = async (o) => {
+    if (!window.confirm("Bu yarım kalan analizi silmek istediğinize emin misiniz?")) return;
+    try {
+      await axios.delete(`${API}/diagnostic/sessions/${o.id}`);
+      toast({ title: "Silindi" });
+      fetchGecmis();
+    } catch (e) { toast({ title: "Silinemedi", description: e.response?.data?.detail || "", variant: "destructive" }); }
+  };
+
   const analiziTamamla = async (veri) => {
     // veri: { sure_saniye, hatalar, gozlem_notu, anlama, prozodik, ogretmen_notu, ogretmen_kur }
     try {
@@ -5494,10 +5510,18 @@ function GirisAnaliziModul({ user, students, teachers }) {
               {gecmisOturumlar.filter(o => o.durum === "devam").map(o => (
                 <div key={o.id} className="flex items-center justify-between gap-2 p-3 rounded-xl border border-amber-200 bg-surface">
                   <div className="min-w-0">
-                    <div className="font-medium text-sm text-content truncate">{o.ogrenci_ad || o.ogrenci_id?.slice(0,8)}</div>
+                    <div className="font-medium text-sm text-content truncate flex items-center gap-1.5">
+                      <span className="text-[10px] font-bold uppercase bg-amber-200 text-amber-800 rounded px-1.5 py-0.5">Yarım</span>
+                      {o.ogrenci_ad || o.ogrenci_id?.slice(0,8)}
+                    </div>
                     <div className="text-xs text-subtle">{o.metin_baslik || "Metin"} • {o.taslak_tarihi ? new Date(o.taslak_tarihi).toLocaleString("tr-TR") : "başlatıldı"}</div>
                   </div>
-                  <Button size="sm" onClick={() => analizeDevam(o)} className="bg-amber-600 hover:bg-amber-700 text-white shrink-0"><Play className="h-4 w-4 mr-1" />Devam Et</Button>
+                  <div className="flex gap-2 shrink-0">
+                    <Button size="sm" onClick={() => analizeDevam(o)} className="bg-amber-600 hover:bg-amber-700 text-white"><Play className="h-4 w-4 mr-1" />Devam Et</Button>
+                    {(user?.role === "admin" || o.ogretmen_id === user?.id) && (
+                      <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => silAnaliz(o)} title="Yarım kalan analizi sil"><Trash2 className="h-4 w-4" /></Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

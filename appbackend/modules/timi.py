@@ -462,60 +462,22 @@ async def timi_rapor_getir(sonuc_id: str, current_user=Depends(get_current_user)
 
 
 # ── Taslak (yarım kalan) otomatik temizlik yardımcıları ──
-def _yas_gun(created_at, now) -> int | None:
-    if not created_at:
-        return None
-    try:
-        d = datetime.fromisoformat(str(created_at).replace("Z", "+00:00"))
-        if d.tzinfo is None:
-            d = d.replace(tzinfo=timezone.utc)
-        return (now - d).days
-    except Exception:
-        return None
-
-
 async def _taslak_temizlik() -> dict:
-    """15 günü geçmiş tamamlanmamış taslakları siler; 13-15 gün arası olanlara (silmeden ~2
-    gün önce) uygulayan öğretmene BİR KEZ uyarı gönderir. Her silme islem_log'a düşer."""
-    now = datetime.now(timezone.utc)
-    from core.audit import islem_kaydet
-    sistem = {"id": "system", "role": "system", "ad": "Sistem", "soyad": ""}
-    silinen = uyarilan = 0
-    taslaklar = await db.timi_sonuclar.find({"durum": {"$ne": "tamamlandi"}}).to_list(length=10000)
-    for s in taslaklar:
-        yas = _yas_gun(s.get("created_at"), now)
-        if yas is None:
-            continue
-        if yas >= 15:
-            await db.timi_sonuclar.delete_one({"id": s["id"]})
-            await islem_kaydet(sistem, "timi", "taslak_oto_sil", "timi_sonuc", s["id"], "yas_gun", yas, "silindi")
-            silinen += 1
-        elif yas >= 13 and not s.get("silme_uyari_tarihi"):
-            try:
-                from modules.bildirim import bildirim_olustur
-                await bildirim_olustur(s.get("ogretmen_id"), "timi_taslak_uyari",
-                                       "Yarım kalan bir TIMI taslağın ~2 gün içinde otomatik silinecek — devam etmek ister misin?", s["id"])
-            except Exception:
-                pass
-            await db.timi_sonuclar.update_one({"id": s["id"]}, {"$set": {"silme_uyari_tarihi": now.isoformat()}})
-            uyarilan += 1
-    return {"ok": True, "silinen": silinen, "uyarilan": uyarilan}
+    """15 günü geçmiş tamamlanmamış TIMI taslaklarını siler; 13-15 gün arasındakilere uygulayan
+    öğretmene BİR KEZ uyarı gönderir. Ortak temizleyiciyi kullanır (core.temizlik)."""
+    from core.temizlik import yarim_kayit_temizle
+    return await yarim_kayit_temizle(
+        koleksiyon="timi_sonuclar", filtre={"durum": {"$ne": "tamamlandi"}},
+        tarih_alan="created_at", ogretmen_alan="ogretmen_id",
+        modul="timi", silme_islem="taslak_oto_sil", hedef_tip="timi_sonuc",
+        bildirim_tur="timi_taslak_uyari",
+        uyari_mesaj="Yarım kalan bir TIMI taslağın ~2 gün içinde otomatik silinecek — devam etmek ister misin?")
 
 
 async def _taslak_temizlik_throttle():
     """Cron yoksa: ilk-istek tetikli, günde bir kez (sessions okumasından çağrılır)."""
-    try:
-        son = await db.sistem_ayarlari.find_one({"tip": "timi_taslak_temizlik_son"})
-        now = datetime.now(timezone.utc)
-        if son and son.get("zaman"):
-            d = _yas_gun(son["zaman"], now)
-            if d is not None and d < 1:
-                return
-        await db.sistem_ayarlari.update_one({"tip": "timi_taslak_temizlik_son"},
-            {"$set": {"tip": "timi_taslak_temizlik_son", "zaman": now.isoformat()}}, upsert=True)
-        await _taslak_temizlik()
-    except Exception:
-        pass
+    from core.temizlik import throttle_gunluk
+    await throttle_gunluk("timi_taslak_temizlik_son", _taslak_temizlik)
 
 
 @router.post("/timi/gunluk-temizlik")
