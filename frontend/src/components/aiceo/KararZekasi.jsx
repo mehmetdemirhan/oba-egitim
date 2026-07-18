@@ -247,8 +247,31 @@ export default function KararZekasi({ apiBase, user }) {
                         {t.learning.lesson && <div className="mt-1 text-content">Ders: {t.learning.lesson}</div>}
                       </div>
                     ) : <div className="text-xs text-subtle">Deney tamamlanınca öğrenme (beklenen vs gerçek + ders) burada görünür.</div>}
+
+                    {/* Faz 2.5: Otonom ajan araç günlüğü (gerçek DB alt sorguları) */}
+                    <div>
+                      <div className="text-[11px] font-bold uppercase text-subtle mb-1.5 flex items-center gap-1"><Activity className="h-3.5 w-3.5 text-indigo-500" />Otonom Ajan Araç Günlüğü (Tool Execution)</div>
+                      {(t.arac_gunlugu || []).length === 0 ? (
+                        <div className="text-xs text-subtle">Bu teklif ajan araçları tetiklenmeden (veya deterministik olarak) üretildi.</div>
+                      ) : (
+                        <div className="space-y-1.5">
+                          {(t.arac_gunlugu || []).map((a, i) => (
+                            <div key={i} className="text-[11px] bg-app border border-line rounded-lg p-2">
+                              <div className="font-mono text-indigo-600 font-semibold">{a.tool}({Object.entries(a.arguments || {}).map(([k, v]) => `${k}=${Array.isArray(v) ? v.join("/") : v}`).join(", ")})</div>
+                              {a.tool === "compare_periods" && a.result && (
+                                <div className="text-subtle mt-0.5">güncel {a.result.current_value ?? "—"} · önceki {a.result.previous_value ?? "—"} · Δ {a.result.delta ?? "—"} · {a.result.trend}</div>
+                              )}
+                              {a.tool === "find_segments" && (
+                                <div className="text-subtle mt-0.5">{(a.result || []).length === 0 ? "ortalamadan anlamlı sapan segment yok" : (a.result || []).map((s, j) => <span key={j} className="inline-block mr-2">{s.segment}: {s.value} (%{s.sapma_yuzde}, n={s.sample_size})</span>)}</div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
                     <div className="bg-app border border-line rounded-xl p-3 font-mono text-[11px] text-subtle space-y-1">
-                      <div>persona: Ayda · analiz: 6_katmanlı</div>
+                      <div>persona: Ayda · analiz: 6_katmanlı · ajan: {(t.arac_gunlugu || []).length} araç</div>
                       <div>tarih: {t.tarih}</div>
                       <div>kaynak: {t._kaynak || "—"} · veri_kalitesi: %{t.veri_kalitesi ?? "—"} · fotograf_id: {t.fotograf_id || "—"}</div>
                     </div>

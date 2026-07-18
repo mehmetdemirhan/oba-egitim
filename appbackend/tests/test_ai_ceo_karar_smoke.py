@@ -159,6 +159,26 @@ async def run():
         check(o14 is not None and "net_etki" in o14 and "genel_deger" in o14,
               "Faz 3: net deney etkisi (pilot−kontrol) + kurum-geneli değer kaydedildi")
 
+        # ── FAZ 2.5: otonom ajan araçları (tool-calling) + audit ──
+        from modules.ai_ceo.tools_engine import get_metric, compare_periods, find_segments
+        # NPS tohumla: Kur 1 düşük (n=4), Kur 3 yüksek (n=4) → find_segments Kur 1'i yakalamalı
+        for i in range(4):
+            await db.ai_ceo_nps.insert_one({"id": f"nps1_{i}", "kur": "Kur 1", "puan": 3, "ogrenci_takma": f"tk1_{i}"})
+            await db.ai_ceo_nps.insert_one({"id": f"nps3_{i}", "kur": "Kur 3", "puan": 9, "ogrenci_takma": f"tk3_{i}"})
+        for i in range(4):  # find_segments distinct kur için Kur 3 öğrencisi de olsun
+            await db.students.insert_one({"id": f"k3_{i}", "kur": "Kur 3", "arsivli": False, "mezun": False})
+
+        m_res = await get_metric("ogretmen.veli_memnuniyeti", filters={"kur": "Kur 1"}, teklif_id="test_agent")
+        check("value" in m_res and m_res["value"] == 3.0 and m_res["sample_size"] == 4,
+              f"Faz 2.5: get_metric Kur 1 NPS segmentini GERÇEK hesapladı (değer {m_res['value']}, n={m_res['sample_size']})")
+        t_res = await compare_periods("ogretmen.yenileme_orani", teklif_id="test_agent")
+        check("trend" in t_res and "delta" in t_res, "Faz 2.5: compare_periods trend + delta döndürdü")
+        s_res = await find_segments("ogretmen.veli_memnuniyeti", ["kur"], teklif_id="test_agent")
+        check(isinstance(s_res, list) and any("kur=Kur 1" in b["segment"] for b in s_res),
+              f"Faz 2.5: find_segments ortalamadan sapan Kur 1 segmentini yakaladı ({len(s_res)} bulgu)")
+        audit = await db.ai_ceo_tool_runs.count_documents({"teklif_id": "test_agent"})
+        check(audit == 3, f"Faz 2.5: yalnız PUBLIC araç çağrıları audit'e mühürlendi ({audit}=3, iç get_metric loglanmadı)")
+
     await server.client.drop_database(TEST_DB)
 
 

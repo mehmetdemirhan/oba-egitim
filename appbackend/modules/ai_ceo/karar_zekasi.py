@@ -192,6 +192,7 @@ async def karar_teklifi_uret() -> dict:
     """GERÇEK fotoğraf + kurumsal hafıza + geçmiş dersler → yapılandırılmış teklif. AI JSON'u
     doğrulanır; ayrıştırılamazsa deterministik taslağa düşer (uydurma yok)."""
     from core.ai import call_claude, GEMINI_API_KEY
+    yeni_id = str(uuid.uuid4())
     foto = await F.sistem_fotografi()
     onceki = await F.son_fotograf()  # trend için en son kayıtlı fotoğraf
     katalog = await _katalog()
@@ -204,10 +205,25 @@ async def karar_teklifi_uret() -> dict:
                await db.ai_ceo_proposals.find({"learning.lesson": {"$exists": True}}, {"_id": 0, "learning": 1})
                .sort("tarih", -1).limit(3).to_list(length=3)]
 
+    # FAZ 2.5: Araştıran ajan — karar öncesi deterministik DB araçlarını tetikle (audit'li)
+    arac_gunlugu = []
+    if GEMINI_API_KEY:
+        try:
+            from .tools_engine import find_segments, compare_periods
+            seg = await find_segments("ogretmen.veli_memnuniyeti", ["kur"], teklif_id=yeni_id)
+            trd = await compare_periods("ogretmen.yenileme_orani", teklif_id=yeni_id)
+            arac_gunlugu = [
+                {"tool": "find_segments", "arguments": {"target_metric": "ogretmen.veli_memnuniyeti", "dimensions": ["kur"]}, "result": seg},
+                {"tool": "compare_periods", "arguments": {"metric": "ogretmen.yenileme_orani"}, "result": trd},
+            ]
+        except Exception:
+            arac_gunlugu = []
+
     teklif = None
     if GEMINI_API_KEY:
         user = (
             f"[SİSTEM FOTOĞRAFI — kanıt sayıları YALNIZ buradan]\n{json.dumps(payload, ensure_ascii=False)[:8000]}\n\n"
+            f"[AJAN ARAÇ BULGULARI (find_segments / compare_periods — GERÇEK DB alt sorguları)]\n{json.dumps(arac_gunlugu, ensure_ascii=False)}\n\n"
             f"[ONAYLI KURUMSAL HAFIZA]\n{json.dumps(hafiza, ensure_ascii=False)}\n\n"
             f"[GEÇMİŞ DERSLER]\n{json.dumps([d for d in dersler if d], ensure_ascii=False)}\n\n"
             f"Aşağıdaki JSON şemasında TEK teklif üret (başka metin yok):\n{_teklif_json_sema()}"
@@ -229,12 +245,13 @@ async def karar_teklifi_uret() -> dict:
     if teklif is None:
         teklif = _deterministik_teklif(foto, katalog, onceki)
 
-    # Kanonik alanlar (id/tarih/durum) + veri kalitesi işareti
-    teklif["id"] = str(uuid.uuid4())
+    # Kanonik alanlar (id/tarih/durum) + veri kalitesi + ajan araç izi
+    teklif["id"] = yeni_id
     teklif["tarih"] = iso()
     teklif["persona"] = "Ayda"
     teklif["status"] = "awaiting_decision"
     teklif["veri_kalitesi"] = vk
+    teklif["arac_gunlugu"] = arac_gunlugu
     teklif["fotograf_id"] = foto.get("id")
     await db.ai_ceo_proposals.insert_one({**teklif})
     teklif.pop("_id", None)
