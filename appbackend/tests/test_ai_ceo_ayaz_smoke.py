@@ -124,6 +124,19 @@ async def run():
         r = await ac.get("/api/ai/ayaz/gorevler", headers=H("koord"))
         check(r.status_code == 200 and len(r.json()["tasks"]) >= 3, "koordinatör görev listesini okur")
 
+        # ── Kriptografik hash-chain audit trail ──
+        r = await ac.get(f"/api/ai/ayaz/gorev/{safe_id}/audit", headers=H("koord"))
+        au = r.json()
+        olaylar = au["olaylar"]
+        check(r.status_code == 200 and len(olaylar) >= 2 and olaylar[0]["seq"] == 0, f"audit zinciri kuruldu (talep_uret→uygula, {len(olaylar)} olay)")
+        check(olaylar[0]["previous_hash"] == "0" * 64 and olaylar[1]["previous_hash"] == olaylar[0]["event_hash"], "hash-chain doğru zincirlenmiş (genesis + prev=onceki_hash)")
+        check(au["dogrulama"]["gecerli"] is True, "zincir doğrulaması: GEÇERLİ (kurcalanmamış)")
+        # Kurcalama: bir olayın metadata'sını değiştir → zincir kırılmalı
+        await db.ayaz_audit.update_one({"task_id": safe_id, "seq": 0}, {"$set": {"metadata": {"risk": "HACKED"}}})
+        r2 = await ac.get(f"/api/ai/ayaz/gorev/{safe_id}/audit", headers=H("koord"))
+        d2 = r2.json()["dogrulama"]
+        check(d2["gecerli"] is False and d2["kirilma_seq"] == 0, "kurcalama TESPİT edildi (metadata değişti → event_hash uyuşmuyor, zincir kırık)")
+
     await server.client.drop_database(TEST_DB)
 
 

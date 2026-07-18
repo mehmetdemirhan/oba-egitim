@@ -10,6 +10,7 @@ TASARIM İLKESİ (kasıtlı sınırlar):
 - Böylece 570 route / Faz kararlılığı ve KVKK güvenceleri korunur.
 
 Yollar /ai/ayaz/* — ai_ceo paketine dahildir (registry.json 'ai_ceo' yükler)."""
+import hashlib
 import io
 import json
 import re
@@ -66,6 +67,52 @@ def _modul_adi(task_id: str) -> str:
     return ham[:40] or "ayaz_modul"
 
 
+# ─────────────── Kriptografik hash-chain append-only audit trail ───────────────
+# Her Ayaz olayı sha256 ile bir öncekine zincirlenir; bir kayıt sonradan değişirse zincir kırılır.
+_GENESIS = "0" * 64
+
+
+def _kanonik(metadata: dict) -> str:
+    try:
+        return json.dumps(metadata or {}, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    except (TypeError, ValueError):
+        return "{}"
+
+
+def _olay_hash(task_id, seq, prev_hash, actor, action, ts, metadata) -> str:
+    ham = f"{task_id}|{seq}|{prev_hash}|{actor}|{action}|{ts}|{_kanonik(metadata)}"
+    return hashlib.sha256(ham.encode("utf-8")).hexdigest()
+
+
+async def _audit_ekle(task_id: str, actor: str, action: str, metadata: dict = None) -> str:
+    """Görevin audit zincirine yeni olay ekler (append-only). Dönen: event_hash."""
+    son = await db.ayaz_audit.find_one({"task_id": task_id}, sort=[("seq", -1)])
+    seq = (son["seq"] + 1) if son else 0
+    prev = son["event_hash"] if son else _GENESIS
+    ts = iso()
+    h = _olay_hash(task_id, seq, prev, actor or "sistem", action, ts, metadata or {})
+    await db.ayaz_audit.insert_one({
+        "event_id": str(uuid.uuid4()), "task_id": task_id, "seq": seq, "previous_hash": prev,
+        "event_hash": h, "actor": actor or "sistem", "action": action, "timestamp": ts, "metadata": metadata or {}})
+    return h
+
+
+async def _audit_dogrula(task_id: str) -> dict:
+    """Zinciri baştan yeniden hesaplayıp kurcalanmadığını ispatlar."""
+    olaylar = await db.ayaz_audit.find({"task_id": task_id}, {"_id": 0}).sort("seq", 1).to_list(length=1000)
+    prev = _GENESIS
+    for i, e in enumerate(olaylar):
+        if e.get("seq") != i:
+            return {"gecerli": False, "kirilma_seq": e.get("seq"), "neden": "seq boşluğu/atlaması", "olay_sayisi": len(olaylar)}
+        if e.get("previous_hash") != prev:
+            return {"gecerli": False, "kirilma_seq": e.get("seq"), "neden": "previous_hash zinciri kopuk", "olay_sayisi": len(olaylar)}
+        beklenen = _olay_hash(e["task_id"], e["seq"], e["previous_hash"], e["actor"], e["action"], e["timestamp"], e.get("metadata"))
+        if beklenen != e.get("event_hash"):
+            return {"gecerli": False, "kirilma_seq": e.get("seq"), "neden": "event_hash yeniden hesaplamayla uyuşmuyor (kayıt değiştirilmiş)", "olay_sayisi": len(olaylar)}
+        prev = e["event_hash"]
+    return {"gecerli": True, "kirilma_seq": None, "olay_sayisi": len(olaylar)}
+
+
 @router.post("/ai/ayaz/talep-uret")
 async def ayaz_talep_uret(govde: AyazTaskRequest, current_user=Depends(_ISTEYEN)):
     """Doğal dil talebi → kod taslağı + analiz + STATİK güvenlik taraması. exec/deploy YOK.
@@ -99,6 +146,8 @@ async def ayaz_talep_uret(govde: AyazTaskRequest, current_user=Depends(_ISTEYEN)
     }
     await db.ai_programmer_tasks.insert_one({**task})
     task.pop("_id", None)
+    await _audit_ekle(task["id"], current_user.get("id"), f"talep_uret:{task['durum']}",
+                      {"risk": gecerli.risk_seviyesi, "guvenlik_hata": len(tarama["errors"]), "kod_sha256": hashlib.sha256(gecerli.kod.encode("utf-8")).hexdigest()})
     await islem_kaydet(current_user, "ayaz", "talep_uret", "ayaz_task", task["id"], None, None, task["durum"])
     return {"ok": True, "task": task}
 
@@ -123,6 +172,7 @@ async def ayaz_reddet(task_id: str, current_user=Depends(_ADMIN)):
         {"id": task_id, "durum": {"$in": ["incelemede", "guvenlik_reddetti"]}}, {"$set": {"durum": "reddedildi"}})
     if r.matched_count == 0:
         raise HTTPException(status_code=400, detail="Yalnız incelemedeki/reddedilen görev reddedilir")
+    await _audit_ekle(task_id, current_user.get("id"), "reddet", {})
     await islem_kaydet(current_user, "ayaz", "reddet", "ayaz_task", task_id, "durum", None, "reddedildi")
     return {"ok": True, "durum": "reddedildi"}
 
@@ -150,12 +200,14 @@ async def ayaz_uygula(task_id: str, current_user=Depends(_ADMIN)):
 
     if not sonuc.get("ok"):
         await db.ai_programmer_tasks.update_one({"id": task_id}, {"$set": {"durum": "kurulum_hatasi", "kurulum": sonuc}})
+        await _audit_ekle(task_id, current_user.get("id"), "uygula:hata", {"errors": (sonuc.get("errors") or [])[:5]})
         await islem_kaydet(current_user, "ayaz", "uygula_hata", "ayaz_task", task_id, None, None, "; ".join(sonuc.get("errors", []))[:200])
         raise HTTPException(status_code=400, detail={"mesaj": "Kurulum reddedildi (güvenlik/doğrulama).", "sonuc": sonuc})
 
     await db.ai_programmer_tasks.update_one({"id": task_id}, {"$set": {
         "durum": "canlida", "kurulum": sonuc, "modul_adi": modul,
         "canliya_alan": current_user.get("id"), "canliya_alinma_tarihi": iso()}})
+    await _audit_ekle(task_id, current_user.get("id"), "uygula:canlida", {"modul": modul, "version": sonuc.get("version")})
     await islem_kaydet(current_user, "ayaz", "uygula", "ayaz_task", task_id, "durum", "incelemede", f"canlida ({modul} v{sonuc.get('version')})")
     return {"ok": True, "durum": "canlida", "modul": modul, "kurulum": sonuc}
 
@@ -168,5 +220,13 @@ async def ayaz_geri_al(task_id: str, current_user=Depends(_ADMIN)):
         raise HTTPException(status_code=400, detail="Yalnız canlıdaki Ayaz modülü geri alınır")
     sonuc = patch_manager.delete_module(t["modul_adi"])
     await db.ai_programmer_tasks.update_one({"id": task_id}, {"$set": {"durum": "geri_alindi", "geri_alma": sonuc}})
+    await _audit_ekle(task_id, current_user.get("id"), "geri_al", {"modul": t.get("modul_adi")})
     await islem_kaydet(current_user, "ayaz", "geri_al", "ayaz_task", task_id, "durum", "canlida", "geri_alindi")
     return {"ok": True, "durum": "geri_alindi", "sonuc": sonuc}
+
+
+@router.get("/ai/ayaz/gorev/{task_id}/audit")
+async def ayaz_audit(task_id: str, current_user=Depends(_ISTEYEN)):
+    """Görevin kriptografik hash-chain audit izini + zincir doğrulamasını döner (salt-okunur)."""
+    olaylar = await db.ayaz_audit.find({"task_id": task_id}, {"_id": 0}).sort("seq", 1).to_list(length=1000)
+    return {"olaylar": olaylar, "dogrulama": await _audit_dogrula(task_id)}
