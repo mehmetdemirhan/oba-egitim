@@ -53,6 +53,7 @@ import AiCeo from "./components/aiceo/AiCeo";
 import KararZekasi from "./components/aiceo/KararZekasi";
 import AyazV1Panel from "./components/aiceo/AyazV1Panel";
 import AgentScorecardReal from "./components/aiceo/AgentScorecardReal";
+import DeployQueuePanel from "./components/aiceo/DeployQueuePanel";
 import KocumMiran from "./components/aiceo/KocumMiran";
 import Deniz from "./components/aiceo/Deniz";
 import YoneticiAdimlar from "./components/aiceo/YoneticiAdimlar";
@@ -1600,6 +1601,7 @@ function AppContent() {
               <div className="mt-6"><KararZekasi apiBase={API} user={user} /></div>
               <div className="mt-6"><AyazV1Panel apiBase={API} user={user} /></div>
               <div className="mt-6"><AgentScorecardReal apiBase={API} /></div>
+              <div className="mt-6"><DeployQueuePanel apiBase={API} user={user} /></div>
             </TabsContent>
           )}
 
