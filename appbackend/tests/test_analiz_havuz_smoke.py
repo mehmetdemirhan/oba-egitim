@@ -140,6 +140,13 @@ async def run():
         # öğretmen onaylayamaz (403)
         r = await ac.post("/api/diagnostic/texts", headers=H("t1"), json={"baslik": "Öğr2", "icerik": "M.", "sorular": [], "acik_sorular": []})
         check((await ac.post(f"/api/diagnostic/texts/{r.json().get('id')}/admin-karar", headers=H("t1"), json={"onay": True})).status_code == 403, "öğretmen admin-karar veremez (403)")
+        # direkt=false → oylamaya; direkt=true → havuza (buton ayrımı doğru çalışıyor)
+        r = await ac.post("/api/diagnostic/texts", headers=H("t1"), json={"baslik": "DirektTest", "icerik": "m", "sorular": [], "acik_sorular": []})
+        did = r.json()["id"]
+        await ac.post(f"/api/diagnostic/texts/{did}/admin-karar", headers=H("koord"), json={"onay": True, "direkt": False})
+        check((await db.analiz_metinler.find_one({"id": did}))["durum"] == "oylama", "onay+direkt=false → oylamaya gönderildi")
+        await ac.post(f"/api/diagnostic/texts/{did}/admin-karar", headers=H("koord"), json={"onay": True, "direkt": True})
+        check((await db.analiz_metinler.find_one({"id": did}))["durum"] == "havuzda", "onay+direkt=true → havuza alındı")
 
         # ── 2+3) yedekle → temizle (geçmiş snapshot korunur) ──
         # eski metne referanslı bir oturum (snapshot'lı) oluştur
