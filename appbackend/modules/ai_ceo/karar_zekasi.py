@@ -19,6 +19,7 @@ from core.db import db
 from core.auth import require_role, UserRole
 from core.zaman import iso
 from core.audit import islem_kaydet
+from core.temizlik import yas_gun, throttle_gunluk
 from . import fotograf as F
 
 router = APIRouter()
@@ -238,6 +239,50 @@ async def karar_teklifi_uret() -> dict:
     return teklif
 
 
+# ─────────────────────────── Kontrollü deney: otomatik checkpoint ölçümü ───────────────────────────
+async def olcum_calistir() -> dict:
+    """Uygulamadaki (implemented) tekliflerde, uygulama tarihinden geçen güne göre kontrol
+    noktalarında (checkpoints) birincil metriğin GERÇEK güncel değerini fotoğraftan okuyup
+    kaydeder + hedefe ilerlemeyi hesaplar. Sistem-seviyesi ölçümdür (pilot/kontrol segmentasyonu
+    henüz yok — ölçümler primary_metric'in kurum genelindeki gidişatını izler)."""
+    foto = await F.sistem_fotografi()
+    katalog = await _katalog()
+    kmap = {m["key"]: m for m in katalog}
+    guncellenen = 0
+    proposals = await db.ai_ceo_proposals.find({"status": "implemented"}, {"_id": 0}).to_list(length=2000)
+    for t in proposals:
+        yas = yas_gun(t.get("uygulama_tarihi"))
+        if yas is None:
+            continue
+        meas = t.get("measurement") or {}
+        checkpoints = [c for c in (meas.get("checkpoints") or []) if isinstance(c, (int, float))]
+        olcumler = meas.get("olcumler") or []
+        olculen_gunler = {o.get("gun") for o in olcumler}
+        m = kmap.get(meas.get("primary_metric"))
+        deger = _metrik_deger(foto, m) if m else None
+        b = meas.get("baseline"); tg = meas.get("target")
+        yeni = False
+        for c in sorted(checkpoints):
+            if c <= yas and c not in olculen_gunler:
+                ilerleme = None
+                try:
+                    if deger is not None and b is not None and tg is not None and (float(tg) - float(b)) != 0:
+                        ilerleme = round((float(deger) - float(b)) / (float(tg) - float(b)) * 100, 1)
+                except (TypeError, ValueError):
+                    ilerleme = None
+                olcumler.append({"gun": c, "tarih": iso(), "deger": deger, "baseline": b,
+                                 "target": tg, "ilerleme_yuzde": ilerleme, "fotograf_id": foto.get("id")})
+                yeni = True
+        if yeni:
+            await db.ai_ceo_proposals.update_one({"id": t["id"]}, {"$set": {"measurement.olcumler": olcumler}})
+            guncellenen += 1
+    return {"ok": True, "guncellenen_teklif": guncellenen}
+
+
+async def _olcum_throttle():
+    await throttle_gunluk("karar_olcum_son", olcum_calistir)
+
+
 # ─────────────────────────── Endpointler ───────────────────────────
 @router.get("/ai/ceo/karar/metrik-katalog")
 async def metrik_katalog(current_user=Depends(_KOORD)):
@@ -251,9 +296,17 @@ async def metrik_katalog_guncelle(key: str, data: dict = Body(...), current_user
     return {"ok": True, "key": key}
 
 
+@router.post("/ai/ceo/karar/olcum-calistir")
+async def karar_olcum_calistir(current_user=Depends(_ADMIN)):
+    """Uygulamadaki tekliflerin kontrol noktası ölçümlerini elle çalıştırır (otomatik olarak da
+    /durum açılışında günde bir kez tetiklenir)."""
+    return await olcum_calistir()
+
+
 @router.get("/ai/ceo/karar/durum")
 async def karar_durum(current_user=Depends(_KOORD)):
     """Çok katmanlı GERÇEK fotoğraf + sağlık skoru + katalog ihlalleri + son teklifler."""
+    await _olcum_throttle()  # cron yoksa: günde bir kez checkpoint ölçümü
     foto = await F.son_fotograf() or await F.sistem_fotografi()
     katalog = await _katalog()
     teklifler = await db.ai_ceo_proposals.find({}, {"_id": 0}).sort("tarih", -1).limit(8).to_list(length=8)

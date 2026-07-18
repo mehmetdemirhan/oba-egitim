@@ -110,6 +110,25 @@ async def run():
         r = await ac.get("/api/ai/ceo/karar/durum", headers=H("koord"))
         check(r.status_code == 200 and "saglik" in r.json() and "ihlaller" in r.json(), "durum ucu: fotoğraf + sağlık + ihlaller")
 
+        # ── Otomatik checkpoint ölçümü (gerçek metrik, uydurma yok) ──
+        from datetime import datetime, timezone, timedelta
+        eski = (datetime.now(timezone.utc) - timedelta(days=20)).isoformat()
+        await db.ai_ceo_proposals.insert_one({"id": "imp1", "persona": "Ayda", "status": "implemented", "uygulama_tarihi": eski,
+            "measurement": {"primary_metric": "ogretmen.yenileme_orani", "baseline": 40.0, "target": 55.0, "checkpoints": [14, 30], "olcumler": []}})
+        async def fake_foto():
+            return {"id": "f1", "ogretmen": {"yenileme_orani_yuzde": 50.0}, "muhasebe": {}, "ogrenci": {}, "kullanim": {}, "birim_ekonomi": {}, "nps": {}}
+        kz.F.sistem_fotografi = fake_foto
+        res = await kz.olcum_calistir()
+        check(res["guncellenen_teklif"] >= 1, f"checkpoint ölçümü çalıştı ({res['guncellenen_teklif']})")
+        p = await db.ai_ceo_proposals.find_one({"id": "imp1"})
+        olc = p["measurement"]["olcumler"]
+        check(any(o["gun"] == 14 and o["deger"] == 50.0 for o in olc), "gün 14: GERÇEK metrik değeri 50.0 kaydedildi (uydurma yok)")
+        check(any(o["gun"] == 14 and abs(o["ilerleme_yuzde"] - 66.7) < 0.2 for o in olc), "hedefe ilerleme %66.7 hesaplandı ((50-40)/(55-40))")
+        check(not any(o["gun"] == 30 for o in olc), "gün 30 (20 gün geçti, henüz gelmedi) ölçülmedi")
+        await kz.olcum_calistir()
+        p2 = await db.ai_ceo_proposals.find_one({"id": "imp1"})
+        check(sum(1 for o in p2["measurement"]["olcumler"] if o["gun"] == 14) == 1, "idempotent: gün 14 tekrar eklenmez")
+
     await server.client.drop_database(TEST_DB)
 
 

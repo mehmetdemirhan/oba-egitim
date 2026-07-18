@@ -58,6 +58,11 @@ export default function KararZekasi({ apiBase, user }) {
     try { await axios.post(api(`/ai/ceo/karar/teklif/${id}/ogrenme`), { actual_result: parseFloat(actual) || null, lesson }); await sonrasi(id); setMesaj("Öğrenme kaydedildi; ders kurumsal hafızaya onay için eklendi."); }
     catch (e) { hata(e); } finally { setYuk(""); }
   };
+  const olcumCalistir = async (id) => {
+    setYuk("olcum");
+    try { const r = await axios.post(api("/ai/ceo/karar/olcum-calistir")); setMesaj(`Checkpoint ölçümü çalıştı (${r.data.guncellenen_teklif} teklif güncellendi).`); await sonrasi(id); }
+    catch (e) { hata(e); } finally { setYuk(""); }
+  };
   const sonrasi = async (id) => { await yukle(); const r = await axios.get(api(`/ai/ceo/karar/teklif/${id}`)); setSecili(r.data); };
   const hata = (e) => setMesaj("İşlem başarısız: " + (e.response?.data?.detail || e.message));
 
@@ -149,7 +154,10 @@ export default function KararZekasi({ apiBase, user }) {
                           <button onClick={() => karar(t.id, "rejected")} disabled={!!yuk} className="inline-flex items-center gap-1 bg-red-600 text-white text-sm rounded-lg px-3 py-2"><XCircle className="h-4 w-4" />Reddet</button>
                         </>}
                         {t.status === "approved" && <button onClick={() => uygula(t.id)} disabled={!!yuk} className="inline-flex items-center gap-1 bg-indigo-600 text-white text-sm rounded-lg px-3 py-2"><PlayCircle className="h-4 w-4" />Deneyi Başlat (uygula)</button>}
-                        {t.status === "implemented" && <button onClick={() => ogrenmeKaydet(t.id)} disabled={!!yuk} className="inline-flex items-center gap-1 bg-slate-700 text-white text-sm rounded-lg px-3 py-2"><GraduationCap className="h-4 w-4" />Sonucu Kaydet (öğrenme)</button>}
+                        {t.status === "implemented" && <>
+                          <button onClick={() => olcumCalistir(t.id)} disabled={!!yuk} className="inline-flex items-center gap-1 bg-teal-600 text-white text-sm rounded-lg px-3 py-2"><Activity className="h-4 w-4" />Ölçümü Çalıştır</button>
+                          <button onClick={() => ogrenmeKaydet(t.id)} disabled={!!yuk} className="inline-flex items-center gap-1 bg-slate-700 text-white text-sm rounded-lg px-3 py-2"><GraduationCap className="h-4 w-4" />Sonucu Kaydet (öğrenme)</button>
+                        </>}
                       </div>
                     )}
                   </>
@@ -184,6 +192,30 @@ export default function KararZekasi({ apiBase, user }) {
                       <div><span className="text-subtle block">Kontrol noktaları</span>{(t.measurement?.checkpoints || []).join(", ") || "—"}</div>
                       <div className="col-span-2 sm:col-span-3"><span className="text-subtle block">Durdurma koşulları</span>{(t.measurement?.stop_conditions || []).join("; ") || "—"}</div>
                     </div>
+                    {t.status === "implemented" && (
+                      <div>
+                        <div className="text-[11px] font-bold uppercase text-subtle mb-1.5">Otomatik Checkpoint Ölçümleri (gerçek metrik)</div>
+                        {(t.measurement?.olcumler || []).length === 0 ? (
+                          <div className="text-xs text-subtle">Henüz ölçüm yok — kontrol noktası günü geldiğinde otomatik kaydedilir (ya da "Ölçümü Çalıştır").</div>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {(t.measurement.olcumler || []).map((o, i) => (
+                              <div key={i} className="text-xs bg-app border border-line rounded-lg px-2 py-1.5">
+                                <div className="flex items-center justify-between">
+                                  <span><b>Gün {o.gun}</b> · değer <b>{o.deger ?? "—"}</b> {o.baseline != null && <span className="text-subtle">(baz {o.baseline} → hedef {o.target ?? "—"})</span>}</span>
+                                  {o.ilerleme_yuzde != null && <span className={o.ilerleme_yuzde >= 100 ? "text-emerald-700 font-semibold" : o.ilerleme_yuzde >= 0 ? "text-amber-700" : "text-red-600"}>hedefe %{o.ilerleme_yuzde}</span>}
+                                </div>
+                                {o.ilerleme_yuzde != null && (
+                                  <div className="w-full bg-slate-200 h-1 rounded-full mt-1 overflow-hidden">
+                                    <div className={`h-1 rounded-full ${o.ilerleme_yuzde >= 100 ? "bg-emerald-500" : "bg-amber-400"}`} style={{ width: `${Math.max(0, Math.min(100, o.ilerleme_yuzde))}%` }} />
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </>
                 )}
 
