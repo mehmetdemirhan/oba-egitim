@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
-import { Terminal, ShieldCheck, ShieldAlert, RefreshCw, Check, X, Rocket, Undo2, AlertTriangle } from "lucide-react";
+import { Terminal, ShieldCheck, ShieldAlert, RefreshCw, Check, X, Rocket, Undo2, AlertTriangle, Link2 } from "lucide-react";
 
 /**
  * AyazV1Panel — Ayaz v1.5 (GÜVENLİ). Doğal dil → kod TASLAĞI + risk analizi + STATİK güvenlik
@@ -23,6 +23,7 @@ export default function AyazV1Panel({ apiBase, user }) {
   const [secili, setSecili] = useState(null);
   const [yuk, setYuk] = useState("");
   const [mesaj, setMesaj] = useState("");
+  const [audit, setAudit] = useState(null);
   const isAdmin = user?.role === "admin";
   const api = (x) => `${apiBase}${x}`;
 
@@ -34,6 +35,13 @@ export default function AyazV1Panel({ apiBase, user }) {
     } catch (e) {}
   }, [apiBase]);
   useEffect(() => { yukle(); }, [yukle]);
+
+  useEffect(() => {
+    if (!secili?.id) { setAudit(null); return; }
+    let iptal = false;
+    axios.get(api(`/ai/ayaz/gorev/${secili.id}/audit`)).then((r) => { if (!iptal) setAudit(r.data); }).catch(() => { if (!iptal) setAudit(null); });
+    return () => { iptal = true; };
+  }, [secili?.id, secili?.durum]);
 
   const talepGonder = async () => {
     if (!talep.trim()) return;
@@ -144,6 +152,26 @@ export default function AyazV1Panel({ apiBase, user }) {
                 <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg p-2">Kurulum reddedildi: {(t.kurulum.errors || []).join("; ")}</div>
               )}
               {t.durum === "canlida" && <div className="text-xs text-emerald-700">Canlı modül: <b>{t.modul_adi}</b> (v{t.kurulum?.version}) · alan: {t.canliya_alan}</div>}
+
+              {/* Kriptografik hash-chain audit izi */}
+              {audit && (audit.olaylar || []).length > 0 && (
+                <div className="border border-line rounded-xl p-2.5">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="text-[11px] font-bold uppercase text-subtle flex items-center gap-1"><Link2 className="h-3.5 w-3.5 text-indigo-500" />Değiştirilemez Denetim İzi (hash-chain)</div>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold flex items-center gap-1 ${audit.dogrulama?.gecerli ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
+                      {audit.dogrulama?.gecerli ? <><ShieldCheck className="h-3 w-3" />Zincir doğrulandı</> : <><ShieldAlert className="h-3 w-3" />Kurcalanmış (seq {audit.dogrulama?.kirilma_seq})</>}
+                    </span>
+                  </div>
+                  <div className="space-y-1 max-h-40 overflow-auto">
+                    {(audit.olaylar || []).map((o) => (
+                      <div key={o.event_id} className="text-[10px] font-mono bg-app border border-line rounded px-2 py-1">
+                        <div className="flex items-center justify-between text-content"><span><b>#{o.seq}</b> {o.action}</span><span className="text-subtle">{o.actor} · {o.timestamp ? new Date(o.timestamp).toLocaleString("tr-TR") : ""}</span></div>
+                        <div className="text-subtle truncate">hash {String(o.event_hash).slice(0, 16)}… ← prev {String(o.previous_hash).slice(0, 12)}…</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Admin eylemleri */}
               {isAdmin && (
