@@ -2277,7 +2277,7 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
     try {
       await axios.post(`${API}/diagnostic/texts/${metinId}/admin-karar`, { onay, direkt });
       fetchMetinler();
-      toast({ title: direkt ? "✅ Direkt havuza alındı" : onay ? "🗳️ Oylama başlatıldı" : "❌ Reddedildi" });
+      toast({ title: direkt && onay ? "✅ Onaylandı — havuza alındı" : onay ? "🗳️ Oylamaya gönderildi" : "❌ Reddedildi" });
     } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
   };
 
@@ -2387,10 +2387,10 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
                 </div>
               </div>
               <div className="flex gap-2 mt-3 flex-wrap">
-                <Button size="sm" onClick={() => adminKarar(m.id, true, false)} className="bg-primary hover:bg-primary-hover text-white"><Users className="h-4 w-4 mr-1" />Oylama Başlat</Button>
-                <Button size="sm" onClick={() => adminKarar(m.id, true, true)} className="bg-green-600 hover:bg-green-700 text-white"><CheckCircle className="h-4 w-4 mr-1" />Direkt Havuza Al</Button>
+                <Button size="sm" onClick={() => adminKarar(m.id, true, true)} className="bg-green-600 hover:bg-green-700 text-white" title="Yönetici/Koordinatör onayı — metin havuza girer, analizde ve tüm egzersizlerde kullanılabilir"><CheckCircle className="h-4 w-4 mr-1" />Onayla</Button>
+                <Button size="sm" variant="outline" onClick={() => adminKarar(m.id, true, false)} className="border-primary text-primary" title="Öğretmen oylamasına aç"><Users className="h-4 w-4 mr-1" />Oylamaya Gönder</Button>
                 <Button size="sm" variant="destructive" onClick={() => adminKarar(m.id, false)}><XCircle className="h-4 w-4 mr-1" />Reddet</Button>
-                <Button size="sm" variant="destructive" onClick={() => sil(m.id)}><Trash2 className="h-4 w-4"/></Button>
+                <Button size="sm" variant="outline" className="text-red-600 border-red-200" onClick={() => sil(m.id)}><Trash2 className="h-4 w-4"/></Button>
               </div>
             </div>
           ))}
