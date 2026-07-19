@@ -350,6 +350,7 @@ function AppContent() {
   const { toast } = useToast();
   const { isFullscreen } = useFullscreenExercise();
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [aiCeoGorunum, setAiCeoGorunum] = useState(null); // dashboard kısayolundan AI CEO'da açılacak alt görünüm (ör. brifing → "ayda")
   const [sssBekleyenSayi, setSssBekleyenSayi] = useState(0);
   const [teachers, setTeachers] = useState([]);
   const [students, setStudents] = useState([]);
@@ -758,7 +759,7 @@ function AppContent() {
               onYaslandirmaSec={(kova) => { setMuhasebeYasKovasi(kova); setActiveTab("payments"); }}
               onOgretmenSec={() => setActiveTab("teachers")}
               ustSerit={<>
-                {user.role === "admin" && <YoneticiAdimlar apiBase={API} onNavigate={setActiveTab} />}
+                {user.role === "admin" && <YoneticiAdimlar apiBase={API} onNavigate={(h) => { if (h === "ai-ceo") setAiCeoGorunum("ayda"); setActiveTab(h); }} />}
                 <GecikenKurlar apiBase={API} />
                 {adminVeyaKoord && bekleyenler?.toplam > 0 && (
                   <BekleyenlerKarti bekleyenler={bekleyenler} onRefresh={fetchAll} onTabChange={setActiveTab} />
@@ -1461,7 +1462,7 @@ function AppContent() {
           {/* ═══ AI YÖNETİM KOKPİTİ (yalnız admin) — 6 bileşen + Deniz tek kabuk içinde ═══ */}
           {user.role === "admin" && (
             <TabsContent value="ai-ceo">
-              <AiYonetimKokpiti apiBase={API} user={user}
+              <AiYonetimKokpiti apiBase={API} user={user} baslangicGorunum={aiCeoGorunum || undefined}
                 onNavigate={(tab, odakKisi) => { setActiveTab(tab); if (odakKisi) setMuhasebeOdakKisi(odakKisi); }} />
             </TabsContent>
           )}

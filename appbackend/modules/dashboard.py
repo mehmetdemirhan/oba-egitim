@@ -484,3 +484,21 @@ async def sinif_dagilimi(current_user=Depends(require_role(UserRole.ADMIN, UserR
         for k, v in kovalar.items()
     ]
     return {"dagilim": dagilim, "toplam": toplam}
+
+
+@router.get("/dashboard/egitim-turu-dagilimi")
+async def egitim_turu_dagilimi(current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+    """Aktif öğrencilerin (arşivli + mezun HARİÇ) aldığı eğitim türüne göre dağılımı.
+    aldigi_egitim serbest string (isimle eşleşir); boş → 'Belirtilmemiş'. En çoktan aza sıralı."""
+    from collections import Counter
+    ogrenciler = await db.students.find(
+        {"arsivli": {"$ne": True}, "mezun": {"$ne": True}},
+        {"_id": 0, "aldigi_egitim": 1},
+    ).to_list(length=None)
+    say = Counter((s.get("aldigi_egitim") or "").strip() or "Belirtilmemiş" for s in ogrenciler)
+    toplam = sum(say.values())
+    dagilim = [
+        {"tur": k, "sayi": v, "yuzde": round(v * 100 / toplam, 1) if toplam else 0.0}
+        for k, v in sorted(say.items(), key=lambda x: -x[1])
+    ]
+    return {"dagilim": dagilim, "toplam": toplam}

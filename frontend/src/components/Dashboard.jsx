@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 import {
   ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar,
   CartesianGrid, XAxis, YAxis, Tooltip, Legend,
@@ -6,11 +7,11 @@ import {
 import {
   TrendingUp, AlertTriangle, Users, UserCheck, BookOpen, Calendar,
   Medal, Heart, Star, Wallet, BarChart3, PieChart as PieChartIcon,
-  GraduationCap,
+  GraduationCap, Layers,
 } from "lucide-react";
 import BilgiIkonu from "./BilgiIkonu";
 import { DashboardKart, StatKart, Bolum, BosDurum } from "./dashboard/Kart";
-import { GRAFIK, EKSEN_TICK, doluAySayisi, MIN_AY } from "./dashboard/dashboardTema";
+import { GRAFIK, EKSEN_TICK, anlamliDilim } from "./dashboard/dashboardTema";
 import { useAnalitik, HuniKarti, SatisKarti, NakitKarti, OgretmenPerfKarti } from "./admin/DashboardAnalitik";
 
 /**
@@ -25,15 +26,21 @@ import { useAnalitik, HuniKarti, SatisKarti, NakitKarti, OgretmenPerfKarti } fro
 export default function Dashboard({
   user, adminVeyaKoord, dashboardStats, ogrenciRiskler = [], adminAnketOzet = [],
   sinifDagilimi, monthlyStats = [], api, formatCurrency,
-  onTab, onYaslandirmaSec, onOgretmenSec, ustSerit,
+  onTab, onYaslandirmaSec, onOgretmenSec, onOgrenciSec, ustSerit,
 }) {
   const analitik = useAnalitik(api);
+  const [egitimTuru, setEgitimTuru] = useState(null);
+  useEffect(() => {
+    let iptal = false;
+    axios.get(`${api}/dashboard/egitim-turu-dagilimi`).then((r) => { if (!iptal) setEgitimTuru(r.data); }).catch(() => {});
+    return () => { iptal = true; };
+  }, [api]);
   if (!dashboardStats) return null;
 
   const koord = user.role === "coordinator";
   const yuksekRisk = ogrenciRiskler.filter((r) => r.risk_seviye === "yuksek");
-  const aylikDolu = doluAySayisi(monthlyStats, ["yeni_ogrenciler", "gelir"]);
-  const sonAy = monthlyStats.length ? monthlyStats[monthlyStats.length - 1] : null;
+  // MEVCUT veriyi hemen yansıt: yalnız veri olan aylara kırp (3 ay bekleme yok).
+  const aylik = anlamliDilim(monthlyStats, ["yeni_ogrenciler", "gelir"]);
 
   const pieData = [
     { name: "Öğrenci Alacakları", value: dashboardStats.toplam_ogrenci_alacak || 0, color: GRAFIK.basari },
@@ -69,10 +76,10 @@ export default function Dashboard({
 
         {ogrenciRiskler.length > 0 && (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <StatKart etiket="Düşük Risk" ton="basari" ikon={Users} deger={ogrenciRiskler.filter((r) => r.risk_seviye === "dusuk").length} altYazi="öğrenci" />
-            <StatKart etiket="Orta Risk" ton="uyari" ikon={Users} deger={ogrenciRiskler.filter((r) => r.risk_seviye === "orta").length} altYazi="öğrenci" />
-            <StatKart etiket="Yüksek Risk" ton="tehlike" vurgulu ikon={AlertTriangle} deger={yuksekRisk.length} altYazi="öğrenci — müdahale gerekli" />
-            <StatKart etiket="North Star" ton="bilgi" ikon={TrendingUp} sagUst={<BilgiIkonu k="risk" />}
+            <StatKart etiket="Düşük Risk" ton="basari" ikon={Users} deger={ogrenciRiskler.filter((r) => r.risk_seviye === "dusuk").length} altYazi="öğrenci" onClick={() => onTab("students")} />
+            <StatKart etiket="Orta Risk" ton="uyari" ikon={Users} deger={ogrenciRiskler.filter((r) => r.risk_seviye === "orta").length} altYazi="öğrenci" onClick={() => onTab("students")} />
+            <StatKart etiket="Yüksek Risk" ton="tehlike" vurgulu ikon={AlertTriangle} deger={yuksekRisk.length} altYazi="öğrenci — müdahale gerekli" onClick={() => onTab("students")} />
+            <StatKart etiket="North Star" ton="bilgi" ikon={TrendingUp} sagUst={<BilgiIkonu k="risk" />} onClick={() => onTab("students")}
               deger={`${ogrenciRiskler.length ? Math.round(ogrenciRiskler.filter((r) => r.aktif_gunler_7 >= 4).length / ogrenciRiskler.length * 100) : 0}%`}
               altYazi="haftada 4+ gün okuyan" />
           </div>
@@ -82,7 +89,9 @@ export default function Dashboard({
           <DashboardKart baslik="Yüksek Riskli Öğrenciler" ikon={AlertTriangle} bilgi="risk" className="border-l-4 border-l-red-500">
             <div className="space-y-2">
               {yuksekRisk.slice(0, 5).map((r) => (
-                <div key={r.id} className="flex items-center justify-between p-2.5 bg-red-500/5 rounded-lg">
+                <div key={r.id} onClick={() => onOgrenciSec ? onOgrenciSec(r.id) : onTab("students")} role="button" tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === "Enter") (onOgrenciSec ? onOgrenciSec(r.id) : onTab("students")); }}
+                  className="flex items-center justify-between p-2.5 bg-red-500/5 rounded-lg cursor-pointer hover:bg-red-500/10 transition-colors">
                   <div><span className="font-medium text-sm text-content">{r.ad} {r.soyad}</span><span className="text-xs text-subtle ml-2">{r.sinif}. sınıf</span></div>
                   <div className="flex items-center gap-3 text-xs">
                     <span className="text-subtle">Streak: {r.streak}</span>
@@ -130,9 +139,9 @@ export default function Dashboard({
           {!koord && (
             <DashboardKart baslik="Aylık İstatistikler" ikon={BarChart3} bilgi="aylik_istatistik">
               <div className="h-60" role="img" aria-label="Aylık yeni öğrenci ve gelir">
-                {aylikDolu >= MIN_AY ? (
+                {aylik.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={monthlyStats}>
+                    <BarChart data={aylik}>
                       <CartesianGrid strokeDasharray="3 3" stroke={GRAFIK.izgara} vertical={false} />
                       <XAxis dataKey="ay" tick={EKSEN_TICK} /><YAxis tick={EKSEN_TICK} />
                       <Tooltip /><Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
@@ -141,10 +150,7 @@ export default function Dashboard({
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
-                  <BosDurum ozet={sonAy ? [
-                    { etiket: "Bu ay yeni öğrenci", deger: sonAy.yeni_ogrenciler ?? 0 },
-                    { etiket: "Bu ay gelir", deger: formatCurrency(sonAy.gelir) },
-                  ] : []} />
+                  <BosDurum minAy={1} mesaj="Henüz aylık veri yok — kayıt/gelir girildikçe burada görünecek." />
                 )}
               </div>
             </DashboardKart>
@@ -169,6 +175,21 @@ export default function Dashboard({
                   </BarChart>
                 </ResponsiveContainer>
               ) : <BosDurum minAy={1} mesaj="Sınıf verisi yok." />}
+            </div>
+          </DashboardKart>
+          <DashboardKart baslik="Eğitim Türü Dağılımı" ikon={Layers} bilgi="egitim_turu_dagilimi">
+            <div className="h-60" role="img" aria-label="Aktif öğrencilerin aldığı eğitim türüne göre dağılımı">
+              {egitimTuru?.dagilim?.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={egitimTuru.dagilim.slice(0, 6)} layout="vertical" margin={{ left: 4, right: 20, top: 4, bottom: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={GRAFIK.izgara} horizontal={false} />
+                    <XAxis type="number" allowDecimals={false} tick={EKSEN_TICK} />
+                    <YAxis type="category" dataKey="tur" width={116} tick={{ ...EKSEN_TICK, fontSize: 10 }} />
+                    <Tooltip formatter={(v, n, p) => [`${v} öğrenci · %${p?.payload?.yuzde}`, "Öğrenci"]} />
+                    <Bar dataKey="sayi" name="Öğrenci" fill={GRAFIK.vurgu} radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : <BosDurum minAy={1} mesaj={egitimTuru ? "Eğitim türü verisi yok." : "Yükleniyor…"} />}
             </div>
           </DashboardKart>
         </div>

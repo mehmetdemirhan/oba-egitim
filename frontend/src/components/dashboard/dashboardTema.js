@@ -32,5 +32,22 @@ export function doluAySayisi(data, anahtarlar) {
   ).length;
 }
 
-// Trend grafiğinin gösterilmesi için gereken en az dolu ay
+// Trend grafiğinin gösterilmesi için gereken en az dolu ay (artık kullanılmıyor —
+// grafikler MEVCUT veriyi hemen yansıtır; bkz. anlamliDilim).
 export const MIN_AY = 3;
+
+// Zaman serisini VERİ OLAN aralığa kırp: ilk dolu aydan son dolu aya kadar.
+// Böylece 12 aylık boş eksen gösterilmez; grafik mevcut veriyi yansıtır ve
+// zaman geçtikçe kendiliğinden büyür. Hiç veri yoksa [] döner.
+export function anlamliDilim(data, anahtarlar) {
+  if (!Array.isArray(data) || data.length === 0) return [];
+  let ilk = -1, son = -1;
+  data.forEach((d, i) => {
+    if (anahtarlar.some((k) => d?.[k] != null && Number(d[k]) !== 0)) {
+      if (ilk < 0) ilk = i;
+      son = i;
+    }
+  });
+  if (ilk < 0) return [];
+  return data.slice(ilk, son + 1);
+}
