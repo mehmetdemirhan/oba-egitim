@@ -17,12 +17,13 @@ export default function AnalizHavuzBakim({ apiBase }) {
 
   const sayilariYukle = useCallback(async () => {
     try {
-      const [analiz, eski] = await Promise.all([
+      const [analiz, eski, olcum] = await Promise.all([
         axios.get(api("/diagnostic/texts?bolum=analiz")),
         axios.get(api("/diagnostic/texts?bolum=okuma_parcalari")),
+        axios.get(api("/diagnostic/texts?bolum=olcum")),
       ]);
       const dusuk = (analiz.data || []).reduce((n, m) => n + (m.sorular || []).filter(s => s.kontrol_gerekli).length, 0);
-      setDurum({ analiz: (analiz.data || []).length, eski: (eski.data || []).length, dusuk_guven: dusuk });
+      setDurum({ analiz: (analiz.data || []).length, eski: (eski.data || []).length, olcum: (olcum.data || []).length, dusuk_guven: dusuk });
     } catch (e) {}
     try { const r = await axios.get(api("/diagnostic/analiz-havuz/yedekler")); setYedekler(r.data.yedekler || []); } catch (e) {}
   }, [apiBase]);
@@ -42,6 +43,10 @@ export default function AnalizHavuzBakim({ apiBase }) {
   const iceAktar = () => calistir("import", async () => {
     const r = await axios.post(api("/diagnostic/akici-okuma-goc"));
     return `İçe aktarım: ${r.data.eklenen} yeni, ${r.data.guncellenen} güncellendi, ${r.data.okuma_parcalarina_tasinan} eski taşındı`;
+  });
+  const olcumIceAktar = () => calistir("olcum", async () => {
+    const r = await axios.post(api("/diagnostic/olcum-import"));
+    return `Ölçüm Metinleri: ${r.data.eklendi} yeni eklendi, ${r.data.korundu} zaten vardı (${r.data.metin} metin, ${r.data.toplam_soru} soru).`;
   });
   const cevapUret = () => calistir("cevap", async () => {
     let toplam = 0, tur = 0;
@@ -79,7 +84,7 @@ export default function AnalizHavuzBakim({ apiBase }) {
     <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm space-y-3">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h3 className="font-bold text-content text-sm flex items-center gap-1.5"><Archive className="h-4 w-4" />Analiz Havuzu Bakımı (Akıcı Okuma — tek kaynak)</h3>
-        <div className="text-xs text-subtle">Havuz: <b>{durum.analiz ?? "…"}</b> · Eski: <b>{durum.eski ?? "…"}</b> · Düşük güvenli soru: <b>{durum.dusuk_guven ?? "…"}</b></div>
+        <div className="text-xs text-subtle">Okuma: <b>{durum.analiz ?? "…"}</b> · Ölçüm: <b>{durum.olcum ?? "…"}</b> · Eski: <b>{durum.eski ?? "…"}</b> · Düşük güvenli soru: <b>{durum.dusuk_guven ?? "…"}</b></div>
       </div>
       <div className="text-xs text-subtle">Sıra: 1) Yedek Al → 2) İçe Aktar (150) → 3) AI Cevap Üret → 4) Tam Temizle. Silme geri dönüşsüzdür; geçmiş öğrenci ilerlemesi korunur (snapshot).</div>
       <div className="flex flex-wrap gap-2">
@@ -88,6 +93,10 @@ export default function AnalizHavuzBakim({ apiBase }) {
         <Btn id="cevap" on={cevapUret} ikon={<Sparkles className="h-4 w-4" />}>3 · AI Cevap Üret</Btn>
         <Btn id="ornek" on={ornekGetir} ikon={<RefreshCw className="h-4 w-4" />}>3b · Cevap Örneklemi (10 metin)</Btn>
         <Btn id="temizle" on={tamTemizle} ikon={<Trash2 className="h-4 w-4" />} kirmizi>4 · Tam Temizle</Btn>
+      </div>
+      <div className="text-xs text-subtle pt-1 border-t border-line">Ölçüm Metinleri (29 · Bloom açık uçlu · sınıf seviyeli) — birebir PDF transkripsiyonu, admin toplu (onaydan muaf). İdempotent.</div>
+      <div className="flex flex-wrap gap-2">
+        <Btn id="olcum" on={olcumIceAktar} ikon={<Upload className="h-4 w-4" />}>Ölçüm Metinleri İçe Aktar (29)</Btn>
       </div>
       {mesaj && <div className="text-sm rounded-lg bg-app border border-line px-3 py-2">{mesaj}</div>}
       {ornek?.ornekler?.length > 0 && (

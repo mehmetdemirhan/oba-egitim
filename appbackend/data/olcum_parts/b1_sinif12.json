@@ -1,0 +1,542 @@
+[
+  {
+    "dosya": "A 1.2 PİKNİKTE 1. SINIF.pdf",
+    "baslik": "PİKNİKTE",
+    "sinif_seviyesi": 1,
+    "kelime_sayisi": 67,
+    "govde_temiz": null,
+    "sorular": [
+      {
+        "no": 1,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Bilgi (Hatırlama)",
+        "soru": "Mert nereye gitmiştir?",
+        "cevap": "Pikniğe, ormana gitmiştir.",
+        "subjektif": false
+      },
+      {
+        "no": 2,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Bilgi (Hatırlama)",
+        "soru": "Piknikte hangi yiyecekler vardı?",
+        "cevap": "Sandviç, meyve ve kek vardı.",
+        "subjektif": false
+      },
+      {
+        "no": 3,
+        "kategori": "Anlama",
+        "kategori_ham": "Kavrama (Anlama)",
+        "soru": "Mert pikniğe gitmeden önce neden sevindi?",
+        "cevap": "Çünkü pikniğe gideceklerdi.",
+        "subjektif": false
+      },
+      {
+        "no": 4,
+        "kategori": "Anlama",
+        "kategori_ham": "Kavrama (Anlama)",
+        "soru": "Ormanda kuşlar ve yapraklar nasıl sesler çıkarıyordu?",
+        "cevap": "Kuşlar cıvıldıyor, yapraklar hışırdıyordu.",
+        "subjektif": false
+      },
+      {
+        "no": 5,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama",
+        "soru": "Sen pikniğe gitsen yanında neler götürürdün?",
+        "cevap": "(Öğrenci cevabı – örnek: su, meyve, top…)",
+        "subjektif": true
+      },
+      {
+        "no": 6,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Mert piknikte kardeşiyle neler yaptı?",
+        "cevap": "Top oynadı ve ip atladı.",
+        "subjektif": false
+      },
+      {
+        "no": 7,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Aile neden akşam olunca ormandan ayrıldı?",
+        "cevap": "Çünkü güneş batıyordu / piknik zamanı bitmişti. (Mantıklı her cevap kabul edilir.)",
+        "subjektif": true
+      },
+      {
+        "no": 8,
+        "kategori": "Yaratma",
+        "kategori_ham": "Sentez (Yaratma)",
+        "soru": "Metne bir cümle ekleseydin Mert piknikte başka ne yapardı?",
+        "cevap": "(Öğrenci cevabı – örnek: uçurtma uçururdu.)",
+        "subjektif": true
+      },
+      {
+        "no": 9,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Sence Mert’in piknikte en çok eğlendiği şey ne olabilir? Neden?",
+        "cevap": "(Öğrenci cevabı.)",
+        "subjektif": true
+      },
+      {
+        "no": 10,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Bu hikâyeyi nasıl buldun? Kendi düşünceni söyle.",
+        "cevap": "(Öğrenci cevabı.)",
+        "subjektif": true
+      }
+    ],
+    "notlar": ""
+  },
+  {
+    "dosya": "A 1.3 OKULDA 1. SINIF.pdf",
+    "baslik": "OKULDA",
+    "sinif_seviyesi": 1,
+    "kelime_sayisi": 76,
+    "govde_temiz": null,
+    "sorular": [
+      {
+        "no": 1,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Bilgi (Hatırlama)",
+        "soru": "Zeynep okula nasıl gitmiştir?",
+        "cevap": "Okula yürüyerek gitmiştir.",
+        "subjektif": false
+      },
+      {
+        "no": 2,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Bilgi (Hatırlama)",
+        "soru": "Öğretmen sınıfa ne getirmiştir?",
+        "cevap": "Yeni bir hikâye kitabı getirmişti.",
+        "subjektif": false
+      },
+      {
+        "no": 3,
+        "kategori": "Anlama",
+        "kategori_ham": "Kavrama (Anlama)",
+        "soru": "Zeynep kitabı neden merak etti?",
+        "cevap": "Çünkü yeni bir hikâye kitabıydı / içindekileri merak ediyordu.",
+        "subjektif": false
+      },
+      {
+        "no": 4,
+        "kategori": "Anlama",
+        "kategori_ham": "Kavrama (Anlama)",
+        "soru": "Zeynep öğretmenin yazdığı sorulara nasıl cevap verdi?",
+        "cevap": "Hepsine doğru cevap verdi.",
+        "subjektif": false
+      },
+      {
+        "no": 5,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama",
+        "soru": "Sen okula giderken yanında neler götürürsün?",
+        "cevap": "(Öğrenci cevabı – örnek: çanta, su, kalem…)",
+        "subjektif": true
+      },
+      {
+        "no": 6,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Zeynep teneffüste hangi oyunları oynadı?",
+        "cevap": "İp atladı ve misket oynadı.",
+        "subjektif": false
+      },
+      {
+        "no": 7,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Günün sonunda öğretmen Zeynep’i neden tebrik etti?",
+        "cevap": "Sorulara doğru cevap verdiği için.",
+        "subjektif": false
+      },
+      {
+        "no": 8,
+        "kategori": "Yaratma",
+        "kategori_ham": "Sentez (Yaratma)",
+        "soru": "Metne yeni bir cümle ekleseydin, Zeynep okulda başka ne yapardı?",
+        "cevap": "(Öğrenci cevabı – örnek: resim yapardı.)",
+        "subjektif": true
+      },
+      {
+        "no": 9,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Sence hikâyedeki en güzel bölüm hangisiydi? Neden?",
+        "cevap": "(Öğrenci cevabı.)",
+        "subjektif": true
+      },
+      {
+        "no": 10,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Okulda yeni bir şey öğrenmek sana nasıl hissettirir?",
+        "cevap": "(Öğrenci cevabı.)",
+        "subjektif": true
+      }
+    ],
+    "notlar": ""
+  },
+  {
+    "dosya": "A1.1 DENİZDE 1. SINIF.pdf",
+    "baslik": "DENİZDE",
+    "sinif_seviyesi": 1,
+    "kelime_sayisi": 60,
+    "govde_temiz": null,
+    "sorular": [
+      {
+        "no": 1,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Bilgi (Hatırlama)",
+        "soru": "Elif nereye gitmiştir?",
+        "cevap": "Denize gitmiştir.",
+        "subjektif": false
+      },
+      {
+        "no": 2,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Bilgi (Hatırlama)",
+        "soru": "Elif deniz kenarında ne yapmıştır?",
+        "cevap": "Kumdan büyük bir kale yapmıştır.",
+        "subjektif": false
+      },
+      {
+        "no": 3,
+        "kategori": "Anlama",
+        "kategori_ham": "Kavrama (Anlama)",
+        "soru": "Elif denize gitmeden önce neden sevindi?",
+        "cevap": "Çünkü denize gideceklerdi.",
+        "subjektif": false
+      },
+      {
+        "no": 4,
+        "kategori": "Anlama",
+        "kategori_ham": "Kavrama (Anlama)",
+        "soru": "Elif ve Eren’in dondurmaları neden birbirinden farklıdır? Hangi dondurmaları yemeyi tercih ettiler?",
+        "cevap": "Çünkü ikisinin beğenileri farklı olabilir. Elif çilekli, Eren çikolatalı dondurma yemiştir.",
+        "subjektif": false
+      },
+      {
+        "no": 5,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama",
+        "soru": "Sen denize gittiğinde yanında neler götürürdün? (Metne uygun cevap beklenir.)",
+        "cevap": "(Öğrenci cevabı – örnek: mayo, şapka, havlu…)",
+        "subjektif": true
+      },
+      {
+        "no": 6,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Metinde Elif ile Eren’in birlikte yaptığı iki şeyi söyle.",
+        "cevap": "Denize girdiler ve kumdan kale yaptılar. (Ya da: Yüzdüler, oynadılar.)",
+        "subjektif": false
+      },
+      {
+        "no": 7,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Sence aile neden akşam olunca eve döndü?",
+        "cevap": "Çünkü hava kararmaya başlamıştı / deniz zamanı bitmişti. (Mantıklı herhangi bir açıklama kabul edilir.)",
+        "subjektif": true
+      },
+      {
+        "no": 8,
+        "kategori": "Yaratma",
+        "kategori_ham": "Sentez (Yaratma)",
+        "soru": "Metne yeni bir cümle ekleseydin, Elif denizde başka ne yapardı?",
+        "cevap": "(Öğrenci cevabı – örnek: Midye toplardı.)",
+        "subjektif": true
+      },
+      {
+        "no": 9,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Sence Elif’in gününün en eğlenceli kısmı hangisiydi? Neden?",
+        "cevap": "(Öğrenci cevabı – örnek: Dondurma yemek çünkü çok severim.)",
+        "subjektif": true
+      },
+      {
+        "no": 10,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Bu hikâyeyi beğendin mi? Kendine göre değerlendir.",
+        "cevap": "(Öğrenci cevabı.)",
+        "subjektif": true
+      }
+    ],
+    "notlar": ""
+  },
+  {
+    "dosya": "A 2.1 GÖLDE BİR GÜN 2. SINIF.pdf",
+    "baslik": "GÖLDE BİR GÜN",
+    "sinif_seviyesi": 2,
+    "kelime_sayisi": 102,
+    "govde_temiz": null,
+    "sorular": [
+      {
+        "no": 1,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Bilgi (Hatırlama)",
+        "soru": "Ece ve ailesi nereye gitmiştir?",
+        "cevap": "Göl kıyısına gitmişlerdir.",
+        "subjektif": false
+      },
+      {
+        "no": 2,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Bilgi (Hatırlama)",
+        "soru": "Ece çantasına hangi eşyaları koymuştur?",
+        "cevap": "Defter ve dürbününü koymuştur.",
+        "subjektif": false
+      },
+      {
+        "no": 3,
+        "kategori": "Anlama",
+        "kategori_ham": "Kavrama (Anlama)",
+        "soru": "Ece gölde kuşları ve ördekleri neden izledi?",
+        "cevap": "Çünkü kuşları ve ördekleri merak ediyordu / onları gözlemlemek istiyordu.",
+        "subjektif": false
+      },
+      {
+        "no": 4,
+        "kategori": "Anlama",
+        "kategori_ham": "Kavrama (Anlama)",
+        "soru": "Yağmur başladığında aile ne yaptı?",
+        "cevap": "Büyük çınar ağacının altına sığındılar.",
+        "subjektif": false
+      },
+      {
+        "no": 5,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama",
+        "soru": "Sen göle giderken hangi eşyaları yanında götürürdün? Neden?",
+        "cevap": "(Öğrenci cevabı – örnek: su, şapka, dürbün… gerekçe beklenir.)",
+        "subjektif": true
+      },
+      {
+        "no": 6,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Ece gölde hangi etkinlikleri yaptı?",
+        "cevap": "Taş sektirdi, resim yaptı, fotoğraf çekti.",
+        "subjektif": false
+      },
+      {
+        "no": 7,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Gökyüzü ve hava durumundaki değişiklikler nelerdir?",
+        "cevap": "Önce güneşliydi, sonra bulutlandı ve hafif yağmur başladı.",
+        "subjektif": false
+      },
+      {
+        "no": 8,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Ece ve ailesi öğle yemeğini nerede yediler?",
+        "cevap": "Örtü serdikleri göl kenarında yediler.",
+        "subjektif": false
+      },
+      {
+        "no": 9,
+        "kategori": "Yaratma",
+        "kategori_ham": "Sentez (Yaratma)",
+        "soru": "Metne bir cümle ekleseydin, Ece gölde başka ne yapardı?",
+        "cevap": "(Öğrenci cevabı – örnek: gölde yüzen ördekleri çizerdi.)",
+        "subjektif": true
+      },
+      {
+        "no": 10,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Sence Ece’nin gününün en güzel anı hangisiydi? Neden?",
+        "cevap": "(Öğrenci cevabı.)",
+        "subjektif": true
+      }
+    ],
+    "notlar": "6. soru cevabında 'resim yaptı' geçiyor; okuma gövdesinde bu etkinlik açıkça yer almıyor (gövdede taş sektirme, dürbünle gözlem ve fotoğraf var). Cevap anahtarı birebir korundu."
+  },
+  {
+    "dosya": "A 2.2 ORMAN MACERASI 2. SINIF.pdf",
+    "baslik": "ORMAN MACERASI",
+    "sinif_seviyesi": 2,
+    "kelime_sayisi": 112,
+    "govde_temiz": null,
+    "sorular": [
+      {
+        "no": 1,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Bilgi (Hatırlama)",
+        "soru": "Arda ve ailesi ormana ne yapmak için gitmiştir?",
+        "cevap": "Ormanda yürüyüş yapmak için gitmişlerdir.",
+        "subjektif": false
+      },
+      {
+        "no": 2,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Bilgi (Hatırlama)",
+        "soru": "Arda çantasına hangi eşyaları koymuştur?",
+        "cevap": "Su matarası ve büyütecini koymuştur.",
+        "subjektif": false
+      },
+      {
+        "no": 3,
+        "kategori": "Anlama",
+        "kategori_ham": "Kavrama (Anlama)",
+        "soru": "Arda ormanda hangi canlıları gözlemlemiştir?",
+        "cevap": "Kelebekler, kuşlar, böcekler.",
+        "subjektif": false
+      },
+      {
+        "no": 4,
+        "kategori": "Anlama",
+        "kategori_ham": "Kavrama (Anlama)",
+        "soru": "Hafif yağmur başlayınca aile ne yaptı?",
+        "cevap": "Çalıların altına sığındılar.",
+        "subjektif": false
+      },
+      {
+        "no": 5,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama",
+        "soru": "Sen ormanda bir yürüyüşe çıksan hangi eşyaları yanına alırdın? Neden?",
+        "cevap": "(Öğrenci cevabı – örnek: su, dürbün, büyüteç… gerekçe beklenir.)",
+        "subjektif": true
+      },
+      {
+        "no": 6,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Arda ormanda hangi etkinlikleri yapmıştır?",
+        "cevap": "Büyüteçle yapraklara ve böceklere bakmış, ip atlamış, taşlarla kule yapmış.",
+        "subjektif": false
+      },
+      {
+        "no": 7,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Ormanda hava nasıl değişmiştir?",
+        "cevap": "Güneşli ve serindi, sonra hafif yağmur başlamıştır.",
+        "subjektif": false
+      },
+      {
+        "no": 8,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Arda öğle yemeğini nerede yemiştir?",
+        "cevap": "Ormanda, birlikte hazırladıkları yerde yemiştir.",
+        "subjektif": false
+      },
+      {
+        "no": 9,
+        "kategori": "Yaratma",
+        "kategori_ham": "Sentez (Yaratma)",
+        "soru": "Metne bir cümle ekleseydin, Arda yağmur durduktan sonra başka ne yapardı?",
+        "cevap": "(Öğrenci cevabı – örnek: gökyüzündeki renkli yaprakları çizerdi.)",
+        "subjektif": true
+      },
+      {
+        "no": 10,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Sence Arda’nın gününün en ilginç kısmı hangisiydi? Neden?",
+        "cevap": "(Öğrenci cevabı.)",
+        "subjektif": true
+      }
+    ],
+    "notlar": ""
+  },
+  {
+    "dosya": "A 2.3 PİKNİKTE 2. SINIF.pdf",
+    "baslik": "PİKNİK GÜNÜ",
+    "sinif_seviyesi": 2,
+    "kelime_sayisi": 115,
+    "govde_temiz": null,
+    "sorular": [
+      {
+        "no": 1,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Bilgi (Hatırlama)",
+        "soru": "Ali ve ailesi pikniğe nereye gitmiştir?",
+        "cevap": "Göl kenarına gitmişlerdir.",
+        "subjektif": false
+      },
+      {
+        "no": 2,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Bilgi (Hatırlama)",
+        "soru": "Ali çantasına neleri koymuştur?",
+        "cevap": "Boyalarını ve resim defterini koymuştur.",
+        "subjektif": false
+      },
+      {
+        "no": 3,
+        "kategori": "Anlama",
+        "kategori_ham": "Kavrama (Anlama)",
+        "soru": "Ali pikniğe gideceklerini duyunca neden sevinmiştir?",
+        "cevap": "Çünkü pikniği çok sevmiştir / eğleneceğini düşünmüştür.",
+        "subjektif": false
+      },
+      {
+        "no": 4,
+        "kategori": "Anlama",
+        "kategori_ham": "Kavrama (Anlama)",
+        "soru": "Metne göre hava neden değişmiştir? (Önce güneşliydi, sonra ne oldu?)",
+        "cevap": "Önce güneşliydi, sonra bulutlandı ve hafif yağmur başladı.",
+        "subjektif": false
+      },
+      {
+        "no": 5,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama",
+        "soru": "Eğer sen pikniğe gitseydin, hangi eşyaları götürürdün? Neden?",
+        "cevap": "(Öğrenci cevabı – örnek: top, su, şapka… gerekçe beklenir.)",
+        "subjektif": true
+      },
+      {
+        "no": 6,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Ali’nin piknikte yaptığı etkinlikleri sırayla söyle.",
+        "cevap": "Resim yaptı, top oynadı, yemek yedi, saklambaç oynadı, yağmuru izledi.",
+        "subjektif": false
+      },
+      {
+        "no": 7,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Ali ve ailesi yağmurdan korunmak için ne yapmıştır?",
+        "cevap": "Çadırın içine girmişlerdir.",
+        "subjektif": false
+      },
+      {
+        "no": 8,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Metinde geçen doğal olaylarını (hava durumlarını) listele.",
+        "cevap": "Güneş açması, kuşların cıvıldaması, bulutlanma, yağmur, gökkuşağı.",
+        "subjektif": false
+      },
+      {
+        "no": 9,
+        "kategori": "Yaratma",
+        "kategori_ham": "Sentez (Yaratma)",
+        "soru": "Metne yeni bir bölüm ekleseydin, Ali yağmur durduktan sonra başka ne yapardı?",
+        "cevap": "(Öğrenci cevabı – örnek: gökkuşağını çizerdi.)",
+        "subjektif": true
+      },
+      {
+        "no": 10,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Sence Ali’nin pikniğinin en güzel anı hangisiydi? Neden böyle düşünüyorsun?",
+        "cevap": "(Öğrenci cevabı.)",
+        "subjektif": true
+      }
+    ],
+    "notlar": ""
+  }
+]
