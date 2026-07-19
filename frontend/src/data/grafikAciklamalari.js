@@ -58,6 +58,14 @@ const grafikAciklamalari = {
     nasil: "Öğretmen başına aktif öğrenci (arşivsiz), geciken kur (35 günden eski açık kur) ve yenileme oranı. Tamamlanan kur 3'ten azsa oran 'yetersiz veri' sayılır.",
     ne: "Öğretmenleri yenileme ve geciken tahsilat açısından kıyaslayıp destek/geri bildirim vermek için.",
   },
+  rozet_durumu: {
+    nasil: "Her öğretmenin kazandığı öğretmen rozeti sayısı / tanımlı toplam rozet sayısı. Rozet koşulları sistem ayarlarından yönetilir.",
+    ne: "Öğretmenlerin platform hedeflerine ne kadar ulaştığını görüp tanıma/teşvik için.",
+  },
+  veli_degerlendirme: {
+    nasil: "Öğretmene bağlı öğrencilerin velilerinin doldurduğu anketlerin ortalama puanı (5 üzerinden) ve tavsiye oranı; anket sayısı parantezde.",
+    ne: "Veli memnuniyetini öğretmen bazında görüp düşük memnuniyette destek/geri bildirim vermek için.",
+  },
   sinif_dagilimi: {
     nasil: "Aktif öğrenciler (arşivli ve mezun HARİÇ) sınıf seviyesine göre sayılır. 1-8. sınıf ayrı; sınıfı boş/aralık dışı olanlar 'Belirsiz' kovasında. Yüzde = kova ÷ toplam.",
     ne: "Hangi sınıf seviyesinde yoğunlaştığını görüp içerik ve kampanyaları o kitleye göre planlamak için.",

@@ -47,7 +47,7 @@ import MuhasebeAyarlari from "./components/admin/MuhasebeAyarlari";
 import OgretmenDonemOdeme from "./components/admin/OgretmenDonemOdeme";
 import GecikenKurlar from "./components/admin/GecikenKurlar";
 import FunnelPanel from "./components/admin/FunnelPanel";
-import DashboardAnalitik from "./components/admin/DashboardAnalitik";
+import Dashboard from "./components/Dashboard";
 import BilgiIkonu from "./components/BilgiIkonu";
 import AiYonetimKokpiti from "./components/aiceo/AiYonetimKokpiti";
 import KocumMiran from "./components/aiceo/KocumMiran";
@@ -647,12 +647,15 @@ function AppContent() {
             <TabsTrigger value="dashboard" className={tabClass}><BarChart3 className="h-4 w-4 mr-2" />Dashboard</TabsTrigger>
             <TabsTrigger value="teachers" className={tabClass}><UserCheck className="h-4 w-4 mr-2" />Öğretmenler</TabsTrigger>
             <TabsTrigger value="students" className={tabClass}><Users className="h-4 w-4 mr-2" />Öğrenciler</TabsTrigger>
+            <TabsTrigger value="courses" className={tabClass}><BookOpen className="h-4 w-4 mr-2" />Kurslar</TabsTrigger>
             {user.role !== "coordinator" && <TabsTrigger value="payments" className={tabClass}><CreditCard className="h-4 w-4 mr-2" />Muhasebe</TabsTrigger>}
             {adminVeyaKoord && <TabsTrigger value="users" className={tabClass}><Shield className="h-4 w-4 mr-2" />Kullanıcılar</TabsTrigger>}
-            <TabsTrigger value="gelisim" className={tabClass}><Trophy className="h-4 w-4 mr-2" />Gelişim</TabsTrigger>
+            {/* Alt-navigasyondaki bir sekme açıkken üst ana sekme "aktif" görünsün (kayıp konum düzeltmesi) */}
+            <TabsTrigger value="gelisim" className={tabClass + (GELISIM_GRUP.includes(activeTab) ? " !bg-gradient-to-r !from-orange-500 !to-red-500 !text-white !shadow-sm" : "")}><Trophy className="h-4 w-4 mr-2" />Gelişim</TabsTrigger>
             <TabsTrigger value="giris-analizi" className={tabClass}><Stethoscope className="h-4 w-4 mr-2" />Analiz</TabsTrigger>
+            <TabsTrigger value="gorevler" className={tabClass}><Target className="h-4 w-4 mr-2" />Görevler</TabsTrigger>
             <TabsTrigger value="mesajlar" className={tabClass}><Mail className="h-4 w-4 mr-2" />Mesajlar</TabsTrigger>
-            {adminVeyaKoord && <TabsTrigger value="ayarlar" className={tabClass}><Star className="h-4 w-4 mr-2" />Ayarlar{sssBekleyenSayi > 0 && <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">{sssBekleyenSayi}</span>}</TabsTrigger>}
+            {adminVeyaKoord && <TabsTrigger value="ayarlar" className={tabClass + (AYARLAR_GRUP.includes(activeTab) ? " !bg-gradient-to-r !from-orange-500 !to-red-500 !text-white !shadow-sm" : "")}><Star className="h-4 w-4 mr-2" />Ayarlar{sssBekleyenSayi > 0 && <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">{sssBekleyenSayi}</span>}</TabsTrigger>}
           </TabsList>
           )}
 
@@ -741,163 +744,27 @@ function AppContent() {
 
           {/* Dashboard */}
           <TabsContent value="dashboard">
-            {dashboardStats && (
-              <div className="space-y-6">
-                {/* Ayda (Sıradaki Adımlar) + Geciken Kurlar + Onay Bekleyenler — yan yana, kompakt */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
-                  {user.role === "admin" && <YoneticiAdimlar apiBase={API} onNavigate={setActiveTab} />}
-                  <GecikenKurlar apiBase={API} />
-                  {adminVeyaKoord && bekleyenler?.toplam > 0 && (
-                    <BekleyenlerKarti bekleyenler={bekleyenler} onRefresh={fetchAll} onTabChange={setActiveTab} />
-                  )}
-                </div>
-                {/* KPI: Risk Durumu + Okuma Aktivitesi */}
-                {ogrenciRiskler.length > 0 && (
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                    <div className="bg-surface rounded-2xl p-4 border border-line shadow-sm">
-                      <div className="flex items-center gap-1.5 text-xs text-subtle font-medium"><span className="w-2 h-2 rounded-full bg-green-500" />Düşük Risk</div>
-                      <div className="text-3xl font-bold text-content tabular-nums mt-1">{ogrenciRiskler.filter(r => r.risk_seviye === "dusuk").length}</div>
-                      <div className="text-xs text-subtle">öğrenci</div>
-                    </div>
-                    <div className="bg-surface rounded-2xl p-4 border border-line shadow-sm">
-                      <div className="flex items-center gap-1.5 text-xs text-subtle font-medium"><span className="w-2 h-2 rounded-full bg-amber-500" />Orta Risk</div>
-                      <div className="text-3xl font-bold text-content tabular-nums mt-1">{ogrenciRiskler.filter(r => r.risk_seviye === "orta").length}</div>
-                      <div className="text-xs text-subtle">öğrenci</div>
-                    </div>
-                    <div className="bg-surface rounded-2xl p-4 border border-line shadow-sm border-l-4 border-l-red-500">
-                      <div className="flex items-center gap-1.5 text-xs text-red-600 font-medium"><span className="w-2 h-2 rounded-full bg-red-500" />Yüksek Risk</div>
-                      <div className="text-3xl font-bold text-red-700 tabular-nums mt-1">{ogrenciRiskler.filter(r => r.risk_seviye === "yuksek").length}</div>
-                      <div className="text-xs text-red-500">öğrenci — müdahale gerekli</div>
-                    </div>
-                    <div className="bg-surface rounded-2xl p-4 border border-line shadow-sm">
-                      <div className="flex items-center justify-between text-xs text-subtle font-medium"><span className="flex items-center gap-1.5"><TrendingUp className="h-3.5 w-3.5 text-primary" />North Star</span><BilgiIkonu k="risk" /></div>
-                      <div className="text-3xl font-bold text-content tabular-nums mt-1">{ogrenciRiskler.length > 0 ? Math.round(ogrenciRiskler.filter(r => r.aktif_gunler_7 >= 4).length / ogrenciRiskler.length * 100) : 0}%</div>
-                      <div className="text-xs text-subtle">haftada 4+ gün okuyan</div>
-                    </div>
-                  </div>
+            <Dashboard
+              user={user}
+              adminVeyaKoord={adminVeyaKoord}
+              dashboardStats={dashboardStats}
+              ogrenciRiskler={ogrenciRiskler}
+              adminAnketOzet={adminAnketOzet}
+              sinifDagilimi={sinifDagilimi}
+              monthlyStats={monthlyStats}
+              api={API}
+              formatCurrency={formatCurrency}
+              onTab={setActiveTab}
+              onYaslandirmaSec={(kova) => { setMuhasebeYasKovasi(kova); setActiveTab("payments"); }}
+              onOgretmenSec={() => setActiveTab("teachers")}
+              ustSerit={<>
+                {user.role === "admin" && <YoneticiAdimlar apiBase={API} onNavigate={setActiveTab} />}
+                <GecikenKurlar apiBase={API} />
+                {adminVeyaKoord && bekleyenler?.toplam > 0 && (
+                  <BekleyenlerKarti bekleyenler={bekleyenler} onRefresh={fetchAll} onTabChange={setActiveTab} />
                 )}
-
-                {/* Riskli öğrenciler uyarısı */}
-                {ogrenciRiskler.filter(r => r.risk_seviye === "yuksek").length > 0 && (
-                  <Card className="border border-line shadow-sm border-l-4 border-l-red-500">
-                    <CardHeader className="pb-2"><CardTitle className="text-sm text-red-700 flex items-center gap-2"><AlertTriangle className="h-4 w-4" />Yüksek Riskli Öğrenciler</CardTitle></CardHeader>
-                    <CardContent><div className="space-y-2">
-                      {ogrenciRiskler.filter(r => r.risk_seviye === "yuksek").slice(0,5).map(r => (
-                        <div key={r.id} className="flex items-center justify-between p-2 bg-red-50 rounded-lg">
-                          <div><span className="font-medium text-sm">{r.ad} {r.soyad}</span><span className="text-xs text-subtle ml-2">{r.sinif}. sınıf</span></div>
-                          <div className="flex items-center gap-3 text-xs">
-                            <span className="text-subtle">Streak: {r.streak}</span>
-                            <span className="text-subtle">7g: {r.dakika_7}dk</span>
-                            <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold">Risk: {r.risk_skoru}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div></CardContent>
-                  </Card>
-                )}
-
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <Card className="border border-line shadow-sm bg-surface cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setActiveTab("students")}>
-                    <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-subtle">Öğrenci</p><p className="text-3xl font-bold text-content tabular-nums mt-1">{dashboardStats.toplam_ogrenci}</p></div><div className="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center"><Users className="h-6 w-6 text-green-600" /></div></div></CardContent>
-                  </Card>
-                  <Card className="border border-line shadow-sm bg-surface cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setActiveTab("teachers")}>
-                    <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-subtle">Öğretmen</p><p className="text-3xl font-bold text-content tabular-nums mt-1">{dashboardStats.toplam_ogretmen}</p></div><div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center"><UserCheck className="h-6 w-6 text-primary" /></div></div></CardContent>
-                  </Card>
-                  <Card className="border border-line shadow-sm bg-surface cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setActiveTab("courses")}>
-                    <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-subtle">Kurs</p><p className="text-3xl font-bold text-content tabular-nums mt-1">{dashboardStats.toplam_kurs}</p></div><div className="w-12 h-12 bg-orange-100 rounded-2xl flex items-center justify-center"><BookOpen className="h-6 w-6 text-orange-600" /></div></div></CardContent>
-                  </Card>
-                  {user.role === "coordinator" ? (
-                  <Card className="border border-line shadow-sm bg-surface cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setActiveTab("students")}>
-                    <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-subtle">Bu Ay Yeni Kayıt</p><p className="text-3xl font-bold text-content tabular-nums mt-1">{dashboardStats.bu_ay_yeni_kayit || 0}</p></div><div className="w-12 h-12 bg-purple-100 rounded-2xl flex items-center justify-center"><Calendar className="h-6 w-6 text-purple-600" /></div></div></CardContent>
-                  </Card>
-                  ) : (
-                  <Card className="border border-line shadow-sm bg-surface cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setActiveTab("payments")}>
-                    <CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-subtle">Bu Ay Tahsilat</p><p className="text-3xl font-bold text-content tabular-nums mt-1">{formatCurrency(dashboardStats.bu_ay_odenen_toplam)}</p></div><div className="w-12 h-12 bg-purple-100 rounded-2xl flex items-center justify-center"><Calendar className="h-6 w-6 text-purple-600" /></div></div></CardContent>
-                  </Card>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Finansal grafikler — YALNIZ Yönetici (koordinatör/öğretmende gizli) */}
-                  {user.role !== "coordinator" && (<>
-                  <Card className="border border-line shadow-sm">
-                    <CardHeader><CardTitle className="flex items-center justify-between">Finansal Durum <BilgiIkonu k="finansal_durum" /></CardTitle></CardHeader>
-                    <CardContent><div className="h-64" role="img" aria-label="Finansal durum: öğrenci alacakları ve öğretmen borçları dağılımı"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value" nameKey="name" stroke="#fff" strokeWidth={2}>{pieData.map((e,i) => <Cell key={i} fill={e.color} />)}</Pie><Tooltip formatter={v => formatCurrency(v)} /><Legend verticalAlign="bottom" height={28} iconType="circle" /></PieChart></ResponsiveContainer></div></CardContent>
-                  </Card>
-                  <Card className="border border-line shadow-sm">
-                    <CardHeader><CardTitle className="flex items-center justify-between">Aylık İstatistikler <BilgiIkonu k="aylik_istatistik" /></CardTitle></CardHeader>
-                    <CardContent><div className="h-64" role="img" aria-label="Aylık istatistikler: yeni öğrenci ve gelir grafiği"><ResponsiveContainer width="100%" height="100%"><BarChart data={monthlyStats}><CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" /><XAxis dataKey="ay" /><YAxis /><Tooltip /><Legend iconType="circle" /><Bar dataKey="yeni_ogrenciler" name="Yeni Öğrenci" fill="#3b82f6" /><Bar dataKey="gelir" name="Gelir" fill="#f97316" /></BarChart></ResponsiveContainer></div></CardContent>
-                  </Card>
-                  </>)}
-                  {/* Öğrenci hareket grafikleri — HEM Yönetici HEM Koordinatör görür */}
-                  <Card className="border border-line shadow-sm">
-                    <CardHeader><CardTitle className="flex items-center justify-between">Yeni Kayıt vs Kur Atlayan (Bu Ay) <BilgiIkonu k="yeni_vs_kuratlayan" /></CardTitle></CardHeader>
-                    <CardContent><div className="h-64" role="img" aria-label="Bu ay yeni kayıt ve kur atlayan öğrenci dağılımı"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={pieDataKoord} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value" nameKey="name" stroke="#fff" strokeWidth={2}>{pieDataKoord.map((e,i) => <Cell key={i} fill={e.color} />)}</Pie><Tooltip formatter={(v,n) => [`${v} öğrenci`, n]} /><Legend verticalAlign="bottom" height={28} iconType="circle" /></PieChart></ResponsiveContainer></div></CardContent>
-                  </Card>
-                  {/* Öğrenci Sınıf Dağılımı — aktif öğrenciler (arşivli+mezun hariç), 1-8 + Belirsiz */}
-                  <Card className="border border-line shadow-sm">
-                    <CardHeader><CardTitle className="flex items-center justify-between">Öğrenci Sınıf Dağılımı <BilgiIkonu k="sinif_dagilimi" /></CardTitle></CardHeader>
-                    <CardContent><div className="h-64" role="img" aria-label="Aktif öğrencilerin sınıf seviyesine göre dağılımı">
-                      {(sinifDagilimi?.dagilim || []).some(d => d.sayi > 0) ? (
-                        <ResponsiveContainer width="100%" height="100%"><BarChart data={sinifDagilimi.dagilim}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                          <XAxis dataKey="sinif" />
-                          <YAxis allowDecimals={false} />
-                          <Tooltip formatter={(v) => [`${v} öğrenci`, "Sayı"]}
-                            labelFormatter={(l) => { const d = (sinifDagilimi?.dagilim || []).find(x => x.sinif === l); return d ? `${d.etiket} · toplam içinde %${d.yuzde}` : l; }} />
-                          <Bar dataKey="sayi" name="Öğrenci" radius={[4,4,0,0]}>
-                            {sinifDagilimi.dagilim.map((e,i) => <Cell key={i} fill={e.sinif === "?" ? "#94a3b8" : "#6366f1"} />)}
-                          </Bar>
-                        </BarChart></ResponsiveContainer>
-                      ) : <div className="h-full flex items-center justify-center text-sm text-subtle">Veri yok.</div>}
-                    </div></CardContent>
-                  </Card>
-                  {/* "Aylık Kur Atlayan Öğrenci" grafiği kaldırıldı — Kur Yenileme Hunisi
-                      + aylık yenileme trendi (DashboardAnalitik) bunu kapsıyor. */}
-                </div>
-
-                {/* Admin analitik: kur yenileme hunisi + nakit akışı/yaşlandırma + öğretmen perf */}
-                <DashboardAnalitik apiBase={API}
-                  onYaslandirmaSec={(kova) => { setMuhasebeYasKovasi(kova); setActiveTab("payments"); }}
-                  onOgretmenSec={() => setActiveTab("teachers")} />
-
-                {/* Öğretmen Rozet + Veli Anket Özeti */}
-                {adminAnketOzet.length > 0 && (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <Card className="border border-line shadow-sm">
-                      <CardHeader><CardTitle className="text-base flex items-center gap-2"><Medal className="h-4 w-4 text-primary" />Öğretmen Rozet Durumu</CardTitle></CardHeader>
-                      <CardContent><div className="space-y-3">
-                        {adminAnketOzet.map(o => (
-                          <div key={o.id} className="flex items-center justify-between p-3 bg-app rounded-xl">
-                            <div><div className="font-medium text-sm">{o.ad} {o.soyad}</div></div>
-                            <div className="flex items-center gap-2">
-                              <div className="bg-app rounded-full h-2 w-24 overflow-hidden border border-line"><div className="h-2 bg-primary rounded-full" style={{width: `${(o.rozet_sayisi / Math.max(o.rozet_toplam, 1)) * 100}%`}} /></div>
-                              <span className="text-xs font-medium text-subtle tabular-nums">{o.rozet_sayisi}/{o.rozet_toplam}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div></CardContent>
-                    </Card>
-                    <Card className="border border-line shadow-sm">
-                      <CardHeader><CardTitle className="text-base flex items-center gap-2"><Heart className="h-4 w-4 text-primary" />Veli Değerlendirme Özeti</CardTitle></CardHeader>
-                      <CardContent><div className="space-y-3">
-                        {adminAnketOzet.map(o => (
-                          <div key={o.id} className="flex items-center justify-between p-3 bg-app rounded-xl">
-                            <div><div className="font-medium text-sm">{o.ad} {o.soyad}</div><div className="text-xs text-subtle">{o.anket?.anket_sayisi || 0} anket</div></div>
-                            <div className="flex items-center gap-3">
-                              {o.anket?.anket_sayisi > 0 ? (<>
-                                <span className="inline-flex items-center gap-1 text-lg font-bold text-content tabular-nums"><Star className="h-4 w-4 text-amber-500 fill-amber-500" />{o.anket.ortalama}</span>
-                                <span className="text-xs text-green-600 font-medium tabular-nums">%{o.anket.tavsiye_oran} tavsiye</span>
-                              </>) : (<span className="text-xs text-subtle">Anket yok</span>)}
-                            </div>
-                          </div>
-                        ))}
-                      </div></CardContent>
-                    </Card>
-                  </div>
-                )}
-
-              </div>
-            )}
+              </>}
+            />
           </TabsContent>
 
           {/* Teachers */}
