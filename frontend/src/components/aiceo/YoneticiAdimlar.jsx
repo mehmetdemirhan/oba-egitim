@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, ChevronDown } from "lucide-react";
 import { PersonaBalon, PERSONA_UI } from "./Personalar";
 
 /**
@@ -10,6 +10,7 @@ import { PersonaBalon, PERSONA_UI } from "./Personalar";
  */
 export default function YoneticiAdimlar({ apiBase, onNavigate }) {
   const [veri, setVeri] = useState(null);
+  const [acik, setAcik] = useState(true);
   const p = PERSONA_UI.ayda;
   const api = (x) => `${apiBase}${x}`;
 
@@ -20,7 +21,10 @@ export default function YoneticiAdimlar({ apiBase, onNavigate }) {
 
   if (!veri) return null;
   const acikKurulum = (veri.kurulum || []).filter(k => !k.tamamlandi);
-  const dinamik = veri.dinamik || [];
+  // "okunmamış brifing" kısayolu KALDIRILDI: AI CEO'da bu brifingleri LİSTELEYEN bir
+  // görünüm yok (yalnız günlük/haftalık rapor ÜRETİLİYOR) → tıklayınca hedefte içerik
+  // görünmüyordu. Dead-end kısayolu gösterme (içerik gösteren adımlar kalır).
+  const dinamik = (veri.dinamik || []).filter(d => d.tip !== "brifing");
   if (acikKurulum.length === 0 && dinamik.length === 0) return null;
 
   const git = async (hedef, gorev) => {
@@ -31,23 +35,31 @@ export default function YoneticiAdimlar({ apiBase, onNavigate }) {
 
   return (
     <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-2 gap-2">
         <PersonaBalon persona="ayda" mesaj={veri.mesaj} size={44} />
-        {veri.kurulum_toplam > 0 && <span className="text-xs text-subtle shrink-0">Kurulum {veri.kurulum_biten}/{veri.kurulum_toplam}</span>}
-      </div>
-      <div className="grid grid-cols-1 gap-2 mt-2 max-h-64 overflow-auto">
-        {dinamik.map((d, i) => (
-          <button key={"d" + i} onClick={() => git(d.hedef)} className="flex items-center justify-between text-left rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 hover:ring-2 hover:ring-amber-200">
-            <span className="text-sm text-amber-800">{d.baslik}</span><ChevronRight className="h-4 w-4 text-amber-500" />
+        <div className="flex items-center gap-2 shrink-0">
+          {veri.kurulum_toplam > 0 && <span className="text-xs text-subtle">Kurulum {veri.kurulum_biten}/{veri.kurulum_toplam}</span>}
+          <button type="button" onClick={() => setAcik(a => !a)} aria-label={acik ? "Kapat" : "Aç"} aria-expanded={acik}
+            className="text-subtle hover:text-content transition-colors p-0.5 rounded">
+            {acik ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </button>
-        ))}
-        {acikKurulum.map(k => (
-          <button key={k.id} onClick={() => git(k.hedef, k)} className="flex items-center justify-between text-left rounded-lg border border-line px-3 py-2 hover:bg-app">
-            <span><span className="text-sm text-content">{k.baslik}</span><span className="text-[11px] text-subtle ml-1">+{k.puan} puan</span></span>
-            <ChevronRight className="h-4 w-4 text-slate-400" />
-          </button>
-        ))}
+        </div>
       </div>
+      {acik && (
+        <div className="grid grid-cols-1 gap-2 mt-2 max-h-64 overflow-auto">
+          {dinamik.map((d, i) => (
+            <button key={"d" + i} onClick={() => git(d.hedef)} className="flex items-center justify-between text-left rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 hover:ring-2 hover:ring-amber-200">
+              <span className="text-sm text-amber-800">{d.baslik}</span><ChevronRight className="h-4 w-4 text-amber-500" />
+            </button>
+          ))}
+          {acikKurulum.map(k => (
+            <button key={k.id} onClick={() => git(k.hedef, k)} className="flex items-center justify-between text-left rounded-lg border border-line px-3 py-2 hover:bg-app">
+              <span><span className="text-sm text-content">{k.baslik}</span><span className="text-[11px] text-subtle ml-1">+{k.puan} puan</span></span>
+              <ChevronRight className="h-4 w-4 text-slate-400" />
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
