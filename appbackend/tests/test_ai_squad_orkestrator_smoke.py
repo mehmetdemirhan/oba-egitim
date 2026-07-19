@@ -97,6 +97,11 @@ async def run():
         check(d["asama"] == "durduruldu" and d["atlas_onay"] and not d["lina_uretim"], "GEMINI yok → Lina'da 'durduruldu' (uydurma yok)")
         ai_mod.GEMINI_API_KEY = "k"
 
+        # ── Lina AI HATASI (geçersiz anahtar/kota) → 'durduruldu' (pipeline 500 ile ÇÖKMEZ) ──
+        ai_mod.call_claude = make_cc(ATLAS_OK, {}, NOVA_OK)  # lina parse başarısız → ai_hatasi
+        d = (await tetikle("koord", "task_aihata")).json()
+        check(d["asama"] == "durduruldu" and d["atlas_onay"] and not d["lina_uretim"], "Lina AI hatası → 'durduruldu' (500 çökmesi ÖNLENDİ — asıl prod bug'ı)")
+
         # ── Yetki + durum ucu ──
         check((await tetikle("t1", "task_403")).status_code == 403, "öğretmen orkestratörü tetikleyemez (403)")
         r = await AC.get("/api/ai/squad/orkestrator/durum/task_full", headers=H("koord"))

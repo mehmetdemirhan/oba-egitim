@@ -46,42 +46,48 @@ async def pipeline_tetikle(govde: PipelineExecutionRequest, current_user=Depends
     durum = {"task_id": tid, "asama": "atlas", "atlas_onay": False, "lina_uretim": False,
              "nova_vize": False, "deploy_hazir": False, "adimlar": [], "son_not": "Atlas bekleniyor."}
 
-    # ── ADIM 1: ATLAS (gerçek çağrı) ──
-    ar = await atlas_analiz_et(AtlasAnalysisRequest(task_id=tid, kod_blogu=govde.baslangic_kodu or govde.talep_metni), current_user=current_user)
-    a_rapor = ar.get("rapor", {})
-    if ar.get("durum") == "reddedildi" or not a_rapor.get("mimari_onay"):
-        return await _bitir(durum, "reddedildi", f"Atlas onay vermedi: {a_rapor.get('neden') or 'mimari_onay=False'}", current_user)
-    durum["atlas_onay"] = True
-    durum["adimlar"].append({"ajan": "atlas", "sonuc": "onay", "rapor_id": a_rapor.get("rapor_id"), "kaynak": a_rapor.get("kaynak")})
+    try:
+        # ── ADIM 1: ATLAS (gerçek çağrı) ──
+        ar = await atlas_analiz_et(AtlasAnalysisRequest(task_id=tid, kod_blogu=govde.baslangic_kodu or govde.talep_metni), current_user=current_user)
+        a_rapor = ar.get("rapor", {})
+        if ar.get("durum") == "reddedildi" or not a_rapor.get("mimari_onay"):
+            return await _bitir(durum, "reddedildi", f"Atlas onay vermedi: {a_rapor.get('neden') or 'mimari_onay=False'}", current_user)
+        durum["atlas_onay"] = True
+        durum["adimlar"].append({"ajan": "atlas", "sonuc": "onay", "rapor_id": a_rapor.get("rapor_id"), "kaynak": a_rapor.get("kaynak")})
 
-    # ── ADIM 2: LINA (gerçek çağrı — kod üretir) ──
-    lr = await lina_tasarla(LinaDesignRequest(task_id=tid, talep=govde.talep_metni), current_user=current_user)
-    if lr.get("durum") == "llm_gerekli":
-        durum["asama"] = "lina"
-        return await _bitir(durum, "durduruldu", "Lina için AI (GEMINI) gerekli — uydurma tasarım üretilmedi.", current_user)
-    l_rapor = lr.get("rapor", {})
-    if lr.get("durum") != "tamam":
-        durum["asama"] = "lina"
-        return await _bitir(durum, "reddedildi", f"Lina güvenlik reddi: {'; '.join(l_rapor.get('guvenlik_bloklari', []))[:200]}", current_user)
-    react_kodu = (l_rapor.get("tasarim", {}) or {}).get("react_kodu", "") or ""
-    durum["lina_uretim"] = True
-    durum["adimlar"].append({"ajan": "lina", "sonuc": "tamam", "rapor_id": l_rapor.get("rapor_id"), "hedef_dosya": (l_rapor.get("tasarim", {}) or {}).get("hedef_dosya")})
+        # ── ADIM 2: LINA (gerçek çağrı — kod üretir) ──
+        lr = await lina_tasarla(LinaDesignRequest(task_id=tid, talep=govde.talep_metni), current_user=current_user)
+        # AI yok/erişilemez (llm_gerekli, ai_hatasi) → 500 ÇÖKMESİ YOK; zarifçe dur.
+        if lr.get("durum") in ("llm_gerekli", "ai_hatasi"):
+            durum["asama"] = "lina"
+            return await _bitir(durum, "durduruldu", f"Lina duraklatıldı ({lr.get('durum')}): {lr.get('mesaj', 'AI kullanılamadı')} — uydurma tasarım üretilmedi.", current_user)
+        l_rapor = lr.get("rapor", {})
+        if lr.get("durum") != "tamam":
+            durum["asama"] = "lina"
+            return await _bitir(durum, "reddedildi", f"Lina güvenlik reddi: {'; '.join(l_rapor.get('guvenlik_bloklari', []))[:200]}", current_user)
+        react_kodu = (l_rapor.get("tasarim", {}) or {}).get("react_kodu", "") or ""
+        durum["lina_uretim"] = True
+        durum["adimlar"].append({"ajan": "lina", "sonuc": "tamam", "rapor_id": l_rapor.get("rapor_id"), "hedef_dosya": (l_rapor.get("tasarim", {}) or {}).get("hedef_dosya")})
 
-    # ── ADIM 3: NOVA (gerçek çağrı — Lina'nın ürettiği kodu inceler) ──
-    nova_girdi = react_kodu if len(react_kodu) >= 10 else govde.talep_metni
-    nr = await nova_incele(NovaReviewRequest(task_id=tid, kod_blogu=nova_girdi), current_user=current_user)
-    n_rapor = nr.get("rapor", {})
-    if not n_rapor.get("deploy_onayi"):
-        durum["asama"] = "nova"
-        return await _bitir(durum, "reddedildi", f"Nova vize vermedi: {'; '.join(n_rapor.get('engelleme_nedenleri', []))[:200]}", current_user)
-    durum["nova_vize"] = True
-    durum["adimlar"].append({"ajan": "nova", "sonuc": "vize", "rapor_id": n_rapor.get("rapor_id")})
+        # ── ADIM 3: NOVA (gerçek çağrı — Lina'nın ürettiği kodu inceler) ──
+        nova_girdi = react_kodu if len(react_kodu) >= 10 else govde.talep_metni
+        nr = await nova_incele(NovaReviewRequest(task_id=tid, kod_blogu=nova_girdi), current_user=current_user)
+        n_rapor = nr.get("rapor", {})
+        if not n_rapor.get("deploy_onayi"):
+            durum["asama"] = "nova"
+            return await _bitir(durum, "reddedildi", f"Nova vize vermedi: {'; '.join(n_rapor.get('engelleme_nedenleri', []))[:200]}", current_user)
+        durum["nova_vize"] = True
+        durum["adimlar"].append({"ajan": "nova", "sonuc": "vize", "rapor_id": n_rapor.get("rapor_id")})
 
-    # ── ADIM 4: AYAZ — OTOMATİK DEĞİL (insan-onaylı akışa bırakılır) ──
-    durum["deploy_hazir"] = True
-    durum["asama"] = "ayaz_insan_onayi"
-    return await _bitir(durum, "deploy_bekliyor",
-                        "Atlas+Lina+Nova geçti. Canlıya alma otomatik DEĞİL: mevcut insan-onaylı Ayaz akışıyla yapılır.", current_user)
+        # ── ADIM 4: AYAZ — OTOMATİK DEĞİL (insan-onaylı akışa bırakılır) ──
+        durum["deploy_hazir"] = True
+        durum["asama"] = "ayaz_insan_onayi"
+        return await _bitir(durum, "deploy_bekliyor",
+                            "Atlas+Lina+Nova geçti. Canlıya alma otomatik DEĞİL: mevcut insan-onaylı Ayaz akışıyla yapılır.", current_user)
+    except Exception as e:
+        # Herhangi bir motor beklenmedik hata fırlatırsa pipeline 500 ile ÇÖKMESİN; 'hata' ile mühürlensin.
+        logging.exception(f"[squad_orkestrator] {tid} motor hatası: {e}")
+        return await _bitir(durum, "hata", f"Motor hatası ({durum['asama']}): {str(e)[:200]}", current_user)
 
 
 @router.get("/ai/squad/orkestrator/durum/{task_id}")
