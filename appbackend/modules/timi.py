@@ -606,7 +606,10 @@ async def timi_pdf(sonuc_id: str, current_user=Depends(get_current_user)):
     doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=1.5*cm, bottomMargin=1.5*cm, leftMargin=2*cm, rightMargin=2*cm)
     doc.build(el, onFirstPage=_footer, onLaterPages=_footer)
     buffer.seek(0)
-    ad = f"{ogr.get('ad','')}_{ogr.get('soyad','')}".strip("_") or "TIMI"
+    # DÜZELTME: Türkçe karakterli öğrenci adı doğrudan HTTP başlığına konunca latin-1 encode
+    # hatası → 500 (PDF indirilemiyor). Gelişim PDF'iyle aynı ASCII güvenli ada çevir.
+    from modules.diagnostic import _ascii_dosya
+    ad = _ascii_dosya(f"{ogr.get('ad','')}_{ogr.get('soyad','')}".strip("_")) or "TIMI"
     return StreamingResponse(buffer, media_type="application/pdf",
                              headers={"Content-Disposition": f'attachment; filename="TIMI_Raporu_{ad}.pdf"'})
 
