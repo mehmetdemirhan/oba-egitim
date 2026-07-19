@@ -102,6 +102,18 @@ async def run():
         d = (await tetikle("koord", "task_aihata")).json()
         check(d["asama"] == "durduruldu" and d["atlas_onay"] and not d["lina_uretim"], "Lina AI hatası → 'durduruldu' (500 çökmesi ÖNLENDİ — asıl prod bug'ı)")
 
+        # ── AI sağlık-ping ──
+        ai_mod.GEMINI_API_KEY = "k"
+        async def fake_saglik(system, user, max_tokens=10, ozellik=""):
+            return {"parsed": None, "text": "OK", "error": None}
+        ai_mod.call_claude = fake_saglik
+        sr = (await AC.get("/api/ai/squad/ai-saglik", headers=H("koord"))).json()
+        check(sr.get("gemini_ok") is True, "ai-saglik: GEMINI ayakta → gemini_ok True")
+        ai_mod.GEMINI_API_KEY = ""
+        sr = (await AC.get("/api/ai/squad/ai-saglik", headers=H("koord"))).json()
+        check(sr.get("gemini_ok") is False and "tanımlı değil" in sr.get("mesaj", ""), "ai-saglik: GEMINI yok → gemini_ok False (sızıntısız)")
+        ai_mod.GEMINI_API_KEY = "k"
+
         # ── Yetki + durum ucu ──
         check((await tetikle("t1", "task_403")).status_code == 403, "öğretmen orkestratörü tetikleyemez (403)")
         r = await AC.get("/api/ai/squad/orkestrator/durum/task_full", headers=H("koord"))

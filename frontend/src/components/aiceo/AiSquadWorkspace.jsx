@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
-import { Cpu, Play, Terminal, AlertTriangle, RefreshCw, Layers, Sparkles, MessageSquare, Eye, Send } from "lucide-react";
+import { Cpu, Play, Terminal, AlertTriangle, RefreshCw, Layers, Sparkles, MessageSquare, Eye, Send, HeartPulse } from "lucide-react";
 
 /**
  * AiSquadWorkspace v2 — orkestratör tetikleyici + Lina kodu CANLI ÖNİZLEME + ajan bazlı İNTERAKTİF
@@ -32,8 +32,17 @@ export default function AiSquadWorkspace({ apiBase }) {
   const [sohbet, setSohbet] = useState({ atlas: [{ k: "sys", t: SELAM.atlas }], lina: [{ k: "sys", t: SELAM.lina }], nova: [{ k: "sys", t: SELAM.nova }] });
   const [girdi, setGirdi] = useState("");
   const [sohbetYuk, setSohbetYuk] = useState(false);
+  const [saglik, setSaglik] = useState(null); // {gemini_ok, mesaj}
+  const [saglikYuk, setSaglikYuk] = useState(false);
   const api = (x) => `${apiBase}${x}`;
   const ekle = (a, m) => setSohbet((p) => ({ ...p, [a]: [...p[a], m] }));
+
+  const aiSaglik = async () => {
+    setSaglikYuk(true); setSaglik(null);
+    try { const r = await axios.get(api("/ai/squad/ai-saglik")); setSaglik(r.data); }
+    catch (e) { setSaglik({ gemini_ok: false, mesaj: "Kontrol başarısız: " + (e.response?.data?.detail || e.message) }); }
+    finally { setSaglikYuk(false); }
+  };
 
   const linaKoduGetir = async (tid) => {
     try {
@@ -100,11 +109,23 @@ export default function AiSquadWorkspace({ apiBase }) {
             <div className="text-xs text-subtle">Tetikle · Lina kodunu canlı önizle · ajanlara interaktif revizyon. Otomatik deploy yok.</div>
           </div>
         </div>
-        <div className="flex bg-app border border-line rounded-lg p-0.5 text-xs font-semibold">
-          <button onClick={() => setGorunum("pipeline")} className={`px-3 py-1 rounded flex items-center gap-1 ${gorunum === "pipeline" ? "bg-indigo-600 text-white" : "text-subtle"}`}><Layers className="h-3.5 w-3.5" />Akış</button>
-          <button onClick={() => setGorunum("preview")} className={`px-3 py-1 rounded flex items-center gap-1 ${gorunum === "preview" ? "bg-indigo-600 text-white" : "text-subtle"}`}><Eye className="h-3.5 w-3.5" />Önizleme</button>
+        <div className="flex items-center gap-2">
+          <button onClick={aiSaglik} disabled={saglikYuk} className="inline-flex items-center gap-1 bg-app border border-line rounded-lg px-2.5 py-1.5 text-xs font-semibold text-content">
+            {saglikYuk ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <HeartPulse className="h-3.5 w-3.5 text-rose-500" />}AI sağlık
+          </button>
+          <div className="flex bg-app border border-line rounded-lg p-0.5 text-xs font-semibold">
+            <button onClick={() => setGorunum("pipeline")} className={`px-3 py-1 rounded flex items-center gap-1 ${gorunum === "pipeline" ? "bg-indigo-600 text-white" : "text-subtle"}`}><Layers className="h-3.5 w-3.5" />Akış</button>
+            <button onClick={() => setGorunum("preview")} className={`px-3 py-1 rounded flex items-center gap-1 ${gorunum === "preview" ? "bg-indigo-600 text-white" : "text-subtle"}`}><Eye className="h-3.5 w-3.5" />Önizleme</button>
+          </div>
         </div>
       </div>
+
+      {saglik && (
+        <div className={`text-sm rounded-lg px-3 py-2 flex items-center gap-2 border ${saglik.gemini_ok ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-red-50 border-red-200 text-red-700"}`}>
+          <HeartPulse className="h-4 w-4 shrink-0" />
+          <span><b>{saglik.gemini_ok ? "GEMINI ayakta ✓" : "GEMINI çalışmıyor ✕"}</b> — {saglik.mesaj}{saglik.gemini_ok ? " Akış çalışır; sorun devam ederse tarayıcıyı yenile." : " Anahtar/kotayı Render env + Google AI Studio'da kontrol et."}</span>
+        </div>
+      )}
 
       {mesaj && <div className="text-sm rounded-lg bg-app border border-line px-3 py-2 flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-amber-600" />{mesaj}</div>}
 

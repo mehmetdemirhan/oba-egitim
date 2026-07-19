@@ -94,3 +94,19 @@ async def pipeline_tetikle(govde: PipelineExecutionRequest, current_user=Depends
 async def pipeline_durum(task_id: str, current_user=Depends(_KOORD)):
     d = await db.ai_squad_pipeline_runs.find_one({"task_id": task_id}, {"_id": 0})
     return {"pipeline": d}
+
+
+@router.get("/ai/squad/ai-saglik")
+async def ai_saglik(current_user=Depends(_KOORD)):
+    """GEMINI ayakta mı — tek health-ping. Anahtar DEĞERİ sızdırılmaz; yalnız durum döner.
+    'çalışmıyor' sebebinin kod mu yoksa AI anahtarı/kotası mı olduğunu ayırt etmek için."""
+    from core.ai import call_claude, GEMINI_API_KEY
+    if not GEMINI_API_KEY:
+        return {"gemini_ok": False, "mesaj": "GEMINI_API_KEY tanımlı değil (Render env eksik)."}
+    try:
+        res = await call_claude("Sen bir sağlık kontrolüsün.", "Sadece 'OK' yaz.", max_tokens=10, ozellik="ai_saglik")
+        if isinstance(res, dict) and not res.get("error") and (res.get("text") or res.get("parsed")):
+            return {"gemini_ok": True, "mesaj": "GEMINI yanıt veriyor — akış çalışır.", "cevap": str(res.get("text") or "")[:80]}
+        return {"gemini_ok": False, "mesaj": f"GEMINI reddetti: {(res.get('error') if isinstance(res, dict) else 'bilinmeyen')}"}
+    except Exception as e:
+        return {"gemini_ok": False, "mesaj": f"GEMINI çağrısı başarısız: {str(e)[:150]}"}
