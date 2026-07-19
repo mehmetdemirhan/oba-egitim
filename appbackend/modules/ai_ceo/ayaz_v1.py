@@ -30,6 +30,7 @@ from .ayaz_semalar import AyazTaskRequest, AyazTaskResponse
 router = APIRouter()
 _ISTEYEN = require_role(UserRole.ADMIN, UserRole.COORDINATOR)
 _ADMIN = require_role(UserRole.ADMIN)
+_GECERLI_ROLLER = {"ADMIN", "COORDINATOR", "TEACHER", "STUDENT", "PARENT"}  # UserRole enum (OGRENCI/VELI YOK)
 
 _SISTEM_PROMPT = (
     "Sen OBA Eğitim projesinin kod asistanı 'Ayaz'sın. Yöneticinin doğal dil isteğini alıp "
@@ -136,14 +137,18 @@ async def ayaz_talep_uret(govde: AyazTaskRequest, current_user=Depends(_ISTEYEN)
         derleme_hatasi = None
     except SyntaxError as e:
         derleme_hatasi = str(e)
-    guvenli = not tarama["errors"] and derleme_hatasi is None
+    # Geçersiz UserRole attribute'u ÜRETİM anında yakala (aksi halde ancak uygula/import_check'te
+    # AttributeError verir → örn. UserRole.OGRENCI). Statik AST tanımsız-ismi çözemediği için ek kontrol.
+    rol_hatalari = [f"Geçersiz UserRole.{r} (geçerli: {'/'.join(sorted(_GECERLI_ROLLER))})"
+                    for r in set(re.findall(r"UserRole\.([A-Za-z_]+)", gecerli.kod)) if r not in _GECERLI_ROLLER]
+    guvenli = not tarama["errors"] and derleme_hatasi is None and not rol_hatalari
 
     task = {
         "id": f"task_{str(uuid.uuid4())[:8]}", "tarih": iso(), "talep_sahibi": current_user.get("id"),
         "kullanici_talebi": govde.talep, "uretilen_kod": gecerli.kod, "aciklama": gecerli.aciklama,
         "etki_analizi": {"degisen_dosyalar": gecerli.degisen_dosyalar, "risk_seviyesi": gecerli.risk_seviyesi,
                          "etki_alani": gecerli.etki_alani, "tahmini_sure_dk": gecerli.tahmini_sure_dk},
-        "guvenlik": {"errors": tarama["errors"], "warnings": tarama["warnings"], "derleme_hatasi": derleme_hatasi},
+        "guvenlik": {"errors": tarama["errors"] + rol_hatalari, "warnings": tarama["warnings"], "derleme_hatasi": derleme_hatasi},
         "durum": "incelemede" if guvenli else "guvenlik_reddetti",
         "kurulum": None, "canliya_alan": None, "canliya_alinma_tarihi": None,
     }
