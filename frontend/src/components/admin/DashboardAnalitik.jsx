@@ -5,8 +5,13 @@ import {
   CartesianGrid, Tooltip, Legend,
 } from "recharts";
 import { Filter, TrendingUp, Users, ArrowUp, ArrowDown, ArrowDownRight, Clock } from "lucide-react";
-import { DashboardKart, BosDurum } from "../dashboard/Kart";
-import { GRAFIK, EKSEN_TICK, doluAySayisi, MIN_AY } from "../dashboard/dashboardTema";
+import { DashboardKart } from "../dashboard/Kart";
+import { GRAFIK, EKSEN_TICK, anlamliDilim } from "../dashboard/dashboardTema";
+
+// Grafikte hiç veri yokken küçük tek satır (12 aylık boş eksen yerine).
+const VeriYok = ({ mesaj = "Henüz veri yok — girildikçe burada görünecek." }) => (
+  <div className="h-full grid place-items-center text-sm text-subtle px-4 text-center">{mesaj}</div>
+);
 
 /**
  * DashboardAnalitik — kur yenileme hunisi + satış + nakit akışı/yaşlandırma +
@@ -50,16 +55,14 @@ export function useAnalitik(apiBase) {
 export function HuniKarti({ veri }) {
   if (!veri) return null;
   const huni = veri.huni || [];
-  const trend = (veri.yenileme_trend || []).map((n) => ({ ...n, ayK: ayEtiket(n.ay) }));
+  // MEVCUT veriyi hemen yansıt: trend yalnız veri olan aylara kırpılır (3 ay bekleme yok).
+  const trend = anlamliDilim((veri.yenileme_trend || []).map((n) => ({ ...n, ayK: ayEtiket(n.ay) })), ["tamamlanan"]);
   const enFazla = Math.max(1, ...huni.map((h) => h.tamamlayan));
   const oranRenk = (oran) =>
     oran == null ? { bar: "bg-slate-400", ok: "text-slate-500" }
       : oran >= 70 ? { bar: "bg-emerald-500", ok: "text-emerald-700" }
         : oran >= 40 ? { bar: "bg-amber-500", ok: "text-amber-700" }
           : { bar: "bg-red-500", ok: "text-red-600" };
-  const trendDolu = doluAySayisi(trend, ["oran"]);
-  const sonTrend = son(trend);
-
   return (
     <DashboardKart baslik="Kur Yenileme Hunisi" ikon={Filter} bilgi="huni" acilir>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -106,18 +109,16 @@ export function HuniKarti({ veri }) {
         <div>
           <div className="text-xs text-subtle mb-1">Aylık yenileme oranı (%) — beklemede penceresi paydadan düşülür</div>
           <div className="h-56">
-            {trendDolu >= MIN_AY ? (
+            {trend.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={trend}>
                   <CartesianGrid strokeDasharray="3 3" stroke={GRAFIK.izgara} vertical={false} />
                   <XAxis dataKey="ayK" tick={EKSEN_TICK} /><YAxis domain={[0, 100]} tick={EKSEN_TICK} unit="%" />
                   <Tooltip formatter={(v, n) => n === "oran" ? [`%${v}`, "Yenileme"] : [v, n]} />
-                  <Line type="monotone" dataKey="oran" stroke={GRAFIK.basari} strokeWidth={2} name="Yenileme %" connectNulls dot={{ r: 2 }} />
+                  <Line type="monotone" dataKey="oran" stroke={GRAFIK.basari} strokeWidth={2} name="Yenileme %" connectNulls dot={{ r: 3 }} />
                 </LineChart>
               </ResponsiveContainer>
-            ) : (
-              <BosDurum ozet={sonTrend?.oran != null ? [{ etiket: `${sonTrend.ayK} yenileme`, deger: `%${sonTrend.oran}` }] : []} />
-            )}
+            ) : <VeriYok mesaj="Henüz tamamlanan kur yok — yenileme trendi burada oluşacak." />}
           </div>
         </div>
       </div>
@@ -128,14 +129,12 @@ export function HuniKarti({ veri }) {
 // ── 2) Satış Başarısı ──
 export function SatisKarti({ veri }) {
   if (!veri) return null;
-  const satis = (veri.satis_basarisi || []).map((n) => ({ ...n, ayK: ayEtiket(n.ay) }));
-  const dolu = doluAySayisi(satis, ["satilan_kur", "yeni_kur", "yenileme_kur"]);
-  const s = son(satis);
+  const satis = anlamliDilim((veri.satis_basarisi || []).map((n) => ({ ...n, ayK: ayEtiket(n.ay) })), ["satilan_kur", "yeni_kur", "yenileme_kur"]);
   return (
     <DashboardKart baslik="Satış Başarısı" ikon={TrendingUp} bilgi="satis_basarisi" acilir>
-      <div className="text-xs text-subtle mb-2">Son 12 ay — çubuklar (yığılmış): satılan kur = yeni kayıt + yenileme; çizgi: yenileme oranı (%)</div>
+      <div className="text-xs text-subtle mb-2">Veri olan aylar — çubuklar (yığılmış): satılan kur = yeni kayıt + yenileme; çizgi: yenileme oranı (%)</div>
       <div style={{ width: "100%", height: 260 }}>
-        {dolu >= MIN_AY ? (
+        {satis.length > 0 ? (
           <ResponsiveContainer>
             <ComposedChart data={satis} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRAFIK.izgara} vertical={false} />
@@ -146,15 +145,10 @@ export function SatisKarti({ veri }) {
               <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
               <Bar yAxisId="left" dataKey="yeni_kur" stackId="s" fill={GRAFIK.bilgi} name="Yeni Kayıt" />
               <Bar yAxisId="left" dataKey="yenileme_kur" stackId="s" fill={GRAFIK.vurgu} name="Yenileme" radius={[4, 4, 0, 0]} />
-              <Line yAxisId="right" type="monotone" dataKey="yenileme_orani" stroke={GRAFIK.basari} strokeWidth={2.5} name="Yenileme %" connectNulls dot={{ r: 2 }} />
+              <Line yAxisId="right" type="monotone" dataKey="yenileme_orani" stroke={GRAFIK.basari} strokeWidth={2.5} name="Yenileme %" connectNulls dot={{ r: 3 }} />
             </ComposedChart>
           </ResponsiveContainer>
-        ) : (
-          <BosDurum ozet={s ? [
-            { etiket: `${s.ayK} satılan kur`, deger: s.satilan_kur ?? 0 },
-            ...(s.yenileme_orani != null ? [{ etiket: "Yenileme oranı", deger: `%${s.yenileme_orani}` }] : []),
-          ] : []} />
-        )}
+        ) : <VeriYok mesaj="Henüz kayıt/satış yok — ilk kayıtlarla bu grafik dolmaya başlar." />}
       </div>
     </DashboardKart>
   );
@@ -163,18 +157,16 @@ export function SatisKarti({ veri }) {
 // ── 3) Nakit Akışı + Yaşlandırma ──
 export function NakitKarti({ veri, onYaslandirmaSec }) {
   if (!veri) return null;
-  const nakit = (veri.nakit_akisi || []).map((n) => ({ ...n, ayK: ayEtiket(n.ay) }));
-  const dolu = doluAySayisi(nakit, ["tahsilat", "vergi", "ogretmen_odeme"]);
-  const s = son(nakit);
+  const nakit = anlamliDilim((veri.nakit_akisi || []).map((n) => ({ ...n, ayK: ayEtiket(n.ay) })), ["tahsilat", "vergi", "ogretmen_odeme"]);
   const yas = veri.yaslandirma || {};
   const KOVA = [["0-30", "0-30 gün", "bg-emerald-50 border-emerald-200 text-emerald-700"],
                 ["31-60", "31-60 gün", "bg-amber-50 border-amber-200 text-amber-700"],
                 ["60+", "60+ gün", "bg-red-50 border-red-200 text-red-700"]];
   return (
     <DashboardKart baslik="Nakit Akışı & Alacak Yaşlandırma" ikon={TrendingUp} bilgi="nakit_akisi" acilir>
-      <div className="text-xs text-subtle mb-2">Son 12 ay — çubuklar: tahsilat/vergi/öğretmen ödemesi, çizgi: NET (tahsilat − vergi − ödeme)</div>
+      <div className="text-xs text-subtle mb-2">Veri olan aylar — çubuklar: tahsilat/vergi/öğretmen ödemesi, çizgi: NET (tahsilat − vergi − ödeme)</div>
       <div className="h-64">
-        {dolu >= MIN_AY ? (
+        {nakit.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={nakit}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRAFIK.izgara} vertical={false} />
@@ -184,15 +176,10 @@ export function NakitKarti({ veri, onYaslandirmaSec }) {
               <Bar dataKey="tahsilat" fill={GRAFIK.bilgi} name="Tahsilat" />
               <Bar dataKey="vergi" fill={GRAFIK.tehlike} name="Vergi" />
               <Bar dataKey="ogretmen_odeme" fill={GRAFIK.uyari} name="Öğretmen Ödemesi" />
-              <Line type="monotone" dataKey="net" stroke={GRAFIK.basari} strokeWidth={2.5} name="Net" dot={{ r: 2 }} />
+              <Line type="monotone" dataKey="net" stroke={GRAFIK.basari} strokeWidth={2.5} name="Net" dot={{ r: 3 }} />
             </ComposedChart>
           </ResponsiveContainer>
-        ) : (
-          <BosDurum ozet={s ? [
-            { etiket: `${s.ayK} tahsilat`, deger: formatTL(s.tahsilat) },
-            { etiket: "Net", deger: formatTL(s.net) },
-          ] : []} />
-        )}
+        ) : <VeriYok mesaj="Henüz ödeme kaydı yok — tahsilat girildikçe akış burada oluşur." />}
       </div>
       <div className="mt-4">
         <div className="text-xs text-subtle mb-2" title={veri.yaslandirma_tanim}>Alacak Yaşlandırma — {veri.yaslandirma_tanim} (kovaya tıkla → tabloyu filtrele)</div>
