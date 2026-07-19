@@ -50,6 +50,8 @@ async def deploy_onayla(govde: DeployApprovalRequest, current_user=Depends(_ADMI
         "id": kuyruk_id, "squad_task_id": tid, "hedef_dosya": hedef_dosya, "uretilen_kod": react_kodu,
         "guvenlik_uyarilari": tarama["warnings"], "admin_gerekce": govde.admin_gerekce,
         "durum": "onaylandi_entegrasyon_bekliyor", "onaylayan": current_user.get("id"), "tarih": iso(),
+        # FAZ 1 — zincir korelasyonu: üretimi tetikleyen pipeline'dan taşınır (yoksa None).
+        "kaynak_oneri_id": pipeline.get("kaynak_oneri_id"),
         "not": "FRONTEND entegrasyonu MANUEL (git+Vercel); backend patch_manager canlı frontend'i deploy etmez.",
     })
     await db.ai_squad_pipeline_runs.update_one({"task_id": tid}, {"$set": {

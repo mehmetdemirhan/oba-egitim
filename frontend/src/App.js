@@ -49,14 +49,8 @@ import GecikenKurlar from "./components/admin/GecikenKurlar";
 import FunnelPanel from "./components/admin/FunnelPanel";
 import DashboardAnalitik from "./components/admin/DashboardAnalitik";
 import BilgiIkonu from "./components/BilgiIkonu";
-import AiCeo from "./components/aiceo/AiCeo";
-import KararZekasi from "./components/aiceo/KararZekasi";
-import AyazV1Panel from "./components/aiceo/AyazV1Panel";
-import AgentScorecardReal from "./components/aiceo/AgentScorecardReal";
-import DeployQueuePanel from "./components/aiceo/DeployQueuePanel";
-import AiSquadWorkspace from "./components/aiceo/AiSquadWorkspace";
+import AiYonetimKokpiti from "./components/aiceo/AiYonetimKokpiti";
 import KocumMiran from "./components/aiceo/KocumMiran";
-import Deniz from "./components/aiceo/Deniz";
 import YoneticiAdimlar from "./components/aiceo/YoneticiAdimlar";
 import GorevTanimYonetimi from "./components/aiceo/GorevTanimYonetimi";
 import AnalizHavuzBakim from "./components/admin/AnalizHavuzBakim";
@@ -1595,22 +1589,19 @@ function AppContent() {
             <AiMerkezi user={user} />
           </TabsContent>
 
-          {/* ═══ AI CEO (yalnız admin) ═══ */}
+          {/* ═══ AI YÖNETİM KOKPİTİ (yalnız admin) — 6 bileşen + Deniz tek kabuk içinde ═══ */}
           {user.role === "admin" && (
             <TabsContent value="ai-ceo">
-              <AiCeo apiBase={API} />
-              <div className="mt-6"><KararZekasi apiBase={API} user={user} /></div>
-              <div className="mt-6"><AyazV1Panel apiBase={API} user={user} /></div>
-              <div className="mt-6"><AiSquadWorkspace apiBase={API} /></div>
-              <div className="mt-6"><AgentScorecardReal apiBase={API} /></div>
-              <div className="mt-6"><DeployQueuePanel apiBase={API} user={user} /></div>
+              <AiYonetimKokpiti apiBase={API} user={user}
+                onNavigate={(tab, odakKisi) => { setActiveTab(tab); if (odakKisi) setMuhasebeOdakKisi(odakKisi); }} />
             </TabsContent>
           )}
 
-          {/* ═══ DENETİM (Deniz) — yalnız admin ═══ */}
+          {/* ═══ DENETİM (Deniz) — eski path, geriye dönük: kokpiti Deniz görünümünde açar ═══ */}
           {user.role === "admin" && (
             <TabsContent value="ai-deniz">
-              <Deniz apiBase={API} onNavigate={(tab, odakKisi) => { setActiveTab(tab); if (odakKisi) setMuhasebeOdakKisi(odakKisi); }} />
+              <AiYonetimKokpiti apiBase={API} user={user} baslangicGorunum="deniz"
+                onNavigate={(tab, odakKisi) => { setActiveTab(tab); if (odakKisi) setMuhasebeOdakKisi(odakKisi); }} />
             </TabsContent>
           )}
 

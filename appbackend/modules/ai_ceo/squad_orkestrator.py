@@ -44,7 +44,9 @@ async def pipeline_tetikle(govde: PipelineExecutionRequest, current_user=Depends
     tid = govde.task_id
     logging.info(f"[squad_orkestrator] {tid} akışı başlatıldı.")
     durum = {"task_id": tid, "asama": "atlas", "atlas_onay": False, "lina_uretim": False,
-             "nova_vize": False, "deploy_hazir": False, "adimlar": [], "son_not": "Atlas bekleniyor."}
+             "nova_vize": False, "deploy_hazir": False, "adimlar": [], "son_not": "Atlas bekleniyor.",
+             # FAZ 1 — zincir korelasyonu (Öneri→Karar→Üretim); yoksa None (bağımsız üretim).
+             "kaynak_oneri_id": govde.kaynak_oneri_id}
 
     try:
         # ── ADIM 1: ATLAS (gerçek çağrı) ──

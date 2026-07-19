@@ -188,9 +188,12 @@ def _deterministik_teklif(foto: dict, katalog: list, onceki: dict | None):
     }
 
 
-async def karar_teklifi_uret() -> dict:
+async def karar_teklifi_uret(kaynak_oneri_id: str | None = None) -> dict:
     """GERÇEK fotoğraf + kurumsal hafıza + geçmiş dersler → yapılandırılmış teklif. AI JSON'u
-    doğrulanır; ayrıştırılamazsa deterministik taslağa düşer (uydurma yok)."""
+    doğrulanır; ayrıştırılamazsa deterministik taslağa düşer (uydurma yok).
+
+    kaynak_oneri_id: FAZ 1 zincir korelasyonu — bu karar hangi Ayda önerisinden (ai_ceo_oneriler.id)
+    doğdu; doğrudan üretimde None kalır (geriye dönük uyumlu)."""
     from core.ai import call_claude, GEMINI_API_KEY
     yeni_id = str(uuid.uuid4())
     foto = await F.sistem_fotografi()
@@ -253,6 +256,7 @@ async def karar_teklifi_uret() -> dict:
     teklif["veri_kalitesi"] = vk
     teklif["arac_gunlugu"] = arac_gunlugu
     teklif["fotograf_id"] = foto.get("id")
+    teklif["kaynak_oneri_id"] = kaynak_oneri_id  # FAZ 1 — zincir korelasyonu (Ayda önerisi → karar)
     await db.ai_ceo_proposals.insert_one({**teklif})
     teklif.pop("_id", None)
     return teklif
@@ -413,8 +417,10 @@ async def karar_durum(current_user=Depends(_KOORD)):
 
 
 @router.post("/ai/ceo/karar/teklif-uret")
-async def teklif_uret(current_user=Depends(_KOORD)):
-    teklif = await karar_teklifi_uret()
+async def teklif_uret(data: dict = Body(default=None), current_user=Depends(_KOORD)):
+    # FAZ 1 — Ayda önerisinden zincir başlatılabilir: {kaynak_oneri_id} gövdede (opsiyonel, geriye uyumlu).
+    kaynak_oneri_id = (data or {}).get("kaynak_oneri_id")
+    teklif = await karar_teklifi_uret(kaynak_oneri_id=kaynak_oneri_id)
     await islem_kaydet(current_user, "ai_ceo", "karar_teklif_uret", "ai_ceo_proposal", teklif["id"], None, None, teklif.get("title"))
     return {"ok": True, "teklif": teklif}
 

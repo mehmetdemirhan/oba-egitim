@@ -19,11 +19,11 @@ from fastapi import APIRouter
 from . import (fotograf, analiz, raporlar, sohbet, mektup, miran, karne, anomali, hedef,
                pazar, kuyruk, yonetim, plan, deniz, deneyim, analitik, nps, yonetici, karar_zekasi,
                ayaz_v1, atlas_motoru, lina_motoru, nova_motoru, squad_orkestrator, agent_scorecard_real,
-               squad_seeder, ayaz_koprusu, deploy_kuyrugu)
+               squad_seeder, ayaz_koprusu, deploy_kuyrugu, kokpit_ozet, oncelik_kuyrugu)
 
 router = APIRouter()
 for _alt in (fotograf, analiz, raporlar, sohbet, mektup, miran, karne, anomali, hedef,
              pazar, kuyruk, yonetim, plan, deniz, deneyim, analitik, nps, yonetici, karar_zekasi,
              ayaz_v1, atlas_motoru, lina_motoru, nova_motoru, squad_orkestrator, agent_scorecard_real,
-             squad_seeder, ayaz_koprusu, deploy_kuyrugu):
+             squad_seeder, ayaz_koprusu, deploy_kuyrugu, kokpit_ozet, oncelik_kuyrugu):
     router.include_router(_alt.router)
