@@ -128,6 +128,11 @@ async def denetle(tetik: str = "manuel") -> dict:
     det += await G.insan_ciktisi_ornek()
     det += await G.maliyet_bulgu()
     det += await G.ikinci_goz(foto or {})
+    # FAZ 2 (madde 6): kapsam genişletme — Karar/Ayaz-zincir/Squad-ret deterministik denetimi
+    from . import deniz_kapsam as K
+    det += await K.karar_dayanak_kontrol()
+    det += await K.ayaz_zincir_kontrol()
+    det += await K.squad_ret_oruntu_kontrol()
     ai = await _ai_denetim(det)
     now = iso()
     denetim_id = str(uuid.uuid4())

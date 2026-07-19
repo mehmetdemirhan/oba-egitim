@@ -42,11 +42,18 @@ async def _bitir(durum: dict, asama: str, not_: str, current_user) -> dict:
 @router.post("/ai/squad/orkestrator/pipeline-tetikle")
 async def pipeline_tetikle(govde: PipelineExecutionRequest, current_user=Depends(_KOORD)):
     tid = govde.task_id
+    # FAZ 2 (madde 8): tetik limiti — sert blok + aşım → 429; değilse uyarı bilgisini taşı.
+    from .squad_limit import limit_kontrol_veya_hata
+    limit_durum = await limit_kontrol_veya_hata()
     logging.info(f"[squad_orkestrator] {tid} akışı başlatıldı.")
     durum = {"task_id": tid, "asama": "atlas", "atlas_onay": False, "lina_uretim": False,
              "nova_vize": False, "deploy_hazir": False, "adimlar": [], "son_not": "Atlas bekleniyor.",
              # FAZ 1 — zincir korelasyonu (Öneri→Karar→Üretim); yoksa None (bağımsız üretim).
-             "kaynak_oneri_id": govde.kaynak_oneri_id}
+             "kaynak_oneri_id": govde.kaynak_oneri_id,
+             # FAZ 2 — maliyet/limit izlenebilirliği için oluşturma zamanı + limit uyarısı.
+             "olusturma_tarihi": iso(),
+             "limit_uyari": (f"Tetik limiti aşıldı ({limit_durum['gunluk_kullanim']}/{limit_durum['gunluk_limit']} günlük) "
+                             "— sert blok kapalı, devam edildi." if limit_durum.get("asildi") else None)}
 
     try:
         # ── ADIM 1: ATLAS (gerçek çağrı) ──

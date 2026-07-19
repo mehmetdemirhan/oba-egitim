@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
-import { Sparkles, RefreshCw, Activity, CheckCircle, XCircle, ShieldAlert, PlayCircle, GraduationCap } from "lucide-react";
+import { Sparkles, RefreshCw, Activity, CheckCircle, XCircle, ShieldAlert, PlayCircle, GraduationCap, TrendingUp } from "lucide-react";
 import { PersonaBalon } from "./Personalar";
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, ReferenceLine } from "recharts";
 
 /**
  * KararZekasi — Ayda Kurumsal Karar Zekâsı (Faz 2). GERÇEK sistem fotoğrafından kanıtlı
@@ -20,6 +21,7 @@ export default function KararZekasi({ apiBase, user }) {
   const [seviye, setSeviye] = useState(1);
   const [yuk, setYuk] = useState("");
   const [mesaj, setMesaj] = useState("");
+  const [trend, setTrend] = useState(null);
   const isAdmin = user?.role === "admin";
   const api = (x) => `${apiBase}${x}`;
 
@@ -29,6 +31,7 @@ export default function KararZekasi({ apiBase, user }) {
       setDurum(r.data);
       const ilk = (r.data.son_teklifler || [])[0];
       setSecili(s => s || ilk || null);
+      axios.get(api("/ai/ceo/karar/trend")).then(t => setTrend(t.data)).catch(() => setTrend(null));
     } catch (e) {}
   }, [apiBase]);
   useEffect(() => { yukle(); }, [yukle]);
@@ -98,6 +101,32 @@ export default function KararZekasi({ apiBase, user }) {
           </div>
         </div>
       )}
+
+      {/* Net etki zaman serisi (pilot − kontrol) — gerçek ölçümlerden; yoksa "—" */}
+      <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+        <div className="flex items-center gap-2 mb-1">
+          <TrendingUp className="h-4 w-4 text-indigo-600" />
+          <div className="font-semibold text-content text-sm">Net Etki Zaman Serisi (pilot − kontrol)</div>
+        </div>
+        <div className="text-[11px] text-subtle mb-2">Uygulanan tekliflerin checkpoint ölçümleri. Pozitif net etki = pilotun kontrol grubuna üstünlüğü.</div>
+        {!trend?.yeterli_veri ? (
+          <div className="text-sm text-subtle py-8 text-center">— Henüz net etki için yeterli ölçüm yok (teklif "uygulandı" olup ölçüm çalıştıkça dolar).</div>
+        ) : (
+          <ResponsiveContainer width="100%" height={230}>
+            <LineChart data={trend.seri.filter(s => s.net_etki != null)} margin={{ top: 5, right: 10, left: -18, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis dataKey="tarih" tick={{ fontSize: 9 }} tickFormatter={t => (t || "").slice(5, 10)} />
+              <YAxis tick={{ fontSize: 10 }} />
+              <Tooltip contentStyle={{ fontSize: 11 }} labelFormatter={t => (t || "").slice(0, 10)} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="4 4" />
+              <Line type="monotone" dataKey="net_etki" name="Net etki" stroke="#6366f1" strokeWidth={2} dot={{ r: 3 }} connectNulls />
+              <Line type="monotone" dataKey="pilot" name="Pilot" stroke="#10b981" strokeWidth={1.5} dot={false} connectNulls />
+              <Line type="monotone" dataKey="kontrol" name="Kontrol" stroke="#f59e0b" strokeWidth={1.5} dot={false} connectNulls />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Teklif kuyruğu */}

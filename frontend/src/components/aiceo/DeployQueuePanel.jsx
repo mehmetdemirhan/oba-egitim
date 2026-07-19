@@ -1,10 +1,12 @@
 import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
-import { GitBranch, RefreshCw, CheckCircle, Clock, Terminal } from "lucide-react";
+import { GitBranch, RefreshCw, CheckCircle, Clock, Terminal, TrendingUp, ShieldCheck, ShieldAlert, HelpCircle } from "lucide-react";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 
 /**
  * DeployQueuePanel — squad_deploy_queue görünürlük + manuel entegrasyon işaretleme.
  * OTOMATİK DEPLOY YOK: Lina JSX'i canlıya alma manuel git+Vercel'dir; bu panel yalnız takip/durum.
+ * FAZ 2: onay→entegrasyon ort. bekleme grafiği + Git SHA/Vercel referansı doğrulama (bloklamaz).
  * Uçlar /ai/squad/deploy-queue/*.
  */
 export default function DeployQueuePanel({ apiBase, user }) {
@@ -13,6 +15,10 @@ export default function DeployQueuePanel({ apiBase, user }) {
   const [not, setNot] = useState("");
   const [yuk, setYuk] = useState(false);
   const [mesaj, setMesaj] = useState("");
+  const [trend, setTrend] = useState(null);
+  const [shaSonuc, setShaSonuc] = useState(null);  // {gecerli, yontem, mesaj}
+  const [shaYuk, setShaYuk] = useState(false);
+  const [zorla, setZorla] = useState(false);       // "biliyorum, devam et"
   const isAdmin = user?.role === "admin";
 
   const yukle = useCallback(async () => {
@@ -21,21 +27,42 @@ export default function DeployQueuePanel({ apiBase, user }) {
       const r = await axios.get(`${apiBase}/ai/squad/deploy-queue/listele`);
       setKuyruk(r.data || []);
       setSecili((s) => (s ? (r.data || []).find((x) => x.queue_id === s.queue_id) || (r.data || [])[0] : (r.data || [])[0]) || null);
+      axios.get(`${apiBase}/ai/squad/deploy-queue/bekleme-trend`).then(t => setTrend(t.data)).catch(() => setTrend(null));
     } catch (e) {} finally { setYuk(false); }
   }, [apiBase]);
   useEffect(() => { yukle(); }, [yukle]);
 
+  const dogrula = async () => {
+    if (!not.trim()) { setShaSonuc({ gecerli: false, mesaj: "Önce bir referans girin." }); return; }
+    setShaYuk(true); setShaSonuc(null);
+    try {
+      const r = await axios.get(`${apiBase}/ai/squad/deploy-queue/sha-dogrula`, { params: { ref: not } });
+      setShaSonuc(r.data);
+    } catch (e) { setShaSonuc({ gecerli: null, mesaj: "Doğrulama servisi hata verdi." }); }
+    finally { setShaYuk(false); }
+  };
+
   const entegreEt = async () => {
     if (!not.trim()) { setMesaj("Git commit SHA / Vercel referansı zorunlu."); return; }
+    // Doğrulanamamış/geçersiz referansta admin'in "biliyorum, devam et" onayı gerekir (şeffaf uyarı, tam blok değil)
+    if (shaSonuc && shaSonuc.gecerli !== true && !zorla) {
+      setMesaj("Referans doğrulanamadı — devam etmek için 'Biliyorum, devam et' kutusunu işaretleyin.");
+      return;
+    }
     setYuk(true); setMesaj("");
     try {
       await axios.post(`${apiBase}/ai/squad/deploy-queue/entegre-et`, { queue_id: secili.queue_id, gelistirici_notu: not });
-      setNot(""); setMesaj("Entegre edildi olarak mühürlendi."); await yukle();
+      setNot(""); setShaSonuc(null); setZorla(false); setMesaj("Entegre edildi olarak mühürlendi."); await yukle();
     } catch (e) { setMesaj("İşlem başarısız: " + (e.response?.data?.detail || e.message)); } finally { setYuk(false); }
   };
 
   const bekleyen = kuyruk.filter((x) => x.durum !== "entegre_edildi").length;
   const t = secili;
+  const shaRozet = shaSonuc && (shaSonuc.gecerli === true
+    ? { c: "text-emerald-700 bg-emerald-50 border-emerald-200", I: ShieldCheck }
+    : shaSonuc.gecerli === false
+    ? { c: "text-red-700 bg-red-50 border-red-200", I: ShieldAlert }
+    : { c: "text-amber-700 bg-amber-50 border-amber-200", I: HelpCircle });
 
   return (
     <div className="space-y-4">
@@ -52,13 +79,34 @@ export default function DeployQueuePanel({ apiBase, user }) {
 
       {mesaj && <div className="text-sm rounded-lg bg-app border border-line px-3 py-2">{mesaj}</div>}
 
+      {/* Onay→entegrasyon ortalama bekleme süresi — gerçek veriden; yoksa "—" */}
+      <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+        <div className="flex items-center gap-2 mb-3">
+          <TrendingUp className="h-4 w-4 text-indigo-600" />
+          <div className="font-semibold text-content text-sm">Ortalama Entegrasyon Bekleme Süresi (gün)</div>
+        </div>
+        {!trend?.yeterli_veri ? (
+          <div className="text-sm text-subtle py-8 text-center">— Henüz yeterli entegre kayıt yok (en az 2 haftalık entegrasyon gerekir).</div>
+        ) : (
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={trend.seri} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis dataKey="hafta" tick={{ fontSize: 10 }} />
+              <YAxis tick={{ fontSize: 10 }} />
+              <Tooltip contentStyle={{ fontSize: 11 }} formatter={(v, n) => [n === "ort_bekleme_gun" ? `${v} gün` : v, n === "ort_bekleme_gun" ? "Ort. bekleme" : "Kayıt"]} />
+              <Bar dataKey="ort_bekleme_gun" name="Ort. bekleme" fill="#6366f1" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="rounded-2xl border border-line bg-surface p-3 shadow-sm">
           <div className="text-[11px] font-bold text-subtle uppercase mb-2">Kuyruk</div>
           <div className="space-y-1.5 max-h-[28rem] overflow-auto">
             {kuyruk.length === 0 && <div className="text-sm text-subtle py-6 text-center">Kuyruk boş.</div>}
             {kuyruk.map((x) => (
-              <button key={x.queue_id} onClick={() => { setSecili(x); setMesaj(""); }}
+              <button key={x.queue_id} onClick={() => { setSecili(x); setMesaj(""); setShaSonuc(null); setZorla(false); }}
                 className={`w-full text-left p-2.5 rounded-lg border transition ${secili?.queue_id === x.queue_id ? "border-indigo-300 bg-indigo-50/50" : "border-line hover:bg-app"}`}>
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-mono text-content truncate">{x.task_id}</span>
@@ -86,10 +134,28 @@ export default function DeployQueuePanel({ apiBase, user }) {
                 <pre className="p-3 bg-app border border-line rounded-lg font-mono text-[11px] text-content overflow-auto max-h-72 whitespace-pre">{t.react_kodu}</pre>
               </div>
               {t.durum === "entegre_edildi" ? (
-                <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5">Entegre edildi · {t.entegrasyon_tarihi} · not: {t.gelistirici_notu}</div>
+                <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5">
+                  Entegre edildi · {t.entegrasyon_tarihi} · not: {t.gelistirici_notu}
+                  {t.sha_dogrulama && <span className="block mt-1 text-subtle">Referans doğrulama: {t.sha_dogrulama.mesaj}</span>}
+                </div>
               ) : isAdmin ? (
                 <div className="pt-2 border-t border-line space-y-2">
-                  <input value={not} onChange={(e) => setNot(e.target.value)} placeholder="Git commit SHA / Vercel deploy referansı" className="w-full bg-app border border-line rounded-lg px-2.5 py-1.5 text-sm text-content outline-none focus:border-indigo-400 font-mono" />
+                  <div className="flex gap-1.5">
+                    <input value={not} onChange={(e) => { setNot(e.target.value); setShaSonuc(null); setZorla(false); }} placeholder="Git commit SHA / Vercel deploy referansı" className="flex-1 bg-app border border-line rounded-lg px-2.5 py-1.5 text-sm text-content outline-none focus:border-indigo-400 font-mono" />
+                    <button onClick={dogrula} disabled={shaYuk} className="inline-flex items-center gap-1 bg-app border border-line rounded-lg px-3 py-1.5 text-sm shrink-0">{shaYuk ? <RefreshCw className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}Doğrula</button>
+                  </div>
+                  {shaSonuc && shaRozet && (
+                    <div className={`text-[11px] border rounded-lg px-2.5 py-1.5 flex items-start gap-1.5 ${shaRozet.c}`}>
+                      <shaRozet.I className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                      <span>{shaSonuc.mesaj}</span>
+                    </div>
+                  )}
+                  {shaSonuc && shaSonuc.gecerli !== true && (
+                    <label className="flex items-center gap-2 text-[11px] text-subtle cursor-pointer">
+                      <input type="checkbox" checked={zorla} onChange={(e) => setZorla(e.target.checked)} />
+                      Biliyorum, doğrulanamayan referansla devam et.
+                    </label>
+                  )}
                   <button onClick={entegreEt} disabled={yuk} className="w-full inline-flex items-center justify-center gap-1.5 bg-indigo-600 disabled:opacity-60 text-white text-sm rounded-lg py-2"><CheckCircle className="h-4 w-4" />Entegre Edildi olarak işaretle (kuyruğu kapat)</button>
                 </div>
               ) : <div className="text-[11px] text-subtle">Entegre işaretleme yalnız admin.</div>}

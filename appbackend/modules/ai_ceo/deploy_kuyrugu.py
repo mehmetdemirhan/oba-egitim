@@ -14,10 +14,17 @@ from core.auth import require_role, UserRole
 from core.zaman import iso
 from core.audit import islem_kaydet
 from .deploy_kuyruk_semalar import QueueIntegrateRequest, QueueItemResponse
+from . import deploy_dogrulama
 
 router = APIRouter()
 _KOORD = require_role(UserRole.ADMIN, UserRole.COORDINATOR)
 _ADMIN = require_role(UserRole.ADMIN)
+
+
+@router.get("/ai/squad/deploy-queue/sha-dogrula")
+async def deploy_sha_dogrula(ref: str = "", current_user=Depends(_KOORD)):
+    """Git SHA / Vercel referansını doğrular (format + mümkünse GitHub API). Bloklamaz — sonucu döner."""
+    return await deploy_dogrulama.dogrula(ref)
 
 
 def _map(item: dict) -> QueueItemResponse:
@@ -44,9 +51,11 @@ async def deploy_queue_entegre_et(govde: QueueIntegrateRequest, current_user=Dep
     if item.get("durum") == "entegre_edildi":
         raise HTTPException(status_code=400, detail="Bu öğe zaten entegre edilmiş.")
     try:
+        # FAZ 2 (madde 7): referansı doğrula ve ŞEFFAFÇA damgala — bloklamaz (admin "biliyorum, devam et").
+        sha_dogrulama = await deploy_dogrulama.dogrula(govde.gelistirici_notu)
         await db.squad_deploy_queue.update_one({"id": govde.queue_id}, {"$set": {
             "durum": "entegre_edildi", "entegrasyon_tarihi": iso(), "gelistirici_notu": govde.gelistirici_notu,
-            "entegre_eden": current_user.get("id")}})
+            "sha_dogrulama": sha_dogrulama, "entegre_eden": current_user.get("id")}})
         await db.ai_squad_pipeline_runs.update_one({"task_id": item.get("squad_task_id")}, {"$set": {
             "asama": "tamamlandi", "son_not": f"Geliştirici manuel Git/Vercel entegrasyonunu tamamladı: {govde.gelistirici_notu[:120]}"}})
         await islem_kaydet(current_user, "ai_squad", "kuyruk_entegre", "deploy_queue", govde.queue_id, "durum", "onaylandi_entegrasyon_bekliyor", "entegre_edildi")

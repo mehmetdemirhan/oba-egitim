@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
-import { Cpu, Play, Terminal, AlertTriangle, RefreshCw, Layers, Sparkles, MessageSquare, Eye, Send, HeartPulse } from "lucide-react";
+import { Cpu, Play, Terminal, AlertTriangle, RefreshCw, Layers, MessageSquare, Eye, Send, HeartPulse, Package, TrendingUp, Coins } from "lucide-react";
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from "recharts";
 
 /**
  * AiSquadWorkspace v2 — orkestratör tetikleyici + Lina kodu CANLI ÖNİZLEME + ajan bazlı İNTERAKTİF
@@ -34,8 +35,17 @@ export default function AiSquadWorkspace({ apiBase }) {
   const [sohbetYuk, setSohbetYuk] = useState(false);
   const [saglik, setSaglik] = useState(null); // {gemini_ok, mesaj}
   const [saglikYuk, setSaglikYuk] = useState(false);
+  const [limit, setLimit] = useState(null);   // tetik limiti + tahmini maliyet
+  const [trend, setTrend] = useState(null);   // pipeline başarı/red trendi
   const api = (x) => `${apiBase}${x}`;
   const ekle = (a, m) => setSohbet((p) => ({ ...p, [a]: [...p[a], m] }));
+
+  const limitTrendYukle = useCallback(async () => {
+    axios.get(api("/ai/squad/orkestrator/limit-durum")).then(x => setLimit(x.data)).catch(() => setLimit(null));
+    axios.get(api("/ai/squad/orkestrator/trend")).then(x => setTrend(x.data)).catch(() => setTrend(null));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiBase]);
+  useEffect(() => { limitTrendYukle(); }, [limitTrendYukle]);
 
   const aiSaglik = async () => {
     setSaglikYuk(true); setSaglik(null);
@@ -61,8 +71,10 @@ export default function AiSquadWorkspace({ apiBase }) {
       const task_id = `task_user_${Date.now().toString().slice(-6)}`;
       const res = await axios.post(api("/ai/squad/orkestrator/pipeline-tetikle"), { task_id, talep_metni: talep, baslangic_kodu: kod || null });
       setR(res.data);
+      if (res.data.limit_uyari) setMesaj(res.data.limit_uyari);
       if (res.data.lina_uretim) { const ok = await linaKoduGetir(res.data.task_id); if (ok) setGorunum("preview"); }
       else setOnizleme(`// Lina kod üretmedi. Aşama: ${res.data.asama}\n// ${res.data.son_not}`);
+      limitTrendYukle();  // tetik sonrası limit/maliyet/trend tazele
     } catch (e) { setMesaj("Pipeline tetiklenemedi: " + (e.response?.data?.detail || e.message)); }
     finally { setYuk(false); }
   };
@@ -129,6 +141,41 @@ export default function AiSquadWorkspace({ apiBase }) {
 
       {mesaj && <div className="text-sm rounded-lg bg-app border border-line px-3 py-2 flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-amber-600" />{mesaj}</div>}
 
+      {/* Tetik limiti + tahmini maliyet — her tetik gerçek Atlas+Lina+Nova LLM çağrısıdır (kotasız risk) */}
+      {limit && (
+        <div className={`text-xs rounded-lg px-3 py-2 border flex flex-wrap items-center gap-x-4 gap-y-1 ${limit.asildi ? "bg-amber-50 border-amber-300 text-amber-800" : "bg-app border-line text-subtle"}`}>
+          <span className="inline-flex items-center gap-1 font-semibold"><Coins className="h-3.5 w-3.5" />Tetik Limiti</span>
+          <span>Günlük: <b className={limit.gunluk_asildi ? "text-red-600" : "text-content"}>{limit.gunluk_kullanim}/{limit.gunluk_limit}</b></span>
+          <span>Aylık: <b className={limit.aylik_asildi ? "text-red-600" : "text-content"}>{limit.aylik_kullanim}/{limit.aylik_limit}</b></span>
+          <span>Tahmini aylık maliyet: <b className="text-content">{limit.tahmini_aylik_maliyet != null ? `${limit.tahmini_aylik_maliyet} ₺` : "— (birim ücret tanımsız)"}</b></span>
+          {limit.asildi && <span className="font-semibold">⚠ Limit aşıldı{limit.sert_blok ? " — SERT BLOK açık, yeni tetik engellenecek." : " — sert blok kapalı; tetikleme uyarıyla devam eder."}</span>}
+        </div>
+      )}
+
+      {/* Pipeline başarı/red oranı zaman serisi — gerçek veriden; yoksa "—" */}
+      <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+        <div className="flex items-center gap-2 mb-3">
+          <TrendingUp className="h-4 w-4 text-indigo-600" />
+          <div className="font-semibold text-content text-sm">Pipeline Başarı / Red Oranı (haftalık)</div>
+        </div>
+        {!trend?.yeterli_veri ? (
+          <div className="text-sm text-subtle py-8 text-center">— Henüz yeterli pipeline geçmişi yok (en az 2 haftalık kayıt gerekir).</div>
+        ) : (
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={trend.seri} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis dataKey="hafta" tick={{ fontSize: 10 }} />
+              <YAxis yAxisId="l" domain={[0, 100]} tick={{ fontSize: 10 }} />
+              <YAxis yAxisId="r" orientation="right" allowDecimals={false} tick={{ fontSize: 10 }} />
+              <Tooltip contentStyle={{ fontSize: 11 }} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Line yAxisId="l" type="monotone" dataKey="basari_orani" name="Başarı %" stroke="#10b981" strokeWidth={2} dot={{ r: 2 }} connectNulls />
+              <Line yAxisId="r" type="monotone" dataKey="red" name="Red (adet)" stroke="#ef4444" strokeWidth={1.5} dot={{ r: 2 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Girdi */}
         <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm space-y-3 flex flex-col">
@@ -152,7 +199,7 @@ export default function AiSquadWorkspace({ apiBase }) {
                   <span className={`text-[10px] px-2 py-0.5 rounded-full border ${rozet(s)}`}>{s}</span>
                 </div>); })}
               <div className={`p-2.5 border border-line bg-app rounded-lg flex items-center justify-between`}>
-                <div><div className="text-xs font-bold text-content">🚀 AYAZ</div><div className="text-[10px] text-subtle">İnsan-onaylı devir (otomatik deploy yok)</div></div>
+                <div><div className="text-xs font-bold text-content flex items-center gap-1"><Package className="h-3.5 w-3.5 text-cyan-600" />Dağıtım Adımı</div><div className="text-[10px] text-subtle">İnsan-onaylı devir kuyruğu (bağımsız "Ayaz — Kod Asistanı" panelinden ayrıdır; otomatik deploy yok)</div></div>
                 <span className={`text-[10px] px-2 py-0.5 rounded-full border ${r?.asama === "deploy_bekliyor" ? rozet("aktif") : rozet(r?.deploy_hazir ? "tamamlandi" : "bekliyor")}`}>{r?.asama === "deploy_bekliyor" ? "🛠 onay bekliyor" : r?.deploy_hazir ? "devredildi" : "bekliyor"}</span>
               </div>
               {r && <div className="rounded-lg border border-line bg-app p-2.5 text-xs"><b className="text-content">Aşama:</b> {r.asama} · <span className="text-subtle">{r.son_not}</span></div>}

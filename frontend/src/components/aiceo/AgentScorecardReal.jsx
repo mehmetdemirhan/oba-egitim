@@ -1,6 +1,9 @@
 import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
-import { Cpu, RefreshCw, ShieldCheck, ShieldAlert, HelpCircle } from "lucide-react";
+import { Cpu, RefreshCw, ShieldCheck, ShieldAlert, HelpCircle, TrendingUp } from "lucide-react";
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from "recharts";
+
+const AJAN_RENK = { atlas: "#6366f1", lina: "#ec4899", nova: "#10b981", ayaz: "#f59e0b" };
 
 /**
  * AgentScorecardReal — %100 dürüst AI Squad karnesi. Tüm sayılar canlı koleksiyonlardan
@@ -15,13 +18,30 @@ const RISK = {
 
 export default function AgentScorecardReal({ apiBase }) {
   const [d, setD] = useState(null);
+  const [trend, setTrend] = useState(null);
   const [yuk, setYuk] = useState(false);
 
   const yukle = useCallback(async () => {
     setYuk(true);
-    try { const r = await axios.get(`${apiBase}/ai/squad/scorecard/ozet`); setD(r.data); } catch (e) {} finally { setYuk(false); }
+    try {
+      const [oz, tr] = await Promise.all([
+        axios.get(`${apiBase}/ai/squad/scorecard/ozet`).then(r => r.data).catch(() => null),
+        axios.get(`${apiBase}/ai/squad/scorecard/trend`).then(r => r.data).catch(() => null),
+      ]);
+      setD(oz); setTrend(tr);
+    } finally { setYuk(false); }
   }, [apiBase]);
   useEffect(() => { yukle(); }, [yukle]);
+
+  // Haftalık skor trendini tek satır dizisine birleştir (X=hafta, ajan başına skor)
+  const trendRows = (() => {
+    if (!trend?.ajanlar) return [];
+    const map = {};
+    Object.entries(trend.ajanlar).forEach(([ajan, seri]) => {
+      (seri || []).forEach(p => { (map[p.hafta] = map[p.hafta] || { hafta: p.hafta })[ajan] = p.skor; });
+    });
+    return Object.values(map).sort((a, b) => (a.hafta > b.hafta ? 1 : -1));
+  })();
 
   if (!d) return <div className="text-sm text-subtle p-4">Karne yükleniyor…</div>;
 
@@ -89,6 +109,30 @@ export default function AgentScorecardReal({ apiBase }) {
           </tbody>
         </table>
         <div className="text-[10px] text-subtle mt-2">Not: "Olumlu/Engelleme" ajanın verdiği KARAR sayısıdır (Atlas onay/red, Nova vize/engelleme…), ajan hatası değil. Skor = olumlu/toplam.</div>
+      </div>
+
+      {/* Ajan başına haftalık skor trendi — gerçek veriden; yetersizse "—" (uydurma yok) */}
+      <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+        <div className="flex items-center gap-2 mb-3">
+          <TrendingUp className="h-4 w-4 text-indigo-600" />
+          <div className="font-semibold text-content text-sm">Ajan Skor Trendi (haftalık)</div>
+        </div>
+        {!trend?.yeterli_veri || trendRows.length < 2 ? (
+          <div className="text-sm text-subtle py-8 text-center">— Henüz trend için yeterli veri yok (en az 2 haftalık ölçüm gerekir).</div>
+        ) : (
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={trendRows} margin={{ top: 5, right: 10, left: -18, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis dataKey="hafta" tick={{ fontSize: 10 }} />
+              <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+              <Tooltip contentStyle={{ fontSize: 11 }} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              {["atlas", "lina", "nova", "ayaz"].map(a => (
+                <Line key={a} type="monotone" dataKey={a} name={a} stroke={AJAN_RENK[a]} strokeWidth={2} dot={{ r: 2 }} connectNulls />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        )}
       </div>
     </div>
   );
