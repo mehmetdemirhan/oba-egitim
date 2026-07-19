@@ -88,7 +88,15 @@ async def run():
         check(rap["durum"] == "guvenlik_reddetti" and any("hedef_dosya" in b for b in rap["guvenlik_bloklari"]),
               "backend/.py hedef yolu → guvenlik_reddetti (yol doğrulaması)")
 
+        # ── AI hatası (geçersiz anahtar/kota) → durum 'ai_hatasi' (502 FIRLATMAZ, orkestratör çökmez) ──
+        async def fake_err(system, user, max_tokens=2500, ozellik=""):
+            return {"parsed": None, "text": "", "error": "API key not valid"}
+        ai_mod.call_claude = fake_err
+        rr = await ac.post("/api/ai/squad/lina/tasarla", headers=H("koord"), json={"task_id": "task_aihata", "talep": "kart tasarla"})
+        check(rr.status_code == 200 and rr.json().get("durum") == "ai_hatasi", "GEMINI hatası → durum 'ai_hatasi' (502 yok; zarif)")
+
         # ── Yetki + audit + raporlar ──
+        ai_mod.call_claude = cc(SAFE)
         ai_mod.call_claude = cc(SAFE)
         check((await ac.post("/api/ai/squad/lina/tasarla", headers=H("t1"), json={"task_id": "task_z", "talep": "tasarim yap"})).status_code == 403,
               "öğretmen Lina'yı çağıramaz (403)")

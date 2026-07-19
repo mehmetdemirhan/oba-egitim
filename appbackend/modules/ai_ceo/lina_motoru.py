@@ -87,7 +87,9 @@ async def lina_tasarla(govde: LinaDesignRequest, current_user=Depends(_KOORD)):
         logging.warning(f"[lina_motoru] LLM tasarım hatası: {e}")
         lina = None
     if lina is None:
-        raise HTTPException(status_code=502, detail="Lina tasarımı üretilemedi (AI yanıtı şema/ayrıştırma).")
+        # AI çağrısı başarısız (geçersiz anahtar/kota/ayrıştırma) → 502 FIRLATMA; zarifçe dur (uydurma yok).
+        # Böylece orkestratör tek motor hatasında 500 ile ÇÖKMEZ, 'durduruldu'ya düşer.
+        return {"durum": "ai_hatasi", "mesaj": "Lina AI çağrısı başarısız (geçersiz GEMINI anahtarı/kota/ayrıştırma). Uydurma tasarım üretilmez."}
 
     bloklar = _uretilen_kodu_tara(lina.react_kodu, lina.hedef_dosya)
     durum = "guvenlik_reddetti" if bloklar else "tamam"
