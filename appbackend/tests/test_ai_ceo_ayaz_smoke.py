@@ -97,6 +97,19 @@ async def run():
               "tehlikeli kod (import os) statik taramada YAKALANDI → guvenlik_reddetti (çalıştırılmadan)")
         danger_id = td["id"]
 
+        # ── Geçersiz UserRole.OGRENCI ÜRETİM anında yakalanır (uygula/import_check'e ulaşmadan) ──
+        OGRENCI_KOD = ("from fastapi import APIRouter, Depends\n"
+                       "from core.auth import require_role, UserRole\n"
+                       "router = APIRouter()\n\n"
+                       "@router.get('/api/x')\n"
+                       "async def x(u=Depends(require_role(UserRole.OGRENCI))):\n"
+                       "    return {}\n")
+        az.call_claude = _cc(OGRENCI_KOD)
+        r = await ac.post("/api/ai/ayaz/talep-uret", headers=H("adm"), json={"talep": "ogrenci rolu ekle"})
+        tog = r.json()["task"]
+        check(r.status_code == 200 and tog["durum"] == "guvenlik_reddetti" and any("OGRENCI" in e for e in tog["guvenlik"]["errors"]),
+              "UserRole.OGRENCI → ÜRETİMDE guvenlik_reddetti (import_check'e ulaşmadan yakalandı)")
+
         # ── Yetki: uygula/reddet yalnız admin ──
         check((await ac.post(f"/api/ai/ayaz/gorev/{safe_id}/uygula", headers=H("koord"))).status_code == 403,
               "koordinatör uygulayamaz (yalnız admin) (403)")
