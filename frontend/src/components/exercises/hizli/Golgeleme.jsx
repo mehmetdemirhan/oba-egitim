@@ -3,10 +3,10 @@
 // tempoyu bozmadan okur; okunan kelimeler soluklaşır. Metin bitince puan.
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { EgzersizDuzen, useEgzersizOturum, Slider } from "../goz/ortak";
-import { useOkumaMetni, kelimelereBol } from "./ortak";
+import { useOkumaMetni, kelimelereBol, MetinSecici } from "./ortak";
 
 export default function Golgeleme({ onTamamla }) {
-  const { metin, yukleniyor, hata, yenile } = useOkumaMetni(40);
+  const { metin, liste, sec, yukleniyor, hata, yenile } = useOkumaMetni(40);
   const [wpm, setWpm] = useState(220);           // kelime / dakika
   const [aktif, setAktif] = useState(-1);
   const [bitti, setBitti] = useState(false);
@@ -42,7 +42,10 @@ export default function Golgeleme({ onTamamla }) {
   const ayarlar = (
     <>
       <Slider etiket="Hız (kelime/dakika)" deger={wpm} min={80} max={700} step={10} birim=" k/dk" onChange={setWpm} />
-      <button onClick={yenile} className="w-full py-1.5 rounded-lg text-sm font-semibold border border-gray-200 bg-white text-gray-600 hover:bg-gray-50">🔄 Yeni Metin</button>
+      <div>
+        <label className="block text-xs text-gray-500 mb-1">Metin seç (onaylı havuz)</label>
+        <MetinSecici liste={liste} metin={metin} sec={sec} yenile={yenile} />
+      </div>
     </>
   );
   const aciklama = "Metnin tamamı görünür; hareketli vurgu kelime kelime ilerler. Vurguya yetişerek, tempoyu bozmadan ve geri dönmeden okuyun. Hızı (kelime/dakika) ayarlardan değiştirin.";

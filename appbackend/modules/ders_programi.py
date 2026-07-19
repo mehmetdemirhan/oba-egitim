@@ -576,9 +576,19 @@ async def oturum_yoklama(oturum_id: str, data: dict, current_user=Depends(_DERS_
 
 
 @router.delete("/ders/oturum/{oturum_id}")
-async def oturum_iptal(oturum_id: str, sebep: str = Query(""), current_user=Depends(_DERS_YETKI)):
-    """Oturumu iptal eder (yoklama=iptal). Kayıt silinmez, geçmiş korunur."""
+async def oturum_iptal(oturum_id: str, sebep: str = Query(""), kalici: bool = Query(False),
+                       current_user=Depends(_DERS_YETKI)):
+    """Oturumu iptal eder (yoklama=iptal, kayıt korunur). kalici=true VE tekli (seri değil) ise
+    yanlış giriş kaydını KALICI siler (seri dersleri için /ders/seri kalıcı silme kullanılır)."""
     o = await _oturum_getir_veya_olustur(oturum_id, current_user)
+    # Yanlış girilmiş TEKLİ ders → kalıcı sil (seri girişleri buradan kalıcı silinmez)
+    if kalici and not o.get("seri_id"):
+        await db.ders_oturumlari.delete_one({"id": o["id"]})
+        await _degisiklik_logla("oturum_kalici_sil", o["ogretmen_id"], o.get("ogretmen_ad", ""),
+                                o["ogrenci_id"], o.get("ogrenci_ad", ""),
+                                f"{o['tarih'][:10]} {o['baslangic_saati']}", "Kalıcı Sil",
+                                sebep or "Yanlış giriş", current_user, seri_id=None, oturum_id=o["id"])
+        return {"id": o["id"], "silindi": True}
     await db.ders_oturumlari.update_one({"id": o["id"]}, {"$set": {
         "yoklama": "iptal", "yoklama_notu": sebep or "",
         "yoklama_tarihi": datetime.utcnow().isoformat(),

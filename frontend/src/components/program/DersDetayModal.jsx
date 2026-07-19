@@ -62,6 +62,9 @@ export default function DersDetayModal({ apiBase, ders, ogrenciler = [], onKapat
   const kaliciSil = () => {
     calistir(() => axios.delete(`${apiBase}/ders/seri/${ders.seri_id}?kalici=true&sebep=${encodeURIComponent(sebep || "Yanlış giriş")}`));
   };
+  const kaliciSilTekli = () => {
+    calistir(() => axios.delete(`${apiBase}/ders/oturum/${encodeURIComponent(ders.id)}?kalici=true&sebep=${encodeURIComponent(sebep || "Yanlış giriş")}`));
+  };
 
   return (
     <div className="fixed inset-0 z-[70] bg-black/40 flex items-center justify-center p-4" onClick={onKapat}>
@@ -100,6 +103,9 @@ export default function DersDetayModal({ apiBase, ders, ogrenciler = [], onKapat
               {ders.seri_id && (
                 <button onClick={() => setMod("kalici-sil")} className="px-4 py-2 rounded-xl border border-red-300 text-red-700 text-sm font-medium hover:bg-red-50">⛔ Kalıcı Sil (yanlış giriş)</button>
               )}
+              {!ders.seri_id && (
+                <button onClick={() => setMod("kalici-sil-tekli")} className="px-4 py-2 rounded-xl border border-red-300 text-red-700 text-sm font-medium hover:bg-red-50">⛔ Kalıcı Sil (yanlış giriş)</button>
+              )}
             </div>
           )}
 
@@ -132,6 +138,20 @@ export default function DersDetayModal({ apiBase, ders, ogrenciler = [], onKapat
               <div className="flex justify-end gap-2">
                 <button onClick={() => setMod(null)} className="px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-600">Geri</button>
                 <button onClick={kaliciSil} disabled={bekliyor} className="px-4 py-2 rounded-xl bg-red-700 text-white text-sm font-semibold disabled:opacity-40">Kalıcı Sil</button>
+              </div>
+            </div>
+          )}
+
+          {/* Kalıcı sil — TEKLİ ders (yanlış giriş) */}
+          {mod === "kalici-sil-tekli" && (
+            <div className="space-y-2">
+              <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg p-2.5">⚠️ Bu tekli ders <b>kalıcı olarak silinecek</b> (geri alınamaz). Yanlış girilen ders için kullanın; öğrenciye bildirim gönderilmez.</div>
+              <label className="block text-xs text-gray-600">Sebep (opsiyonel)
+                <input value={sebep} onChange={(e) => setSebep(e.target.value)} placeholder="Yanlış giriş"
+                  className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200 text-sm" /></label>
+              <div className="flex justify-end gap-2">
+                <button onClick={() => setMod(null)} className="px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-600">Geri</button>
+                <button onClick={kaliciSilTekli} disabled={bekliyor} className="px-4 py-2 rounded-xl bg-red-700 text-white text-sm font-semibold disabled:opacity-40">Kalıcı Sil</button>
               </div>
             </div>
           )}
