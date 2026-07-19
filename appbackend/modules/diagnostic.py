@@ -180,8 +180,11 @@ class MetinCreate(BaseModel):
     icerik: str
     kelime_sayisi: int = 0
     sinif_seviyesi: str = "4"
-    tur: str = "hikaye"  # hikaye, bilgilendirici, siir
-    bolum: str = "analiz"  # analiz (Analiz havuzu) | okuma_parcalari (Gelişim→Okuma Metinleri)
+    tur: str = "hikaye"  # hikaye, bilgilendirici, siir, olcum
+    bolum: str = "analiz"  # analiz (Okuma Metinleri havuzu) | okuma_parcalari | olcum (Ölçüm Metinleri)
+    # Ölçüm Metinleri için Bloom taksonomili açık uçlu sorular (10 adet); ÇSS opsiyonel.
+    acik_sorular: Optional[List[dict]] = None
+    sorular: Optional[List[dict]] = None
 
 # Metin oylama modeli — metin_oy_ver endpoint'i kullanıyor (NameError düzeltmesi)
 class MetinOyCreate(BaseModel):
@@ -251,7 +254,8 @@ async def akici_okuma_goc(current_user=Depends(require_role(UserRole.ADMIN))):
 
     now = datetime.utcnow().isoformat()
     toplam_mevcut = await db.analiz_metinler.count_documents({})
-    await db.analiz_metinler.update_many({}, {"$set": {"bolum": "okuma_parcalari"}})
+    # Ölçüm Metinleri (bolum="olcum") AYRI kategoridir — göç sırasında DOKUNULMAZ.
+    await db.analiz_metinler.update_many({"bolum": {"$ne": "olcum"}}, {"$set": {"bolum": "okuma_parcalari"}})
 
     eklenen, guncellenen, dusuk_guven = 0, 0, 0
     for m in metinler:
@@ -287,6 +291,21 @@ async def akici_okuma_goc(current_user=Depends(require_role(UserRole.ADMIN))):
     return {"ok": True, "eklenen": eklenen, "guncellenen": guncellenen,
             "dusuk_guven_soru": dusuk_guven, "okuma_parcalarina_tasinan": okuma_parcalari_say,
             "onceki_toplam": toplam_mevcut, "toplam_metin": len(metinler)}
+
+
+@router.post("/diagnostic/olcum-import")
+async def olcum_import(current_user=Depends(require_role(UserRole.ADMIN))):
+    """ÖLÇÜM METİNLERİ toplu içe aktarım (bolum="olcum", durum="havuzda").
+
+    Kaynak: data/olcum_metinleri.json (29 metin + Bloom açık uçlu sorular). ADMIN
+    toplu işlemi = ONAYDAN MUAF. İdempotent (uuid5 id, $setOnInsert). Bu içe aktarım
+    'AI metin üretmez' kuralını ihlal etmez: içerik var olan PDF'lerin BİREBİR
+    transkripsiyonudur (metin katmanından çıkarıldı, Gemini/OCR kullanılmadı)."""
+    from core import olcum
+    ozet = await olcum.yukle(db)
+    if ozet.get("hata"):
+        raise HTTPException(status_code=500, detail=ozet["hata"])
+    return {"ok": True, **ozet}
 
 
 @router.post("/diagnostic/analiz-havuz/yedekle")
@@ -453,17 +472,24 @@ async def create_metin(data: MetinCreate, current_user=Depends(get_current_user)
     if kelime_sayisi == 0 and data.icerik:
         kelime_sayisi = len(data.icerik.strip().split())
 
-    # Admin/Koordinatör eklerse direkt oylama, öğretmen eklerse beklemede
+    # Admin/Koordinatör eklerse direkt oylama, öğretmen eklerse beklemede.
+    # NOT: Ölçüm Metinleri havuzuna ELLE eklenen yeni metinler de bu ONAY AKIŞINA
+    # girer (doğrudan havuza DÜŞMEZ). İlk 29'luk admin toplu içe aktarımı ayrı
+    # script (olcum_import.py) ile durum="havuzda" yazılır → onaydan muaftır.
     durum = "oylama" if role in ["admin", "coordinator"] else "beklemede"
+
+    bolum = data.bolum if data.bolum in ("analiz", "okuma_parcalari", "olcum") else "analiz"
 
     metin_doc = {
         "id": str(uuid.uuid4()),
         "baslik": data.baslik,
         "icerik": data.icerik,
         "kelime_sayisi": kelime_sayisi,
+        "seviye": kelime_sayisi,
         "sinif_seviyesi": data.sinif_seviyesi,
         "tur": data.tur,
-        "bolum": data.bolum if data.bolum in ("analiz", "okuma_parcalari") else "analiz",
+        "bolum": bolum,
+        "kaynak": "elle",
         # Kutulu Okuma metin seçimi için otomatik zorluk etiketi (sezgisel).
         "zorluk": zorluk_hesapla(data.icerik or ""),
         "durum": durum,
@@ -473,6 +499,23 @@ async def create_metin(data: MetinCreate, current_user=Depends(get_current_user)
         "olusturma_tarihi": datetime.now(timezone.utc).isoformat(),
         "yayin_tarihi": None,
     }
+
+    # Ölçüm Metinleri: Bloom taksonomili açık uçlu sorular (varsa) normalize edilir.
+    if data.acik_sorular:
+        from core.acik_soru import acik_soru_nesnesi
+        acik = []
+        for i, s in enumerate(data.acik_sorular):
+            acik.append(acik_soru_nesnesi(
+                str(uuid.uuid4()),
+                s.get("no", i + 1),
+                s.get("kategori_ham") or s.get("kategori"),
+                s.get("soru", ""),
+                s.get("model_cevap") if s.get("model_cevap") is not None else s.get("cevap", ""),
+            ))
+        metin_doc["acik_sorular"] = acik
+    if data.sorular is not None:
+        metin_doc["sorular"] = data.sorular
+
     await db.analiz_metinler.insert_one(metin_doc)
 
     # Ekleyene puan ver (dinamik)
@@ -605,32 +648,40 @@ async def get_metinler(
     sinif_seviyesi: Optional[str] = None,
     min_kelime: Optional[int] = None,   # SEVİYE (kelime sayısı) alt sınırı
     max_kelime: Optional[int] = None,   # SEVİYE (kelime sayısı) üst sınırı
-    bolum: Optional[str] = None,        # None/"analiz" = Analiz havuzu; "okuma_parcalari" = eski metinler
+    bolum: Optional[str] = None,        # "analiz"=Okuma Metinleri · "olcum"=Ölçüm Metinleri · "okuma_parcalari"=eski
     current_user=Depends(get_current_user),
 ):
     role = current_user.get("role", "")
     user_id = current_user.get("id", "")
 
     query = {}
-    # Bölüm ayrımı:
+    # Bölüm ayrımı (kategori ekseni):
+    #   bolum="analiz"          → Okuma Metinleri (150 Akıcı Okuma; 5 ÇSS + açık uçlu).
+    #   bolum="olcum"           → Ölçüm Metinleri (29 Bloom taksonomili açık uçlu set).
     #   bolum="okuma_parcalari" → Gelişim→Okuma Metinleri (eski/taşınan metinler).
-    #   bolum="analiz"          → Analiz havuzu (yalnız AKICI OKUMA + analiz etiketli).
-    #   bolum yok               → geriye uyumlu: okuma_parcalari HARİÇ tümü.
+    #   bolum yok               → geriye uyumlu: okuma_parcalari VE olcum HARİÇ tümü
+    #                             (Ölçüm ayrı bir sekme; eski Analiz görünümünü kirletmez).
     if bolum == "okuma_parcalari":
         query["bolum"] = "okuma_parcalari"
+    elif bolum == "olcum":
+        query["bolum"] = "olcum"
     elif bolum == "analiz":
         query["bolum"] = "analiz"
     else:
-        query["bolum"] = {"$ne": "okuma_parcalari"}
+        query["bolum"] = {"$nin": ["okuma_parcalari", "olcum"]}
     if sinif_seviyesi:
-        m = re.search(r"\d+", sinif_seviyesi)
-        if m:
-            # Sınıf filtresi eski (sınıf etiketli) metinler için geçerli; ama seviye
-            # (kelime sayısı) bazlı havuz metinleri sinif_seviyesi=null olduğundan
-            # HER ZAMAN dahil edilir — aksi halde 159 havuz metni bir öğrenci
-            # seçilince dropdown'dan gizlenirdi. Seviye daraltması kelime filtresiyle.
+        # Sınıf seçimi: sayısal (1-8) veya "lise". Ölçüm Metinleri gerçek sınıf
+        # etiketi taşır; havuz (okuma) metinleri sinif_seviyesi=null olduğundan HER
+        # ZAMAN dahil edilir (aksi halde bir sınıf seçilince okuma havuzu gizlenirdi).
+        sv = sinif_seviyesi.strip().lower()
+        if "lise" in sv:
+            deger = "lise"
+        else:
+            m = re.search(r"\d+", sinif_seviyesi)
+            deger = m.group() if m else None
+        if deger:
             query["$or"] = [
-                {"sinif_seviyesi": m.group()},
+                {"sinif_seviyesi": deger},
                 {"sinif_seviyesi": None},
                 {"sinif_seviyesi": {"$exists": False}},
             ]

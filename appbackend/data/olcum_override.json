@@ -1,0 +1,272 @@
+[
+  {
+    "dosya": "8 A.3 Eşsiz Şehrin Yankıları.pdf",
+    "baslik": "Eşsiz Şehrin Yankıları",
+    "sinif_seviyesi": 8,
+    "kelime_sayisi": 664,
+    "govde_temiz": null,
+    "sorular": [
+      {
+        "no": 1,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Bilgi (Hatırlama)",
+        "soru": "Kasabada yaşanan gizemli olayın adı nedir?",
+        "cevap": "Kasabada “kaybolan yankı” olayı yaşanmaktadır; yani kasabada hiçbir sesin yankılanmaması gizemli olay olarak anlatılmaktadır.",
+        "subjektif": false
+      },
+      {
+        "no": 2,
+        "kategori": "Anlama",
+        "kategori_ham": "Kavrama (Anlama)",
+        "soru": "Yaşlı adamın anlattıklarına göre seslerin kaybolmasının nedeni ne olabilir?",
+        "cevap": "Yaşlı adam, vadide bir şeylerin değiştiğini ve seslerin eski yolunu bulamadığını söylemektedir. Bu da seslerin yönünü değiştiren veya engelleyen bir olay yaşandığını düşündürür.",
+        "subjektif": false
+      },
+      {
+        "no": 3,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama (Kullanma)",
+        "soru": "Yaren’in bronz plakada okuduğu cümleden yola çıkarak sesin neden kasabaya geri dönemediğini kendi cümlelerinle açıklayın.",
+        "cevap": "Bronz plakadaki cümle sesin “yolunu kaybettiğini” ifade eder. Bu durum, vadideki doğal yapının değiştiğini, ses dalgalarının eski güzergâhını takip edemediğini ve bu yüzden kasabaya ulaşamadığını gösterir.",
+        "subjektif": false
+      },
+      {
+        "no": 4,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz (Çözümleme)",
+        "soru": "Yaren’in vadide yaptığı gözlemlerden hangi ipuçları, seslerin yön değiştirdiğini anlamasını sağlamıştır? Metinden en az iki kanıt yazın.",
+        "cevap": "Vadide bazı kaya yüzeylerinin kırılmış veya yer değiştirmiş olduğunu fark etmesi, sesin çarpacağı yüzeylerin değiştiğini göstermiştir. Havanın bile alışılmadık şekilde sessiz olması, ses dalgalarının dağılması yerine başka bir yöne saptığını düşündürmüştür.",
+        "subjektif": false
+      },
+      {
+        "no": 5,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz (Karşılaştırma)",
+        "soru": "Kasabanın olay öncesi durumu ile olay sonrası durumu arasında ne gibi farklar vardır? En az üç maddede karşılaştırın.",
+        "cevap": "Olay Öncesi: Kasaba canlı ve neşelidir; çocuklar oyun oynarken yankı oluşur; insanlar günlük yaşamlarını sorunsuz sürdürür. Olay Sonrası: Kasaba sessiz ve huzursuz hale gelir; hiçbir ses yankılanmaz; insanlar tedirgin olur ve çözüm aramaya başlar.",
+        "subjektif": false
+      },
+      {
+        "no": 6,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme (Yorumlama)",
+        "soru": "Kasabalıların Yaren’e ilk başta güvenmemelerini nasıl değerlendirirsiniz? Bu tutumun nedenlerini tartışın.",
+        "cevap": "Kasabalıların temkinli davranması doğal görülebilir; çünkü gizemli bir durum yaşanmaktadır ve tanımadıkları birinin çözüm bulabileceğine dair şüphe duymaları normaldir. Ayrıca geçmişte başarısız denemeler olmuş olabilir. Ancak Yaren’in gözlemlerini ve çabasını görünce güvenmeleri doğru bir tutumdur.",
+        "subjektif": false
+      },
+      {
+        "no": 7,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme (Eleştirel Düşünme)",
+        "soru": "Yaren’in sesleri geri getirmek için metal levhaları kullanma fikrini ne kadar bilimsel buluyorsunuz? Gerekçeleriyle açıklayın.",
+        "cevap": "Ses dalgalarının yüzeylerden yansıyabildiği bilinen bir fizik kuralıdır. Metal yüzeylerin sesi yönlendirmek için kullanılabilmesi bilimsel olarak mümkündür. Yaren’in fikri bu açıdan mantıklıdır. Ancak gerçek hayatta sesin doğru açıyla yönlendirilmesi için daha detaylı hesaplamalar gerekebilir.",
+        "subjektif": false
+      },
+      {
+        "no": 8,
+        "kategori": "Yaratma",
+        "kategori_ham": "Yaratma (Tahmin / Üretme)",
+        "soru": "Eğer Yaren yanlış bir açıyla levha yerleştirseydi olay nasıl sonuçlanabilirdi? Olası bir senaryo yazın.",
+        "cevap": "Ses kasabaya geri dönmek yerine tamamen başka bir noktaya yönlenebilirdi. Sesin vadi içinde sıkışıp kalması, başka bir kasabada tuhaf bir yankı oluşması veya yankının daha da zayıflaması gibi sonuçlar ortaya çıkabilirdi.",
+        "subjektif": true
+      },
+      {
+        "no": 9,
+        "kategori": "Yaratma",
+        "kategori_ham": "Yaratma (Alternatif Çözüm)",
+        "soru": "Yaren’in kullandığı yöntemin dışında kasabanın yankısını geri getirmek için başka hangi çözüm yolları denenebilirdi? En az iki farklı fikir üretin.",
+        "cevap": "Vadinin doğal yapısını inceleyerek çökmüş kayaların eski hâline getirilmesi; yankıyı güçlendirmek için ses yansıtıcı kuleler veya ahşap paneller yerleştirilmesi; sesin yönünü tespit etmek için basit bir akustik ölçüm cihazı yapılması.",
+        "subjektif": true
+      },
+      {
+        "no": 10,
+        "kategori": "Yaratma",
+        "kategori_ham": "Yaratma (Genelleme)",
+        "soru": "Bu hikâyeden hareketle, “Küçük bir fikrin büyük bir değişime yol açması” temasını günümüzden bir örnekle açıklayın.",
+        "cevap": "Örneğin geri dönüşüm kutularının okullara yerleştirilmesi fikri küçük bir başlangıçtır; ancak zamanla bütün öğrencilerin bilinçlenmesine, atıkların azalmasına ve çevre farkındalığının artmasına yol açabilir. Küçük bir uygulama büyük bir sosyal etki oluşturur.",
+        "subjektif": true
+      }
+    ],
+    "notlar": "Ajan çıktısı hatalıydı (Q1/Q3 uydurma); kaynak temiz metinden birebir düzeltildi."
+  },
+  {
+    "dosya": "A. 1 DUVARLARIN ARASINDA BÜYÜYEN SES.pdf",
+    "baslik": "DUVARLARIN ARASINDA BÜYÜYEN SES",
+    "sinif_seviyesi": "lise",
+    "kelime_sayisi": 540,
+    "govde_temiz": null,
+    "sorular": [
+      {
+        "no": 1,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Hatırlama",
+        "soru": "Arda’nın okul çıkışlarında kulaklık takmasının temel nedeni nedir?",
+        "cevap": "Arda, kulaklığı müzik dinlemek için değil, dış dünyayla arasına görünmez bir duvar örmek, insanlarla iletişim kurmak zorunda kalmamak ve kendini korumak için takmaktadır.",
+        "subjektif": false
+      },
+      {
+        "no": 2,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Hatırlama",
+        "soru": "Edebiyat öğretmeni öğrencilerden nasıl bir öykü yazmalarını istemiştir?",
+        "cevap": "Öğretmen, öğrencilerden kendilerini anlatan ancak bunu doğrudan değil, bir karakter üzerinden yapan bir öykü yazmalarını istemiştir.",
+        "subjektif": false
+      },
+      {
+        "no": 3,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama",
+        "soru": "Metinde Arda’nın sessizliği nasıl bir “savunma biçimi” olarak açıklanmaktadır?",
+        "cevap": "Arda, söylediklerinin dikkate alınmayacağından ve havada kalacağından korktuğu için susmaktadır. Bu nedenle sessizlik, onun için reddedilme ve anlaşılmama korkusuna karşı geliştirdiği bir savunma biçimi hâline gelmiştir.",
+        "subjektif": false
+      },
+      {
+        "no": 4,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama",
+        "soru": "Öğretmenin “Yazmak senin sesin olabilir.” sözü Arda için ne anlama gelmektedir? Açıklayınız.",
+        "cevap": "Bu söz, Arda’nın kendini sözlü olarak ifade edemediği duygularını yazı yoluyla ifade edebileceğini, yazının onun için bir iletişim ve kendini anlatma aracı olabileceğini fark etmesini sağlamıştır.",
+        "subjektif": false
+      },
+      {
+        "no": 5,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama",
+        "soru": "Arda’nın yaşadığı duruma benzer bir durumda olan bir öğrencinin kendini ifade edebilmesi için metinden hareketle iki somut yol öneriniz.",
+        "cevap": "Duygu ve düşüncelerini yazı, günlük veya hikâye yoluyla ifade etmeye çalışmak; güvendiği bir öğretmen ya da arkadaşla düşüncelerini paylaşmak. Metnin temel düşüncesiyle uyumlu farklı somut öneriler de kabul edilir.",
+        "subjektif": true
+      },
+      {
+        "no": 6,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Arda’nın konuşmak yerine yazmayı tercih etmesinin nedenlerini metne dayalı olarak analiz ediniz.",
+        "cevap": "Arda, konuşurken anlaşılmayacağını düşündüğü için yazmayı tercih etmektedir. Yazı, ona düşüncelerini düzenleme, duygularını daha rahat aktarma ve kendini güvende hissetme imkânı vermektedir. Bu nedenle yazmak, Arda için daha kontrollü ve güvenli bir ifade biçimidir.",
+        "subjektif": false
+      },
+      {
+        "no": 7,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Metnin başındaki Arda ile metnin sonundaki Arda arasında hangi içsel değişimler vardır? Karşılaştırarak açıklayınız.",
+        "cevap": "Metnin başında Arda, sessizliğini bir kaçış ve zorunluluk olarak yaşarken; metnin sonunda sessizliğini bir özellik olarak kabul etmiş, istediğinde konuşabileceğini fark eden daha bilinçli ve özgüvenli bir birey hâline gelmiştir.",
+        "subjektif": false
+      },
+      {
+        "no": 8,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Sizce Arda’nın sessizliğini bir eksiklik değil, bir özellik olarak görmesi doğru bir bakış açısı mıdır? Metne dayanarak görüşünüzü gerekçelendiriniz.",
+        "cevap": "Evet, doğru bir bakış açısıdır. Çünkü herkesin kendini ifade etme biçimi farklıdır. Sessizlik, Arda’nın değersiz olduğu anlamına gelmez; aksine onun kişiliğinin bir parçasıdır. Metinde bu farkındalık Arda’ya güç kazandırmıştır. Metne dayalı gerekçelendirme yapıldığı sürece farklı görüşler kabul edilebilir.",
+        "subjektif": true
+      },
+      {
+        "no": 9,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Öğretmenin Arda’ya yaklaşımını eğitim açısından değerlendiriniz. Bu yaklaşımın Arda üzerindeki etkisi sizce yeterli midir?",
+        "cevap": "Öğretmenin yaklaşımı olumludur; çünkü Arda’yı yargılamadan, yeteneğini fark ederek desteklemiştir. Bu yaklaşım, Arda’nın kendini ifade etmesine ve özgüven kazanmasına katkı sağlamıştır.",
+        "subjektif": false
+      },
+      {
+        "no": 10,
+        "kategori": "Yaratma",
+        "kategori_ham": "Yaratma",
+        "soru": "Bu öykünün temasını yansıtan yeni bir başlık öneriniz ya da Arda’nın hikâyesine 1 paragrafla alternatif bir son yazınız.",
+        "cevap": "Örnek başlık: “Sessizliğin İçindeki Güç”, “Kelimelere Dönüşen Sessizlik”. Alternatif son için ölçüt: Metnin ana temasına uygun olmalı; Arda’nın içsel gelişimini yansıtmalı; özgün olmalı. Öğrencinin metinle bağlantılı, yaratıcı ürünleri kabul edilir.",
+        "subjektif": true
+      }
+    ],
+    "notlar": "Ajan Q5-Q9'u boş bırakmıştı; kaynak tam metinden birebir düzeltildi."
+  },
+  {
+    "dosya": "A. 4 İNSAN.pdf",
+    "baslik": "İNSAN–DOĞA İLİŞKİSİNİN DÖNÜŞÜMÜ",
+    "sinif_seviyesi": "lise",
+    "kelime_sayisi": 553,
+    "govde_temiz": "İnsan ile doğa arasındaki ilişki, insanlık tarihinin en temel dinamiklerinden biridir. Bu ilişki, yalnızca çevresel bir mesele değil; aynı zamanda ekonomik, toplumsal ve kültürel boyutları olan karmaşık bir yapıdır. Tarihsel süreçte doğanın “kaynak” olarak algılanma biçimi değiştikçe, insanın doğa üzerindeki etkisi artmış, bu artış da ekolojik sorunları görünür hâle getirmiştir. Günümüzde doğa\n–insan ilişkisinin dönüşümü, iklim krizi ve sürdürülebilirlik tartışmalarıyla birlikte daha da kritik bir noktaya ulaşmıştır.Tarih öncesi dönemlerde insan, doğaya büyük ölçüde bağımlı bir yaşam sürmüştür. Avcılık ve toplayıcılık yapan topluluklar için doğa, hem beslenme hem barınma hem de güvenlik açısından belirleyici bir unsurdu. Bu dönemde insanın doğaya müdahalesi sınırlıydı; çünkü teknolojik kapasite düşük, nüfus yoğunluğu azdı. Doğal döngüler, insan yaşamının ritmini belirliyor; mevsimler, göç yolları ve su kaynakları yaşam biçimini şekillendiriyordu.Tarım devrimiylebirlikte bu ilişki yeni bir boyuta taşınmıştır. İnsan, doğanın sunduğu ürünleri yalnızca tüketen bir varlık olmaktan çıkarak doğayı dönüştüren bir aktöre dönüşmüştür. Tarımsal üretim, yerleşik yaşamı teşvik etmiş, nüfus artışı hızlanmış ve doğaya müdahale kapasitesi artmıştır. Ormanların tarım alanına dönüştürülmesi, sulama sistemlerinin kurulması, hayvanların evcilleştirilmesi gibi süreçler, insanın doğa üzerindeki etkisini artırmıştır. Ancak bu dönemde bile doğanın “sınırsız” olduğu inancı henüz yaygın değildir; doğanın sınırları çoğu zaman yaşanan kıtlıklar ve iklim koşullarıyla hissedilmiştir.Sanayi devrimi, insan\n–doğa ilişkisini kökten değiştiren kırılma noktalarından biridir. Fosil yakıtların yaygın kullanımı, seri üretim, fabrikalaşma ve hızla büyüyen şehirler, doğaya yönelik baskıyı olağanüstü düzeyde artırmıştır. Bu süreçte doğa, giderek daha fazla “ham madde deposu” olarak görülmüş; ekonomik büyüme hedefleri çevresel maliyetleri ikinci plana itmiştir. Hava kirliliği, su kaynaklarının kirlenmesi vehızlı tüketim alışkanlıkları, sanayileşmenin doğrudan sonuçlarıdır.Modern dönemde bu dönüşüm, küreselleşmeyle birlikte daha geniş bir etki alanına yayılmıştır. Artan tüketim talebi, enerji ihtiyacını artırmış; üretim süreçleri hızlanmış; atık miktarı büyümüştür. Plastik kirliliği, elektronik atıklar ve kimyasal kirlilik gibi sorunlar, yalnızca yerel değil küresel ölçekte bir problem hâline gelmiştir. Aynı zamanda biyolojik çeşitliliğin azalması da insan faaliyetlerinin önemli sonuçlarından biridir. Yaşam alanlarının yok edilmesi, ekosistemlerin parçalanması ve türlerin azalması, doğanın dengesini zayıflatmaktadır.İklim değişikliği, insan\n–doğa ilişkisindeki dönüşümün en kapsamlı ve en çok tartışılan sonucudur. Atmosfere salınan sera gazlarının artması, küresel sıcaklıkların yükselmesine ve iklim düzeninin değişmesine neden olmaktadır. Bu değişim, aşırı hava olaylarının artması, kuraklık, sel, orman yangınları gibi risklerin büyümesiyle kendini göstermektedir. İklim \n\n–insan ilişkisinde dönüşüm mümkündür. Tüketim alışkanlıklarının sorgulanması, geri dönüşüm, bilinçli enerji kullanımı ve toplu taşıma gibi davranışlar, çevresel etkiyi azaltabilir. Ancak bireysel çabalar tek başına yeterli değildir; kamusal politikalar, eğitim sistemleri ve kurumsal sorumluluk da aynı derecede önemlidir. Eğitim, çevre bilincinin oluşmasında temel bir role sahiptir. Genç bireylerin ekolojik okuryazarlık kazanması, gelecekte daha bilinçli kararlar alınmasını sağlayabilir.Sonuç olarak insan\n–doğa ilişkisinin dönüşümü, tarihsel süreçte insanın artan müdahale kapasitesiyle bağlantılıdır. Bu dönüşüm, bir yandan yaşam standartlarını yükseltmiş; diğer yandan çevresel krizleri derinleştirmiştir. Günümüzde temel mesele, insanın doğayla çatışan bir güç olmaktan çıkarak doğayla uyum içinde yaşayan bir aktöre dönüşebilmesidir. Bu dönüşüm gerçekleşmediğinde, doğadaki bozulmanın bedelini yalnızca doğa değil, insanın kendisi de ödemektedir.",
+    "sorular": [
+      {
+        "no": 1,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Hatırlama",
+        "soru": "Metne göre insan–doğa ilişkisinin dönüşümünde etkili olan üç temel tarihsel dönem hangileridir?",
+        "cevap": "Tarih öncesi dönem (avcılık–toplayıcılık); Tarım devrimi; Sanayi devrimi (ve modern dönemle birlikte küreselleşme).",
+        "subjektif": false
+      },
+      {
+        "no": 2,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Hatırlama",
+        "soru": "Sanayi devriminin doğa üzerindeki etkilerinden metinde hangileri örnek olarak verilmiştir?",
+        "cevap": "Fosil yakıtların yaygın kullanımı; hava kirliliği; su kaynaklarının kirlenmesi; fabrikalaşma ve hızlı şehirleşme; tüketim alışkanlıklarının artması.",
+        "subjektif": false
+      },
+      {
+        "no": 3,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama",
+        "soru": "Yazar, doğanın tarihsel süreçte “kaynak” olarak algılanmasının ne anlama geldiğini nasıl açıklamaktadır?",
+        "cevap": "",
+        "subjektif": false
+      },
+      {
+        "no": 4,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama",
+        "soru": "Metne göre iklim değişikliğinin yalnızca çevresel değil, aynı zamanda toplumsal bir kriz olmasının nedeni nedir?",
+        "cevap": "",
+        "subjektif": false
+      },
+      {
+        "no": 5,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama",
+        "soru": "Metinden yararlanarak, bir lise öğrencisinin günlük yaşamında doğa–insan dengesini korumaya yönelik uygulayabileceği iki somut davranış yazınız.",
+        "cevap": "Geri dönüşüme dikkat etmek ve atıkları ayrıştırmak; enerji tasarrufu yapmak (gereksiz ışıkları kapatmak, suyu bilinçli kullanmak). Metinle uyumlu farklı somut örnekler kabul edilir.",
+        "subjektif": true
+      },
+      {
+        "no": 6,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Tarım devrimi ile sanayi devriminin insan–doğa ilişkisi üzerindeki etkilerini karşılaştırarak analiz ediniz.",
+        "cevap": "Tarım devrimi: Doğaya müdahale başlamış, insan yerleşik yaşama geçmiş ve üretici konuma gelmiştir. Sanayi devrimi: Doğa üzerindeki baskı çok artmış, kaynaklar hızla tüketilmiş ve çevresel bozulma büyük ölçekli hâle gelmiştir. Sanayi devriminin etkisi tarım devrimine göre daha yıkıcıdır.",
+        "subjektif": false
+      },
+      {
+        "no": 7,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Metinde bireysel çabalar ile kamusal politikaların çevre sorunlarının çözümündeki rolü nasıl ilişkilendirilmiştir?",
+        "cevap": "Bireysel çabaların önemli olduğu ancak tek başına yeterli olmadığı, çevre sorunlarının çözümü için kamusal politikalar, eğitim sistemleri ve kurumsal sorumluluğun da gerekli olduğu belirtilmiştir.",
+        "subjektif": false
+      },
+      {
+        "no": 8,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "“İnsan doğayla uyum içinde yaşamadığı sürece çevresel krizler kaçınılmazdır.” görüşünü metne dayanarak değerlendiriniz.",
+        "cevap": "Metinde insanın doğaya aşırı müdahalesinin çevresel krizleri artırdığı açıkça belirtilmektedir. Doğayla uyum sağlanmadığında ekosistem dengesi bozulmaktadır. Metne dayalı gerekçelendirme yapıldığı sürece farklı görüşler kabul edilir.",
+        "subjektif": true
+      },
+      {
+        "no": 9,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Yazarın sürdürülebilirlik kavramına verdiği önemi ne ölçüde haklı buluyorsunuz? Gerekçenizi belirtiniz.",
+        "cevap": "Yazarın sürdürülebilirliğe verdiği önem haklıdır; çünkü doğal kaynakların sınırlı olduğu ve gelecek kuşakların haklarının korunması gerektiği vurgulanmaktadır.",
+        "subjektif": true
+      },
+      {
+        "no": 10,
+        "kategori": "Yaratma",
+        "kategori_ham": "Yaratma",
+        "soru": "Metinden hareketle, gençlere yönelik doğa bilinci kazandırmayı amaçlayan kısa bir paragraf, slogan ya da afiş metni yazınız.",
+        "cevap": "Doğa bilinci kazandırmayı amaçlayan paragraf/slogan değerlendirmesinde ölçüt: metnin ana düşüncesiyle uyum; çevre bilinci vurgusu; özgünlük. Öğrencinin metinle bağlantılı yaratıcı ürünleri kabul edilir.",
+        "subjektif": true
+      }
+    ],
+    "notlar": "Başlık düzeltildi, gövde tam_ham'dan çıkarıldı. Q3/Q4 (Anlama) cevapları KAYNAK PDF'de YOK → boş; koordinatör onayında tamamlanmalı."
+  }
+]

@@ -1,0 +1,452 @@
+[
+  {
+    "dosya": "A. 1 DUVARLARIN ARASINDA BÜYÜYEN SES.pdf",
+    "baslik": "DUVARLARIN ARASINDA BÜYÜYEN SES",
+    "sinif_seviyesi": "lise",
+    "kelime_sayisi": 540,
+    "govde_temiz": null,
+    "sorular": [
+      {
+        "no": 1,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Hatırlama",
+        "soru": "Arda’nın okul çıkışlarında kulaklık takmasının temel nedeni nedir?",
+        "cevap": "Arda, kulaklığı müzik dinlemek için değil, dış dünyayla arasına görünmez bir duvar örmek, insanlarla iletişim kurmak zorunda kalmamak ve kendini korumak için takmaktadır.",
+        "subjektif": false
+      },
+      {
+        "no": 2,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Hatırlama",
+        "soru": "Edebiyat öğretmeni öğrencilerden nasıl bir öykü yazmalarını istemiştir?",
+        "cevap": "Öğretmen, öğrencilerden kendilerini anlatan ancak bunu doğrudan değil, bir karakter üzerinden yapan bir öykü yazmalarını istemiştir.",
+        "subjektif": false
+      },
+      {
+        "no": 3,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama",
+        "soru": "Metinde Arda’nın sessizliği nasıl bir “savunma biçimi” olarak açıklanmaktadır?",
+        "cevap": "Arda, söylediklerinin dikkate alınmayacağından ve havada kalacağından korktuğu için susmaktadır. Bu nedenle sessizlik, onun için reddedilme ve anlaşılmama korkusuna karşı geliştirdiği bir savunma biçimi hâline gelmiştir.",
+        "subjektif": false
+      },
+      {
+        "no": 4,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama",
+        "soru": "“Yazmak senin sesin olabilir.” sözü Arda için ne anlama gelmektedir?",
+        "cevap": "Bu söz, Arda’nın kendini sözlü olarak ifade edemediği duygularını yazı yoluyla ifade edebileceğini, yazının onun için bir iletişim ve kendini anlatma aracı olabileceğini fark etmesini sağlamıştır.",
+        "subjektif": false
+      },
+      {
+        "no": 5,
+        "kategori": "Uygulama",
+        "kategori_ham": "",
+        "soru": "",
+        "cevap": "",
+        "subjektif": false
+      },
+      {
+        "no": 6,
+        "kategori": "Analiz",
+        "kategori_ham": "",
+        "soru": "",
+        "cevap": "",
+        "subjektif": false
+      },
+      {
+        "no": 7,
+        "kategori": "Analiz",
+        "kategori_ham": "",
+        "soru": "",
+        "cevap": "",
+        "subjektif": false
+      },
+      {
+        "no": 8,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "",
+        "soru": "",
+        "cevap": "",
+        "subjektif": false
+      },
+      {
+        "no": 9,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "",
+        "soru": "",
+        "cevap": "",
+        "subjektif": false
+      },
+      {
+        "no": 10,
+        "kategori": "Yaratma",
+        "kategori_ham": "",
+        "soru": "(Soru metni PDF çıkarımında bozulmuş; okunabilen kısım:) … yeni bir başlık ya da 1 paragrafla alternatif bir son yazınız.",
+        "cevap": "(örnek başlık): “Sessizliğin İçindeki Güç”; “Kelimelere Dönüşen Sessizlik”. Alternatif son için ölçüt: Metnin ana temasına uygun olmalı; Arda’nın içsel gelişimini yansıtmalı; Özgün olmalı. Öğrencinin metinle bağlantılı, yaratıcı ürünleri kabul edilir.",
+        "subjektif": true
+      }
+    ],
+    "notlar": "Bu dosyada sorular_ham/cevap_ham alanları yok; içerik yalnızca govde ve tam_ham içinde ve PDF çıkarımı ağır biçimde bozuk. ANLAMA SORULARI bölümü sadece fiil parçaları hâlinde çıkmış (ör. '3. yolöneriniz.4. ediniz.'), tam soru metinleri kaybolmuş. CEVAP ANAHTARI’ndan yalnızca 1-4. soruların tam soru+cevabı ile 10. sorunun (Yaratma) örnek cevabı kurtarılabildi. 5-9. soruların soru ve cevap metinleri geri getirilemedi (soru='' cevap=''); bu soruların kategorileri, dizideki değişmez Bloom şablonuna (Hatırlama×2, Anlama×2, Uygulama×1, Analiz×2, Değerlendirme×2, Yaratma×1) ve metnin görünen '1. Hatırlama'/'2. Anlama' başlıklarına dayanılarak çıkarımla verildi; kategori_ham boş bırakıldı. UYDURMA yapılmadı. Gövde metni de govde ile tam_ham arasında tutarsız (bir bölümü bozuk); govde_temiz null bırakıldı."
+  },
+  {
+    "dosya": "A. 2. KENDİMİ ARARKEN.pdf",
+    "baslik": "KENDİMİ ARARKEN",
+    "sinif_seviyesi": "lise",
+    "kelime_sayisi": 567,
+    "govde_temiz": null,
+    "sorular": [
+      {
+        "no": 1,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Hatırlama",
+        "soru": "Anlatıcı, lise birinci sınıfta okul bahçesine çıktığında kendisini nasıl hissetmiştir?",
+        "cevap": "Anlatıcı, kendisini bir yere ait olmayan, sanki yanlış bir kapıdan girmiş gibi hisseden biri olarak tanımlamıştır.",
+        "subjektif": false
+      },
+      {
+        "no": 2,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Hatırlama",
+        "soru": "Metinde anlatıcının kendisine yakıştırılan “etiket” hangisidir?",
+        "cevap": "Anlatıcıya yakıştırılan etiket “sessiz”dir.",
+        "subjektif": false
+      },
+      {
+        "no": 3,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama",
+        "soru": "Metinde ergenlik döneminin “kimliğin inşa edildiği bir süreç” olarak tanımlanmasının nedeni nedir?",
+        "cevap": "Çünkü ergenlik döneminde bireyin duyguları, düşünceleri ve ilişkileri sık sık değişir; bu değişimler yoluyla kişi kendini tanımaya ve kimliğini oluşturmaya başlar.",
+        "subjektif": false
+      },
+      {
+        "no": 4,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama",
+        "soru": "Anlatıcıya göre “ait olmak” neden sadece bir grubun içinde bulunmak anlamına gelmemektedir?",
+        "cevap": "Çünkü anlatıcıya göre ait olmak, anlaşıldığını hissetmekle ilgilidir. Fiziksel olarak bir grubun içinde olmak, kendini anlaşılmış hissetmeden gerçek bir aidiyet sağlamaz.",
+        "subjektif": false
+      },
+      {
+        "no": 5,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama",
+        "soru": "Metinden hareketle, kendini bir gruba ait hissetmeyen bir öğrencinin bu durumu daha sağlıklı yönetebilmesi için iki somut davranış öneriniz.",
+        "cevap": "(örnek): Duygu ve düşüncelerini yazı, günlük veya benzeri yollarla ifade etmeye çalışmak; Kendini rahat hissettiği kişilerle daha küçük ve güvenli iletişimler kurmak. Metnin düşüncesiyle uyumlu farklı somut öneriler de kabul edilir.",
+        "subjektif": true
+      },
+      {
+        "no": 6,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Anlatıcının sessizliğinin zamanla nasıl bir kimlik parçasına dönüştüğünü neden–sonuç ilişkisi içinde analiz ediniz.",
+        "cevap": "Anlatıcı, başlangıçta sessizliği bir tercih olarak yaşamış; zamanla bu sessizlik alışkanlığa dönüşmüş ve çevrenin de etkisiyle kişiliğinin değişmez bir parçası gibi algılanmaya başlamıştır.",
+        "subjektif": false
+      },
+      {
+        "no": 7,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Metinde aile beklentileri ile anlatıcının iç dünyası arasında nasıl bir çatışma vardır? Açıklayınız.",
+        "cevap": "Ailesi anlatıcının derslerine odaklanmasını ve geleceğini düşünmesini isterken, anlatıcı henüz kendini tanımakta zorlanmakta ve bu beklentilerin yarattığı baskıyla içsel bir karmaşa yaşamaktadır.",
+        "subjektif": false
+      },
+      {
+        "no": 8,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "“İnsan kendini en çok yalnız kaldığında tanır.” düşüncesini metne dayanarak değerlendiriniz. Bu görüşe katılıyor musunuz? Neden?",
+        "cevap": "(örnek): Bu görüş metne göre anlamlıdır; çünkü anlatıcı yalnız kaldığında kendi duygularını fark etmiş ve kimlik arayışına dair ipuçları yakalamıştır. Yalnızlık, kendini tanıma fırsatı sunmuştur. Metne dayalı gerekçelendirme yapıldığı sürece farklı görüşler kabul edilir.",
+        "subjektif": true
+      },
+      {
+        "no": 9,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Anlatıcının kendini kabul etmeye başlamasını bir olgunlaşma göstergesi olarak değerlendirebilir miyiz? Gerekçenizi belirtiniz.",
+        "cevap": "Evet, olgunlaşma göstergesidir. Anlatıcı, kusurlarını ve çelişkilerini fark etmiş; “tam” olmayı beklemeden kendini kabul etmeyi öğrenmiştir. Bu durum, içsel gelişimin bir göstergesidir.",
+        "subjektif": true
+      },
+      {
+        "no": 10,
+        "kategori": "Yaratma",
+        "kategori_ham": "Yaratma",
+        "soru": "Metnin ana temasını yansıtan yeni bir başlık öneriniz ya da anlatıcının hikâyesine 4–5 cümlelik kısa bir devam paragrafı yazınız.",
+        "cevap": "(örnek başlık): “Sessizlikten Kendime”; “Kimliğe Giden Yol”. Değerlendirme ölçütleri: Metnin ana temasıyla (kimlik arayışı, aidiyet, içsel farkındalık) uyumlu olması; Özgünlük içermesi; Anlatıcının gelişimini yansıtması. Öğrencinin metinle bağlantılı yaratıcı ürünleri kabul edilir.",
+        "subjektif": true
+      }
+    ],
+    "notlar": "sorular_ham ve cevap_ham temiz; 10 sorunun tamamı soru+cevap ile eşleşti. Kategori etiketleri metinde zaten kanonik Türkçe (Hatırlama/Anlama/Uygulama/Analiz/Değerlendirme/Yaratma). Yalnızca PDF birleşmeleri boşlukla ayrıldı (ör. 'gibihisseden'→'gibi hisseden', 'hissetmekleilgilidir'→'hissetmekle ilgilidir', 'zorlanmaktave'→'zorlanmakta ve', 'davranışöneriniz'→'davranış öneriniz'). 2. cevaptaki '**...**' vurgu işaretleri sadeleştirildi."
+  },
+  {
+    "dosya": "A. 4 İNSAN.pdf",
+    "baslik": "İNSAN–DOĞA İLİŞKİSİNİN DÖNÜŞÜMÜ",
+    "sinif_seviyesi": "lise",
+    "kelime_sayisi": 553,
+    "govde_temiz": "İnsan ile doğa arasındaki ilişki, insanlık tarihinin en temel dinamiklerinden biridir. Bu ilişki, yalnızca çevresel bir mesele değil; aynı zamanda ekonomik, toplumsal ve kültürel boyutları olan karmaşık bir yapıdır. Tarihsel süreçte doğanın “kaynak” olarak algılanma biçimi değiştikçe, insanın doğa üzerindeki etkisi artmış, bu artış da ekolojik sorunları görünür hâle getirmiştir. Günümüzde doğa–insan ilişkisinin dönüşümü, iklim krizi ve sürdürülebilirlik tartışmalarıyla birlikte daha da kritik bir noktaya ulaşmıştır.\n\nTarih öncesi dönemlerde insan, doğaya büyük ölçüde bağımlı bir yaşam sürmüştür. Avcılık ve toplayıcılık yapan topluluklar için doğa, hem beslenme hem barınma hem de güvenlik açısından belirleyici bir unsurdu. Bu dönemde insanın doğaya müdahalesi sınırlıydı; çünkü teknolojik kapasite düşük, nüfus yoğunluğu azdı. Doğal döngüler, insan yaşamının ritmini belirliyor; mevsimler, göç yolları ve su kaynakları yaşam biçimini şekillendiriyordu.\n\nTarım devrimiyle birlikte bu ilişki yeni bir boyuta taşınmıştır. İnsan, doğanın sunduğu ürünleri yalnızca tüketen bir varlık olmaktan çıkarak doğayı dönüştüren bir aktöre dönüşmüştür. Tarımsal üretim, yerleşik yaşamı teşvik etmiş, nüfus artışı hızlanmış ve doğaya müdahale kapasitesi artmıştır. Ormanların tarım alanına dönüştürülmesi, sulama sistemlerinin kurulması, hayvanların evcilleştirilmesi gibi süreçler, insanın doğa üzerindeki etkisini artırmıştır. Ancak bu dönemde bile doğanın “sınırsız” olduğu inancı henüz yaygın değildir; doğanın sınırları çoğu zaman yaşanan kıtlıklar ve iklim koşullarıyla hissedilmiştir.\n\nSanayi devrimi, insan–doğa ilişkisini kökten değiştiren kırılma noktalarından biridir. Fosil yakıtların yaygın kullanımı, seri üretim, fabrikalaşma ve hızla büyüyen şehirler, doğaya yönelik baskıyı olağanüstü düzeyde artırmıştır. Bu süreçte doğa, giderek daha fazla “ham madde deposu” olarak görülmüş; ekonomik büyüme hedefleri çevresel maliyetleri ikinci plana itmiştir. Hava kirliliği, su kaynaklarının kirlenmesi ve hızlı tüketim alışkanlıkları, sanayileşmenin doğrudan sonuçlarıdır.\n\nModern dönemde bu dönüşüm, küreselleşmeyle birlikte daha geniş bir etki alanına yayılmıştır. Artan tüketim talebi, enerji ihtiyacını artırmış; üretim süreçleri hızlanmış; atık miktarı büyümüştür. Plastik kirliliği, elektronik atıklar ve kimyasal kirlilik gibi sorunlar, yalnızca yerel değil küresel ölçekte bir problem hâline gelmiştir. Aynı zamanda biyolojik çeşitliliğin azalması da insan faaliyetlerinin önemli sonuçlarından biridir. Yaşam alanlarının yok edilmesi, ekosistemlerin parçalanması ve türlerin azalması, doğanın dengesini zayıflatmaktadır.\n\nİklim değişikliği, insan–doğa ilişkisindeki dönüşümün en kapsamlı ve en çok tartışılan sonucudur. Atmosfere salınan sera gazlarının artması, küresel sıcaklıkların yükselmesine ve iklim düzeninin değişmesine neden olmaktadır. Bu değişim, aşırı hava olaylarının artması, kuraklık, sel, orman yangınları gibi risklerin büyümesiyle kendini göstermektedir. İklim […] –insan ilişkisinde dönüşüm mümkündür. Tüketim alışkanlıklarının sorgulanması, geri dönüşüm, bilinçli enerji kullanımı ve toplu taşıma gibi davranışlar, çevresel etkiyi azaltabilir. Ancak bireysel çabalar tek başına yeterli değildir; kamusal politikalar, eğitim sistemleri ve kurumsal sorumluluk da aynı derecede önemlidir. Eğitim, çevre bilincinin oluşmasında temel bir role sahiptir. Genç bireylerin ekolojik okuryazarlık kazanması, gelecekte daha bilinçli kararlar alınmasını sağlayabilir.\n\nSonuç olarak insan–doğa ilişkisinin dönüşümü, tarihsel süreçte insanın artan müdahale kapasitesiyle bağlantılıdır. Bu dönüşüm, bir yandan yaşam standartlarını yükseltmiş; diğer yandan çevresel krizleri derinleştirmiştir. Günümüzde temel mesele, insanın doğayla çatışan bir güç olmaktan çıkarak doğayla uyum içinde yaşayan bir aktöre dönüşebilmesidir. Bu dönüşüm gerçekleşmediğinde, doğadaki bozulmanın bedelini yalnızca doğa değil, insanın kendisi de ödemektedir.",
+    "sorular": [
+      {
+        "no": 1,
+        "kategori": "Hatırlama",
+        "kategori_ham": "",
+        "soru": "Metne göre insan–doğa ilişkisinin dönüşümünde etkili olan üç temel tarihsel dönem hangileridir?",
+        "cevap": "Tarih öncesi dönem (avcılık–toplayıcılık); Tarım devrimi; Sanayi devrimi (ve modern dönemle birlikte küreselleşme).",
+        "subjektif": false
+      },
+      {
+        "no": 2,
+        "kategori": "Hatırlama",
+        "kategori_ham": "",
+        "soru": "Sanayi devriminin doğa üzerindeki etkilerinden metinde hangileri örnek olarak verilmiştir?",
+        "cevap": "Fosil yakıtların yaygın kullanımı; Hava kirliliği; Su kaynaklarının kirlenmesi; Fabrikalaşma ve hızlı şehirleşme; Tüketim alışkanlıklarının artması.",
+        "subjektif": false
+      },
+      {
+        "no": 3,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama",
+        "soru": "Yazar, doğanın tarihsel süreçte “kaynak” olarak algılanmasının ne anlama geldiğini nasıl açıklamaktadır?",
+        "cevap": "",
+        "subjektif": false
+      },
+      {
+        "no": 4,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama",
+        "soru": "Metne göre iklim değişikliğinin yalnızca çevresel değil, aynı zamanda toplumsal bir kriz olmasının nedeni nedir?",
+        "cevap": "",
+        "subjektif": false
+      },
+      {
+        "no": 5,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama",
+        "soru": "Metinden yararlanarak, bir lise öğrencisinin günlük yaşamında doğa–insan dengesini korumaya yönelik uygulayabileceği iki somut davranış yazınız.",
+        "cevap": "(örnek): Geri dönüşüme dikkat etmek ve atıkları ayrıştırmak; Enerji tasarrufu yapmak (gereksiz ışıkları kapatmak, suyu bilinçli kullanmak). Metinle uyumlu farklı somut örnekler kabul edilir.",
+        "subjektif": true
+      },
+      {
+        "no": 6,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Tarım devrimi ile sanayi devriminin insan–doğa ilişkisi üzerindeki etkilerini karşılaştırarak analiz ediniz.",
+        "cevap": "Tarım devrimi: Doğaya müdahale başlamış, insan yerleşik yaşama geçmiş ve üretici konuma gelmiştir. Sanayi devrimi: Doğaya müdahale büyük ölçüde artmış, fosil yakıt kullanımı ve çevresel tahribat hızlanmıştır. Her iki dönem de doğaya müdahaleyi artırmıştır; ancak sanayi devrimi etkileri açısından daha yıkıcıdır.",
+        "subjektif": false
+      },
+      {
+        "no": 7,
+        "kategori": "Analiz",
+        "kategori_ham": "",
+        "soru": "Metinde bireysel çabalar ile kamusal politikaların çevre sorunlarının çözümündeki rolü nasıl ilişkilendirilmiştir?",
+        "cevap": "Bireysel çabaların önemli olduğu ancak tek başına yeterli olmadığı, çevre sorunlarının çözümü için kamusal politikalar, eğitim sistemleri ve kurumsal sorumluluğun da gerekli olduğu belirtilmiştir.",
+        "subjektif": false
+      },
+      {
+        "no": 8,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "“İnsan doğayla uyum içinde yaşamadığı sürece çevresel krizler kaçınılmazdır.” görüşünü metne dayanarak değerlendiriniz.",
+        "cevap": "(örnek): Bu görüş haklıdır; çünkü metinde insanın doğaya aşırı müdahalesinin çevresel krizleri artırdığı açıkça belirtilmektedir. Doğayla uyum sağlanmadığında ekosistem dengesi bozulmaktadır. Metne dayalı gerekçelendirme yapıldığı sürece farklı görüşler kabul edilir.",
+        "subjektif": true
+      },
+      {
+        "no": 9,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "",
+        "soru": "Yazarın sürdürülebilirlik kavramına verdiği önemi ne ölçüde haklı buluyorsunuz? Gerekçenizi belirtiniz.",
+        "cevap": "(örnek): Yazarın sürdürülebilirliğe verdiği önem haklıdır; çünkü doğal kaynakların sınırlı olduğu ve gelecek kuşakların haklarının korunması gerektiği vurgulanmaktadır.",
+        "subjektif": true
+      },
+      {
+        "no": 10,
+        "kategori": "Yaratma",
+        "kategori_ham": "Yaratma",
+        "soru": "Metinden hareketle, gençlere yönelik doğa bilinci kazandırmayı amaçlayan kısa bir paragraf, slogan ya da afiş metni yazınız.",
+        "cevap": "(değerlendirme ölçütleri): Metnin ana düşüncesiyle uyum; Çevre bilinci vurgusu; Özgünlük. Öğrencinin metinle bağlantılı yaratıcı ürünleri kabul edilir.",
+        "subjektif": true
+      }
+    ],
+    "notlar": "sorular_ham ve cevap_ham BOŞ; tüm içerik tam_ham’dan çıkarıldı (cevaplar 'Soru:'/'Cevap:' işaretleriyle geliyor, ayrı 'CEVAP ANAHTARI' başlığı yok). baslik yanlış çıkmıştı ('–DOĞA İLİŞKİSİNİN DÖNÜŞÜMÜ'); 'İNSAN–DOĞA İLİŞKİSİNİN DÖNÜŞÜMÜ' olarak düzeltildi. govde_temiz tam_ham gövdesinden temizlenip yazıldı; PDF birleşmeleri ayrıldı (birunsurdu→'bir unsurdu', 'devrimiylebirlikte'→'devrimiyle birlikte', 'müdahalekapasitesi'→'müdahale kapasitesi', 'vehızlı'→'ve hızlı'). Gövdenin iklim değişikliği paragrafında PDF çıkarım BOŞLUĞU var ('İklim … –insan ilişkisinde dönüşüm mümkündür.'); orada kayıp metin '[…]' ile işaretlendi, içerik uydurulmadı. Soru dizisinde 1. ve 2. sorunun kategori başlığı ('1. Hatırlama') tam_ham’da düşmüştü; Hatırlama olarak standart şablona göre atandı, kategori_ham boş. CEVAP bölümünde 3. ve 4. soruların (Anlama) CEVAPLARI kaynakta hiç yok — cevap='' bırakıldı; soruları mevcut. Diğer 8 soru soru+cevap tam."
+  },
+  {
+    "dosya": "A.3. BAŞARI KİMİN ÖLÇÜSÜNE GÖRE.pdf",
+    "baslik": "BAŞARI KİMİN ÖLÇÜSÜNE GÖRE?",
+    "sinif_seviyesi": "lise",
+    "kelime_sayisi": 645,
+    "govde_temiz": null,
+    "sorular": [
+      {
+        "no": 1,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Hatırlama",
+        "soru": "Metinde okul sisteminde başarının hangi ölçütlerle değerlendirildiği belirtilmiştir?",
+        "cevap": "Başarı; sınavlar, yazılılar, testler, performans notları, sıralamalar ve belgeler gibi ölçülebilir, sayısal ölçütlerle değerlendirilmektedir.",
+        "subjektif": false
+      },
+      {
+        "no": 2,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Hatırlama",
+        "soru": "Yazar, lise yıllarını neden başarı kavramının en yoğun hissedildiği dönem olarak görmektedir?",
+        "cevap": "Çünkü lise yılları, akademik beklentilerin arttığı, aynı zamanda gençlerin kendilerini tanıma ve geleceklerini şekillendirme sürecinde oldukları bir dönemdir. Bu nedenle başarı baskısı bu dönemde daha yoğun hissedilir.",
+        "subjektif": false
+      },
+      {
+        "no": 3,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama",
+        "soru": "Yazarın “başarının dar bir alana sıkışması” ifadesiyle anlatmak istediği düşünce nedir?",
+        "cevap": "Başarının yalnızca notlar ve sınav sonuçlarıyla değerlendirilmesi; yazma, iletişim, sosyal beceriler gibi diğer yeteneklerin göz ardı edilmesi anlamına gelmektedir. Yazar, bu nedenle başarının tek boyutlu hâle geldiğini vurgulamaktadır.",
+        "subjektif": false
+      },
+      {
+        "no": 4,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama",
+        "soru": "Metne göre “başarı baskısı” öğrencilerin öğrenme sürecini nasıl etkilemektedir?",
+        "cevap": "Başarı baskısı, öğrencilerin hata yapmaktan korkmasına, risk almaktan kaçınmasına ve öğrenme sürecinin zayıflamasına neden olmaktadır. Öğrenciler denemek yerine yalnızca doğruyu işaretlemeye odaklanmaktadır.",
+        "subjektif": false
+      },
+      {
+        "no": 5,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama",
+        "soru": "Metinden hareketle, bir lise öğrencisinin başarıyı yalnızca notlarla değerlendirmemesi için günlük hayatında uygulayabileceği iki davranış örneği veriniz.",
+        "cevap": "(örnek): Kendi gelişimini önceki hâliyle karşılaştırarak değerlendirmek; Akademik başarı dışında ilgi duyduğu alanlarda (sanat, spor, sosyal sorumluluk) kendini geliştirmeye çalışmak. Metnin düşüncesiyle uyumlu farklı somut örnekler kabul edilir.",
+        "subjektif": true
+      },
+      {
+        "no": 6,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Yazarın başarı ile kimlik algısı arasında kurduğu ilişkiyi neden–sonuç açısından analiz ediniz.",
+        "cevap": "Yazar, başarının yalnızca sonuçlarla tanımlanmasının bireyin kendini “başarılı” veya “başarısız” etiketiyle tanımlamasına yol açtığını belirtir. Bu durum, başarının bir hedef olmaktan çıkıp kimlik zorunluluğuna dönüşmesine neden olur.",
+        "subjektif": false
+      },
+      {
+        "no": 7,
+        "kategori": "Analiz",
+        "kategori_ham": "",
+        "soru": "Metinde geçen okul başarısı anlayışı ile bireysel gelişim anlayışını karşılaştırınız.",
+        "cevap": "Okul başarısı anlayışı: Not, sınav ve sıralama odaklıdır; ölçülebilir sonuçlara dayanır. Bireysel gelişim anlayışı: Süreç odaklıdır; emek, öğrenme, hata yapma ve kişisel ilerlemeyi esas alır.",
+        "subjektif": false
+      },
+      {
+        "no": 8,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "“Başarıyı tek ölçütlü hâle getirmek gençler için zararlıdır.” görüşünü metne dayanarak değerlendiriniz.",
+        "cevap": "(örnek): Bu görüşe katılabiliriz çünkü başarıyı yalnızca notlarla değerlendirmek, gençlerin özgüvenini zedeleyebilir ve farklı yeteneklerini fark etmelerini engeller. Metin, bu durumun öğrenme isteğini azalttığını göstermektedir. Metne dayalı gerekçelendirme yapıldığı sürece farklı görüşler kabul edilebilir.",
+        "subjektif": true
+      },
+      {
+        "no": 9,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "",
+        "soru": "Yazarın sosyal medyanın başarı algısı üzerindeki etkilerine yönelik eleştirilerini ne ölçüde haklı buluyorsunuz? Gerekçenizi belirtiniz.",
+        "cevap": "(örnek): Yazarın eleştirileri haklıdır; çünkü sosyal medya başarıyı görünürlük ve gösteriş üzerinden tanımlar. Bu durum, gençlerin kendilerini yetersiz hissetmelerine ve gerçek gelişimlerini göz ardı etmelerine neden olabilir.",
+        "subjektif": true
+      },
+      {
+        "no": 10,
+        "kategori": "Yaratma",
+        "kategori_ham": "Yaratma",
+        "soru": "Metinden yola çıkarak başarıyı daha kapsayıcı bir şekilde tanımlayan kısa bir paragraf ya da özgün bir slogan yazınız.",
+        "cevap": "(örnek slogan): “Başarı, başkalarına yetişmek değil, kendini geliştirmektir.” Değerlendirme ölçütleri: Metnin ana düşüncesiyle uyumlu olması; Özgünlük içermesi; Başarıyı tek boyutlu olmayan bir şekilde ele alması. Öğrencinin metinle bağlantılı yaratıcı ürünleri kabul edilir.",
+        "subjektif": true
+      }
+    ],
+    "notlar": "sorular_ham ve cevap_ham temiz; 10 soru tam soru+cevap eşleşti. Kategori etiketleri kaynakta kanonik. PDF birleşmeleri ayrıldı (ör. 'belgelergibi'→'belgeler gibi', 'sonuçlarıyladeğerlendirilmesi'→'sonuçlarıyla değerlendirilmesi', 'etiketiyletanımlamasına'→'etiketiyle tanımlamasına', 'davranışörneği'→'davranış örneği', 'paragrafya da'→'paragraf ya da'). 2. sorunun soru metni sorular_ham'da nokta ile bitiyordu; cevap_ham'daki soru işaretli biçim kullanıldı."
+  },
+  {
+    "dosya": "A.5 ZAMANIN GÖLGESİNDE GENÇLİK.pdf",
+    "baslik": "ZAMANIN GÖLGESİNDE GENÇLİK",
+    "sinif_seviyesi": "lise",
+    "kelime_sayisi": 719,
+    "govde_temiz": null,
+    "sorular": [
+      {
+        "no": 1,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Hatırlama",
+        "soru": "Metinde gençlerin zamanla ilgili en sık dile getirdiği yakınma nedir?",
+        "cevap": "Gençlerin zamanla ilgili en sık dile getirdiği yakınma, “zamanın yetmediği” düşüncesidir.",
+        "subjektif": false
+      },
+      {
+        "no": 2,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Hatırlama",
+        "soru": "Yazar, toplumun gençlerden beklediği başarı yolunu hangi üç aşama ile örneklendirmektedir?",
+        "cevap": "İyi bir lise; İyi bir üniversite; Saygın bir meslek.",
+        "subjektif": false
+      },
+      {
+        "no": 3,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama",
+        "soru": "Metne göre zamanın “psikolojik bir algı” olarak değerlendirilmesinin nedeni nedir? Açıklayınız.",
+        "cevap": "Zamanın algılanışı, bireyin ruh hâline göre değiştiği için psikolojik bir algı olarak değerlendirilir. Kaygı arttığında zamanın hızla geçtiği, huzur olduğunda ise daha yavaş algılandığı belirtilmiştir.",
+        "subjektif": false
+      },
+      {
+        "no": 4,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama",
+        "soru": "Yazar, lise yıllarını neden kişisel gelişim açısından önemli bir dönem olarak görmektedir?",
+        "cevap": "Çünkü lise yılları, bireyin yalnızca akademik değil; arkadaşlıklar, hatalar, hayal kırıklıkları ve deneyimler yoluyla kişiliğini ve karakterini şekillendirdiği bir dönemdir.",
+        "subjektif": false
+      },
+      {
+        "no": 5,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama",
+        "soru": "Metinde verilen zaman baskısı örneklerinden yola çıkarak, bir lise öğrencisinin günlük yaşamında zamanı daha bilinçli kullanması için yapabileceği iki somut uygulama öneriniz.",
+        "cevap": "(örnek): Sosyal medya kullanımına günlük süre sınırı koymak; Günlük veya haftalık çalışma ve dinlenme planı hazırlamak. Not: Metinle tutarlı olduğu sürece benzer somut öneriler kabul edilir.",
+        "subjektif": true
+      },
+      {
+        "no": 6,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Toplumsal beklentiler ile gençlerin zaman algısı arasındaki ilişkiyi neden–sonuç açısından analiz ediniz.",
+        "cevap": "Toplumun gençlerden belirli yaşlarda belirli başarıları beklemesi, gençlerde “geç kalma” korkusu yaratır. Bu korku, zamanın bir baskı unsuru olarak algılanmasına neden olur ve gençler sürekli yetişme duygusuyla yaşar.",
+        "subjektif": false
+      },
+      {
+        "no": 7,
+        "kategori": "Analiz",
+        "kategori_ham": "",
+        "soru": "Metinde teknolojinin zaman algısı üzerindeki etkisi ile içsel beklentilerin etkisi arasında nasıl bir fark vardır? Karşılaştırarak açıklayınız.",
+        "cevap": "Teknoloji, zamanı farkında olmadan tüketmeye neden olurken; içsel beklentiler, gençlerin kendilerine koydukları hedefler nedeniyle zamanı yetersiz hissetmelerine yol açar. Biri dışsal, diğeri içsel etkendir.",
+        "subjektif": false
+      },
+      {
+        "no": 8,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "“Zaman baskısı gençlerin potansiyelini fark etmesini engeller.” görüşünü metne dayanarak değerlendiriniz. Katılıyor musunuz? Neden?",
+        "cevap": "(örnek): Bu görüşe katılınabilir; çünkü zaman baskısı altında yaşayan gençler anı yaşayamaz ve kendilerini tanımaya yeterli zamanı ayıramaz. Bu durum, potansiyellerini fark etmelerini zorlaştırır. Metne dayalı gerekçelendirme yapıldığı sürece farklı görüşler kabul edilebilir.",
+        "subjektif": true
+      },
+      {
+        "no": 9,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "",
+        "soru": "Yazarın eğitim sistemiyle ilgili eleştirilerini ne ölçüde haklı buluyorsunuz? Metinden örnekle gerekçelendiriniz.",
+        "cevap": "(örnek): Yazarın eleştirileri haklıdır; çünkü sadece sonuç odaklı bir eğitim anlayışı, öğrenme sürecini ve bireysel gelişimi göz ardı etmektedir. Süreç odaklı yaklaşım daha sağlıklıdır.",
+        "subjektif": true
+      },
+      {
+        "no": 10,
+        "kategori": "Yaratma",
+        "kategori_ham": "Yaratma",
+        "soru": "Metinden hareketle, gençlerin zamanla daha sağlıklı bir ilişki kurmasını hedefleyen kısa bir slogan veya paragraf yazınız.",
+        "cevap": "(örnek): “Zamanla yarışma, onunla birlikte yürü.” veya “Zaman, gençler için bir baskı değil; kendini tanıma ve geliştirme fırsatı olarak görülmelidir.” Öğrencinin özgün, metinle bağlantılı ürünleri kabul edilir.",
+        "subjektif": true
+      }
+    ],
+    "notlar": "sorular_ham ve cevap_ham temiz; 10 soru tam soru+cevap eşleşti. Kategori etiketleri kaynakta kanonik. PDF birleşmeleri ayrıldı (ör. 'uygulamaöneriniz'→'uygulama öneriniz', 'birlise'→'bir lise', 'paragrafyazınız'→'paragraf yazınız')."
+  }
+]

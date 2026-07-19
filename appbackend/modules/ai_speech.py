@@ -181,11 +181,11 @@ def _pool_to_speech(d, varsayilan_sinif):
 
 @router.get("/ai/speech/metinler")
 async def speech_okuma_metinleri(sinif: int = 3, current_user=Depends(get_current_user)):
-    """Sınıfa göre sesli okuma metinleri — TEK KAYNAK: 150'lik Akıcı Okuma havuzu (bolum=analiz)."""
+    """Sınıfa göre sesli okuma metinleri — kaynak: Okuma Metinleri (analiz) + Ölçüm Metinleri (olcum) gövdeleri."""
     proj = {"_id": 0, "id": 1, "baslik": 1, "icerik": 1, "sinif_seviyesi": 1, "kelime_sayisi": 1}
 
     async def _q(extra):
-        return await db.analiz_metinler.find({"bolum": "analiz", "durum": "havuzda", **extra}, proj).to_list(length=None)
+        return await db.analiz_metinler.find({"bolum": {"$in": ["analiz", "olcum"]}, "durum": "havuzda", **extra}, proj).to_list(length=None)
 
     docs = await _q({"sinif_seviyesi": str(sinif)}) or await _q({})
     return {"metinler": [_pool_to_speech(d, sinif) for d in docs], "sinif": sinif}

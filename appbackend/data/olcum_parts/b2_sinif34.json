@@ -1,0 +1,122 @@
+[
+  {
+    "dosya": "A 3.1 BAHÇEDEKİ KUŞ.pdf",
+    "baslik": "BAHÇEDEKİ KUŞ",
+    "sinif_seviyesi": 3,
+    "kelime_sayisi": 169,
+    "govde_temiz": null,
+    "sorular": [
+      {"no": 1, "kategori": "Hatırlama", "kategori_ham": "Hatırlama", "soru": "Kuş neden uçamıyordu?", "cevap": "Kanadı incindiği için.", "subjektif": false},
+      {"no": 2, "kategori": "Hatırlama", "kategori_ham": "Hatırlama", "soru": "Mert kuşu nereye koydu?", "cevap": "Küçük bir kutuya koydu.", "subjektif": false},
+      {"no": 3, "kategori": "Anlama", "kategori_ham": "Anlama", "soru": "Mert kuş için neden kutu hazırladı?", "cevap": "Güvende olması için.", "subjektif": false},
+      {"no": 4, "kategori": "Anlama", "kategori_ham": "Anlama", "soru": "Ailesi kuşu nereye götürdü?", "cevap": "Ağaçların yakınına götürdü.", "subjektif": false},
+      {"no": 5, "kategori": "Uygulama", "kategori_ham": "Uygulama", "soru": "Sen bahçede yaralı bir kuş bulsan ne yapardın?", "cevap": "(Öğrenci cevabı.)", "subjektif": true},
+      {"no": 6, "kategori": "Analiz", "kategori_ham": "Analiz", "soru": "Mert kuşa yardım etmeseydi ne olurdu?", "cevap": "Kuş zarar görebilirdi veya uçamazdı.", "subjektif": false},
+      {"no": 7, "kategori": "Analiz", "kategori_ham": "Analiz", "soru": "Mert’in gün içinde yaptığı üç etkinliği söyle.", "cevap": "Top oynadı, ip atladı, saklambaç oynadı.", "subjektif": false},
+      {"no": 8, "kategori": "Değerlendirme", "kategori_ham": "Değerlendirme", "soru": "Mert’in davranışını nasıl değerlendirirsin?", "cevap": "Doğru bir davranış; bir hayvana yardım etti.", "subjektif": false},
+      {"no": 9, "kategori": "Yaratma", "kategori_ham": "Yaratma", "soru": "Kuş uçarken Mert ne düşünmüş olabilir?", "cevap": "(Öğrenci cevabı.)", "subjektif": true},
+      {"no": 10, "kategori": "Yaratma", "kategori_ham": "Yaratma", "soru": "Hikâyeye yeni bir son yaz: Kuş ertesi gün geri gelse ne olur?", "cevap": "(Öğrenci cevabı.)", "subjektif": true}
+    ],
+    "notlar": ""
+  },
+  {
+    "dosya": "A 3.2 ORMANDAKİ TAVŞAN.pdf",
+    "baslik": "ORMANDAKİ TAVŞAN",
+    "sinif_seviyesi": 3,
+    "kelime_sayisi": 210,
+    "govde_temiz": null,
+    "sorular": [
+      {"no": 1, "kategori": "Hatırlama", "kategori_ham": "Hatırlama", "soru": "Arda ormana neden gitmişti?", "cevap": "Yürüyüş yapmak ve doğayı incelemek için.", "subjektif": false},
+      {"no": 2, "kategori": "Hatırlama", "kategori_ham": "Hatırlama", "soru": "Tavşan nerede sıkışmıştı?", "cevap": "Çalıların arasında sıkışmıştı.", "subjektif": false},
+      {"no": 3, "kategori": "Anlama", "kategori_ham": "Anlama", "soru": "Arda tavşanın neden yerini değiştirdi?", "cevap": "Güvende olması için.", "subjektif": false},
+      {"no": 4, "kategori": "Anlama", "kategori_ham": "Anlama", "soru": "Arda büyüteçle neyi incelemiştir?", "cevap": "Böcekleri ve taşları.", "subjektif": false},
+      {"no": 5, "kategori": "Uygulama", "kategori_ham": "Uygulama", "soru": "Sen ormanda bir hayvan görsen ne yaparsın?", "cevap": "(Öğrenci cevabı.)", "subjektif": true},
+      {"no": 6, "kategori": "Analiz", "kategori_ham": "Analiz", "soru": "Arda tavşanı kurtarmasaydı ne olabilirdi?", "cevap": "Tavşan zarar görebilirdi.", "subjektif": false},
+      {"no": 7, "kategori": "Analiz", "kategori_ham": "Analiz", "soru": "Metinde geçen doğa seslerinden iki tanesini söyle.", "cevap": "Kuş cıvıltıları ve yaprak hışırtısı.", "subjektif": false},
+      {"no": 8, "kategori": "Değerlendirme", "kategori_ham": "Değerlendirme", "soru": "Arda’nın davranışını nasıl değerlendirirsin? Neden?", "cevap": "Doğru bulurum, çünkü bir canlının hayatını kurtardı.", "subjektif": false},
+      {"no": 9, "kategori": "Yaratma", "kategori_ham": "Yaratma", "soru": "Ormana Arda ile gitseydin, başka hangi hayvanları görebilirdiniz?", "cevap": "(Öğrenci cevabı.)", "subjektif": true},
+      {"no": 10, "kategori": "Yaratma", "kategori_ham": "Yaratma", "soru": "Bu hikâyeye yeni bir bölüm ekleseydin, yağmurdan sonra Arda ne yapardı?", "cevap": "(Öğrenci cevabı.)", "subjektif": true}
+    ],
+    "notlar": ""
+  },
+  {
+    "dosya": "A 3.3 DENİZDEKİ KAPLUMBAĞA.pdf",
+    "baslik": "DENİZDEKİ KAPLUMBAĞA",
+    "sinif_seviyesi": 3,
+    "kelime_sayisi": 214,
+    "govde_temiz": null,
+    "sorular": [
+      {"no": 1, "kategori": "Hatırlama", "kategori_ham": "Hatırlama", "soru": "Elif nereye gitmeyi seviyordu?", "cevap": "Sahile gitmeyi seviyordu.", "subjektif": false},
+      {"no": 2, "kategori": "Hatırlama", "kategori_ham": "Hatırlama", "soru": "Kaplumbağa neye takılmıştı?", "cevap": "Plastik torbaya takılmıştı.", "subjektif": false},
+      {"no": 3, "kategori": "Anlama", "kategori_ham": "Anlama", "soru": "Elif neden kaplumbağayı kurtarmak istemiş olabilir?", "cevap": "Çünkü kaplumbağa zor durumdaydı ve canı acıyordu.", "subjektif": false},
+      {"no": 4, "kategori": "Anlama", "kategori_ham": "Anlama", "soru": "Elif çöpleri neden toplamıştır?", "cevap": "Denizi temizlemek ve başka hayvanların zarar görmemesi için.", "subjektif": false},
+      {"no": 5, "kategori": "Uygulama", "kategori_ham": "Uygulama", "soru": "Sahilde olsan çevreyi korumak için sen ne yapardın?", "cevap": "(Öğrenci cevabı –örnek: çöpleri toplardım.)", "subjektif": true},
+      {"no": 6, "kategori": "Analiz", "kategori_ham": "Analiz", "soru": "Metinde geçen tehlikeli durum nedir?", "cevap": "Kaplumbağanın ağzına torba takılması.", "subjektif": false},
+      {"no": 7, "kategori": "Analiz", "kategori_ham": "Analiz", "soru": "Elif kaplumbağayı kurtarmak için hangi adımları sırayla yaptı?", "cevap": "Fark etti, sudan çıktı, torbayı dikkatle açtı, kaplumbağayı kurtardı.", "subjektif": false},
+      {"no": 8, "kategori": "Değerlendirme", "kategori_ham": "Değerlendirme", "soru": "Elif’in davranışı doğru muydu? Neden?", "cevap": "Evet, çünkü bir canlıyı korudu.", "subjektif": false},
+      {"no": 9, "kategori": "Yaratma", "kategori_ham": "Yaratma", "soru": "Metne bir cümle ekleseydin, Elif eve gidince ailesine ne anlatırdı?", "cevap": "(Öğrenci cevabı.)", "subjektif": true},
+      {"no": 10, "kategori": "Yaratma", "kategori_ham": "Yaratma", "soru": "Bu hikâyeye farklı bir son yazsaydın, kaplumbağayı başka nasıl kurtulabilirdi?", "cevap": "(Öğrenci cevabı –örnek: sahil görevlisi gelip yardım edebilirdi.)", "subjektif": true}
+    ],
+    "notlar": ""
+  },
+  {
+    "dosya": "4 A.1 Gizemli Orman Yolu.pdf",
+    "baslik": "Gizemli Orman Yolu",
+    "sinif_seviyesi": 4,
+    "kelime_sayisi": 310,
+    "govde_temiz": null,
+    "sorular": [
+      {"no": 1, "kategori": "Hatırlama", "kategori_ham": "Hatırlama (Bilgi)", "soru": "Eylül ve Mert, ormanda neyi bulmakla görevlendirilmişti?", "cevap": "Ormandaki eski göleti bulup su otları toplamakla görevlendirilmişlerdi.", "subjektif": false},
+      {"no": 2, "kategori": "Hatırlama", "kategori_ham": "Hatırlama (Bilgi)", "soru": "Yanlarına hangi eşyaları alarak yolculuğa çıktılar?", "cevap": "Harita, biraz su ve dedelerinin yaptığı küçük çörekler.", "subjektif": false},
+      {"no": 3, "kategori": "Anlama", "kategori_ham": "Anlama (Kavrama)", "soru": "Ormanın girişindeki büyük meşe ağacının önemi nedir?", "cevap": "Haritada işaretli olduğu için doğru yolda olduklarını anlamalarını sağladı.", "subjektif": false},
+      {"no": 4, "kategori": "Anlama", "kategori_ham": "Anlama (Kavrama)", "soru": "Soldaki yolu seçmelerinin nedeni neydi?", "cevap": "Eylül, soldakinin gölete daha yakın olduğunu düşündüğü için.", "subjektif": false},
+      {"no": 5, "kategori": "Uygulama", "kategori_ham": "Uygulama", "soru": "Sen ormanda kaybolacak olsan hangi üç şeyi yanına almak isterdin? Neden?", "cevap": "Öğrenci cevabı; örnek: su, harita, pusula; güvenlik ve yön bulmak için.", "subjektif": true},
+      {"no": 6, "kategori": "Analiz", "kategori_ham": "Analiz", "soru": "Metindeki olayların başlangıç, gelişme ve sonuç bölümlerini maddeler hâlinde yazınız.", "cevap": "Başlangıç: Eylül ve Mert dedelerinin verdiği görevi alır ve ormana girerler. Gelişme: Yol ayrımında karar verirler, çiçekli açıklık ve sincabı görürler, sincabı takip ederler. Sonuç: Göleti bulur ve su otlarını toplarlar; dedeleri doğanın rehberleri olduğunu anlatır.", "subjektif": false},
+      {"no": 7, "kategori": "Analiz", "kategori_ham": "Analiz", "soru": "Sincabın davranışları çocuklara nasıl yol göstermiştir?", "cevap": "Sincap onlara rehberlik ederek doğru yolda göleti bulmalarına yardımcı olmuştur.", "subjektif": false},
+      {"no": 8, "kategori": "Yaratma", "kategori_ham": "Sentez (Yaratma)", "soru": "Eğer Eylül ve Mert sağdaki yolu seçseydi hikâye nasıl devam edebilirdi? Kısa bir paragraf yaz.", "cevap": "Öğrenci cevabı; örnek: sağ yol daha uzun/tehlikeli olabilir veya farklı bir hayvan rehberle karşılaşabilirlerdi.", "subjektif": true},
+      {"no": 9, "kategori": "Değerlendirme", "kategori_ham": "Değerlendirme", "soru": "Sence Eylül ve Mert'in doğru yolu bulması şans mıydı, yoksa doğru kararlar mı verdiler? Açıkla.", "cevap": "Doğru karar verdiler, çünkü haritayı kullanarak ve birbirlerinin fikirlerini dinleyerek güvenli yolu seçtiler.", "subjektif": false},
+      {"no": 10, "kategori": "Değerlendirme", "kategori_ham": "Değerlendirme", "soru": "Doğayı “bir dost” olarak görme fikrine katılıyor musun? Neden?", "cevap": "Öğrenci cevabı; örnek: Evet, doğa hayvanlarla ve bitkilerle rehberlik ederek yardım ediyor, bu nedenle dost gibidir.", "subjektif": true}
+    ],
+    "notlar": ""
+  },
+  {
+    "dosya": "4 A.2. Müze Gezisindeki Sır.pdf",
+    "baslik": "Müze Gezisindeki Sır",
+    "sinif_seviyesi": 4,
+    "kelime_sayisi": 347,
+    "govde_temiz": null,
+    "sorular": [
+      {"no": 1, "kategori": "Hatırlama", "kategori_ham": "Hatırlama", "soru": "Öğrencilerin gittiği müzenin adı nedir?", "cevap": "Zaman Yolculuğu Müzesi.", "subjektif": false},
+      {"no": 2, "kategori": "Hatırlama", "kategori_ham": "Hatırlama", "soru": "Çocukları müzede kim karşıladı?", "cevap": "Müze Rehberi Deniz Bey.", "subjektif": false},
+      {"no": 3, "kategori": "Anlama", "kategori_ham": "Anlama", "soru": "Asya, 300 yıllık oyuncak bebeği görünce ne merak etmiştir?", "cevap": "Eski zamanlarda çocukların o oyuncakla nasıl oynadığını merak etmiştir.", "subjektif": false},
+      {"no": 4, "kategori": "Anlama", "kategori_ham": "Anlama", "soru": "Geleceğe ait bölümde çocukların en çok ilgisini çeken şey neydi? Açıklayınız.", "cevap": "Geleceğin şehir maketi ve havada süzülen arabalar (öğrencinin açıklaması kabul edilir).", "subjektif": true},
+      {"no": 5, "kategori": "Uygulama", "kategori_ham": "Uygulama", "soru": "Sen bu müzeyi gezseydin, hangi bölümü incelemek isterdin? Nedeniyle yaz.", "cevap": "(Öğrencinin kişisel tercihine göre değişir.)", "subjektif": true},
+      {"no": 6, "kategori": "Analiz", "kategori_ham": "Analiz", "soru": "Ali neden bilim insanı olmak istediğini söylemiştir? Metne dayanarak açıklayın.", "cevap": "Çünkü pusulaya benzeyen eşyanın parlaması onu çok meraklandırmış ve sırrı çözmek istemiştir.", "subjektif": false},
+      {"no": 7, "kategori": "Analiz", "kategori_ham": "Analiz", "soru": "“Sır Odası” diğer bölümlerden hangi yönleriyle ayrılmaktadır?", "cevap": "Karanlık, gizemli olması ve eşyalara dokunulmasının yasak olması; ayrıca içindeki eşyaların gizemli olması.", "subjektif": false},
+      {"no": 8, "kategori": "Değerlendirme", "kategori_ham": "Değerlendirme", "soru": "Sır Odası’nda pusulaya benzeyen eşyanın parlaması size göre ne anlama geliyor olabilir? Yorumlayın.", "cevap": "(Öğrenci yorumu –kabul edilebilir tüm mantıklı cevaplar.)", "subjektif": true},
+      {"no": 9, "kategori": "Yaratma", "kategori_ham": "Yaratma", "soru": "Sizce bu gizemli eşya ne işe yarıyor olabilir? Yeni bir fikirle açıklayın.", "cevap": "(Öğrenci yaratıcı cevabı –geleceği gösteren cihaz, zaman ölçer vb. tüm yaratıcı fikirler kabul edilir.)", "subjektif": true},
+      {"no": 10, "kategori": "Yaratma", "kategori_ham": "Yaratma", "soru": "Müze gezisinde yaşanan bu olaydan yola çıkarak kısa bir macera başlatın: “Çocuklar ertesi gün okula döndüklerinde…” diye başlayarak bir paragraf yazın.", "cevap": "(Öğrencinin paragrafı –yaratıcılığa bağlıdır.)", "subjektif": true}
+    ],
+    "notlar": ""
+  },
+  {
+    "dosya": "4 A.3 Uçurtma Kulübü.pdf",
+    "baslik": "Uçurtma Kulübü’nün Büyük Yarışı",
+    "sinif_seviyesi": 4,
+    "kelime_sayisi": 351,
+    "govde_temiz": null,
+    "sorular": [
+      {"no": 1, "kategori": "Hatırlama", "kategori_ham": "Hatırlama (Bilgi)", "soru": "Uçurtma Kulübü’nün üyeleri kimlerdir?", "cevap": "Elif, Kaan, Zeynep ve Arda.", "subjektif": false},
+      {"no": 2, "kategori": "Hatırlama", "kategori_ham": "Hatırlama (Bilgi)", "soru": "Çocuklar uçurtmalarını neden yeniden yapmak zorunda kalmıştır?", "cevap": "Çünkü ilk denemede uçurtma havalanmamış, ya yere çakılmış ya da çok savrulmuştur.", "subjektif": false},
+      {"no": 3, "kategori": "Anlama", "kategori_ham": "Anlama (Kavrama)", "soru": "Öğretmen Sevinç Hanım yarışın amacını nasıl açıklamıştır?", "cevap": "Birlikte çalışmak, emek vermek ve pes etmemek olduğunu söylemiştir.", "subjektif": false},
+      {"no": 4, "kategori": "Anlama", "kategori_ham": "Anlama (Kavrama)", "soru": "İlk denemede uçurtmanın havalanamamasının sebebi nedir?", "cevap": "Uçurtma ağır ve dengesiz olduğu için havalanamamıştır; rüzgâr azsa yere çakılmış, fazlaysa savrulmuştur.", "subjektif": false},
+      {"no": 5, "kategori": "Uygulama", "kategori_ham": "Uygulama", "soru": "Sen uçurtma tasarlayacak olsan hangi görevi üstlenmek isterdin? Neden?", "cevap": "Öğrenci cevabı.", "subjektif": true},
+      {"no": 6, "kategori": "Analiz", "kategori_ham": "Analiz", "soru": "Çocukların uçurtmayı geliştirmek için yaptıkları değişiklikleri maddeler hâlinde yazınız.", "cevap": "Daha ince çerçeve yaptılar. Kuyrukları hafifleştirdiler. Gövdeyi daha dayanıklı bir kâğıtla kapladılar.", "subjektif": false},
+      {"no": 7, "kategori": "Analiz", "kategori_ham": "Analiz", "soru": "Yarış sırasında kulüp üyelerinin görev paylaşımı uçurtmanın dengeli uçmasına nasıl yardımcı olmuştur?", "cevap": "Zeynep ipi kontrol etti, Kaan rüzgârı takip etti, Elif ve Arda destek oldu; böylece uçurtma dengeli şekilde yükseldi.", "subjektif": false},
+      {"no": 8, "kategori": "Yaratma", "kategori_ham": "Sentez (Yaratma)", "soru": "Uçurtma Kulübü bir sonraki yarış için yeni bir özellik eklese bu ne olurdu? Kendi fikrini yaz.", "cevap": "Öğrenci cevabı (örneğin ışıklı, sesli, daha aerodinamik bir uçurtma vb.)", "subjektif": true},
+      {"no": 9, "kategori": "Değerlendirme", "kategori_ham": "Değerlendirme", "soru": "Sizce Uçurtma Kulübü’nün ikinci olması başarı sayılır mı? Gerekçenizi yazınız.", "cevap": "Evet, çünkü birlikte çalıştılar ve uçurtmayı geliştirdiler / Evet çünkü ikinci olmak da büyük bir başarıdır / Öğrenci gerekçeli cevabı.", "subjektif": true},
+      {"no": 10, "kategori": "Değerlendirme", "kategori_ham": "Değerlendirme", "soru": "Metindeki hangi davranış sana göre en takdir edilesi davranıştır? Neden?", "cevap": "Öğrenci cevabı (örneğin pes etmemeleri, takım çalışması yapmaları, birbirlerini motive etmeleri vb.)", "subjektif": true}
+    ],
+    "notlar": ""
+  }
+]

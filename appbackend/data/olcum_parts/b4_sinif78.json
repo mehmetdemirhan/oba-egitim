@@ -1,0 +1,566 @@
+[
+  {
+    "dosya": "7 A.1 ORMANIN UNUTULAN KÜTÜPHANESİ.pdf",
+    "baslik": "ORMANIN UNUTULAN KÜTÜPHANESİ",
+    "sinif_seviyesi": 7,
+    "kelime_sayisi": 404,
+    "govde_temiz": null,
+    "sorular": [
+      {
+        "no": 1,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Hatırlama – Bilgi",
+        "soru": "Zehra ormanda ne bulmuştur ve kapının üzerinde ne yazmaktadır?",
+        "cevap": "Yosunlu taş bir kapı ve üzerinde “Bilgi, bulana değil arayana görünür.” yazısı. Kapı açıldığında büyük bir yer altı kütüphanesi vardı.",
+        "subjektif": false
+      },
+      {
+        "no": 2,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Hatırlama – Bilgi",
+        "soru": "Kütüphanenin ana sorunu/metindeki çatışma nedir?",
+        "cevap": "Bilgi Taşı kaybolmuş; bu yüzden kütüphanenin karanlığa gömülme tehlikesi ve kitapların gücünü kaybetme riski vardı.",
+        "subjektif": false
+      },
+      {
+        "no": 3,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama – Kavrama",
+        "soru": "Kitapların hologram göstermesi kütüphaneye nasıl bir özellik kazandırmaktadır?",
+        "cevap": "Okumayı daha etkileşimli ve görsel hale getirir; kitaplar sadece okunmaz, içeriği gösterir —öğrenmeyi kolaylaştırır ve büyülü özellik katar.",
+        "subjektif": false
+      },
+      {
+        "no": 4,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama – Kavrama",
+        "soru": "Haritada gösterilen üç bölümün isimlerini yazın.",
+        "cevap": "Yankı Odası, Sessiz Tünel, Rüya Koridoru.",
+        "subjektif": false
+      },
+      {
+        "no": 5,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama",
+        "soru": "Bilgi Taşı kaybolduğunda kütüphanenin ne gibi problemler yaşayacağını tahmin edin.",
+        "cevap": "Kitapların canlılığını yitirmesi, kütüphanenin karanlığa gömülmesi, bilgiye erişimin zorlaşması, rafların solması veya kitapların sessizleşmesi gibi sonuçlar beklenir.",
+        "subjektif": false
+      },
+      {
+        "no": 6,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama",
+        "soru": "Metinde verilen ipuçlarından yararlanarak Yankı Odası’nın neyi temsil ettiğini açıklayın.",
+        "cevap": "Yankı Odası geçmişin seslerini, anıları ve önceki okuyucuların izlerini temsil eder; bilgi aktarımının yankılanması, deneyimlerin iz bırakması anlamında yorumlanabilir.",
+        "subjektif": false
+      },
+      {
+        "no": 7,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Zehra’nın kitap sevgisi onu görev boyunca nasıl motive etmiştir?",
+        "cevap": "Merakı ve sevgi dolu yaklaşımı sayesinde zorluklardan vazgeçmedi; ipuçlarını dikkatle okudu, sessizliği göze aldı ve Rüya Koridoru’ndaki görüntülerle yüzleşti —görev tamamlandı.",
+        "subjektif": false
+      },
+      {
+        "no": 8,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Üç bölümün (Yankı Odası, Sessiz Tünel, Rüya Koridoru) bilgi arayışıyla ilişkisini açıklayın.",
+        "cevap": "Yankı Odası: geçmiş/deneyim ipuçları; Sessiz Tünel: dikkat, sabır ve içe dönük arama; Rüya Koridoru: hayal gücü ve içsel bilgeliğin sınavı. Bu sırayla ilerlemek bilgiye ulaşmayı sağlar.",
+        "subjektif": false
+      },
+      {
+        "no": 9,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Sizce Zehra’nın tek başına bu maceraya atılması doğru muydu? Neden?",
+        "cevap": "Savunma: Kitap sevgisi ve cesareti olumlu; görev başarıyla tamamlandı. Eleştiri: Tehlikeli olabilirdi, yardım almak daha güvenli olabilirdi. (Gerekçelendirme beklenir.)",
+        "subjektif": true
+      },
+      {
+        "no": 10,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Ormanın Unutulan Kütüphanesi gerçekte olsa insanlar için ne tür yararlar ve tehlikeler oluştururdu?",
+        "cevap": "Yararlar: Erişilebilir bilgi, etkileşimli öğrenme, korunan kültürel miras. Tehlikeler: Bilgiye kötü niyetle erişim, bilgi bağımlılığı, koruma ve gizlilik sorunları.",
+        "subjektif": false
+      },
+      {
+        "no": 11,
+        "kategori": "Yaratma",
+        "kategori_ham": "Yaratma",
+        "soru": "Kütüphanede yeni bir bölüm tasarlayın. Bu bölümün adı, görünümü ve içindeki görevi açıklayın.",
+        "cevap": "Örnek: “Zaman Rafı” —rafların her birinde farklı çağlardan kitaplar; ziyaretçi bir kitabı açınca o çağın sesi/görüntüsü canlanır. Görevi: Okuyucuya tarihsel empati kazandırmak. (Yaratıcı ve tutarlı tasarımlar puanlanır.)",
+        "subjektif": true
+      }
+    ],
+    "notlar": "Kaynakta 11 soru var (10 değil); tümü korundu. Cevap Anahtarı 1. soruda kaynak hatası: 'İlayda' yazıyor, oysa metin kahramanı Zehra (soru metni ve gövde 'Zehra' der). Gövdede PDF birleşmeleri var (Zehramerakla, Zehramasaya vb.) ama tam ve okunur; govde_temiz=null."
+  },
+  {
+    "dosya": "7 A.2 GÖLGELERİN SIRRI.pdf",
+    "baslik": "GÖLGELERİN SIRRI",
+    "sinif_seviyesi": 7,
+    "kelime_sayisi": 435,
+    "govde_temiz": null,
+    "sorular": [
+      {
+        "no": 1,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Hatırlama – Bilgi",
+        "soru": "Eylül’ün her gün baktığı eski sokak lambasının tuhaf özelliği neydi?",
+        "cevap": "Lambanın ne zaman yanıp söneceğinin belli olmaması; bazen aydınlıkken yanması, bazen karanlıkken sönük kalması.",
+        "subjektif": false
+      },
+      {
+        "no": 2,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Hatırlama – Bilgi",
+        "soru": "Eylül ilk kez gölgeyi gördüğünde nasıl tepki verdi?",
+        "cevap": "Korktu; gölgenin kendi gölgesi olmadığını fark edip geri çekildi ve etrafa baktı.",
+        "subjektif": false
+      },
+      {
+        "no": 3,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama – Kavrama",
+        "soru": "Karaltı’nın sadece Eylül tarafından görülebilmesinin nedeni nedir?",
+        "cevap": "Metne göre Karaltı sadece meraklı ve ışık-gölge ilişkisini sorgulayan kişiler tarafından duyulup görülebilir; Eylül bu niteliğe sahiptir. (Örnek ifade: “Çünkü Eylül merak eden birisidir.”)",
+        "subjektif": false
+      },
+      {
+        "no": 4,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama – Kavrama",
+        "soru": "Karaltı neden lambaya bağlı olarak kalmıştır? Kısaca açıklayın.",
+        "cevap": "Bir fırtına gecesinde lambanın içindeki kristal kırıldı; Karaltı o olaydan sonra lambanın içinde/çevresinde sıkıştı.",
+        "subjektif": false
+      },
+      {
+        "no": 5,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama",
+        "soru": "Eğer Eylül olsaydınız Karaltı’ya özgürlüğünü kazandırmak için nasıl bir yöntem geliştirirdiniz?",
+        "cevap": "Kabul edilebilir örnek: Kristali onarmak için dolunay ışığından yararlanmak; veya lambanın içindeki kırık parçayı değiştirmek ve lambayı tamir etmek. (Öğrencinin mantıklı adımları puanlanır.)",
+        "subjektif": true
+      },
+      {
+        "no": 6,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama",
+        "soru": "Dolunayın kristali onarmada nasıl bir rolü vardır? Metne göre açıklayın.",
+        "cevap": "Dolunayın ışığı kristali yeniden güçlendirir; Eylül kristali ay ışığı altında çıkartıp yerine koyduğunda kristal parlayıp lambayı eski hâline getirdi.",
+        "subjektif": false
+      },
+      {
+        "no": 7,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Eylül’ün karakter özellikleri ile Karaltı’nın karakter özelliklerini karşılaştırın.",
+        "cevap": "Eylül: meraklı, cesur, yardımsever, çözüm arayan. Karaltı: hüzünlü, özgürlüğüne hasret, lambaya bağlı, konuşkan/uyarıcı. (Benzerlik: İkisi de ışık-gölge arasındaki bağlantıya önem veriyor; farklılık: Eylül insan, Karaltı gölge varlık.)",
+        "subjektif": false
+      },
+      {
+        "no": 8,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Metinde ışık ve gölge ilişkisi nasıl sembolik bir anlam taşımaktadır?",
+        "cevap": "Işık umudu, bilgi/çözümü; gölge ise sırları, yalnızlığı veya geçmişi temsil eder. Gölge (Karaltı) ışığın yardımıyla özgürlüğe kavuşur — bilginin/cesaretin kurtarıcı olduğu mesajı çıkarılabilir.",
+        "subjektif": false
+      },
+      {
+        "no": 9,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Sizce Eylül geceleri dışarı çıkıp kristali onarmakta doğru bir karar mı verdi? Neden?",
+        "cevap": "Savunan cevap: Evet — cesaretli ve yaratıcı bir çözüm sundu; Karaltı özgürlüğe kavuştu. Eleştiren cevap: Hayır — tehlikeli olabilirdi; yetişkinlere haber verilmeli veya güvenlik alınmalıydı. (Puanlama: mantıklı gerekçe ve metinden örnek gösterme üzerinden değerlendirin.)",
+        "subjektif": true
+      },
+      {
+        "no": 10,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Hikâyenin sonunda Karaltı’nın “Işığa ihtiyacın olduğunda gölgen hep yanındadır” sözünü nasıl yorumlarsınız?",
+        "cevap": "Örnek yorum: Zor zamanlarda (karanlıkta) bile gölge/hatıralarımız bizi yalnız bırakmaz; doğru zamanda ışık (yardım/cesaret) geldiğinde geçmişimizle barışırız. Veya: Karanlık taraflarımız bile destek kaynağı olabilir.",
+        "subjektif": true
+      },
+      {
+        "no": 11,
+        "kategori": "Yaratma",
+        "kategori_ham": "Yaratma",
+        "soru": "Karaltı özgürlüğüne kavuştuktan sonra Eylül’e geri dönerse, nasıl bir sahne yaşanırdı? Kısa bir paragraf yazın.",
+        "cevap": "Kabul edilebilir örnek: Karaltı minnetle geri gelir, Eylül’e teşekkür eder; birlikte sokağı aydınlatan o geceyi paylaşırlar; Karaltı gerektiğinde Eylül’ü koruyacağını söyler. (Yaratıcı ifadeler puanlanır.)",
+        "subjektif": true
+      }
+    ],
+    "notlar": "Kaynakta 11 soru var (10 değil); tümü korundu. Gövde tam ve okunur, PDF birleşmeleri var (Zehra→Eylül metni değil; burada 'zamandırbu', 'ışıkparıldadı' gibi) ama içerik eksiksiz; govde_temiz=null."
+  },
+  {
+    "dosya": "7 A.3 ZAMAN MÜHENDİSİ.pdf",
+    "baslik": "ZAMAN MÜHENDİSİ",
+    "sinif_seviyesi": 7,
+    "kelime_sayisi": 451,
+    "govde_temiz": null,
+    "sorular": [
+      {
+        "no": 1,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Hatırlama – Bilgi",
+        "soru": "Aras’ın dedesinin deposunda bulduğu tuhaf nesne nedir?",
+        "cevap": "Metal bir küre (tuhaftı, sembollerle kaplı) ve ayrıca eski saat makinesi/parçaları. Küre zamanla bağlantılı gizemli bir cihaz.",
+        "subjektif": false
+      },
+      {
+        "no": 2,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Hatırlama – Bilgi",
+        "soru": "Aras geleceğe gittiğinde insanların bileklerinde hangi teknolojiyi görmüştür?",
+        "cevap": "Zaman bileklikleri (zaman yönetimini düzenleyen bileklikler).",
+        "subjektif": false
+      },
+      {
+        "no": 3,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama – Kavrama",
+        "soru": "Aras neden zaman bilekliği almak istemiştir?",
+        "cevap": "Gelecekte insanların zaman bilekliklerini kullanarak daha düzenli ve verimli yaşadıklarını gördüğü için merak etmiş ve benzer faydaları kendisi de elde etmek istemiştir.",
+        "subjektif": false
+      },
+      {
+        "no": 4,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama – Kavrama",
+        "soru": "Bileklik neden küreyle aynı anda çalışamaz? Metne göre açıklayın.",
+        "cevap": "Metinde bileklik ile kürenin aynı anda aktif olmasının zamanlar arasında denge bozulmasına neden olduğu belirtilir; iki zaman-enerji kaynağı aynı anda çalışınca denge tehlikeye girer.",
+        "subjektif": false
+      },
+      {
+        "no": 5,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama",
+        "soru": "Eğer siz Aras’ın yerinde olsaydınız gelecekte hangi teknolojiyi daha ayrıntılı incelemek isterdiniz?",
+        "cevap": "Kabul edilebilir örnek: Zaman bilekliklerinin algoritmasını, enerji kaynağını, veri gizliliği etkilerini veya uçan araçların güvenlik sistemlerini. (Öğrencinin mantıklı gerekçesi puanlanır.)",
+        "subjektif": true
+      },
+      {
+        "no": 6,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama",
+        "soru": "Zaman yönetimi hakkında testte sorulan sorulardan birini kendiniz üretip cevaplayın.",
+        "cevap": "Örnek soru: “Ders çalışırken Pomodoro tekniğini nasıl uygularsın?” Cevap: 25 dk çalışma + 5 dk mola; 4 döngü sonra uzun mola. (Yaratıcı ve uygulanabilir cevaplar kabul edilir.)",
+        "subjektif": true
+      },
+      {
+        "no": 7,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Aras’ın “küçük mucit” kişiliği olayların gelişimini nasıl etkilemiştir?",
+        "cevap": "Merakı ve teknik bilgi birikimi sayesinde küreyi incelemiş, küreyle etkileşime girmiş, zaman bilekliğinin anlamını kavramış ve dengelemek için makineyi kullanma fikrini bulmuştur. Kısacası çözüm üretmesini sağlamıştır.",
+        "subjektif": false
+      },
+      {
+        "no": 8,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Metinde zaman yolculuğunun hem avantajları hem de riskleri nelerdir?",
+        "cevap": "Avantajlar: Geleceği görmek, yeni teknolojiler öğrenmek, zaman yönetiminde iyileşme. Riskler: Zaman dengesi bozulması, beklenmeyen etkiler, geçmiş-günümüz etkileşimi ve sorumluluk gerektirmesi.",
+        "subjektif": false
+      },
+      {
+        "no": 9,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Sizce Aras’ın zaman bilekliğini dengelemek için düzenek kurması ne tür bir sorumluluk örneği göstermektedir?",
+        "cevap": "Bilinçli davranma, risk yönetimi, teknolojinin olası zararlarını önleme ve başkalarının güvenliğini/günün dengesini koruma sorumluluğu.",
+        "subjektif": false
+      },
+      {
+        "no": 10,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Zaman makinesi ya da zaman bilekliği gerçekte olsa toplum için yararlı mı yoksa zararlı mı olurdu? Kendi görüşünüzü savunun.",
+        "cevap": "Yararlı argüman: Verimlilik artar, hatalardan ders alma imkânı, eğitime katkı. Zararlı argüman: Güvenlik, etik ve sosyal eşitsizlik sorunları, kontrolsüz kullanım tehlikesi. (Puanlama: mantıklı gerekçe ve örneklemeye bakın.)",
+        "subjektif": true
+      },
+      {
+        "no": 11,
+        "kategori": "Yaratma",
+        "kategori_ham": "Yaratma",
+        "soru": "Aras’ın geleceğe yeniden gitmesine izin verilseydi hangi görevi üstlenmesini isterdiniz? Bir görev tasarlayın.",
+        "cevap": "Örnek görev: Zaman teknolojisinin etik kullanımını denetleyen genç bir mühendis olmak; zaman enerji kaynaklarını daha güvenli hâle getirmek. (Yaratıcı ve mantıklı görev önerileri kabul edilir.)",
+        "subjektif": true
+      }
+    ],
+    "notlar": "Kaynakta 11 soru var (10 değil); tümü korundu. Gövde tam ve okunur, PDF birleşmeleri var (duranmetalden, ışıkyayan vb.) ama içerik eksiksiz; govde_temiz=null."
+  },
+  {
+    "dosya": "8 A.2 KIRIK PUSULANIN GÖSTERDİĞİ YOL.pdf",
+    "baslik": "Kırık Pusulanın Gösterdiği Yol",
+    "sinif_seviyesi": 8,
+    "kelime_sayisi": 412,
+    "govde_temiz": null,
+    "sorular": [
+      {
+        "no": 1,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Bilgi (Hatırlama)",
+        "soru": "Metinde Mert’in sahilde bulduğu nesne nedir?",
+        "cevap": "Mert’in sahilde bulduğu nesne eski ve camı çatlamış bir pusuladır.",
+        "subjektif": false
+      },
+      {
+        "no": 2,
+        "kategori": "Anlama",
+        "kategori_ham": "Kavrama (Anlama)",
+        "soru": "Mert’in pusulanın sürekli aynı yönü göstermesini tuhaf bulmasının nedeni nedir? Kısaca açıklayınız.",
+        "cevap": "Pusulanın camı kırık ve iğnesi titrek olmasına rağmen sürekli aynı yönü göstermesi, normal bir pusulada beklenmeyecek bir durum olduğu için Mert’e tuhaf gelmiştir.",
+        "subjektif": false
+      },
+      {
+        "no": 3,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama",
+        "soru": "Mert’in yerinde olsaydınız pusulanın işaret ettiği yönü takip eder miydiniz? Gerekçesiyle açıklayınız.",
+        "cevap": "(Örnek cevap) Evet, takip ederdim çünkü pusulanın bozuk olmasına rağmen sabit bir yön göstermesi gizemli ve araştırmaya değer bir durumdur. —veya— Hayır, takip etmezdim çünkü tek başıma ormana gitmek tehlikeli olabilir.",
+        "subjektif": true
+      },
+      {
+        "no": 4,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Metinde geçen orman yolunun yıllardır kullanılmamasının sebepleri nelerdir? Metne göre açıklayınız.",
+        "cevap": "Orman yolunun yıllardır kullanılmamasının sebebi köylülerin burada tuhaf ışıklar gördüklerini ve geceleri fısıltılar duyduklarını söylemeleridir. Bu söylentiler insanların bu yolu tercih etmemesine neden olmuştur.",
+        "subjektif": false
+      },
+      {
+        "no": 5,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Pusula, harita ve kuyudaki kabartma gibi öğelerin metindeki ortak işlevi nedir? Bu öğeler üzerinden metnin yapısını analiz ediniz.",
+        "cevap": "Bu öğelerin ortak işlevi Mert’i adım adım gizli bir bilgiye yönlendirmeleridir. Pusula yol gösterir, harita hedefi belirler, kabartma ise gizli merdiveni açarak sırrın bulunduğu yere ulaşmasını sağlar. Hepsi macerayı ilerleten rehber unsurlardır.",
+        "subjektif": false
+      },
+      {
+        "no": 6,
+        "kategori": "Yaratma",
+        "kategori_ham": "Sentez (Yaratma)",
+        "soru": "Mert’in bulduğu defterin devam sayfalarında ne tür bilgiler olabileceğine dair kısa bir paragraf yazınız.",
+        "cevap": "(Örnek cevap) Defterin devamında koruyucu birliğin görevleri, sakladıkları sırrın kasabanın tarihindeki önemi, bu sırrı korumak için kurdukları tuzaklar ve gizli geçitler yer alabilir.",
+        "subjektif": true
+      },
+      {
+        "no": 7,
+        "kategori": "Yaratma",
+        "kategori_ham": "Sentez (Yaratma)",
+        "soru": "Metne yeni bir karakter ekleyerek hikâyenin nasıl farklı bir yöne evirileceğini kurgulayınız.",
+        "cevap": "(Örnek cevap) Hikâyeye Mert’in yakın arkadaşı “Deniz” eklenirse, ikisi birlikte macerayı sürdürür ve tehlikelere karşı birbirlerini uyararak ilerlerler. Bu da hikâyenin daha işbirlikçi, diyalog ağırlıklı ve hareketli bir yapıya dönüşmesini sağlar.",
+        "subjektif": true
+      },
+      {
+        "no": 8,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Mert’in tek başına ormana girmesi sizce doğru bir karar mıydı? Metinden örnekler kullanarak değerlendirme yapınız.",
+        "cevap": "(Örnek cevap) Mert’in tek başına ormana girmesi riskli bir karardır çünkü güneş batmaktadır ve orman yolunda tuhaf olayların yaşandığı söylenmektedir. Ancak merak duygusu ve pusulanın gizemi düşünüldüğünde cesur bir karar olduğu da söylenebilir.",
+        "subjektif": true
+      },
+      {
+        "no": 9,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Koruyucu birliğin geçmişte ormanda bir sır saklamasının kasaba için olumlu ve olumsuz yönlerini tartışınız.",
+        "cevap": "(Örnek cevap) Olumlu yön: Kasabayı tehlikelere karşı korumuş olabilirler. Olumsuz yön: Sır kasabadan gizlendiği için halk geçmişi tam olarak bilememiş olabilir veya bazı tehlikeler zamanla göz ardı edilmiştir.",
+        "subjektif": true
+      },
+      {
+        "no": 10,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Metnin sonunda Mert’in “bu sırrı tamamen ortaya çıkarma” kararlılığını nasıl değerlendiriyorsunuz? Bu kararın olası sonuçlarını yorumlayınız.",
+        "cevap": "(Örnek cevap) Mert’in kararlılığı olumlu bir özelliktir çünkü araştırma ve öğrenme isteğini gösterir. Ancak sırrın tehlikeli bir yönü varsa Mert’in kendini riske atma ihtimali vardır. Bu karar hem büyük bir keşfe hem de potansiyel tehlikelere yol açabilir.",
+        "subjektif": true
+      }
+    ],
+    "notlar": "10 soru; kategori sırası Bilgi/Kavrama/Uygulama/Analiz(2)/Sentez-Yaratma(2)/Değerlendirme(3). Değerlendirme, Yaratma'dan SONRA gelir. Gövde tam ve okunur, PDF birleşmeleri var; govde_temiz=null."
+  },
+  {
+    "dosya": "8 A.3 Eşsiz Şehrin Yankıları.pdf",
+    "baslik": "Eşsiz Şehrin Yankıları",
+    "sinif_seviyesi": 8,
+    "kelime_sayisi": 664,
+    "govde_temiz": "Yaren, ailesiyle birlikte büyük şehrin bitmeyen trafiğinden ve gürültüsünden uzaklaşmak için hafta sonu küçük bir kasabaya gitmişti. Şehri geride bıraktıklarında sanki kulakları dinlenmeye başlamış, yollar daraldıkça çevredeki yeşillik artmıştı. Kasabanın sokakları sakin, evleri ahşap, yolları taş döşemeydi. İlk anda buranın sıradan bir kasaba olduğunu düşünmüştü. Ancak sabah uyandığında etrafta tek bir ses bile duymayınca şaşkınlıkla irkildi. Ne kuşlar ötüyor ne rüzgâr uğulduyordu. Hatta evin içindeki en ufak çıtırtı bile yok denecek kadar zayıftı. Kasaba neredeyse tamamen sessizdi. Merakı artan Yaren hemen dışarı çıktı. Sessiz sokaklardan geçerken insanların fısıltıyla konuştuğunu fark etti ancak bu fısıltının bile yankısı yoktu. Meydanda oturan yaşlı bir adama yaklaşarak neden bu kadar sessiz olduğunu sordu. Yaşlı adam, yüzündeki derin çizgileri hareket ettiren yavaş bir ifadeyle ona kasabada insanların sesleri bile yankı yapmaz olmuştu. Yaşlı adam konuşurken sesi o kadar cılızdı ki Yaren birkaç kez tekrar etmesini istemek zorunda kaldı. Adam, kasabanın eskiden sesi çok iyi taşıyan bir coğrafi yapıya sahip olduğunu, bu yüzden “Yankı Vadisi” olarak tanındığını söyledi. Vadinin girişindeki dev kaya kütlesi geçen haftaki sarsıntıda çatlamıştı. Kasabalılar, yankıların kaybolmasının bu çatlakla ilgili olduğuna inanıyordu. Yaren duyduklarına inanmakta zorlandı ama merakı ağır bastı. Vadiye gitmeye karar verdi. Dar patikayı takip ederek vadinin girişine ulaştığında karşısında duran manzara onu hem ürküttü hem de büyüledi. Çatlak gerçekten devasa büyüklükteydi; sanki dev bir yaratık kayayı pençeleriyle yarmıştı. Kayaların arasından rüzgâr esiyor fakat çıkan ses neredeyse tamamen yutuluyordu. Yaren avuç içlerini kayaya yaslayıp dinledi; ne titreşim vardı ne yankı… Sanki vadi tüm sesleri içine çekiyor ama geri vermiyordu. Yerleri incelerken toprağa yarı gömülü eski bir bronz plaka dikkatini çekti. Üzerindeki yazılar biraz silinmişti ama yine de okunabiliyordu: “Ses, yönünü kaybettiğinde yankı da kaybolur.” Yankılar kaybolmuyordu; yalnızca doğru yöne ilerleyemiyor olabilirlerdi. Vadi, ses dalgalarını doğal bir tünel gibi düzenli bir biçimde taşıyordu. Ancak çatlak bu düzeni bozuyor, ses dalgalarını savuruyor ve geri dönemeyecek şekilde dağıtıyordu. Eğer çatlağın açısı ölçülür ve uygun bir yansıtıcı yüzey yapılırsa ses yeniden yönlendirilip kasabaya döndürülebilirdi. Bu fikri daha fazla içinde tutamazdı. Hemen kasabaya dönüp meydandaki insanlara planını anlattı. Kasabalılar önce şaşkındı; bazıları genç bir kızın böyle bir sorunu çözebileceğine pek ihtimal vermiyordu. Ama Yaren, bronz plakanın üzerindeki sözden, vadinin yapısından ve ses dalgalarının yayılma biçiminden öyle net ve tutkulu bir şekilde bahsetti ki herkesin yüzünde umut beliriverdi. Kısa sürede ekipler oluşturuldu. Bir grup metal levhalar bulmak için depolara gitti, diğerleri ölçüm yapabilmek için eski aletleri tamir etti. Yaren de vadinin girişine geri dönüp çatlağın genişliğini, yüksekliğini ve açısını dikkatle ölçtü. Metrelerle, iplerle, sopalarla tüm değerleri belirlediler. Planına göre metal levhalar çatlağın tam karşısına yerleştirildi ve vadi duvarına hafifçe vurdu. Önce çok zayıf bir tık sesi duyuldu. Ardından birkaç saniyelik sessizlik… Tam o anda kasabadan yankı yükseldi. Önce bir fısıltı gibi, sonra giderek güçlenen bir titreşimle… Ses bir duvardan diğerine çarparak çoğaldı, yayıldı ve sonunda tüm kasaba meydanında duyulacak kadar büyüdü. Kasabalılar sevinçle bağırdı. Bu kez sesleri tekrar yankılandı! Birbirlerine sarıldılar, bazıları gözyaşlarını gizleyemedi. Yaren sayesinde kasabanın kayıp sesi geri dönmüştü. Ertesi sabah kasaba bambaşka bir yere dönüşmüştü. Kuşlar yeniden ötmeye başlamış, deredeki su neşeyle akmıştı. Çocukların kahkahaları sokaklarda dolaşıyor, pazardaki esnafın sesleri vadide yankılanıyordu. Kasaba yeniden canlı, yeniden kendisi olmuştu. Yaren dönüş yolunda derin bir huzur hissediyordu. Küçük bir fikrin, cesaretle birleştiğinde ne kadar büyük bir değişim yaratabileceğini artık çok iyi biliyordu. Arkasına baktığında sessizliğe gömülmüş kasabadan eser kalmamıştı; yankılar kasabaya yeniden hayat vermişti.",
+    "sorular": [
+      {
+        "no": 1,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Bilgi (Hatırlama)",
+        "soru": "Kasabada yaşanan gizemli olay nedir?",
+        "cevap": "Kasabada seslerin yankılanmaması; hiçbir sesin geri dönmemesi (yankı kaybı) yaşanmaktadır.",
+        "subjektif": false
+      },
+      {
+        "no": 2,
+        "kategori": "Anlama",
+        "kategori_ham": "Kavrama (Anlama)",
+        "soru": "Yaren’in bronz plakada okuduğu cümleden yola çıkarak sesin neden kasabaya geri dönemediğini açıklayın.",
+        "cevap": "Bronz plakadaki cümle sesin “yolunu kaybettiğini” ifade eder. Bu durum, vadideki doğal yapının değiştiğini, ses dalgalarının eski güzergâhını takip edemediğini ve bu yüzden kasabaya ulaşamadığını gösterir.",
+        "subjektif": false
+      },
+      {
+        "no": 3,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama (Kullanma)",
+        "soru": "Bilgi (Hatırlama) plakada okuduğu cümleden yola çıkarak sesin neden kasabaya geri dönemediğini açıklayın.",
+        "cevap": "Bronz plakadaki cümle sesin “yolunu kaybettiğini” ifade eder. Bu durum, vadideki doğal yapının değiştiğini, ses dalgalarının eski güzergâhını takip edemediğini ve bu yüzden kasabaya ulaşamadığını gösterir.",
+        "subjektif": false
+      },
+      {
+        "no": 4,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz (Çözümleme)",
+        "soru": "Yaren’in vadide yaptığı gözlemlerden hangi ipuçları, seslerin yön değiştirdiğini anlamasını sağlamıştır? Metinden en az iki kanıt yazın.",
+        "cevap": "Vadide bazı kaya yüzeylerinin kırılmış veya yer değiştirmiş olduğunu fark etmesi, sesin çarpacağı yüzeylerin değiştiğini göstermiştir. Havanın bile alışılmadık şekilde sessiz olması, ses dalgalarının dağılması yerine başka bir yöne saptığını düşündürmüştür.",
+        "subjektif": false
+      },
+      {
+        "no": 5,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz (Karşılaştırma)",
+        "soru": "Kasabanın olay öncesi durumu ile olay sonrası durumu arasında ne gibi farklar vardır? En az üç maddede karşılaştırın.",
+        "cevap": "Olay Öncesi: Kasaba canlı ve neşelidir. Çocuklar oyun oynarken yankı oluşur. İnsanlar günlük yaşamlarını sorunsuz sürdürür. Olay Sonrası: Kasaba sessiz ve huzursuz hale gelir. Hiçbir ses yankılanmaz. İnsanlar tedirgin olur ve çözüm aramaya başlar.",
+        "subjektif": false
+      },
+      {
+        "no": 6,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme (Yorumlama)",
+        "soru": "Kasabalıların Yaren’e ilk başta güvenmemelerini nasıl değerlendirirsiniz? Bu tutumun nedenlerini tartışın.",
+        "cevap": "Kasabalıların temkinli davranması doğal görülebilir; çünkü gizemli bir durum yaşanmaktadır ve genç bir kızın böyle bir sorunu çözebileceğine ihtimal vermemeleri olağandır. Ancak Yaren’in bilgisini ve tutkusunu görünce ona güvenmeleri doğru bir tutumdur.",
+        "subjektif": false
+      },
+      {
+        "no": 7,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme (Eleştirel Düşünme)",
+        "soru": "Yaren’in sesleri geri getirmek için metal levhaları kullanma fikrini ne kadar bilimsel buluyorsunuz? Gerekçeleriyle açıklayın.",
+        "cevap": "Ses dalgalarının yüzeylerden yansıyabildiği bilinen bir fizik kuralıdır. Metal yüzeylerin sesi yönlendirmek için kullanılabilmesi bilimsel olarak mümkündür. Yaren’in fikri bu açıdan mantıklıdır. Ancak gerçek hayatta sesin doğru açıyla yönlendirilmesi için daha detaylı hesaplamalar gerekebilir.",
+        "subjektif": false
+      },
+      {
+        "no": 8,
+        "kategori": "Yaratma",
+        "kategori_ham": "Yaratma (Tahmin / Üretme)",
+        "soru": "Eğer Yaren yanlış bir açıyla levha yerleştirseydi olay nasıl sonuçlanabilirdi? Olası bir senaryo yazın.",
+        "cevap": "Ses kasabaya geri dönmek yerine tamamen başka bir noktaya yönlenebilirdi. Sesin vadi içinde sıkışıp kalması, başka bir kasabada tuhaf bir yankı oluşması veya yankının daha da zayıflaması gibi sonuçlar ortaya çıkabilirdi.",
+        "subjektif": true
+      },
+      {
+        "no": 9,
+        "kategori": "Yaratma",
+        "kategori_ham": "Yaratma (Alternatif Çözüm)",
+        "soru": "Yaren’in kullandığı yöntemin dışında kasabanın yankısını geri getirmek için başka hangi çözüm yolları denenebilirdi? En az iki farklı fikir üretin.",
+        "cevap": "Vadinin doğal yapısını inceleyerek çökmüş kayaların eski hâline getirilmesi. Yankıyı güçlendirmek için ses yansıtıcı kuleler veya ahşap paneller yerleştirilmesi. Sesin yönünü tespit etmek için bir düzenek/ölçüm yapılması.",
+        "subjektif": true
+      },
+      {
+        "no": 10,
+        "kategori": "Yaratma",
+        "kategori_ham": "Yaratma (Genelleme)",
+        "soru": "Bu hikâyeden hareketle, “Küçük bir fikrin büyük bir değişime yol açması” düşüncesini kendi hayatınızdan/günümüzden bir örnekle açıklayın.",
+        "cevap": "(Öğrenci cevabı) Küçük bir başlangıç fikrinin (ör. bir okulda geri dönüşüm uygulaması) zamanla büyük bir farkındalığa ve değişime yol açması gibi örneklerle açıklanır. (Yaratıcı ve tutarlı örnekler kabul edilir.)",
+        "subjektif": true
+      }
+    ],
+    "notlar": "10 soru; her sorunun kendi alt-etiketi var. DİKKAT: kaynak dosyada bu metin AŞIRI bozuk/paragrafları karışmış (soru gövdeleri, cevap parçaları ve okuma metni iç içe geçmiş, kelime_sayisi işaretleri metne karışmış). Soru ve cevaplar tam_ham içindeki dağınık parçalardan yeniden derlendi; ŞÜPHELİ. Özellikle: (1) 3. soru (Uygulama) metni bozuk gelmiş, kaynakta soru gövdesi 2. soru ile neredeyse aynı ('Bilgi (Hatırlama) plakada...'); soru metni kaynaktaki bozuk haliyle bırakıldı, cevap 2. soru cevabıyla örtüşüyor — İNSAN KONTROLÜ GEREKİR. (2) 1, 6, 9, 10. soruların soru/cevap metinleri kaynakta eksik/parçalı olduğundan tam_ham parçalarından toparlandı; ifadeler yaklaşık olabilir. (3) 6. ve 7. soru cevapları özgün 'Cevap:' bloklarından alındı. govde_temiz, tam_ham'daki dağınık gövde parçaları birleştirilerek yeniden kuruldu (govde alanı bozuktu)."
+  },
+  {
+    "dosya": "8 A.3 GELECEĞİN KAPISINDA.pdf",
+    "baslik": "Geleceğin Kapısında",
+    "sinif_seviyesi": 8,
+    "kelime_sayisi": 760,
+    "govde_temiz": null,
+    "sorular": [
+      {
+        "no": 1,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Bilgi (Hatırlama)",
+        "soru": "Duru’nun bilim kulübünde gördüğü büyük cihazın adı nedir?",
+        "cevap": "Cihazın adı Zaman Algılayıcı Prototiptir.",
+        "subjektif": false
+      },
+      {
+        "no": 2,
+        "kategori": "Anlama",
+        "kategori_ham": "Kavrama (Anlama)",
+        "soru": "Zaman Algılayıcı Prototip’in nasıl bir işlevi olduğunu metne dayanarak açıklayınız.",
+        "cevap": "Zaman Algılayıcı Prototip, gelecekte oluşabilecek bazı ihtimalleri analiz ederek kısa süreli görüntüler şeklinde yansıtan bir cihazdır. Gerçek zaman yolculuğu yapmaz, bilgisayar hesaplamalarına dayanır.",
+        "subjektif": false
+      },
+      {
+        "no": 3,
+        "kategori": "Anlama",
+        "kategori_ham": "Kavrama (Anlama)",
+        "soru": "Cihazın ürettiği iki farklı gelecek görüntüsü, Duru’ya ne anlatmaktadır?",
+        "cevap": "İki farklı gelecek görüntüsü, Duru’ya hem başarılı olabileceğini hem de hataları nedeniyle zor durumlarla karşılaşabileceğini göstermektedir. Yani geleceğin seçimlerine bağlı olarak değişebileceğini anlatmaktadır.",
+        "subjektif": false
+      },
+      {
+        "no": 4,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama",
+        "soru": "Duru’nun defterine “Yapabileceklerim” ve “Dikkat Etmem Gerekenler” başlıklarını yazmasının amacı nedir?",
+        "cevap": "Duru bu iki başlığı, hedeflerini daha iyi belirlemek ve hangi konularda dikkatli olması gerektiğini görmek için yazmıştır. Kendini geliştirme amacıyla planlama yapmak istemiştir.",
+        "subjektif": false
+      },
+      {
+        "no": 5,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama",
+        "soru": "Metne göre laboratuarda hangi güvenlik önlemlerinin artırılması gerektiğine iki örnek veriniz.",
+        "cevap": "Metne göre artırılması gereken güvenlik önlemlerine örnekler: Kimyasal maddelerin ayrı bir bölmede saklanması. Elektrik düzeneklerinin güvenli hâle getirilmesi. Tehlikeli deneylerde koruyucu gözlük takılması. Deney öncesi kontrol listesi hazırlanması.",
+        "subjektif": false
+      },
+      {
+        "no": 6,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Duru’nun gördüğü başarılı sahne ile başarısız sahneyi neden–sonuç ilişkisiyle karşılaştırınız.",
+        "cevap": "Başarılı sahnede Duru düzenli, disiplinli çalışmış ve projesini büyük bir fuarda başarıyla sunmuştur. Başarısız sahnede ise dikkatsiz çalışma sonucu deney bozulmuş, ortam dağılmış ve Duru moral olarak çökmüştür. Yani başarı veya başarısızlık çalışma biçimiyle doğrudan ilişkilidir.",
+        "subjektif": false
+      },
+      {
+        "no": 7,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Bilim kulübünün laboratuarda yeni kurallar belirlemesine neden olan olayları açıklayınız.",
+        "cevap": "Cihaz aşırı yüklenip arıza verince laboratuarın güvenlik açısından eksikleri fark edilmiştir. Ayrıca cihazın gösterdiği gelecekteki uyarılar laboratuarda düzenlemeler yapılması gerektiğini göstermiştir. Bu olaylar sonucunda kulüp yeni kurallar belirleme kararı almıştır.",
+        "subjektif": false
+      },
+      {
+        "no": 8,
+        "kategori": "Yaratma",
+        "kategori_ham": "Sentez (Yaratma)",
+        "soru": "Zaman Algılayıcı Prototip yeniden çalışsaydı, Duru’nun görebileceği olası yeni bir gelecek sahnesi yazınız.",
+        "cevap": "(Örnek cevap) Duru üçüncü denemede gelecekte büyük bir bilim yarışmasına katılıp enerji verimliliği projesinin geliştirilmiş hâlini sunduğunu görebilirdi. Ya da kendi laboratuarını kurmuş, genç öğrencilere rehberlik ederken görülebilirdi.",
+        "subjektif": true
+      },
+      {
+        "no": 9,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Duru’nun laboratuar güvenliği için öncülük ettiği çalışmaların önemini değerlendiriniz.",
+        "cevap": "(Örnek cevap) Duru’nun güvenlik konusundaki öncülüğü hem kazaları önlemiş hem de kulüp üyelerinin daha bilinçli çalışmasını sağlamıştır. Bu tutum hem eğitim ortamını güvenli hâle getirmiş hem de ekip içinde sorumluluk bilinci oluşturmuştur.",
+        "subjektif": true
+      },
+      {
+        "no": 10,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Metnin sonunda Duru’nun “Gelecek belirsizdir ama onu şekillendirebilirsin.” düşüncesinin ne kadar doğru olduğunu yorumlayınız.",
+        "cevap": "(Örnek cevap) Bu düşünce doğrudur çünkü geleceğin kesin olmadığı ancak çalışmayla yönlendirilebileceği vurgulanmaktadır. Duru’nun çabaları sayesinde başarı ihtimalinin gerçeğe dönüşmesi bunun bir örneğidir.",
+        "subjektif": true
+      }
+    ],
+    "notlar": "10 soru; kategori sırası Bilgi/Kavrama(2)/Uygulama(2)/Analiz(2)/Sentez-Yaratma(1)/Değerlendirme(2). Cevap Anahtarı numaralı, 'Cevap:' işareti yok; cevaplar doğrudan soru numarasıyla eşleşti. Gövde tam ve okunur, PDF birleşmeleri var; govde_temiz=null."
+  }
+]

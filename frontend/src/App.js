@@ -2221,8 +2221,15 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
   // kelime sayısına göre seçilir.
   const [kelimeAralik, setKelimeAralik] = useState(null); // {min,max,l} | null
   const [acikId, setAcikId] = useState(null); // tıklayınca cevap anahtarı/görsel editörü açılan metin
-  const [bolum, setBolum] = useState(sabitBolum || "analiz"); // analiz | okuma_parcalari
+  // Kategori ekseni: "olcum" (Ölçüm Metinleri — Bloom açık uçlu, BİRİNCİL) ·
+  // "analiz" (Okuma Metinleri — 150 Akıcı Okuma) · "okuma_parcalari" (eski, sabit görünüm)
+  const [bolum, setBolum] = useState(sabitBolum || "olcum");
   const okumaParcalariGorunumu = bolum === "okuma_parcalari";
+  const olcumGorunumu = bolum === "olcum";
+  // Sınıf seviyesi filtresi (Ölçüm Metinleri): varsayılan öğrencinin sınıfı, ama
+  // KISITLAMA değil — öğretmen serbestçe başka seviye/"Tüm seviyeler" seçebilir.
+  const [siniFiltre, setSiniFiltre] = useState(filtreSinif ? String(filtreSinif) : "");
+  const SINIF_SECENEKLERI = ["1", "2", "3", "4", "5", "6", "7", "8", "lise"];
   const [gocYukleniyor, setGocYukleniyor] = useState(false);
   const KELIME_ARALIKLARI = [
     { l: "0–70 kelime", min: 0, max: 70 },
@@ -2239,8 +2246,10 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
   const fetchMetinler = async () => {
     try {
       const params = new URLSearchParams();
-      if (filtreSinif) params.set("sinif_seviyesi", filtreSinif);
-      params.set("bolum", bolum); // "analiz" → yalnız 150 havuz; "okuma_parcalari" → eskiler
+      // Sınıf filtresi: Ölçüm sekmesinde chip seçimi (siniFiltre), diğerlerinde prop.
+      const sinifParam = olcumGorunumu ? siniFiltre : filtreSinif;
+      if (sinifParam) params.set("sinif_seviyesi", sinifParam);
+      params.set("bolum", bolum); // "olcum" → Ölçüm · "analiz" → 150 Okuma · "okuma_parcalari" → eskiler
       const r = await axios.get(`${API}/diagnostic/texts?${params.toString()}`);
       setMetinler(r.data);
     } catch(e) { hataBildir(toast, "Metinler yüklenemedi"); }
@@ -2250,7 +2259,9 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
     try { const r = await axios.get(`${API}/ayarlar/puanlar`); setPuanAyarlari(r.data); } catch(e) {}
   };
 
-  useEffect(() => { fetchMetinler(); fetchPuanAyarlari(); /* eslint-disable-next-line */ }, [filtreSinif, bolum]);
+  // Öğrenci değişince (atama modalı) sınıf filtresini onun sınıfına sıfırla (varsayılan).
+  useEffect(() => { setSiniFiltre(filtreSinif ? String(filtreSinif) : ""); }, [filtreSinif]);
+  useEffect(() => { fetchMetinler(); fetchPuanAyarlari(); /* eslint-disable-next-line */ }, [filtreSinif, bolum, siniFiltre]);
 
   // Akıcı Okuma metinlerini (150) havuza yükle + eski metinleri Okuma Parçaları'na taşı
   const akiciOkumaGoc = async () => {
@@ -2270,11 +2281,18 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
   const kaydet = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(`${API}/diagnostic/texts`, { ...form, kelime_sayisi: kelimeSay(form.icerik), bolum: okumaParcalariGorunumu ? "okuma_parcalari" : "analiz" });
+      const yeniBolum = okumaParcalariGorunumu ? "okuma_parcalari" : (olcumGorunumu ? "olcum" : "analiz");
+      await axios.post(`${API}/diagnostic/texts`, {
+        ...form,
+        tur: olcumGorunumu ? "olcum" : form.tur,
+        kelime_sayisi: kelimeSay(form.icerik),
+        bolum: yeniBolum,
+      });
       setForm({ baslik: "", icerik: "", kelime_sayisi: 0, sinif_seviyesi: "4", tur: "hikaye" });
       setFormAcik(false); fetchMetinler();
       const rol = user?.role;
-      toast({ title: "Metin eklendi (+5 puan)", description: rol === "admin" ? "Oylama başlatıldı" : "Yönetici onayına gönderildi" });
+      const olcumNot = olcumGorunumu ? " Soru/cevap anahtarı, onay sırasında düzenleme ekranından eklenir." : "";
+      toast({ title: "Metin eklendi (+5 puan)", description: (rol === "admin" ? "Oylama başlatıldı." : "Yönetici onayına gönderildi.") + olcumNot });
     } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
   };
 
@@ -2323,16 +2341,32 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
 
   return (
     <div className="space-y-4">
+      {/* Kategori sekmeleri: Ölçüm Metinleri (birincil) · Okuma Metinleri (150).
+          sabitBolum verilmişse (eski okuma_parçaları görünümü) sekme gösterilmez. */}
+      {!sabitBolum && (
+        <div className="flex items-center gap-1 bg-app rounded-lg p-1 w-fit">
+          {[["olcum", "Ölçüm Metinleri"], ["analiz", "Okuma Metinleri"]].map(([k, etiket]) => (
+            <button key={k} onClick={() => setBolum(k)}
+              className={`text-sm px-3 py-1.5 rounded-md transition ${bolum === k ? "bg-primary text-white shadow-sm" : "text-subtle hover:text-content"}`}>
+              {etiket}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Üst bar */}
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-content">{okumaParcalariGorunumu ? "Okuma Metinleri" : "Analiz Metinleri"}</h3>
+        <h3 className="font-semibold text-content">
+          {olcumGorunumu ? "Ölçüm Metinleri" : okumaParcalariGorunumu ? "Okuma Metinleri" : "Okuma Metinleri"}
+          {olcumGorunumu && <span className="ml-2 text-xs font-normal text-subtle">(Bloom taksonomili açık uçlu · sınıf seviyeli)</span>}
+        </h3>
         <Button onClick={() => setFormAcik(!formAcik)} className="bg-primary hover:bg-primary-hover text-white" size="sm">
           <Plus className="h-4 w-4 mr-1"/>{formAcik ? "İptal" : "Metin Ekle (+5 puan)"}
         </Button>
       </div>
 
-      {/* Akıcı Okuma göç (yalnız Analiz havuzu yönetimi; okuma_parçaları görünümünde yok) */}
-      {!secimModu && !okumaParcalariGorunumu && user?.role === "admin" && (
+      {/* Akıcı Okuma göç (yalnız Okuma Metinleri / analiz havuzu yönetimi) */}
+      {!secimModu && bolum === "analiz" && user?.role === "admin" && (
         <div className="flex items-center justify-end gap-2 flex-wrap">
           <button onClick={akiciOkumaGoc} disabled={gocYukleniyor} title="150 Akıcı Okuma metnini sınıf seviyeleriyle yükle; eski metinleri Okuma Metinleri'ne taşı"
             className="text-xs px-2.5 py-1.5 rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">
@@ -2342,6 +2376,23 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
       )}
       {okumaParcalariGorunumu && (
         <p className="text-xs text-subtle bg-app rounded-lg p-2">Bu metinler eski havuzdan taşınan okuma metinleridir; Analiz'de kullanılmaz. Buradan erişilebilir; silinmezler.</p>
+      )}
+
+      {/* Sınıf seviyesi filtresi — Ölçüm Metinleri (varsayılan öğrencinin sınıfı, serbest seçim) */}
+      {olcumGorunumu && (
+        <div className="flex items-center gap-1.5 flex-wrap text-sm">
+          <span className="text-subtle mr-1">Sınıf:</span>
+          <button onClick={() => setSiniFiltre("")}
+            className={`px-2.5 py-1 rounded-full border text-xs ${!siniFiltre ? "bg-primary text-white border-primary" : "border-line text-subtle hover:bg-app"}`}>
+            Tüm seviyeler
+          </button>
+          {SINIF_SECENEKLERI.map(s => (
+            <button key={s} onClick={() => setSiniFiltre(s)}
+              className={`px-2.5 py-1 rounded-full border text-xs ${siniFiltre === s ? "bg-primary text-white border-primary" : "border-line text-subtle hover:bg-app"}`}>
+              {s === "lise" ? "Lise" : `${s}. Sınıf`}
+            </button>
+          ))}
+        </div>
       )}
 
       {/* Metin Ekleme Formu */}

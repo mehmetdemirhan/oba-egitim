@@ -1,0 +1,542 @@
+[
+  {
+    "dosya": "5 A.1 Göl Kenarındaki Sürpriz.pdf",
+    "baslik": "Göl Kenarındaki Sürpriz",
+    "sinif_seviyesi": 5,
+    "kelime_sayisi": 261,
+    "govde_temiz": null,
+    "sorular": [
+      {
+        "no": 1,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Bilgi – Hatırlama",
+        "soru": "Zeynep tatilde nereye gitmiştir?",
+        "cevap": "Göl kenarına gitmiştir.",
+        "subjektif": false
+      },
+      {
+        "no": 2,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Bilgi – Hatırlama",
+        "soru": "Sandalda bulduğu kutuda neler vardı?",
+        "cevap": "Renkli taşlar, pusula ve notlar.",
+        "subjektif": false
+      },
+      {
+        "no": 3,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama",
+        "soru": "Zeynep neden notları ailesiyle paylaşmıştır?",
+        "cevap": "Notların önemli bilgiler içerdiğini düşündüğü için.",
+        "subjektif": false
+      },
+      {
+        "no": 4,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama",
+        "soru": "Kutunun gölün koruyucuları tarafından bırakıldığını düşünmesinin nedeni nedir?",
+        "cevap": "Notların doğayı koruma mesajları vermesi nedeniyle böyle düşünmüştür.",
+        "subjektif": false
+      },
+      {
+        "no": 5,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama",
+        "soru": "Doğayı korumak için Zeynep'in yaptığı gözlemlerden yola çıkarak bir öneri yaz.",
+        "cevap": "(Öğrenci önerisi: çöp atmamak, suyu kirletmemek vb.)",
+        "subjektif": true
+      },
+      {
+        "no": 6,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Gölün canlılarıyla ilgili yaptığı gözlemler neyi gösteriyor?",
+        "cevap": "Canlıların düzenli bir yaşam döngüsü olduğunu ve gözlemle öğrenilebileceğini gösteriyor.",
+        "subjektif": false
+      },
+      {
+        "no": 7,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Gölün Zeynep üzerinde nasıl bir etkisi olmuştur?",
+        "cevap": "Doğayı sevmeyi ve koruma bilinci kazanmasını sağlamıştır.",
+        "subjektif": false
+      },
+      {
+        "no": 8,
+        "kategori": "Yaratma",
+        "kategori_ham": "Sentez – Yaratma",
+        "soru": "Zeynep'in notlarına eklemesi için göl hakkında yeni bir bilgi yaz.",
+        "cevap": "(Yaratıcı cevap)",
+        "subjektif": true
+      },
+      {
+        "no": 9,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Sence Zeynep'in keşfi neden değerlidir?",
+        "cevap": "Gölü koruma bilinci kazandırdığı için.",
+        "subjektif": false
+      },
+      {
+        "no": 10,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Göl çevresinde yapılan etkinliklerin doğaya etkisini olumlu–olumsuz yönleriyle değerlendir.",
+        "cevap": "Olumlu: eğitim, gözlem, spor. Olumsuz: kalabalık, kirlilik riski.",
+        "subjektif": false
+      }
+    ],
+    "notlar": "Gövde metni tam ancak PDF kaynaklı bitişik kelimeler içeriyor (ör. 'Gölünetrafı', 'defter,boya', 'göl değilaynı'); içerik eksiksiz olduğundan govde_temiz=null bırakıldı. Kategori başlıkları 2'şer soru bloğu (Bilgi-Hatırlama: 1-2, Anlama: 3-4, Uygulama: 5, Analiz: 6-7, Sentez-Yaratma: 8, Değerlendirme: 9-10)."
+  },
+  {
+    "dosya": "5 A.2 Ormanda Kaybolan Harita.pdf",
+    "baslik": "Ormanda Kaybolan Harita",
+    "sinif_seviyesi": 5,
+    "kelime_sayisi": 296,
+    "govde_temiz": null,
+    "sorular": [
+      {
+        "no": 1,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Bilgi – Hatırlama",
+        "soru": "Hazine haritasını çocuklara kim vermiştir?",
+        "cevap": "Dedeleri.",
+        "subjektif": false
+      },
+      {
+        "no": 2,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Bilgi – Hatırlama",
+        "soru": "Haritanın başlangıç noktası neresidir?",
+        "cevap": "Ormanın girişindeki büyük meşe ağacı.",
+        "subjektif": false
+      },
+      {
+        "no": 3,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama",
+        "soru": "Elif soldaki yolu seçmeyi neden istemiştir?",
+        "cevap": "Daha güvenli ve gölete yakın olduğunu düşündüğü için.",
+        "subjektif": false
+      },
+      {
+        "no": 4,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama",
+        "soru": "Çardak çocuklara neyi öğretmiştir?",
+        "cevap": "Birlikte hareket ederek zorlukları aşmayı öğretmiştir.",
+        "subjektif": false
+      },
+      {
+        "no": 5,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama",
+        "soru": "Sen bu macerada olsaydın hangi malzemeleri yanına alırdın ve neden?",
+        "cevap": "(Öğrenci kendi malzemeleri + gerekçesi)",
+        "subjektif": true
+      },
+      {
+        "no": 6,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Mete ve Elif'in karar verme şekillerini nasıl karşılaştırırsın?",
+        "cevap": "Mete daha hızlı karar veren, Elif daha temkinli davranandır.",
+        "subjektif": false
+      },
+      {
+        "no": 7,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Sandığın içindekiler maceranın amacını nasıl açıklıyor?",
+        "cevap": "Hazine, maddi değerden çok öğrenme ve iş birliği mesajı taşıyordu.",
+        "subjektif": false
+      },
+      {
+        "no": 8,
+        "kategori": "Yaratma",
+        "kategori_ham": "Sentez – Yaratma",
+        "soru": "Yeni bir orman ipucu tasarla. Çocuklar bu ipucunu nasıl çözsün?",
+        "cevap": "(Yaratıcı cevap)",
+        "subjektif": true
+      },
+      {
+        "no": 9,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Sence çocuklar doğru yolu mu seçmiştir? Gerekçen ne?",
+        "cevap": "Evet/Hayır → Öğrenci sebeplerini açıklar.",
+        "subjektif": true
+      },
+      {
+        "no": 10,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Hazineyi bulma sürecini en önemli 3 aşamayla değerlendir.",
+        "cevap": "Haritanın okunması, ipuçlarının çözülmesi, sandığın bulunması.",
+        "subjektif": false
+      }
+    ],
+    "notlar": "Gövde tam; PDF bitişik kelimeler mevcut (ör. 'Haritadaki yerişaretlerini', 'girişindekibüyük', 'heyecanlıydıçünkü'), govde_temiz=null. Cevap 3'teki 'gölete yakın' ifadesi metinle birebir korundu (gövdede yalnızca 'daha güvenli' geçiyor)."
+  },
+  {
+    "dosya": "5 A.3 GİZEMLİ DENİZ FENERİ.pdf",
+    "baslik": "Gizemli Deniz Feneri",
+    "sinif_seviyesi": 5,
+    "kelime_sayisi": 343,
+    "govde_temiz": null,
+    "sorular": [
+      {
+        "no": 1,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Bilgi – Hatırlama",
+        "soru": "Can ve Selin tatilde nereye gitmiştir?",
+        "cevap": "Dedelerinin yaşadığı sahil kasabasına gitmişlerdir.",
+        "subjektif": false
+      },
+      {
+        "no": 2,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Bilgi – Hatırlama",
+        "soru": "Çocukların fenerde bulduğu kutunun içinde neler vardı?",
+        "cevap": "Mektuplar, anahtarlar ve pusulalar vardı.",
+        "subjektif": false
+      },
+      {
+        "no": 3,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama",
+        "soru": "Haritaların fenerde bulunmasının nedeni ne olabilir?",
+        "cevap": "Fener, denizcilere yol gösterdiği için haritalar burada saklanmış olabilir.",
+        "subjektif": false
+      },
+      {
+        "no": 4,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama",
+        "soru": "Can ve Selin neden deniz fenerini keşfetmek istemiştir?",
+        "cevap": "Fener hakkındaki gizemli hikâyeler onları meraklandırmıştır.",
+        "subjektif": false
+      },
+      {
+        "no": 5,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama",
+        "soru": "Sen Can ve Selin olsaydın feneri gezerken nelere dikkat ederdin?",
+        "cevap": "(Öğrenci cevabı değişebilir) Güvenlik, karanlık yerlere dikkat etme, yalnız çıkmama…",
+        "subjektif": true
+      },
+      {
+        "no": 6,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Fenerdeki mektupların görevini nasıl açıklarsın?",
+        "cevap": "Denizciler arasında mesajlaşma ve yön bulma amacıyla kullanıldığını gösteriyordu.",
+        "subjektif": false
+      },
+      {
+        "no": 7,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Bu keşif çocukların kişisel gelişiminde nasıl bir etkide bulunmuştur?",
+        "cevap": "Keşfetme isteğini artırmış, birlikte çalışma ve gözlem yapmayı öğretmiştir.",
+        "subjektif": false
+      },
+      {
+        "no": 8,
+        "kategori": "Yaratma",
+        "kategori_ham": "Sentez – Yaratma",
+        "soru": "Fenerin yeni bir gizemini ortaya çıkaracak kısa bir olay yaz.",
+        "cevap": "(Yaratıcı cevap)",
+        "subjektif": true
+      },
+      {
+        "no": 9,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Sence dedelerinin “Bazı sırlar keşfedenlere özeldir.” sözü doğru mudur? Neden?",
+        "cevap": "(Değerlendirme) Öğrenci gerekçesini açıklar.",
+        "subjektif": true
+      },
+      {
+        "no": 10,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Çocukların davranışlarını maceracı, dikkatli ve işbirlikçi yönleriyle değerlendir.",
+        "cevap": "Maceracı: feneri keşfetmeleri; dikkatli: haritaları incelemeleri; işbirlikçi: birlikte hareket etmeleri.",
+        "subjektif": false
+      }
+    ],
+    "notlar": "Gövde tam; PDF bitişik kelimeler mevcut (ör. 'içeridekitozlu merdivenlerigördüler', 'yollarınıbulmalarına', 'farkettiler'), govde_temiz=null. Soru 9'daki tırnak içi söz metinle birebir korundu."
+  },
+  {
+    "dosya": "6 A.1 ZAMANIN ANAHTARI.pdf",
+    "baslik": "ZAMANIN ANAHTARI",
+    "sinif_seviyesi": 6,
+    "kelime_sayisi": 413,
+    "govde_temiz": null,
+    "sorular": [
+      {
+        "no": 1,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Hatırlama",
+        "soru": "Eymen'in öğretmeninin sınıfa verdiği görev neydi?",
+        "cevap": "Öğretmen, öğrencilerden geçmişten ya da gelecekten bir anı anlatan bir sunum hazırlamalarını istemişti.",
+        "subjektif": false
+      },
+      {
+        "no": 2,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Hatırlama",
+        "soru": "Eymen, anahtarı nerede buldu?",
+        "cevap": "Eymen, anahtarı odasındaki kitaplıkta duran eski bir kutunun içinde buldu.",
+        "subjektif": false
+      },
+      {
+        "no": 3,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama",
+        "soru": "Eymen neden son zamanlarda hayal gücünü pek kullanamadığını düşünüyor olabilir?",
+        "cevap": "Çünkü okulda dersler artmış, ödevleri çoğalmış ve oyun oynayacak vakti azalmıştır. Bu yüzden hayal kurmaya fazla zamanı kalmamıştır.",
+        "subjektif": false
+      },
+      {
+        "no": 4,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama",
+        "soru": "Eymen'in gittiği döneminin Orta Çağ olduğunu anlamasını sağlayan ipuçları nelerdir?",
+        "cevap": "Taş sokaklar, yüksek kuleler, insanların eski kıyafetler giymesi, demirci dükkânı gibi ortamlar Orta Çağ'a ait olduğunu gösteren ipuçlarıdır.",
+        "subjektif": false
+      },
+      {
+        "no": 5,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama",
+        "soru": "Eymen'in yerinde olsaydın demircinin “Yeni çırak sen misin?” sorusuna nasıl cevap verirdin? Kısa bir açıklama yaz.",
+        "cevap": "Öğrencinin yorumuna göre değişebilir. Örnek cevap: “Evet, yardım etmek için geldim.” ya da “Hayır, sadece burayı merak ettiğim için bakıyorum.”",
+        "subjektif": true
+      },
+      {
+        "no": 6,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama",
+        "soru": "Metindeki olay akışını kullanarak Eymen'in sunumunda hangi 3 ana noktayı vurgulaması gerektiğini belirle.",
+        "cevap": "Örnek cevaplar: Zaman anahtarını nasıl bulduğu; Orta Çağ'a giden kapıdan geçmesi; Demirci, şehir halkı ve köprü inşaatı gibi deneyimleri.",
+        "subjektif": true
+      },
+      {
+        "no": 7,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Anahtarın metindeki olayların gelişimindeki rolünü açıklayın. Olay örgüsünün hangi noktasında kritik bir dönüşüm sağlıyor?",
+        "cevap": "Anahtar, olayların başlamasını sağlayan tetikleyici öğedir. Eymen'i zaman kapısına götürür ve maceranın başlamasını sağlar. Ayrıca onu geri döndürerek olayları tamamlar.",
+        "subjektif": false
+      },
+      {
+        "no": 8,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Metindeki Eymen karakterinin iki farklı dünyadaki (günümüz ve Orta Çağ) davranışlarını karşılaştırın. Benzerlikler ve farklılıklar nelerdir?",
+        "cevap": "Günümüzde: Daha sıkılmış, yoğun ödevlerden yorulmuş, zamansızlık yaşayan biri. Orta Çağ'da: Meraklı, çevresini keşfetmeye çalışan, olaylara uyum sağlayan biri. Benzerlik: Her iki durumda da dikkatli, gözlemci ve öğrenmeye açık olması.",
+        "subjektif": false
+      },
+      {
+        "no": 9,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "Eymen'in macerasını öğretmenin “hayal gücünüzü kullanın” göreviyle ilişkilendirir misiniz? Bu görev Eymen için doğru bir görev miydi? Neden?",
+        "cevap": "Evet, çünkü bu görev Eymen'in hayal gücünü yeniden kullanmasını sağladı. Ayrıca yaşadığı macera (gerçek olsa bile) sunumu için yaratıcı ve etkileyici bir içerik oluşturmasına yardımcı oldu. Dolayısıyla görev Eymen için uygundu.",
+        "subjektif": false
+      },
+      {
+        "no": 10,
+        "kategori": "Yaratma",
+        "kategori_ham": "Yaratma",
+        "soru": "Anahtarın Eymen'i bir sonraki sefer nereye götüreceğini hayal ederek kısa bir paragraf yazın. Yeni ortam, karşılaşacağı kişiler ve yaşayacağı bir olaydan bahsedin.",
+        "cevap": "Örnek cevap: “Anahtar bu kez Eymen'i geleceğin uçan araçlarla dolu bir şehrine götürdü. Binalar gökyüzüne kadar yükseliyor, insanlar robotlarla birlikte yaşıyordu. Eymen orada bir bilim ekibiyle tanıştı. Onlar, zamanı kontrol eden bir cihaz üzerinde çalışıyordu. Ancak cihaz bozulmuştu ve Eymen'in yardımıyla yeniden çalıştırılacaktı. Böylece Eymen, geleceği kurtaran bir maceraya atılmış oldu.”",
+        "subjektif": true
+      }
+    ],
+    "notlar": "Kategori başlıkları tek etiketli, sıra 1-2 Hatırlama, 3-4 Anlama, 5-6 Uygulama, 7-8 Analiz, 9 Değerlendirme, 10 Yaratma (üst sınıf sırası: Değerlendirme, Yaratma'dan önce). Cevap anahtarı her cevaptan önce soruyu tekrar ediyordu; tekrar edilen soru metni atıldı, yalnız cevap alındı. Gövde ve sorularda PDF bitişik kelimeler düzeltildi (ör. 'hayal gücünüpek'→'hayal gücünü pek', 'olsaydındemircinin'→'olsaydın demircinin', 'hazırlamalarınıistemişti'→'hazırlamalarını istemişti')."
+  },
+  {
+    "dosya": "6 A.2 KAYIP ADA GÜNLÜĞÜ.pdf",
+    "baslik": "KAYIP ADA GÜNLÜĞÜ",
+    "sinif_seviyesi": 6,
+    "kelime_sayisi": 553,
+    "govde_temiz": null,
+    "sorular": [
+      {
+        "no": 1,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Hatırlama",
+        "soru": "Arda sahilde bulduğu şişenin içinde ne vardı?",
+        "cevap": "Sararmış bir kâğıt, yani bir hazine haritasına benzeyen harita vardı.",
+        "subjektif": false
+      },
+      {
+        "no": 2,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Hatırlama",
+        "soru": "İkizlere adaya gitmekte kim yardımcı oldu?",
+        "cevap": "Yusuf Amca, balıkçı teknesiyle yardımcı oldu.",
+        "subjektif": false
+      },
+      {
+        "no": 3,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama",
+        "soru": "Yusuf Amca'nın haritayı görünce yüzündeki gülümsemenin kaybolmasının sebebi ne olabilir?",
+        "cevap": "Adanın tehlikeli ve sisli bir bölge olduğunu bilmesi, uzun süredir kimsenin oraya gitmemesi ve yolun zor olması onu endişelendirmiş olabilir.",
+        "subjektif": false
+      },
+      {
+        "no": 4,
+        "kategori": "Anlama",
+        "kategori_ham": "Anlama",
+        "soru": "Ada neden ‘cesaret isteyen bir yer' olarak tanımlanmış olabilir? Metinden ipuçları verin.",
+        "cevap": "Çünkü adada: Sis nedeniyle yolu kaybetme riski vardır. İçeride taş kapı, loş tüneller, gizemli sesler ve görevler vardır. Rüzgâr tüneli gibi zorlu engellerden geçmek gerekir. Bu nedenle cesaret ister.",
+        "subjektif": false
+      },
+      {
+        "no": 5,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama",
+        "soru": "İkizler gibi gizlice maceraya çıkmak yerine başka bir yol izleseydin, ne yapardın? Kendi çözümünü yaz.",
+        "cevap": "Örnek cevap: Aileme haritayı gösterip birlikte güvenli bir şekilde keşfe gitmeyi önerirdim. Böylece hem macera yaşar hem de güvende olurdum. (Bu soru kişisel cevaba açık olduğu için farklı cevaplar da kabul edilir.)",
+        "subjektif": true
+      },
+      {
+        "no": 6,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama",
+        "soru": "İkizlerin bulması gereken üç sembolün (su, taş, rüzgâr) her biri için adada karşılaştıkları engeli kısaca açıkla.",
+        "cevap": "Su sembolü: Şelalenin arkasındaki mağarada bulunuyordu; mağara loş ve gizliydi. Taş sembolü: Adanın ortasındaki büyük kayanın altında gizlenmişti. Rüzgâr sembolü: Sürekli yön değiştiren, güçlü rüzgârlarla dolu bir tünelden geçmek gerekiyordu.",
+        "subjektif": false
+      },
+      {
+        "no": 7,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Metindeki üç sembolün (su–taş–rüzgâr) ortak özelliği nedir? Hikâyenin akışındaki görev sistemine nasıl hizmet ediyorlar?",
+        "cevap": "Üçü de doğanın temel unsurlarını temsil eder (su–taş–rüzgâr) ve adanın gizemli yapısıyla uyumludur. Hikâyede kahramanlara aşamalı bir görev sistemi sunar; her sembol bir zorluğu aşmak anlamına gelir ve finalde kapının açılmasını sağlar.",
+        "subjektif": false
+      },
+      {
+        "no": 8,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz",
+        "soru": "Arda ve Defne'nin karakter özelliklerini metne göre karşılaştırın. Benzer yönleri ve farklılıkları neler?",
+        "cevap": "Benzer yönleri: İkisi de meraklı, cesur ve maceraya heveslidir. Görevleri birlikte tamamlarlar. Farklılıkları: Arda daha atılgan ve soru soran bir yapıya sahiptir (ör. “Görev nedir?” diye sorar). Defne daha dikkatli, gözlemci ve heyecanlıdır (ör. izleri fark eder, kayalıkları ilk o görür).",
+        "subjektif": false
+      },
+      {
+        "no": 9,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme",
+        "soru": "İkizlerin bu maceraya çıkma kararını doğru buluyor musunuz? Neden? Metindeki olaylardan örnek vererek açıklayın.",
+        "cevap": "Örnek değerlendirme: Kısmen doğru buluyorum çünkü cesaretleri sayesinde görevi tamamlamışlardır. Ancak ailelerine haber vermeden gizlice gitmeleri risklidir. Adada taş kapı, rüzgâr tüneli gibi tehlikeler vardı. Daha güvenli bir plan yapabilirlerdi. (Bu soru kişisel görüş gerektirir; farklı cevaplar da doğrudur.)",
+        "subjektif": true
+      },
+      {
+        "no": 10,
+        "kategori": "Yaratma",
+        "kategori_ham": "Yaratma",
+        "soru": "Hikâyenin sonunda ortaya çıkan yeni haritayı düşünerek, ikizlerin gideceği yeni adayı hayal edin. Bu adada karşılarına çıkacak bir gizem ya da görev tasarlayın.",
+        "cevap": "Örnek yaratıcı cevap: Yeni haritadaki ada “Alev Adası” olabilir. Bu adanın merkezinde sürekli parlayan bir ateş kristali bulunur. İkizler bu kristale ulaşmak için sıcak kumlardan, lav nehirlerinden ve ateş ruhlarının bulmacalarından geçmek zorundadır. Görevleri ise kristali yerine yerleştirip adanın dengesini sağlamak olabilir. (Öğrenciler farklı yaratıcı cevaplar yazabilir.)",
+        "subjektif": true
+      }
+    ],
+    "notlar": "Sıra 1-2 Hatırlama, 3-4 Anlama, 5-6 Uygulama, 7-8 Analiz, 9 Değerlendirme, 10 Yaratma. Cevap anahtarı her cevaptan önce soruyu tekrar ediyordu; tekrar ve '→' işaretleri atıldı. PDF bitişik kelimeler düzeltildi (ör. 'haritavardı'→'harita vardı', 'tehlikelive'→'tehlikeli ve', 'seslerve görevlervardır'→'sesler ve görevler vardır', 'gözlemcive'→'gözlemci ve')."
+  },
+  {
+    "dosya": "6 A.3 ZAMANI DONDURAN SAAT.pdf",
+    "baslik": "ZAMANI DONDURAN SAAT",
+    "sinif_seviyesi": 6,
+    "kelime_sayisi": 607,
+    "govde_temiz": null,
+    "sorular": [
+      {
+        "no": 1,
+        "kategori": "Hatırlama",
+        "kategori_ham": "Bilgi (Hatırlama)",
+        "soru": "Eymen çatı katında bulduğu saatte hangi özel detayı fark etmiştir?",
+        "cevap": "Saatin arkasında hafifçe açılmış bir gizli bölme ve içinde bir not olduğunu fark etmiştir.",
+        "subjektif": false
+      },
+      {
+        "no": 2,
+        "kategori": "Anlama",
+        "kategori_ham": "Kavrama (Anlama)",
+        "soru": "Eymen zaman durduğunda ilk başta neden eğlendiğini kendi cümlelerinle açıkla.",
+        "cevap": "Zaman durduğu için sokaklar boşalmıştı, kimse hareket etmiyordu. Eymen de bunu bir oyun fırsatı gibi gördü; paten sürdü, kaydıraktan kaydı, boş alanlarda özgürce dolaştı. Bu yüzden eğlendi.",
+        "subjektif": false
+      },
+      {
+        "no": 3,
+        "kategori": "Uygulama",
+        "kategori_ham": "Uygulama (Kullanma)",
+        "soru": "Eğer sen Eymen'in yerinde olsaydın, zaman durduğunda hangi iki olumlu davranışı yapardın? Örnek ver.",
+        "cevap": "Trafikte tehlike oluşturan bir durumu düzeltebilirdim. Bir insanın düşmesini engelleyebilir veya kavga edenleri ayırabilirdim.",
+        "subjektif": true
+      },
+      {
+        "no": 4,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz (Çözümleme)",
+        "soru": "Eymen'in zaman durduktan sonra önce eğlenip sonra huzursuz olmasının nedenlerini karşılaştırarak açıklayınız.",
+        "cevap": "Başta bunu bir oyun gibi gördü ve özgürce hareket etmenin heyecanını yaşadı. Ancak bir süre sonra zamanın durması insanların hayatını olumsuz etkileyebileceğini düşündü. Annesinin eve dönemeyeceği, herkesin hareketsiz kalacağı fikri onu huzursuz etti.",
+        "subjektif": false
+      },
+      {
+        "no": 5,
+        "kategori": "Analiz",
+        "kategori_ham": "Analiz (Çözümleme)",
+        "soru": "Metinde Eymen'in dedesinin görüntüsünün ortaya çıktığı bölümün hikâyedeki işlevi nedir? Açıklayınız.",
+        "cevap": "Dede, saatin kökeni ve anlamı hakkında bilgi vererek hikâyeye açıklık getirir. Ayrıca Eymen'e sorumluluk ve doğru kullanımın önemini anlatır. Böylece hikâyenin ana mesajı güçlenir.",
+        "subjektif": false
+      },
+      {
+        "no": 6,
+        "kategori": "Yaratma",
+        "kategori_ham": "Sentez (Yaratma)",
+        "soru": "Saatin başka bir gizli gücü olsaydı, bunun ne olmasını isterdin? Bu gücü kullanarak yeni bir sahne yaz.",
+        "cevap": "Saat zamanı durdurmak yerine kısa süreli olarak geçmişe bir dakika dönebilmeyi sağlayabilir. Eymen yanlış yaptığı bir şeyi düzeltmek için bu gücü kullanabilir.",
+        "subjektif": true
+      },
+      {
+        "no": 7,
+        "kategori": "Yaratma",
+        "kategori_ham": "Sentez (Yaratma)",
+        "soru": "Eymen'in gelecekte saati devredeceği kişi hakkında kısa bir karakter tasarımı oluştur. Bu kişi nasıl biri olurdu?",
+        "cevap": "Sorumluluk sahibi, meraklı, adil bir çocuk olabilir. Yardım etmeyi seven, aceleci kararlar almayan ve zor durumlarda sakin kalabilen biri seçilebilir.",
+        "subjektif": true
+      },
+      {
+        "no": 8,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme (Yargılama)",
+        "soru": "Eymen'in okulda kavga eden çocukları ayırmak için zamanı durdurma kararını doğru buluyor musun? Nedenleriyle değerlendir.",
+        "cevap": "Evet, çünkü zaman durduğunda kimse zarar görmedi ve Eymen çocukları ayırarak bir kavganın büyümesini engelledi. Bu davranış iyi niyetli ve güvenliydi. (Öğrenci “hayır” cevabı da verebilir; önemli olan mantıklı gerekçeler sunmasıdır.)",
+        "subjektif": true
+      },
+      {
+        "no": 9,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme (Yargılama)",
+        "soru": "Dedesinin “Zaman, sorumluluk ister” sözüne göre Eymen saati adil bir şekilde kullanmış mıdır? Metinden kanıtlar göstererek açıklayın.",
+        "cevap": "Evet. Sadece gerektiğinde kullandı: önce eğlenmiş olsa bile, daha sonra saati kavga durdurmak gibi olumlu bir amaçla kullandı. Gereksiz yere uzun süre kullanmamaya dikkat etti.",
+        "subjektif": false
+      },
+      {
+        "no": 10,
+        "kategori": "Değerlendirme",
+        "kategori_ham": "Değerlendirme (Yargılama)",
+        "soru": "Sence böyle bir saatin gerçek hayatta var olması insanlık için yararlı mı yoksa zararlı mı olurdu? Mantıklı argümanlarla tartış.",
+        "cevap": "Zararlı olabilir, çünkü yanlış kişilerin eline geçtiğinde kötü amaçlarla kullanılabilir. İnsanların doğal zaman akışına müdahale etmek tehlikeli sonuçlar doğurabilir. (Bazı öğrenciler yararlı yönlerini savunabilir; mantıklı gerekçe kabul edilir.)",
+        "subjektif": true
+      }
+    ],
+    "notlar": "Her sorunun kendi alt-etiketi var; kategori bloğu: 1 Hatırlama, 2 Anlama, 3 Uygulama, 4-5 Analiz, 6-7 Yaratma, 8-9-10 Değerlendirme. Not: kategori başlıkları 1..6 numaralı, sorular 1..10 numaralı — karıştırılmadı. Cevap anahtarı 'Soru:'/'Cevap:' işaretleriyle geliyordu; yalnız cevap alındı. PDF bitişik kelimeler düzeltildi (ör. 'bölmeve'→'bölme ve', 'notolduğunu'→'not olduğunu', 'gördü veözgürce'→'gördü ve özgürce')."
+  }
+]
