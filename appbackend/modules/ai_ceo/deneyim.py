@@ -130,9 +130,24 @@ async def _degerlendir(tid: str) -> dict:
     siradaki = next((s for s in sonuc if not s["tamamlandi"]), None)
     _xp_kayit = await db.ai_ceo_deneyim_tamamlanan.find({"ogretmen_id": tid}, {"_id": 0, "xp": 1}).to_list(length=1000)
     kazanilan_xp = sum(k.get("xp", 0) for k in _xp_kayit)
+
+    # Tekrarlayan (sürekli) görevler — tek-seferlik DEĞİL; ilerledikçe sayaç artar (XP users.puan'da).
+    try:
+        from core.sistem import get_puan_ayarlari
+        kalite_metin_sayi = len(await db.metin_kalite_geribildirim.distinct("metin_id", {"ogretmen_id": tid}))
+        xp_birim = int((await get_puan_ayarlari()).get("metin_kalite_geri_bildirim", 3))
+    except Exception:
+        kalite_metin_sayi, xp_birim = 0, 3
+    surekli_gorevler = [{
+        "id": "metin_kalite_denetcisi", "baslik": "Metin kalitesi denetçisi",
+        "aciklama": "Kullandığın okuma/ölçüm metinlerine kalite puanı ver — her yeni metin sana XP kazandırır ve içerik kalitesini denetler.",
+        "sayac": kalite_metin_sayi, "birim": "metin", "xp_birim": xp_birim, "hedef": "ogrencilerim",
+    }]
+
     return {"gorevler": sonuc, "toplam": toplam, "biten": biten,
             "ilerleme_yuzde": round(biten * 100 / toplam, 0) if toplam else 0,
-            "siradaki": siradaki, "kazanilan_xp": kazanilan_xp}
+            "siradaki": siradaki, "kazanilan_xp": kazanilan_xp,
+            "surekli_gorevler": surekli_gorevler}
 
 
 # ── Öğretmen uçları ──

@@ -66,6 +66,18 @@ export default function KocumMiran({ apiBase, onNavigate }) {
               </button>
             ))}
           </div>
+          {/* Tekrarlayan (sürekli) görevler — sayaçla ilerler, kapanmaz */}
+          {(deneyim.surekli_gorevler || []).map(sg => (
+            <button key={sg.id} onClick={() => onNavigate && sg.hedef && onNavigate(sg.hedef)}
+              className="w-full text-left rounded-xl p-2.5 mt-2 border border-dashed border-amber-300 bg-amber-50/50 hover:bg-amber-50 transition">
+              <div className="flex items-center gap-2">
+                <span>🔁</span>
+                <span className="text-sm font-semibold text-content">{sg.baslik}</span>
+                <span className="ml-auto text-[11px] font-semibold text-amber-700">{sg.sayac} {sg.birim} · +{sg.xp_birim} XP/{sg.birim}</span>
+              </div>
+              <div className="text-xs text-subtle mt-0.5">{sg.aciklama}</div>
+            </button>
+          ))}
         </div>
       )}
 

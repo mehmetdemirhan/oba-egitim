@@ -146,6 +146,7 @@ VARSAYILAN_PUANLAR = {
     # Metin havuzu katkıları (öğretmen/koordinatör/yönetici) — yalnız İLK katkı ödüllendirilir
     "cevap_duzeltme": 2,       # bir MCQ'nun doğru cevabını ilk kez düzelten
     "gorsel_ekleme": 2,        # bir metne ilk kez görsel ekleyen
+    "metin_kalite_geri_bildirim": 3,  # bir metne İLK kez kalite puanı veren (metin başına anti-farm)
 }
 
 

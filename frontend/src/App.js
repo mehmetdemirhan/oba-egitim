@@ -51,9 +51,11 @@ import DashboardAnalitik from "./components/admin/DashboardAnalitik";
 import BilgiIkonu from "./components/BilgiIkonu";
 import AiYonetimKokpiti from "./components/aiceo/AiYonetimKokpiti";
 import KocumMiran from "./components/aiceo/KocumMiran";
+import MetinKaliteWidget from "./components/MetinKaliteWidget";
 import YoneticiAdimlar from "./components/aiceo/YoneticiAdimlar";
 import GorevTanimYonetimi from "./components/aiceo/GorevTanimYonetimi";
 import AnalizHavuzBakim from "./components/admin/AnalizHavuzBakim";
+import MetinKaliteRiski from "./components/admin/MetinKaliteRiski";
 import SinavYonetimi from "./components/admin/SinavYonetimi";
 import SinavCozum from "./components/SinavCozum";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
@@ -5439,6 +5441,11 @@ function GirisAnaliziModul({ user, students, teachers }) {
       <div className="space-y-4">
         <AnalizSonucEkrani sonuc={sonuc} ogrenci={seciliOgrenci} onKaydet={kurOnayla}
           onYeniAnaliz={() => { setAdim("liste"); setSonuc(null); }} />
+        {/* Metni kullandıktan sonra kalite geri bildirimi (öğretmen henüz puanlamadıysa) */}
+        {sonuc.kalite_gb_iste && sonuc.metin_id && (
+          <MetinKaliteWidget apiBase={API} metinId={sonuc.metin_id} metinBaslik={sonuc.metin_baslik}
+            onDone={() => setSonuc((s) => ({ ...s, kalite_gb_iste: false }))} />
+        )}
       </div>
     );
   }
@@ -10094,7 +10101,7 @@ function SistemAyarlari({ user }) {
       <p className="text-subtle text-sm">Rozet, XP, lig ve anket ayarlarını buradan yönetin. Değişiklikler anında uygulanır.</p>
 
       <div className="flex gap-2 flex-wrap">
-        {[{id:"ozellikler",l:"Özellik Yönetimi"},{id:"xp",l:"XP Değerleri"},{id:"ogretmen_xp",l:"Öğretmen XP"},{id:"lig",l:"Lig Eşikleri"},{id:"ogretmen_rozet",l:"Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"Öğrenci Rozetleri"},{id:"anket",l:"Anket Soruları"},{id:"kutulu_okuma",l:"Kutulu Okuma"},{id:"rapor_olcutleri",l:"Rapor Ölçütleri"},{id:"timi_anahtar",l:"TIMI Puanlama Anahtarı"},{id:"timi_metin",l:"TIMI Rapor Metinleri"},{id:"profil_gorunurluk",l:"Profil Görünürlüğü"},{id:"instagram",l:"Instagram"},{id:"kvkk",l:"Veri & KVKK"},{id:"sezon",l:"Sezonluk Reset"},...(user?.role === "admin" ? [{id:"analiz_havuz",l:"📚 Analiz Havuzu Bakımı"},{id:"duyurular",l:"✨ Yeni Ne Var"},{id:"altyapi",l:"☁️ Altyapı"},{id:"bakim",l:"🔧 Bakım Modu"}] : [])].map(s => (
+        {[{id:"ozellikler",l:"Özellik Yönetimi"},{id:"xp",l:"XP Değerleri"},{id:"ogretmen_xp",l:"Öğretmen XP"},{id:"lig",l:"Lig Eşikleri"},{id:"ogretmen_rozet",l:"Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"Öğrenci Rozetleri"},{id:"anket",l:"Anket Soruları"},{id:"kutulu_okuma",l:"Kutulu Okuma"},{id:"rapor_olcutleri",l:"Rapor Ölçütleri"},{id:"timi_anahtar",l:"TIMI Puanlama Anahtarı"},{id:"timi_metin",l:"TIMI Rapor Metinleri"},{id:"profil_gorunurluk",l:"Profil Görünürlüğü"},{id:"instagram",l:"Instagram"},{id:"kvkk",l:"Veri & KVKK"},{id:"sezon",l:"Sezonluk Reset"},...(user?.role === "admin" ? [{id:"analiz_havuz",l:"📚 Analiz Havuzu Bakımı"},{id:"metin_kalite",l:"🚩 Kalite Denetimi"},{id:"duyurular",l:"✨ Yeni Ne Var"},{id:"altyapi",l:"☁️ Altyapı"},{id:"bakim",l:"🔧 Bakım Modu"}] : [])].map(s => (
           <button key={s.id} onClick={() => setAyarSekme(s.id)}
             className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${ayarSekme === s.id ? 'bg-primary text-white border-blue-600' : 'bg-surface text-subtle border-line'}`}>{s.l}</button>
         ))}
@@ -10213,6 +10220,7 @@ function SistemAyarlari({ user }) {
       {ayarSekme === "timi_anahtar" && <TimiAnahtarPaneli />}
       {ayarSekme === "timi_metin" && <TimiRaporMetinPaneli />}
       {ayarSekme === "analiz_havuz" && user?.role === "admin" && <AnalizHavuzBakim apiBase={API} />}
+      {ayarSekme === "metin_kalite" && (user?.role === "admin" || user?.role === "coordinator") && <MetinKaliteRiski apiBase={API} />}
 
       {ayarSekme === "ozellikler" && (
         <Card className="border border-line shadow-sm">

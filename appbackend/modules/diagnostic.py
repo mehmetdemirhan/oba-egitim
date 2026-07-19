@@ -1128,6 +1128,15 @@ async def tamamla_oturum(oturum_id: str, data: AnalizTamamla, current_user=Depen
     # Öğrencinin kurunu güncelle
     await db.students.update_one({"id": oturum["ogrenci_id"]}, {"$set": {"kur": atanan_kur}})
 
+    # Metin kalite geri bildirimi istensin mi — öğretmen bu metni HENÜZ puanlamadıysa (kullandıktan
+    # sonra kalite puanı ister; anti-farm ve keşif yolu 'metin kalitesi denetçisi' görevini besler).
+    kalite_gb_iste = False
+    if current_user.get("role") in ("teacher", "coordinator", "admin"):
+        _tid = current_user.get("linked_id") or current_user.get("id")
+        _var = await db.metin_kalite_geribildirim.find_one(
+            {"metin_id": oturum["metin_id"], "ogretmen_id": _tid}, {"_id": 1})
+        kalite_gb_iste = _var is None
+
     return {
         "wpm": wpm,
         "dogruluk_yuzde": dogruluk,
@@ -1135,7 +1144,10 @@ async def tamamla_oturum(oturum_id: str, data: AnalizTamamla, current_user=Depen
         "sistem_kur": sistem_kur,
         "atanan_kur": atanan_kur,
         "hata_sayilari": hata_sayilari,
-        "sure_saniye": data.sure_saniye
+        "sure_saniye": data.sure_saniye,
+        "kalite_gb_iste": kalite_gb_iste,
+        "metin_id": oturum["metin_id"],
+        "metin_baslik": oturum.get("metin_baslik") or (metin.get("baslik") if metin else ""),
     }
 
 
