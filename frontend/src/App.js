@@ -64,7 +64,7 @@ import ExerciseStarter from "./components/ExerciseStarter";
 import UnifiedExerciseGrid from "./components/exercises/UnifiedExerciseGrid";
 import { GOZ_YENI_EGZERSIZLER, GOZ_YENI_RENDER } from "./components/exercises/goz";
 import { HIZLI_OKUMA_EGZERSIZLER, HIZLI_OKUMA_RENDER } from "./components/exercises/hizli";
-import { EgzersizDuzen } from "./components/exercises/goz/ortak";
+import { EgzersizDuzen, metronomVurus } from "./components/exercises/goz/ortak";
 import OgretmenBasarilarim from "./components/gelisim/OgretmenBasarilarim";
 import OgretmenProfil from "./components/profil/OgretmenProfil";
 import ProfilGorunurlukAyarlari from "./components/admin/ProfilGorunurlukAyarlari";
@@ -3931,7 +3931,7 @@ function RaporGoruntule({ rapor, ogrenci, onGeri }) {
 // ═══════════════════════════════════════════════════════════════
 function EgzersizlerModul({ user, egzersizPuanlari = {}, onTamamla }) {
   const [aktifEgzersiz, setAktifEgzersiz] = useState(null);
-  const [egzersizAyar, setEgzersizAyar] = useState({ hiz: 2, boyut: 40, sure: 30, kelimeHiz: 300 });
+  const [egzersizAyar, setEgzersizAyar] = useState({ hiz: 2, boyut: 40, sure: 30, kelimeHiz: 300, bpm: 100, metronom: false });
   const canvasRef = React.useRef(null);
   const animRef = React.useRef(null);
   const [calisiyorMu, setCalisiyorMu] = useState(false);
@@ -4072,6 +4072,16 @@ function EgzersizlerModul({ user, egzersizPuanlari = {}, onTamamla }) {
     return () => clearTimeout(t);
   }, [calisiyorMu, kalanSure]);
 
+  // Metronom — goz-zigzag / goz-genisletme için BPM'e göre vuruş (isteğe bağlı ses)
+  React.useEffect(() => {
+    if (!calisiyorMu || !egzersizAyar.metronom) return;
+    if (!['goz-zigzag', 'goz-genisletme'].includes(aktifEgzersiz)) return;
+    const ms = Math.max(150, 60000 / (egzersizAyar.bpm || 100));
+    metronomVurus();
+    const id = setInterval(metronomVurus, ms);
+    return () => clearInterval(id);
+  }, [calisiyorMu, egzersizAyar.metronom, egzersizAyar.bpm, aktifEgzersiz]);
+
   // Canvas animasyonları
   React.useEffect(() => {
     if (!calisiyorMu || !canvasRef.current) return;
@@ -4080,7 +4090,8 @@ function EgzersizlerModul({ user, egzersizPuanlari = {}, onTamamla }) {
     const W = canvas.width = canvas.offsetWidth;
     const H = canvas.height = canvas.offsetHeight;
     let t = 0;
-    const speed = egzersizAyar.hiz;
+    // goz-zigzag / goz-genisletme artık BPM tabanlı tempo kullanır (2x/1x yerine 100 bpm gibi)
+    const speed = ['goz-zigzag', 'goz-genisletme'].includes(aktifEgzersiz) ? egzersizAyar.bpm / 60 : egzersizAyar.hiz;
     const sz = egzersizAyar.boyut;
 
     const draw = () => {
@@ -4300,9 +4311,13 @@ function EgzersizlerModul({ user, egzersizPuanlari = {}, onTamamla }) {
             koyu={KOYU_EGZ.includes(aktifEgzersiz)}
             aciklama={EGZ_ACIKLAMA[aktifEgzersiz]}
             ayarlar={<>
-              {aktifEgzersiz !== 'hizli-kelime' && (
+              {!['hizli-kelime', 'goz-zigzag', 'goz-genisletme'].includes(aktifEgzersiz) && (
                 <div><label className="text-xs text-subtle block mb-1">Hız</label><input type="range" min="0.5" max="5" step="0.5" value={egzersizAyar.hiz} onChange={e => setEgzersizAyar({...egzersizAyar, hiz: parseFloat(e.target.value)})} className="w-full" /><span className="text-xs font-medium">{egzersizAyar.hiz}x</span></div>
               )}
+              {['goz-zigzag', 'goz-genisletme'].includes(aktifEgzersiz) && (<>
+                <div><label className="text-xs text-subtle block mb-1">Hız (tempo)</label><input type="range" min="40" max="160" step="5" value={egzersizAyar.bpm} onChange={e => setEgzersizAyar({...egzersizAyar, bpm: parseInt(e.target.value)})} className="w-full" /><span className="text-xs font-medium">{egzersizAyar.bpm} bpm</span></div>
+                <label className="flex items-center gap-2 text-xs text-subtle cursor-pointer"><input type="checkbox" checked={egzersizAyar.metronom} onChange={e => setEgzersizAyar({...egzersizAyar, metronom: e.target.checked})} className="accent-indigo-600" />🔔 Metronom sesi</label>
+              </>)}
               {['goz-takip','goz-sekiz','goz-zigzag'].includes(aktifEgzersiz) && (
                 <div><label className="text-xs text-subtle block mb-1">Top Boyutu</label><input type="range" min="20" max="80" step="5" value={egzersizAyar.boyut} onChange={e => setEgzersizAyar({...egzersizAyar, boyut: parseInt(e.target.value)})} className="w-full" /><span className="text-xs font-medium">{egzersizAyar.boyut}px</span></div>
               )}

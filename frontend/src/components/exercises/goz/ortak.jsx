@@ -38,6 +38,20 @@ export function bipCal(freq = 880, sure = 0.08, ses = 0.15) {
 
 export const dogruSes = () => bipCal(660, 0.12, 0.12);
 export const yanlisSes = () => bipCal(180, 0.18, 0.14);
+export const metronomVurus = () => bipCal(1040, 0.05, 0.13);
+
+// ── BPM metronom hook ───────────────────────────────────────────────────
+// acik && calisiyor iken bpm'e göre (60000/bpm ms) düzenli metronom vuruşu çalar.
+// Egzersiz temposunu kulakla takip etmek için (2x/1x yerine 100 bpm gibi).
+export function useMetronom(bpm, acik, calisiyor) {
+  useEffect(() => {
+    if (!acik || !calisiyor || !bpm) return;
+    const ms = Math.max(150, 60000 / bpm);
+    metronomVurus();  // ilk vuruş hemen
+    const id = setInterval(metronomVurus, ms);
+    return () => clearInterval(id);
+  }, [bpm, acik, calisiyor]);
+}
 
 // ── Oturum hook'u — başlat/durdur + geri sayım ──────────────────────────
 // sure=0 → süresiz (interaktif skor egzersizleri). onTamamla süre dolunca

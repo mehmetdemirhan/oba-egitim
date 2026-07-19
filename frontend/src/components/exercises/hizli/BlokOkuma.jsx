@@ -3,10 +3,10 @@
 // sıçraması) odaklanır; geriye dönüş olmadan ileri okur. Tüm bloklar bitince puan.
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { EgzersizDuzen, useEgzersizOturum, Slider } from "../goz/ortak";
-import { useOkumaMetni, kelimelereBol, gruplara } from "./ortak";
+import { useOkumaMetni, kelimelereBol, gruplara, MetinSecici } from "./ortak";
 
 export default function BlokOkuma({ onTamamla }) {
-  const { metin, yukleniyor, hata, yenile } = useOkumaMetni(40);
+  const { metin, liste, sec, yukleniyor, hata, yenile } = useOkumaMetni(40);
   const [blokBoyu, setBlokBoyu] = useState(3);   // blok başına kelime
   const [hiz, setHiz] = useState(120);           // blok / dakika
   const [index, setIndex] = useState(0);
@@ -43,7 +43,10 @@ export default function BlokOkuma({ onTamamla }) {
     <>
       <Slider etiket="Blok Başına Kelime" deger={blokBoyu} min={1} max={5} onChange={setBlokBoyu} />
       <Slider etiket="Hız (blok/dakika)" deger={hiz} min={40} max={400} step={10} birim=" blok/dk" onChange={setHiz} />
-      <button onClick={yenile} className="w-full py-1.5 rounded-lg text-sm font-semibold border border-gray-200 bg-white text-gray-600 hover:bg-gray-50">🔄 Yeni Metin</button>
+      <div>
+        <label className="block text-xs text-gray-500 mb-1">Metin seç (onaylı havuz)</label>
+        <MetinSecici liste={liste} metin={metin} sec={sec} yenile={yenile} />
+      </div>
     </>
   );
   const aciklama = "Metin, blok blok (birkaç kelime) ekranın ortasında hızla gösterilir. Her bloğa tek bakışta odaklanın, geri dönmeden ileri okuyun. Blok boyutunu ve hızı ayarlardan değiştirebilirsiniz.";

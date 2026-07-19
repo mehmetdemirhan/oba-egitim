@@ -1,13 +1,15 @@
 // Dikey Zikzak Göz Egzersizi — top yukarıdan aşağıya zikzak çizerek iner.
 // Sütunlar arası dikey tarama ve satır geçiş becerisini geliştirir.
 import React, { useState } from "react";
-import { CanvasSahne, EgzersizDuzen, Slider, useEgzersizOturum } from "./ortak";
+import { CanvasSahne, EgzersizDuzen, Slider, SesToggle, useEgzersizOturum, useMetronom } from "./ortak";
 
 export default function DikeyZikzak({ onTamamla }) {
-  const [hiz, setHiz] = useState(1.5);
+  const [bpm, setBpm] = useState(100);      // tempo (metronom + görsel hız)
+  const [metronom, setMetronom] = useState(false);
   const [kolon, setKolon] = useState(4);   // dikey zikzak sütun sayısı
   const [sure, setSure] = useState(30);
   const { calisiyor, kalan, baslat, durdur } = useEgzersizOturum({ sure, onTamamla });
+  useMetronom(bpm, metronom, calisiyor);   // BPM'e göre metronom vuruşu
 
   const ciz = (ctx, W, H, t) => {
     const marj = 24;
@@ -50,11 +52,12 @@ export default function DikeyZikzak({ onTamamla }) {
     <EgzersizDuzen calisiyor={calisiyor} kalan={kalan} sure={sure} baslat={baslat} durdur={durdur}
       aciklama="Topu çapraz zikzak yol boyunca gözlerinizle takip edin. Başınızı sabit tutun."
       ayarlar={<>
-        <Slider etiket="Hız" deger={hiz} min={0.5} max={4} step={0.5} birim="x" onChange={setHiz} />
+        <Slider etiket="Hız (tempo)" deger={bpm} min={40} max={160} step={5} birim=" bpm" onChange={setBpm} />
         <Slider etiket="Dönüş" deger={kolon} min={2} max={6} onChange={setKolon} />
         <Slider etiket="Süre" deger={sure} min={10} max={120} step={10} birim="sn" onChange={setSure} />
+        <SesToggle acik={metronom} onChange={setMetronom} />
       </>}>
-      <CanvasSahne ciz={ciz} calisiyor={calisiyor} hiz={hiz} />
+      <CanvasSahne ciz={ciz} calisiyor={calisiyor} hiz={bpm / 60} />
     </EgzersizDuzen>
   );
 }
