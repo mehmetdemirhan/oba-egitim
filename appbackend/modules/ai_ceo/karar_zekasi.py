@@ -232,7 +232,10 @@ async def karar_teklifi_uret(kaynak_oneri_id: str | None = None) -> dict:
             f"Aşağıdaki JSON şemasında TEK teklif üret (başka metin yok):\n{_teklif_json_sema()}"
         )
         try:
-            res = await call_claude(_ayda_sistem_prompt(), user, max_tokens=3000, ozellik="ai_ceo_karar")
+            # FAZ 4 (madde 13): RAG öğrenme enjeksiyonu — karar üretiminde geçmiş dersler (ağırlık değişmez)
+            from .ogrenme import ogrenme_enjeksiyonu
+            _sistem = _ayda_sistem_prompt() + await ogrenme_enjeksiyonu("karar")
+            res = await call_claude(_sistem, user, max_tokens=3000, ozellik="ai_ceo_karar")
             parsed = res.get("parsed") if isinstance(res, dict) else None
             if not parsed and isinstance(res, dict) and res.get("text"):
                 import re as _re

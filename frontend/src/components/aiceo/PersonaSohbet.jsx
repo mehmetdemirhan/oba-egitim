@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import axios from "axios";
 import { Send, MessageSquare, AlertTriangle, ShieldAlert, Bot } from "lucide-react";
+import GeriBildirimWidget from "./GeriBildirimWidget";
 
 /**
  * PersonaSohbet — birleşik çok-persona sohbeti (FAZ 3, madde 11).
@@ -92,6 +93,9 @@ export default function PersonaSohbet({ apiBase, user }) {
                     {m.zayif_dayanak && <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5"><AlertTriangle className="h-3 w-3" />Zayıf dayanak: doğrulanamayan sayı{Array.isArray(m.dogrulanamayan_sayilar) && m.dogrulanamayan_sayilar.length ? ` (${m.dogrulanamayan_sayilar.join(", ")})` : ""}</span>}
                     {m.kaynak === "deterministik" && <span className="inline-flex items-center gap-1 text-[10px] text-slate-600 bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5"><ShieldAlert className="h-3 w-3" />Guard: deterministik güvenli cevap</span>}
                   </div>
+                )}
+                {m.id && m.kaynak !== "hata" && (
+                  <GeriBildirimWidget apiBase={apiBase} ajan={aktif} kaynakId={m.id} kaynakTur="sohbet" kategori={aktif} />
                 )}
               </div>
             </div>

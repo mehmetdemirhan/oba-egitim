@@ -3,6 +3,7 @@ import axios from "axios";
 import { Sparkles, RefreshCw, Activity, CheckCircle, XCircle, ShieldAlert, PlayCircle, GraduationCap, TrendingUp } from "lucide-react";
 import { PersonaBalon } from "./Personalar";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, ReferenceLine } from "recharts";
+import GeriBildirimWidget from "./GeriBildirimWidget";
 
 /**
  * KararZekasi — Ayda Kurumsal Karar Zekâsı (Faz 2). GERÇEK sistem fotoğrafından kanıtlı
@@ -158,6 +159,7 @@ export default function KararZekasi({ apiBase, user }) {
               </div>
               <div className="p-4 space-y-4">
                 {t._kaynak === "deterministik" && <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">Deterministik taslak (AI yok/ayrıştırılamadı) — sayılar gerçek metrikten, uydurma yok.</div>}
+                <GeriBildirimWidget apiBase={apiBase} ajan="karar" kaynakId={t.id} kaynakTur="karar" kategori="karar" />
 
                 {seviye === 1 && (
                   <>

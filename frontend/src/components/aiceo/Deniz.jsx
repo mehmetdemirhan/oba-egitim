@@ -3,6 +3,7 @@ import axios from "axios";
 import { ShieldCheck, Play, CheckCircle2, XCircle, RefreshCw, Copy, Check, RotateCw, ExternalLink } from "lucide-react";
 import BilgiIkonu from "../BilgiIkonu";
 import { PersonaBalon } from "./Personalar";
+import GeriBildirimWidget from "./GeriBildirimWidget";
 
 const ONEM_RENK = { kritik: "border-red-300 bg-red-50 text-red-700", orta: "border-amber-300 bg-amber-50 text-amber-700", dusuk: "border-slate-300 bg-slate-50 text-slate-600" };
 const DURUM_ET = { yeni: "Yeni", admin_gecerli: "Geçerli", admin_gecersiz: "Geçersiz", cozuldu: "Çözüldü" };
@@ -177,7 +178,10 @@ export default function Deniz({ apiBase, onNavigate }) {
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setSeciliBulgu(null)}>
           <div className="bg-surface rounded-2xl max-w-2xl w-full max-h-[88vh] overflow-auto p-5" onClick={e => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-2">
-              <h3 className="font-bold text-content">{seciliBulgu.ozet}</h3>
+              <div>
+                <h3 className="font-bold text-content">{seciliBulgu.ozet}</h3>
+                <GeriBildirimWidget apiBase={apiBase} ajan="deniz" kaynakId={seciliBulgu.id} kaynakTur="denetim" kategori={seciliBulgu.tur} />
+              </div>
               <span className={`text-[10px] px-1.5 py-0.5 rounded border ${ONEM_RENK[seciliBulgu.onem]}`}>{seciliBulgu.onem}</span>
             </div>
             {!detay ? <div className="text-sm text-subtle mt-3">Yükleniyor…</div> : (

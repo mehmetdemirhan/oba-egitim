@@ -7,6 +7,7 @@ import {
 import { Play, FileDown, RefreshCw, Send, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import BilgiIkonu from "../BilgiIkonu";
 import { PersonaBalon, PersonaRozet, AydaAvatar } from "./Personalar";
+import GeriBildirimWidget from "./GeriBildirimWidget";
 
 const KAT_ETIKET = {
   ogretmen_gelisimi: "Öğretmen Gelişimi", tahsilat: "Tahsilat", urun_iyilestirme: "Ürün",
@@ -561,6 +562,7 @@ export default function AiCeo({ apiBase }) {
             </div>
             <div className="text-sm text-content mt-2">{secili.ozet}</div>
             {secili.beklenen_etki && <div className="text-xs text-subtle mt-1">Beklenen etki: {secili.beklenen_etki}</div>}
+            <GeriBildirimWidget apiBase={apiBase} ajan="ayda" kaynakId={secili.id} kaynakTur="oneri" kategori={secili.kategori} />
             <div className="mt-3">
               <div className="text-xs font-semibold text-content mb-1">Dayanaklar</div>
               {(secili.dayanaklar || []).map((d, i) => (

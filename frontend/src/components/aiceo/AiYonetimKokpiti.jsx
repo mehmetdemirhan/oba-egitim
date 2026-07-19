@@ -3,7 +3,7 @@ import axios from "axios";
 import {
   LayoutDashboard, Activity, Cpu, GitBranch, Package, Search,
   RefreshCw, AlertTriangle, ChevronRight, ClipboardList, Bot, Gauge,
-  MessageSquare, Workflow,
+  MessageSquare, Workflow, Brain,
 } from "lucide-react";
 
 import AiCeo from "./AiCeo";
@@ -15,6 +15,7 @@ import DeployQueuePanel from "./DeployQueuePanel";
 import Deniz from "./Deniz";
 import PersonaSohbet from "./PersonaSohbet";
 import AjanAkislari from "./AjanAkislari";
+import OgrenmeSeviyesi from "./OgrenmeSeviyesi";
 
 /**
  * AiYonetimKokpiti — FAZ 1 kabuğu.
@@ -40,6 +41,7 @@ const GORUNUMLER = [
   { key: "deniz", ad: "Denetim — Deniz", ikon: Search },
   { key: "sohbet", ad: "Persona Sohbeti", ikon: MessageSquare },
   { key: "akislar", ad: "Nasıl Çalışıyor?", ikon: Workflow },
+  { key: "ogrenme", ad: "Öğrenme Seviyesi", ikon: Brain },
 ];
 
 // Öncelik kuyruğu kaynak rozetleri
@@ -114,6 +116,7 @@ export default function AiYonetimKokpiti({ apiBase, user, onNavigate, baslangicG
       case "deniz": return <Deniz apiBase={apiBase} onNavigate={onNavigate} />;
       case "sohbet": return <PersonaSohbet apiBase={apiBase} user={user} />;
       case "akislar": return <AjanAkislari />;
+      case "ogrenme": return <OgrenmeSeviyesi apiBase={apiBase} />;
       default: return null;
     }
   };

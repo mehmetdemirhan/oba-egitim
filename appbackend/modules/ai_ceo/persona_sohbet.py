@@ -26,6 +26,7 @@ from .analiz import _duz_degerler, _sayisal_kume
 from .sohbet import _baglam_getir, _cevap_dayanak_kontrol
 from .miran import ogretmen_odak, _guard_ihlali, _muhasebe_veri, _guard_muhasebe
 from . import squad_prompts
+from .ogrenme import ogrenme_enjeksiyonu
 
 router = APIRouter()
 
@@ -142,6 +143,10 @@ async def persona_sor(govde: dict, current_user=Depends(get_current_user)):
         system, user, baglam, guard = await _miran_baglam(current_user)
     else:  # squad ajanı
         system, user, baglam = await _squad_baglam(persona, govde.get("task_id"))
+
+    # FAZ 4 (madde 13): RAG öğrenme enjeksiyonu — geçmiş olumsuz geri bildirimler bağlama eklenir
+    # (model ağırlıkları DEĞİŞMEZ). Persona kendi dersleriyle sınırlıdır (leakage guard korunur).
+    system += await ogrenme_enjeksiyonu(persona)
 
     user += f"SORU: {soru}\n\nKısa, dayanaklı, düz metin cevap ver."
     res = await call_claude(system, user, max_tokens=1200, ozellik=f"persona_{persona}")

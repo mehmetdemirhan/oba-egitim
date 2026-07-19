@@ -180,6 +180,10 @@ async def calistir_analiz(tetik: str = "manuel", fotograf: dict | None = None, p
     except Exception:
         pass
     system, user = _analiz_prompt(ai_payload(fotograf), plan, denetim_notu)
+    # FAZ 4 (madde 13): RAG öğrenme enjeksiyonu — Ayda'nın geçmiş reddedilen önerilerinden ders
+    # (model ağırlıkları DEĞİŞMEZ, yalnız bağlam).
+    from .ogrenme import ogrenme_enjeksiyonu
+    system += await ogrenme_enjeksiyonu("ayda")
     parsed = None
     for _ in range(2):
         res = await call_claude(system, user, max_tokens=4000, ozellik="ceo_analiz")
