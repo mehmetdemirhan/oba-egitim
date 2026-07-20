@@ -5577,6 +5577,92 @@ function GirisAnaliziModul({ user, students, teachers }) {
 
 
 
+// Öğrenci profilinde: o öğrenciye ait TÜM Giriş Analizi raporları
+// (tamamlanmış → PDF indirilebilir) + erişilebilir yarım taslaklar (silinebilir).
+function AnalizRaporlariKart({ ogrenciId, ogrenci, user, toast }) {
+  const [raporlar, setRaporlar] = useState(null);
+  const [taslaklar, setTaslaklar] = useState([]);
+  const [pdfYuk, setPdfYuk] = useState("");
+
+  const yukle = useCallback(async () => {
+    if (!ogrenciId) { setRaporlar([]); setTaslaklar([]); return; }
+    try {
+      const [rRapor, rOturum] = await Promise.all([
+        axios.get(`${API}/diagnostic/rapor/ogrenci/${ogrenciId}`).catch(() => ({ data: [] })),
+        axios.get(`${API}/diagnostic/sessions/student/${ogrenciId}`).catch(() => ({ data: [] })),
+      ]);
+      setRaporlar(Array.isArray(rRapor.data) ? rRapor.data : []);
+      setTaslaklar((Array.isArray(rOturum.data) ? rOturum.data : []).filter(o => o.durum === "devam"));
+    } catch (e) { setRaporlar([]); setTaslaklar([]); }
+  }, [ogrenciId]);
+
+  useEffect(() => { yukle(); }, [yukle]);
+
+  const pdfIndir = async (rapor) => {
+    setPdfYuk(rapor.id);
+    try {
+      const r = await axios.get(`${API}/diagnostic/rapor/${rapor.id}/pdf`, { responseType: "blob" });
+      const url = URL.createObjectURL(r.data);
+      const a = document.createElement("a"); a.href = url;
+      a.download = `Analiz_Raporu_${(ogrenci?.ad || "ogrenci").trim()}.pdf`; a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) { hataBildir(toast, hataMetniCoz(e, "PDF indirilemedi")); } finally { setPdfYuk(""); }
+  };
+
+  const taslakSil = async (o) => {
+    if (!window.confirm("Bu yarım kalan analizi silmek istediğinize emin misiniz?")) return;
+    try {
+      await axios.delete(`${API}/diagnostic/sessions/${o.id}`);
+      toast({ title: "🗑️ Yarım analiz silindi" });
+      yukle();
+    } catch (e) { hataBildir(toast, hataMetniCoz(e, "Silinemedi")); }
+  };
+
+  if (raporlar === null) return null;
+  const gTarih = (t) => t ? new Date(t).toLocaleDateString("tr-TR") : "-";
+  const silebilir = (o) => user?.role === "admin" || o.ogretmen_id === user?.id;
+
+  return (
+    <Card className="border border-line shadow-sm">
+      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><FileText className="h-4 w-4" />Analiz Raporları (Giriş / Okuma)</CardTitle></CardHeader>
+      <CardContent className="space-y-3">
+        {/* Tamamlanmış raporlar */}
+        {raporlar.length > 0 ? (
+          <div className="space-y-1.5">
+            {raporlar.map(r => (
+              <div key={r.id} className="flex items-center justify-between gap-2 text-xs border border-line rounded-lg px-2.5 py-1.5">
+                <span className="text-content font-medium">{gTarih(r.olusturma_tarihi)}</span>
+                <span className="text-subtle flex-1 text-center tabular-nums">Anlama %{r.anlama_yuzde ?? "-"} • Prozodi {r.prozodik_toplam ?? "-"}/20</span>
+                <button onClick={() => pdfIndir(r)} disabled={pdfYuk === r.id} className="inline-flex items-center gap-1 text-primary hover:underline disabled:opacity-50"><Download className="h-3.5 w-3.5" />PDF</button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-xs text-subtle">Tamamlanmış analiz raporu yok</div>
+        )}
+
+        {/* Erişilebilir yarım taslaklar */}
+        {taslaklar.length > 0 && (
+          <div className="pt-2 border-t border-line">
+            <div className="text-xs font-semibold text-amber-700 mb-1">Yarım Kalan Taslaklar ({taslaklar.length})</div>
+            <div className="space-y-1">
+              {taslaklar.map(o => (
+                <div key={o.id} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="inline-flex items-center gap-1"><span className="text-[9px] font-bold uppercase bg-amber-200 text-amber-800 px-1 rounded">Yarım</span>{o.metin_baslik || "Metin"}</span>
+                  <span className="text-subtle">{gTarih(o.taslak_tarihi || o.olusturma_tarihi)}</span>
+                  {silebilir(o) && (
+                    <button onClick={() => taslakSil(o)} title="Yarım analizi sil" className="text-red-600 hover:text-red-700"><Trash2 className="h-3.5 w-3.5" /></button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ═══════════════════════════════════════════════
 // ÖĞRETMEN PANELİ — Sadece kendi öğrencileri, görev, analiz, mesaj
 // ═══════════════════════════════════════════════
@@ -5890,6 +5976,8 @@ function OgretmenPaneli({ user, logout }) {
 
             {/* TIMI Çoklu Zeka özeti */}
             <TimiOzetKart ogrenci={seciliOgrenci} />
+
+            <AnalizRaporlariKart ogrenciId={seciliOgrenci?.id} ogrenci={seciliOgrenci} user={user} toast={toast} />
 
             {/* 🤖 AI Koçluk Butonu + Sonuçlar */}
             {(() => {
