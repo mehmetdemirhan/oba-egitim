@@ -1822,6 +1822,12 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     # ESKİ raporlarda alan yoksa hepsini göster (geriye dönük — eski raporlar as-is).
     aktif_gruplar = rapor.get("aktif_anlama_gruplari") or ["4.1", "4.2", "4.3", "4.4", "4.5"]
 
+    # E: Öğrencinin ÖNCEKİ ölçüm raporu (varsa) — gelişim/trend mini-bölümü için
+    _onceki = await db.diagnostic_raporlar.find_one(
+        {"ogrenci_id": rapor.get("ogrenci_id"), "rapor_tipi": "olcum",
+         "olusturma_tarihi": {"$lt": rapor.get("olusturma_tarihi", "")}, "id": {"$ne": rapor.get("id")}},
+        sort=[("olusturma_tarihi", -1)])
+
     # D: sunucu tarafı vektör grafikler
     import core.rapor_grafik as grafik
     # Sınıf okuma hızı normu (gauge + karşılaştırma için) — "yeterli" eşiği hedef alınır
@@ -2097,6 +2103,35 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     el.append(t_p)
     el.append(RLPara(f"Prozodik okuma performansı: <b>{proz_sev}</b> (Toplam {proz_toplam}/20)", styles['BodyOBA']))
     el.append(grafik.prozodik_bar(proz_toplam))  # D: renk bantlı prozodik göstergesi
+
+    # ── E. GELİŞİM (ÖNCEKİ RAPORA GÖRE) ──
+    if _onceki:
+        el.append(RLPara("5.1. Gelişim (Önceki Rapora Göre)", styles['SubSectOBA']))
+        _onceki_t = str(_onceki.get("olusturma_tarihi", ""))[:10]
+        el.append(RLPara(f"Önceki ölçüm: <b>{_onceki_t}</b> tarihli rapor ile karşılaştırma:", styles['BodyOBA']))
+
+        def _fmtd(simdi_v, once_v, birim=""):
+            try:
+                d = float(simdi_v or 0) - float(once_v or 0)
+            except Exception:
+                d = 0
+            ok = "▲" if d > 0 else ("▼" if d < 0 else "▬")
+            renk = "#2E9E5B" if d > 0 else ("#D9534F" if d < 0 else "#888888")
+            isaret = "+" if d > 0 else ""
+            return f'<font color="{renk}">{ok} {isaret}{round(d, 1)}{birim}</font>'
+
+        trend_rows = [["Ölçüt", "Önceki", "Şimdi", "Değişim"]]
+        trend_rows.append(["Okuma Hızı (kelime/dk)", str(round(_onceki.get("wpm") or 0)), str(wpm),
+                           RLPara(_fmtd(rapor.get("wpm"), _onceki.get("wpm")), styles['BodyOBA'])])
+        trend_rows.append(["Doğru Okuma (%)", f"%{round(_onceki.get('dogruluk_yuzde') or 0)}", f"%{round(dogruluk)}",
+                           RLPara(_fmtd(rapor.get("dogruluk_yuzde"), _onceki.get("dogruluk_yuzde"), ""), styles['BodyOBA'])])
+        trend_rows.append(["Okuduğunu Anlama (%)", f"%{round(_onceki.get('anlama_yuzde') or 0)}", f"%{round(anlama_pct)}",
+                           RLPara(_fmtd(rapor.get("anlama_yuzde"), _onceki.get("anlama_yuzde"), ""), styles['BodyOBA'])])
+        trend_rows.append(["Prozodik (/20)", str(round(_onceki.get("prozodik_toplam") or 0)), str(proz_toplam),
+                           RLPara(_fmtd(rapor.get("prozodik_toplam"), _onceki.get("prozodik_toplam")), styles['BodyOBA'])])
+        t_tr = RLTable(trend_rows, colWidths=[6*cm, 3*cm, 3*cm, 3.5*cm])
+        t_tr.setStyle(TableStyle(tbl_style(len(trend_rows)) + [('ALIGN', (1, 0), (-1, -1), 'CENTER')]))
+        el.append(t_tr)
 
     # ── 6. SONUÇ VE GENEL YORUM ──
     el.append(RLPara("6. Sonuç ve Genel Yorum", styles['SectOBA']))
