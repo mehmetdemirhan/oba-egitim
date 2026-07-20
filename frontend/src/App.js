@@ -78,9 +78,38 @@ import { saveAs } from 'file-saver';
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
+// Genel hata metni çözücü — axios/FastAPI hatasını GÜVENLE okunur string'e çevirir.
+// FastAPI `detail` alanı string, {msg,loc,...} objesi VEYA obje dizisi (Pydantic v2
+// 422 doğrulama hataları: [{type,loc,msg,input,url}]) olabilir. Ham objeyi asla JSX'e
+// basmayız — aksi halde React #31 ("Objects are not valid as a React child") çöker.
+// `kaynak` bir hata objesi, bir detail değeri veya düz string olabilir.
+const hataMetniCoz = (kaynak, varsayilan = "İşlem başarısız oldu. Lütfen tekrar deneyin.") => {
+  if (kaynak == null) return varsayilan;
+  if (typeof kaynak === "string") return kaynak || varsayilan;
+  const coz = (d) => {
+    if (d == null) return "";
+    if (typeof d === "string") return d;
+    if (Array.isArray(d)) return d.map(coz).filter(Boolean).join("; ");
+    if (typeof d === "object") {
+      if (typeof d.msg === "string") {
+        const yer = Array.isArray(d.loc) ? d.loc.filter((x) => x !== "body").join(".") : "";
+        return yer ? `${yer}: ${d.msg}` : d.msg;
+      }
+      try { return JSON.stringify(d); } catch { return String(d); }
+    }
+    return String(d);
+  };
+  // axios hata nesnesi mi, doğrudan detail değeri mi?
+  const detail = kaynak?.response?.data?.detail ?? kaynak?.detail ?? kaynak;
+  const metin = coz(detail);
+  return metin || kaynak?.message || varsayilan;
+};
+
 // Ortak hata bildirimi — sessiz catch'ler yerine tutarlı kullanıcı uyarısı.
+// `mesaj` string, axios hatası veya ham FastAPI detail (obje/dizi) olabilir; hepsi
+// hataMetniCoz'dan geçirilir → toast'a asla ham obje verilmez.
 const hataBildir = (toast, mesaj = "İşlem başarısız oldu. Lütfen tekrar deneyin.") =>
-  toast?.({ title: mesaj, variant: "destructive" });
+  toast?.({ title: hataMetniCoz(mesaj), variant: "destructive" });
 const LIG_ESIKLERI_FE = { bronz: 0, gumus: 200, altin: 500, elmas: 1000 };
 
 function roleLabel(role) {
@@ -3472,6 +3501,9 @@ JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
         oturum_id: oturum.id,
         anlama: anlamaFull,
         prozodik: prozodikFull,
+        // Öğretmenin elle girdiği genel anlama yüzdesi (varsa) backend'de
+        // seviyelerden hesaplanan değerin yerine kullanılsın.
+        anlama_yuzde: Number.isFinite(anlama.genel_yuzde) && anlama.genel_yuzde > 0 ? anlama.genel_yuzde : undefined,
         ogretmen_notu: tamNot,
       });
 
@@ -3481,7 +3513,7 @@ JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
       toast({ title: "✅ Rapor oluşturuldu!" });
       onRaporTamamla(raporData);
     } catch(e) {
-      toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" });
+      hataBildir(toast, hataMetniCoz(e, "Rapor oluşturulamadı"));
     }
   };
 
@@ -5244,14 +5276,15 @@ function GirisAnaliziModul({ user, students, teachers }) {
             oturum_id: aktifOturumId,
             anlama: veri.anlama,
             prozodik: veri.prozodik,
+            anlama_yuzde: Number.isFinite(veri.anlama?.genel_yuzde) && veri.anlama.genel_yuzde > 0 ? veri.anlama.genel_yuzde : undefined,
             ogretmen_notu: veri.ogretmen_notu || "",
           });
           setAktifRapor(rRapor.data);
           setAdim("rapor-goruntule");
-        } catch(e2) { setAdim("sonuc"); hataBildir(toast, "Rapor kaydedilemedi; sonuç ekranına geçildi"); }
+        } catch(e2) { setAdim("sonuc"); hataBildir(toast, hataMetniCoz(e2, "Rapor kaydedilemedi; sonuç ekranına geçildi")); }
       } else { setAdim("sonuc"); }
     } catch(e) {
-      toast({ title: "Hata", description: e.response?.data?.detail || "Analiz tamamlanamadı", variant: "destructive" });
+      hataBildir(toast, hataMetniCoz(e, "Analiz tamamlanamadı"));
     }
   };
 

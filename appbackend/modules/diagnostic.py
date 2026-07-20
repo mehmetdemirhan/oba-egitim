@@ -9,7 +9,7 @@ import os
 import re
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Body, Query
 from fastapi.responses import StreamingResponse, Response
@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from core.db import db
 from core.auth import get_current_user, require_role, UserRole
 from core.sistem import get_puan_ayarlari
+from core.zaman import iso
 from core.metin_zorluk import zorluk_hesapla
 from core.rapor_ayarlari import (
     get_rapor_ayari, set_rapor_ayari, DUZENLENEBILIR_TIPLER,
@@ -1160,8 +1161,13 @@ async def tamamla_oturum(oturum_id: str, data: AnalizTamamla, current_user=Depen
 # Geriye dönük uyum: eski raporlarda anlama/prozodik zaten aynı id'li düz sözlük.
 class RaporOlusturCreate(BaseModel):
     oturum_id: str
-    anlama: Dict[str, str] = {}
-    prozodik: Dict[str, int] = {}
+    # NOT: anlama sözlüğü seviye string'leri (zayif/orta/iyi) yanında sayısal
+    # `genel_yuzde` gibi alanlar da taşıyabildiği için Dict[str, str] KATI şeması
+    # 422 doğrulama hatası veriyordu (Pydantic v2 int→str coerce etmez). Değerleri
+    # tüketen `anlama_yuzde_hesapla` zaten `isinstance(v, str)` ile süzüyor;
+    # `prozodik_toplam` da `int(v)` ile normalize ediyor → tolerant tut.
+    anlama: Dict[str, Any] = {}
+    prozodik: Dict[str, Any] = {}
     anlama_yuzde: Optional[int] = None   # verilmezse anlama'dan hesaplanır
     ogretmen_notu: str = ""
 
@@ -1246,7 +1252,7 @@ async def olustur_rapor(data: RaporOlusturCreate, current_user=Depends(get_curre
         "prozodik_toplam": prozodik_toplam,
         "ogretmen_notu": data.ogretmen_notu,
         "rapor_tipi": "olcum",   # olcum | gelisim
-        "olusturma_tarihi": datetime.utcnow().isoformat(),
+        "olusturma_tarihi": iso(),
     }
     await db.diagnostic_raporlar.insert_one(rapor_data)
     rapor_data.pop("_id", None)

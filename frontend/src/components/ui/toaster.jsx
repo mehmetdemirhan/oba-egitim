@@ -37,16 +37,35 @@ const ToastDescription = React.forwardRef(({ className, ...props }, ref) => (
 ))
 ToastDescription.displayName = ToastPrimitive.Description.displayName
 
+// Güvenlik ağı: title/description'a yanlışlıkla ham obje/dizi verilirse (örn.
+// FastAPI 422 detail dizisi [{type,loc,msg,input,url}]) React #31 ile çökmeyi
+// önle — her değeri okunur bir string'e indir.
+function guvenliMetin(deger) {
+  if (deger == null || typeof deger === "string") return deger
+  if (React.isValidElement(deger)) return deger
+  if (Array.isArray(deger)) return deger.map(guvenliMetin).filter(Boolean).join("; ")
+  if (typeof deger === "object") {
+    if (typeof deger.msg === "string") {
+      const yer = Array.isArray(deger.loc) ? deger.loc.filter((x) => x !== "body").join(".") : ""
+      return yer ? `${yer}: ${deger.msg}` : deger.msg
+    }
+    try { return JSON.stringify(deger) } catch { return String(deger) }
+  }
+  return String(deger)
+}
+
 function Toaster() {
   const { toasts } = useToast()
   return (
     <ToastProvider>
       {toasts.map(function ({ id, title, description, action, ...props }) {
+        const t = guvenliMetin(title)
+        const d = guvenliMetin(description)
         return (
           <Toast key={id} {...props}>
             <div className="grid gap-1">
-              {title && <ToastTitle>{title}</ToastTitle>}
-              {description && <ToastDescription>{description}</ToastDescription>}
+              {t && <ToastTitle>{t}</ToastTitle>}
+              {d && <ToastDescription>{d}</ToastDescription>}
             </div>
             {action}
             <ToastClose />
