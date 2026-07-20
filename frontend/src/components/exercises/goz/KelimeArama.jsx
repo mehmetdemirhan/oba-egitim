@@ -119,6 +119,7 @@ export default function KelimeArama({ onTamamla }) {
         {!calisiyor ? (
           <div className="h-[380px] flex flex-col items-center justify-center text-gray-400 text-sm text-center px-6">
             <div>▶ Başlat'a basın. Gizli kelimenin <strong className="mx-1">ilk ve son harfine</strong> tıklayarak seçin (yatay/dikey).</div>
+            <div className="mt-3"><ZorlukKontrol taban={taban} setTaban={setTaban} min={min} max={max} efektif={zorluk} /></div>
             <RekorRozeti rekor={rekor} sonSonuc={sonSonuc} />
           </div>
         ) : (

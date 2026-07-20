@@ -91,6 +91,7 @@ export default function BenzerKelimeler({ onTamamla }) {
         {!calisiyor ? (
           <div className="text-gray-400 text-sm text-center px-6">
             ▶ Başlat'a basın. İki kelimesi <strong>farklı</strong> olan kutuyu bulun.
+            <div className="mt-3 flex flex-col items-center"><ZorlukKontrol taban={taban} setTaban={setTaban} min={min} max={max} efektif={zorluk} /></div>
             <RekorRozeti rekor={rekor} sonSonuc={sonSonuc} />
           </div>
         ) : (

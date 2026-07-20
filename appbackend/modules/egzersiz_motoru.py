@@ -53,6 +53,50 @@ _MEB_KELIME_TIPLERI = {
 # Deyim/atasözü/tekerleme egzersizleri: AI içeriğine db.deyim_atasozu havuzunu enjekte et.
 _DEYIM_TIPLERI = {"deyim_eslestirme", "deyim_bosluk", "tekerleme_okuma"}
 
+# Kelime-anlam ÇİFTİ tabanlı tipler: AI'a GEREK YOK — onaylı MEB havuzundaki
+# kelime+anlam çiftlerinden yerel ve HER SEFERİNDE TAZE üretilir (aynı içerik
+# tekrarı sorununu kökten çözer; AI metin üretmekte zorlanınca da çalışır).
+_POOL_CIFTLER_TIPLERI = {"kelime_anlam_eslestirme", "hafiza_karti"}
+
+
+def _kisa_anlam(anlam: str, uzunluk: int = 60) -> str:
+    """Uzun sözlük anlamını eşleştirme kartına sığacak kısa ifadeye indir."""
+    a = (anlam or "").strip()
+    # İlk cümle/madde ayır (";", " / ", "." öncesi)
+    for ayirac in (";", " / ", ". "):
+        if ayirac in a:
+            a = a.split(ayirac)[0].strip()
+            break
+    return a[:uzunluk].strip() if len(a) > uzunluk else a
+
+
+async def _meb_kelime_anlam_ciftleri(sinif: int, limit: int = 80) -> list[dict]:
+    """Onaylı MEB havuzundan (anlamı dolu) kelime-anlam çiftleri: [{kelime, anlam}]."""
+    try:
+        from core.kelime_secici import meb_kelime_kayitlari
+        docs = await meb_kelime_kayitlari(sinif, sadece_anlamli=True, limit=limit)
+        ciftler = []
+        for d in docs:
+            k = str(d.get("kelime", "")).strip()
+            a = str(d.get("anlam", "")).strip()
+            if k and a:
+                ciftler.append({"kelime": k, "anlam": a})
+        return ciftler
+    except Exception as ex:
+        logging.warning(f"[egzersiz_motoru] kelime-anlam havuzu hatası: {ex}")
+        return []
+
+
+def _pool_ciftler_uret(havuz: list[dict], soru_sayisi: int, zorluk: str | None) -> dict | None:
+    """Kelime-anlam eşleştirme / hafıza kartı içeriğini havuzdan üretir (AI'sız, taze).
+    Zorluk arttıkça daha çok çift (ayırt etmesi güç). Rastgele seçim → her tur farklı."""
+    if not havuz or len(havuz) < 3:
+        return None
+    z = {"kolay": 1, "orta": 2, "zor": 3}.get((zorluk or "orta").lower(), 2)
+    adet = min(len(havuz), max(soru_sayisi, 2 + z + 1))  # kolay~4, orta~5, zor~6
+    secilen = random.sample(havuz, adet)
+    return {"ciftler": [{"sol": c["kelime"], "sag": _kisa_anlam(c["anlam"])} for c in secilen]}
+
 
 # ─────────────────────────────────────────────
 # Yardımcılar
@@ -131,6 +175,15 @@ async def _icerik_uret(tip: str, sinif: int, konu: str | None, zorluk: str | Non
     if meta.get("icerik_uretici") == "bulmaca":
         meb = await _meb_kelimeler(sinif)
         return bulmaca_uret(sinif, meb_kelimeler=meb or None), False
+
+    # Kelime-anlam çifti tabanlı tipler: ONAYLI HAVUZDAN taze üret (AI'sız). AI metin
+    # üretmekte zorlansa bile çalışır; her tur farklı kelime/anlam → tekrar sorunu yok.
+    if tip in _POOL_CIFTLER_TIPLERI:
+        havuz = await _meb_kelime_anlam_ciftleri(sinif, limit=80)
+        pool_icerik = _pool_ciftler_uret(havuz, soru_sayisi, zorluk)
+        if pool_icerik:
+            return pool_icerik, False   # mock değil — onaylı havuzdan gerçek içerik
+        # Havuz yetersizse (o sınıfta anlamlı kelime yok) AI/mock akışına düş.
 
     system, user_msg = prompt_uret(tip, sinif, konu, soru_sayisi, zorluk)
     if not user_msg:
@@ -281,6 +334,16 @@ async def _icerik_sec_veya_uret(tip: str, sinif: int, ekleyen_id: str,
        öğrencinin en ESKİ gördüğü içerik yeniden gösterilir — tüm havuz döndükten
        sonra makul bir aralıkla tekrar (spaced) demektir.
     """
+    # Pool tabanlı tipler (kelime-anlam): AI'sız + ucuz → kap dolana kadar HER
+    # oturumda TAZE üret (bayat mock'lar yerine hep farklı içerik). Kap dolunca
+    # aşağıdaki tekrarsız/en-eski akışına düşer.
+    if tip in _POOL_CIFTLER_TIPLERI:
+        mevcut = await db.egzersiz_icerikler.count_documents(_aktif_sorgu(tip, sinif))
+        if mevcut < KUTUPHANE_KAP:
+            icerik, mock = await _icerik_uret(tip, sinif, None, None, ogrenci_id)
+            if not mock and icerik.get("ciftler"):
+                return await _icerik_kaydet(tip, sinif, None, None, icerik, ekleyen_id, mock, kaynak="havuz_uretim")
+
     adaylar = await db.egzersiz_icerikler.find(_aktif_sorgu(tip, sinif)).sort(
         [("kullanim_sayisi", 1), ("son_kullanim_tarihi", 1)]
     ).to_list(length=KUTUPHANE_KAP + 30)
