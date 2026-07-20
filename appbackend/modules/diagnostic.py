@@ -1574,8 +1574,12 @@ def _gelisim_raporu_pdf(rapor: dict):
 
     # Metin tablosu (ön/son)
     el.append(RLPara("2. Ölçüm Metinleri", styles['GSect']))
+    # Metin adları Paragraph olarak sarılır → uzun adlar 6.5cm hücreye sığmayıp
+    # yan hücreyle üst üste biniyordu; Paragraph sütun içinde satır kaydırır.
+    _mtc = ParagraphStyle('mtc', fontSize=9, leading=11, alignment=TA_CENTER, fontName=FONT)
     mt = [["", "Ön Test (İlk Ölçüm)", "Son Test (Kur Sonu)"],
-          ["Metin", _tr_upper(rapor.get("ilk_metin_adi", "-")), _tr_upper(rapor.get("son_metin_adi", "-"))]]
+          ["Metin", RLPara(_tr_upper(rapor.get("ilk_metin_adi", "-")), _mtc),
+           RLPara(_tr_upper(rapor.get("son_metin_adi", "-")), _mtc)]]
     tm = RLTable(mt, colWidths=[3*cm, 6.5*cm, 6.5*cm])
     tm.setStyle(TableStyle([('GRID', (0,0), (-1,-1), 0.5, bdr), ('FONTSIZE', (0,0), (-1,-1), 9),
         ('FONTNAME', (0,0), (-1,-1), FONT), ('BACKGROUND', (0,0), (-1,0), hdr_bg), ('TEXTCOLOR', (0,0), (-1,0), colors.white),
@@ -1711,6 +1715,9 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     styles.add(ParagraphStyle(name='BodyOBA', fontSize=9, leading=13, spaceAfter=4, fontName=FONT))
     styles.add(ParagraphStyle(name='SmallOBA', fontSize=8, leading=11, textColor=colors.HexColor('#999999'), fontName=FONT))
     styles.add(ParagraphStyle(name='BigNum', fontSize=28, leading=32, textColor=colors.HexColor('#1F4E79'), fontName=FONTB))
+    # Büyük (28pt) satır-içi sayı için: leading küçük kalırsa (BodyOBA=13) rakam
+    # üst/alt satıra biner. Satır yüksekliğini 34'e çıkararak çakışmayı önle.
+    styles.add(ParagraphStyle(name='HizBig', fontSize=9, leading=34, spaceAfter=2, fontName=FONT))
 
     el = []  # elements
 
@@ -1795,7 +1802,7 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     hiz_map = {"dusuk": "Düşük", "orta": "Orta", "yeterli": "Yeterli", "ileri": "İleri"}
     hiz_label = hiz_map.get(rapor.get("hiz_deger", ""), "?")
     hiz_renk = {"dusuk": "#E74C3C", "orta": "#F39C12", "yeterli": "#27AE60", "ileri": "#2E86C1"}.get(rapor.get("hiz_deger", ""), "#333")
-    el.append(RLPara(f'<font size="28" color="{hiz_renk}"><b>{wpm}</b></font>  <font size="10">kelime/dakika</font>', styles['BodyOBA']))
+    el.append(RLPara(f'<font size="28" color="{hiz_renk}"><b>{wpm}</b></font>  <font size="10">kelime/dakika</font>', styles['HizBig']))
     el.append(RLPara(f'<font size="12" color="{hiz_renk}"><b>{hiz_label} Düzey</b></font>', styles['BodyOBA']))
     el.append(Spacer(1, 4))
     sinif = rapor.get("ogrenci_sinif", "")
@@ -1905,26 +1912,30 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     }
     proz_labels = {"noktalama": "Noktalama ve Duraklama", "vurgu": "Vurgu", "tonlama": "Tonlama", "akicilik": "Akıcılık", "anlamli_gruplama": "Anlamlı Gruplama"}
 
+    # Hücreleri Paragraph olarak sar → düz string'ler sütuna sığmayıp yan hücreye
+    # taşıyordu (örn. "Noktalama ve Duraklama" ↔ "Uymuyor" üst üste biniyordu).
+    # Paragraph sütun genişliğinde satır kaydırır; seçili puan turuncu+kalın markup ile.
+    pcC = ParagraphStyle('pcC', fontSize=8, leading=10, alignment=TA_CENTER, fontName=FONT)
+    pcL = ParagraphStyle('pcL', fontSize=8, leading=10, alignment=TA_LEFT, fontName=FONTB)
+    pcN = ParagraphStyle('pcN', fontSize=9, leading=11, alignment=TA_CENTER, fontName=FONTB)
+
     proz_rows = [["Ölçüt", "1 puan", "2 puan", "3 puan", "4 puan", "Puan"]]
     for key in ["noktalama", "vurgu", "tonlama", "akicilik", "anlamli_gruplama"]:
         puan = proz.get(key, 0)
         descs = proz_desc.get(key, ["", "", "", ""])
-        row = [proz_labels.get(key, key)]
+        row = [RLPara(proz_labels.get(key, key), pcL)]
         for pi in range(4):
-            row.append(descs[pi])
-        row.append(str(puan))
+            d = descs[pi] or ""
+            if pi + 1 == puan:
+                row.append(RLPara(f'<font color="#E67E22"><b>{d}</b></font>', pcC))
+            else:
+                row.append(RLPara(d, pcC))
+        row.append(RLPara(str(puan), pcN))
         proz_rows.append(row)
     proz_rows.append(["", "", "", "", "Toplam", str(proz_toplam)])
 
     t_p = RLTable(proz_rows, colWidths=[2.8*cm, 2.5*cm, 2.5*cm, 2.5*cm, 2.8*cm, 1.5*cm])
     ps = tbl_style(len(proz_rows))
-    # Seçili puanı turuncu yap
-    for ri in range(1, len(proz_rows) - 1):
-        key = list(proz_desc.keys())[ri - 1]
-        puan = proz.get(key, 0)
-        if 1 <= puan <= 4:
-            ps.append(('TEXTCOLOR', (puan, ri), (puan, ri), ora))
-            ps.append(('FONTNAME', (puan, ri), (puan, ri), FONTB))
     ps.append(('ALIGN', (5, 0), (5, -1), 'CENTER'))
     ps.append(('FONTNAME', (0, -1), (-1, -1), FONTB))
     ps.append(('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#E8F0FE')))
