@@ -5668,9 +5668,19 @@ function AnalizRaporlariKart({ ogrenciId, ogrenci, user, toast }) {
     } catch (e) { hataBildir(toast, hataMetniCoz(e, "Silinemedi")); }
   };
 
+  const raporSil = async (r) => {
+    if (!window.confirm("Bu tamamlanmış analiz raporunu silmek istediğinize emin misiniz? Bu işlem geri alınamaz.")) return;
+    try {
+      await axios.delete(`${API}/diagnostic/rapor/${r.id}`);
+      toast({ title: "🗑️ Analiz raporu silindi" });
+      yukle();
+    } catch (e) { hataBildir(toast, hataMetniCoz(e, "Rapor silinemedi")); }
+  };
+
   if (raporlar === null) return null;
   const gTarih = (t) => t ? new Date(t).toLocaleDateString("tr-TR") : "-";
-  const silebilir = (o) => user?.role === "admin" || o.ogretmen_id === user?.id;
+  // Silme yetkisi: admin/koordinatör her zaman; öğretmen yalnız kendi raporu (backend de doğrular).
+  const silebilir = (o) => user?.role === "admin" || user?.role === "coordinator" || o.ogretmen_id === user?.id;
 
   return (
     <Card className="border border-line shadow-sm">
@@ -5684,6 +5694,9 @@ function AnalizRaporlariKart({ ogrenciId, ogrenci, user, toast }) {
                 <span className="text-content font-medium">{gTarih(r.olusturma_tarihi)}</span>
                 <span className="text-subtle flex-1 text-center tabular-nums">Anlama %{r.anlama_yuzde ?? "-"} • Prozodi {r.prozodik_toplam ?? "-"}/20</span>
                 <button onClick={() => pdfIndir(r)} disabled={pdfYuk === r.id} className="inline-flex items-center gap-1 text-primary hover:underline disabled:opacity-50"><Download className="h-3.5 w-3.5" />PDF</button>
+                {silebilir(r) && (
+                  <button onClick={() => raporSil(r)} title="Analiz raporunu sil" className="text-red-600 hover:text-red-700 shrink-0"><Trash2 className="h-3.5 w-3.5" /></button>
+                )}
               </div>
             ))}
           </div>

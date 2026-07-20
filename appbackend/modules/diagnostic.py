@@ -1139,6 +1139,30 @@ async def sil_oturum(oturum_id: str, current_user=Depends(get_current_user)):
     return {"message": "Silindi", "taslak": True}
 
 
+@router.delete("/diagnostic/rapor/{rapor_id}")
+async def sil_rapor(rapor_id: str, current_user=Depends(get_current_user)):
+    """Tamamlanmış analiz raporunu (ve bağlı oturumu) siler — öğrenci profilinden.
+    Yetki: admin, koordinatör VEYA raporu oluşturan öğretmen. islem_log'a düşer."""
+    rapor = await db.diagnostic_raporlar.find_one({"id": rapor_id})
+    if not rapor:
+        raise HTTPException(status_code=404, detail="Rapor bulunamadı")
+    rol = current_user.get("role")
+    sahip = rapor.get("ogretmen_id") == current_user.get("id")
+    if not (rol in ("admin", "coordinator") or (rol == "teacher" and sahip)):
+        raise HTTPException(status_code=403, detail="Bu raporu silme yetkiniz yok")
+
+    oturum_id = rapor.get("oturum_id")
+    await db.diagnostic_raporlar.delete_one({"id": rapor_id})
+    # Aynı oturuma bağlı diğer raporlar (ör. gelişim) + oturumun kendisi de temizlenir.
+    if oturum_id:
+        await db.diagnostic_raporlar.delete_many({"oturum_id": oturum_id})
+        await db.diagnostic_oturumlar.delete_one({"id": oturum_id})
+    from core.audit import islem_kaydet
+    await islem_kaydet(current_user, "diagnostic", "analiz_rapor_sil", "diagnostic_rapor", rapor_id,
+                       "oturum_id", oturum_id, "silindi")
+    return {"message": "Rapor silindi", "oturum_silindi": bool(oturum_id)}
+
+
 async def _analiz_temizlik() -> dict:
     """15 günü geçmiş tamamlanmamış analiz oturumlarını siler; 13-15 gün arasındakilere başlatan
     öğretmene uyarı. Ortak temizleyici (core.temizlik) — TIMI taslak temizliğiyle aynı mekanizma."""
