@@ -100,7 +100,8 @@ from starlette.responses import JSONResponse as _JSONResponse
 from core.bakim import bakim_durumu as _bakim_durumu
 from core.auth import decode_token as _decode_token
 
-_BAKIM_MUAF = ("/api/sistem/durum", "/api/auth/login", "/api/funnel/whatsapp/webhook")
+_BAKIM_MUAF = ("/api/sistem/durum", "/api/auth/login", "/api/funnel/whatsapp/webhook",
+               "/api/anketler/anket")  # girişsiz veli anketi (public token) bakımdan muaf
 
 class BakimMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):

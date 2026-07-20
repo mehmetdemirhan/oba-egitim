@@ -4,6 +4,7 @@ import axios from "axios";
 import { useAuth } from "./context/AuthContext";
 import LoginPage from "./pages/LoginPage";
 import SifreSifirla from "./pages/SifreSifirla";
+import VeliAnketPublic from "./pages/VeliAnketPublic";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
@@ -500,6 +501,12 @@ function AppContent() {
         </div>
       </div>
     );
+  }
+
+  // Girişsiz veli anketi: /veli-anket?token=... → auth durumundan bağımsız (login olsa da olmasa da) anket ekranı
+  {
+    const _atok = new URLSearchParams(window.location.search).get("token");
+    if (window.location.pathname === "/veli-anket" && _atok) return <VeliAnketPublic token={_atok} />;
   }
 
   if (!user) {
@@ -5663,6 +5670,75 @@ function AnalizRaporlariKart({ ogrenciId, ogrenci, user, toast }) {
   );
 }
 
+// Öğrenci profilinde: girişsiz veli memnuniyet anketi linki üret + (ops.) SMS/WhatsApp gönder.
+function AnketLinkKart({ ogrenci, user, toast }) {
+  const [link, setLink] = useState("");
+  const [gonder, setGonder] = useState(false);
+  const [kanal, setKanal] = useState("sms");
+  const [yuk, setYuk] = useState(false);
+  const [gonderim, setGonderim] = useState(null);
+  const [kopyalandi, setKopyalandi] = useState(false);
+
+  const ogretmenId = user?.role === "teacher" ? user.id : (ogrenci?.ogretmen_id || "");
+  const telefon = ogrenci?.veli_telefon || "";
+
+  const olustur = async () => {
+    if (!ogrenci?.id) return;
+    setYuk(true); setGonderim(null);
+    try {
+      const r = await axios.post(`${API}/anketler/token`, {
+        ogretmen_id: ogretmenId,
+        ogrenci_id: ogrenci.id,
+        ogrenci_ad: `${ogrenci.ad || ""} ${ogrenci.soyad || ""}`.trim(),
+        veli_ad: ogrenci.veli_ad || "",
+        veli_telefon: telefon,
+        gonder: gonder && !!telefon,
+        kanal,
+      });
+      setLink(r.data?.link || "");
+      setGonderim(r.data?.gonderim || null);
+      if (r.data?.gonderim?.ok) toast({ title: "📤 Anket linki gönderildi" });
+      else if (gonder && !telefon) toast({ title: "Veli telefonu yok", description: "Link üretildi; elle paylaşabilirsiniz.", variant: "destructive" });
+      else toast({ title: "🔗 Anket linki oluşturuldu" });
+    } catch (e) { hataBildir(toast, hataMetniCoz(e, "Anket linki oluşturulamadı")); } finally { setYuk(false); }
+  };
+
+  const kopyala = async () => {
+    try { await navigator.clipboard.writeText(link); setKopyalandi(true); setTimeout(() => setKopyalandi(false), 1500); } catch (e) {}
+  };
+
+  return (
+    <Card className="border border-line shadow-sm">
+      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><Star className="h-4 w-4" />Veli Memnuniyet Anketi (girişsiz link)</CardTitle></CardHeader>
+      <CardContent className="space-y-2">
+        <p className="text-xs text-subtle">Veli panele girmeden, süreli tek-kullanımlık linkle öğretmeni değerlendirir. Sonuç doğrudan "Veli Değerlendirme Özeti"ne işlenir.</p>
+        <label className="flex items-center gap-2 text-xs text-content">
+          <input type="checkbox" checked={gonder} onChange={e => setGonder(e.target.checked)} disabled={!telefon} />
+          Linki veliye {telefon ? `(${telefon})` : "(telefon yok)"} gönder
+          {gonder && telefon && (
+            <select value={kanal} onChange={e => setKanal(e.target.value)} className="ml-1 border border-line rounded px-1 py-0.5 text-xs">
+              <option value="sms">SMS</option>
+              <option value="whatsapp">WhatsApp</option>
+            </select>
+          )}
+        </label>
+        <Button onClick={olustur} disabled={yuk || !ogrenci?.id} size="sm" className="bg-primary hover:bg-primary-hover text-white text-xs h-8">
+          {yuk ? "Oluşturuluyor…" : "Anket Linki Oluştur"}
+        </Button>
+        {link && (
+          <div className="flex items-center gap-2 mt-1">
+            <input readOnly value={link} className="flex-1 min-w-0 text-[11px] border border-line rounded-lg px-2 py-1 bg-app text-subtle" onFocus={e => e.target.select()} />
+            <button onClick={kopyala} className="text-xs text-primary hover:underline shrink-0">{kopyalandi ? "✓ Kopyalandı" : "Kopyala"}</button>
+          </div>
+        )}
+        {gonderim && !gonderim.ok && (
+          <div className="text-[11px] text-amber-600">Gönderim yapılamadı ({gonderim.hata || gonderim.durum || "kanal yapılandırılmamış"}). Linki elle paylaşabilirsiniz.</div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ═══════════════════════════════════════════════
 // ÖĞRETMEN PANELİ — Sadece kendi öğrencileri, görev, analiz, mesaj
 // ═══════════════════════════════════════════════
@@ -5978,6 +6054,8 @@ function OgretmenPaneli({ user, logout }) {
             <TimiOzetKart ogrenci={seciliOgrenci} />
 
             <AnalizRaporlariKart ogrenciId={seciliOgrenci?.id} ogrenci={seciliOgrenci} user={user} toast={toast} />
+
+            <AnketLinkKart ogrenci={seciliOgrenci} user={user} toast={toast} />
 
             {/* 🤖 AI Koçluk Butonu + Sonuçlar */}
             {(() => {
