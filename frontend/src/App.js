@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./components/ui/dialog";
 import { Badge } from "./components/ui/badge";
-import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send, Bell, Database, RefreshCw, GitBranch, AlertTriangle, Package, ClipboardList, Flame, Target, Award, Heart, FlaskConical, Medal, Lock, Sparkles, Lightbulb, MessageCircle, TrendingUp, Palette, Brain, XCircle, Check, Clock, Save, Image as ImageIcon, ArrowLeft, ArrowRight, Play, Pause, Settings, Music, Printer, Search, Link2, Pin, Upload, Activity, ScrollText, HelpCircle, Archive, ArchiveRestore } from "lucide-react";
+import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send, Bell, Database, RefreshCw, GitBranch, AlertTriangle, Package, ClipboardList, Flame, Target, Award, Heart, FlaskConical, Medal, Lock, Sparkles, Lightbulb, MessageCircle, TrendingUp, Palette, Brain, XCircle, Check, Clock, Save, Image as ImageIcon, ArrowLeft, ArrowRight, Play, Pause, Settings, Music, Printer, Search, Link2, Pin, Upload, Activity, ScrollText, HelpCircle, Archive, ArchiveRestore, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { useToast } from "./hooks/use-toast";
 import { IkonCoz } from "./lib/ikonlar";
 import { Toaster } from "./components/ui/toaster";
@@ -112,6 +112,35 @@ const hataMetniCoz = (kaynak, varsayilan = "İşlem başarısız oldu. Lütfen t
 // hataMetniCoz'dan geçirilir → toast'a asla ham obje verilmez.
 const hataBildir = (toast, mesaj = "İşlem başarısız oldu. Lütfen tekrar deneyin.") =>
   toast?.({ title: hataMetniCoz(mesaj), variant: "destructive" });
+
+// responseType:'blob' isteklerinde HATA gövdesi de Blob olur → e.response.data.detail
+// her zaman undefined. Gerçek sunucu mesajını okumak için Blob'u metne çevir.
+const blobHataCoz = async (e, varsayilan = "İşlem başarısız oldu.") => {
+  try {
+    const d = e?.response?.data;
+    if (d instanceof Blob) {
+      const txt = await d.text();
+      try { return hataMetniCoz(JSON.parse(txt), varsayilan); } catch { return txt || varsayilan; }
+    }
+  } catch {}
+  return hataMetniCoz(e, varsayilan);
+};
+
+// Ortak dosya (PDF/blob) indirme — indirir; hata olursa gerçek nedeni bildirir.
+const dosyaIndir = async (url, dosyaAd, toast, varsayilan = "Dosya indirilemedi") => {
+  try {
+    const r = await axios.get(url, { responseType: "blob" });
+    const nesne = URL.createObjectURL(r.data);
+    const a = document.createElement("a"); a.href = nesne; a.download = dosyaAd;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(nesne), 1000);
+    return true;
+  } catch (e) {
+    hataBildir(toast, await blobHataCoz(e, varsayilan));
+    return false;
+  }
+};
+
 const LIG_ESIKLERI_FE = { bronz: 0, gumus: 200, altin: 500, elmas: 1000 };
 
 function roleLabel(role) {
@@ -2761,17 +2790,26 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, onAnasayfayaD
   const [gozlemNotu, setGozlemNotu] = useState("");
   const intervalRef = useRef(null);
 
-  // Yazı boyutu (14–24 px) — localStorage'da kalıcı
+  // Yazı boyutu (14–40 px) — localStorage'da kalıcı. Geniş aralık: metni okuyamayan
+  // öğretmen/öğrenci puntoyu belirgin biçimde büyütebilsin.
+  const FONT_MIN = 14, FONT_MAX = 40;
   const FONT_KEY = "oba.canli.fontSize";
   const [fontSize, setFontSize] = useState(() => {
     try {
       const v = parseInt(localStorage.getItem(FONT_KEY) || "", 10);
-      return v >= 14 && v <= 24 ? v : 18;
+      return v >= FONT_MIN && v <= FONT_MAX ? v : 18;
     } catch { return 18; }
   });
   useEffect(() => { try { localStorage.setItem(FONT_KEY, String(fontSize)); } catch {} }, [fontSize]);
-  const fontKucult = () => setFontSize(s => Math.max(14, s - 2));
-  const fontBuyut  = () => setFontSize(s => Math.min(24, s + 2));
+  const fontKucult = () => setFontSize(s => Math.max(FONT_MIN, s - 2));
+  const fontBuyut  = () => setFontSize(s => Math.min(FONT_MAX, s + 2));
+
+  // Sağ değerlendirme paneli (Hata Takibi / Anlama / Prozodik) aç-kapa — kalıcı.
+  const SAGPANEL_KEY = "oba.canli.sagPanel";
+  const [sagPanelAcik, setSagPanelAcik] = useState(() => {
+    try { return localStorage.getItem(SAGPANEL_KEY) !== "0"; } catch { return true; }
+  });
+  useEffect(() => { try { localStorage.setItem(SAGPANEL_KEY, sagPanelAcik ? "1" : "0"); } catch {} }, [sagPanelAcik]);
 
   // Cümle bazlı parse — paragraf paragraf, her cümle sonunda kümülatif kelime sayısı
   const paragraflar = React.useMemo(() => {
@@ -2793,13 +2831,14 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, onAnasayfayaD
   }, [metin?.icerik]);
 
   const FontKontrol = ({ light = false }) => (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-1" title="Metin punto boyutu">
       <button onClick={fontKucult} aria-label="Yazıyı küçült"
-        className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${light ? 'bg-white/70 hover:bg-surface text-content border border-line' : 'bg-app hover:bg-line text-content'}`}
-        disabled={fontSize <= 14}>A−</button>
+        className={`w-8 h-8 rounded-lg text-xs font-bold transition-all disabled:opacity-40 ${light ? 'bg-white/70 hover:bg-surface text-content border border-line' : 'bg-app hover:bg-line text-content'}`}
+        disabled={fontSize <= FONT_MIN}>A−</button>
+      <span className="text-xs text-subtle tabular-nums w-9 text-center select-none">{fontSize}px</span>
       <button onClick={fontBuyut} aria-label="Yazıyı büyüt"
-        className={`w-8 h-8 rounded-lg text-sm font-bold transition-all ${light ? 'bg-white/70 hover:bg-surface text-content border border-line' : 'bg-app hover:bg-line text-content'}`}
-        disabled={fontSize >= 24}>A+</button>
+        className={`w-8 h-8 rounded-lg text-base font-bold transition-all disabled:opacity-40 ${light ? 'bg-white/70 hover:bg-surface text-content border border-line' : 'bg-app hover:bg-line text-content'}`}
+        disabled={fontSize >= FONT_MAX}>A+</button>
     </div>
   );
 
@@ -2940,6 +2979,10 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, onAnasayfayaD
         </div>
         <div className="flex items-center gap-4">
           <FontKontrol />
+          <button onClick={() => setSagPanelAcik(v => !v)} title={sagPanelAcik ? "Değerlendirme panelini gizle" : "Değerlendirme panelini göster"}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-line text-sm text-subtle hover:bg-app">
+            {sagPanelAcik ? <><PanelRightClose className="h-4 w-4" /><span className="hidden sm:inline">Paneli Gizle</span></> : <><PanelRightOpen className="h-4 w-4" /><span className="hidden sm:inline">Paneli Göster</span></>}
+          </button>
           <div className="text-3xl font-mono font-bold text-content tabular-nums">{formatSure(sure)}</div>
           <button onClick={toggleSayac}
             className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-white font-medium transition-all ${calisıyor ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}>
@@ -2992,7 +3035,8 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, onAnasayfayaD
           )}
         </div>
 
-        {/* Sağ panel: sekmeli form */}
+        {/* Sağ panel: sekmeli form (aç/kapa) */}
+        {sagPanelAcik && (
         <div className="w-96 bg-surface border-l overflow-y-auto flex flex-col">
           {/* Adım sekmeleri */}
           <div className="flex border-b shrink-0">
@@ -3135,6 +3179,7 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, onAnasayfayaD
               className="flex-1 inline-flex items-center justify-center gap-1 py-2 text-sm bg-primary hover:bg-primary-hover text-white rounded-xl disabled:opacity-30">İleri<ArrowRight className="h-4 w-4" /></button>
           </div>
         </div>
+        )}
       </div>
     </div>
   );
@@ -3963,15 +4008,8 @@ function RaporGoruntule({ rapor, ogrenci, onGeri }) {
       )}
 
       <div className="flex gap-3 pb-8">
-        <Button onClick={async () => {
-          try {
-            const r = await axios.get(`${API}/diagnostic/rapor/${rapor.id}/pdf`, { responseType: 'blob' });
-            const url = window.URL.createObjectURL(new Blob([r.data], { type: 'application/pdf' }));
-            const a = document.createElement('a'); a.href = url;
-            a.download = `Rapor_${rapor.ogrenci_ad?.replace(/\s/g,'_')}_${rapor.olusturma_tarihi?.slice(0,10)}.pdf`;
-            document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url);
-          } catch(e) { toast({ title: "PDF indirilemedi", description: e.response?.data?.detail || "Rapor PDF'i oluşturulamadı.", variant: "destructive" }); }
-        }} className="flex-1 bg-primary hover:bg-primary-hover text-white"><FileText className="h-4 w-4 mr-1" />PDF İndir</Button>
+        <Button onClick={() => dosyaIndir(`${API}/diagnostic/rapor/${rapor.id}/pdf`, `Rapor_${(rapor.ogrenci_ad || "ogrenci").replace(/\s/g,'_')}_${(rapor.olusturma_tarihi || "").slice(0,10)}.pdf`, toast, "Rapor PDF'i oluşturulamadı.")}
+          className="flex-1 bg-primary hover:bg-primary-hover text-white"><FileText className="h-4 w-4 mr-1" />PDF İndir</Button>
         <Button onClick={() => window.print()} variant="outline" className="flex-1"><Printer className="h-4 w-4 mr-1" />Yazdır</Button>
         <Button onClick={onGeri} variant="outline" className="flex-1"><ArrowLeft className="h-4 w-4 mr-1" />Geri</Button>
       </div>
@@ -4555,14 +4593,7 @@ function GelisimRaporuButonu({ students }) {
     setUretiliyor(false);
   };
 
-  const pdfIndir = async () => {
-    try {
-      const r = await axios.get(`${API}/diagnostic/rapor/${sonucRapor.id}/pdf`, { responseType: "blob" });
-      const url = URL.createObjectURL(r.data);
-      const a = document.createElement("a"); a.href = url; a.download = `Gelisim_Raporu.pdf`; a.click();
-      URL.revokeObjectURL(url);
-    } catch (e) { toast({ title: "PDF indirilemedi", variant: "destructive" }); }
-  };
+  const pdfIndir = () => dosyaIndir(`${API}/diagnostic/rapor/${sonucRapor.id}/pdf`, `Analiz_Raporu.pdf`, toast, "Rapor PDF'i oluşturulamadı.");
 
   const ot = (o) => `${new Date(o.olusturma_tarihi).toLocaleDateString("tr-TR")} • ${o.wpm} wpm • %${o.dogruluk_yuzde} • ${o.oturum_tipi || "analiz"}`;
 
@@ -5624,12 +5655,8 @@ function AnalizRaporlariKart({ ogrenciId, ogrenci, user, toast }) {
   const pdfIndir = async (rapor) => {
     setPdfYuk(rapor.id);
     try {
-      const r = await axios.get(`${API}/diagnostic/rapor/${rapor.id}/pdf`, { responseType: "blob" });
-      const url = URL.createObjectURL(r.data);
-      const a = document.createElement("a"); a.href = url;
-      a.download = `Analiz_Raporu_${(ogrenci?.ad || "ogrenci").trim()}.pdf`; a.click();
-      URL.revokeObjectURL(url);
-    } catch (e) { hataBildir(toast, hataMetniCoz(e, "PDF indirilemedi")); } finally { setPdfYuk(""); }
+      await dosyaIndir(`${API}/diagnostic/rapor/${rapor.id}/pdf`, `Analiz_Raporu_${(ogrenci?.ad || "ogrenci").trim()}.pdf`, toast, "Rapor PDF'i oluşturulamadı.");
+    } finally { setPdfYuk(""); }
   };
 
   const taslakSil = async (o) => {

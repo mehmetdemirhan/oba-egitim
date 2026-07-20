@@ -1494,11 +1494,11 @@ async def olustur_gelisim_raporu(data: GelisimRaporCreate,
 
 # ── PDF Rapor Üretimi ──
 def _tr_upper(text):
-    """Türkçe büyük harf çevirimi (i→İ, ı→I)"""
+    """Türkçe büyük harf çevirimi (i→İ, ı→I). None/boş → "-" (PDF hücresi güvenli)."""
     if not text:
-        return text
+        return "-"
     tr_map = str.maketrans("abcçdefgğhıijklmnoöprsştuüvyz", "ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZ")
-    return text.translate(tr_map)
+    return str(text).translate(tr_map)
 
 # Türkçe destekli PDF fontu — çok platformlu (Linux DejaVu, Windows Arial/Segoe,
 # macOS Arial). Bulunamazsa Helvetica'ya düşer (latin-1; TR karakterlerde patlar).
@@ -1591,7 +1591,7 @@ def _gelisim_raporu_pdf(rapor: dict):
     el.append(RLPara("3. Bireysel Gelişim Özet Tablosu", styles['GSect']))
     head = ["Ölçüt", "Ön Test", "Son Test", "Değişim", "Normlara Göre", "Gelişim"]
     rows = [head]
-    ozet = rapor.get("ozet_tablo", [])
+    ozet = rapor.get("ozet_tablo") or []
     for m in ozet:
         deg = m.get("degisim", 0)
         ok = yon_ikon.get(m.get("yon", "sabit"), "■")
@@ -1770,11 +1770,13 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
 
     # ── 2. METİN BİLGİLERİ ──
     el.append(RLPara("2. Metin Bilgileri", styles['SectOBA']))
-    kelime_s = rapor.get("kelime_sayisi", 0)
-    dogruluk = rapor.get("dogruluk_yuzde", 0)
+    # NOT: rapor.get(key, 0) alanda None SAKLIYSA None döner (default yalnız eksik
+    # anahtarda geçerli) → round(None)/int(None) çöker. Bu yüzden `or 0` ile normalize.
+    kelime_s = rapor.get("kelime_sayisi") or 0
+    dogruluk = rapor.get("dogruluk_yuzde") or 0
     yanlis_k = round(kelime_s * (100 - dogruluk) / 100) if kelime_s else 0
     dogru_k = kelime_s - yanlis_k
-    sure_sn_total = rapor.get("sure_saniye", 0)
+    sure_sn_total = rapor.get("sure_saniye") or 0
     sure_dk = int(sure_sn_total) // 60
     sure_sn = int(sure_sn_total) % 60
     metin_info = [
@@ -1798,7 +1800,7 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
 
     # ── 3. OKUMA HIZI ──
     el.append(RLPara("3. Okuma Hızı", styles['SectOBA']))
-    wpm = round(rapor.get("wpm", 0))
+    wpm = round(rapor.get("wpm") or 0)
     hiz_map = {"dusuk": "Düşük", "orta": "Orta", "yeterli": "Yeterli", "ileri": "İleri"}
     hiz_label = hiz_map.get(rapor.get("hiz_deger", ""), "?")
     hiz_renk = {"dusuk": "#E74C3C", "orta": "#F39C12", "yeterli": "#27AE60", "ileri": "#2E86C1"}.get(rapor.get("hiz_deger", ""), "#333")
@@ -1811,7 +1813,7 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     # ── 4. DOĞRU OKUMA ORANI ──
     el.append(RLPara("3.1. Doğru Okuma Oranı", styles['SubSectOBA']))
     el.append(RLPara(f"Doğruluk: <b>%{round(dogruluk)}</b>", styles['BodyOBA']))
-    hatalar = rapor.get("hata_sayilari", [])
+    hatalar = rapor.get("hata_sayilari") or []
     # Dict formatındaysa listeye çevir: {"atlama": 2, ...} → [{"tur": "atlama", "sayi": 2}]
     if isinstance(hatalar, dict):
         hatalar = [{"tur": k, "sayi": v} for k, v in hatalar.items()]
@@ -1835,8 +1837,8 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
         el.append(t3)
 
     # ── 5. OKUDUĞUNU ANLAMA ──
-    anlama = rapor.get("anlama", {})
-    anlama_pct = rapor.get("anlama_yuzde", 0)
+    anlama = rapor.get("anlama") or {}
+    anlama_pct = rapor.get("anlama_yuzde") or 0
     anlama_sev = "İyi" if anlama_pct >= 85 else "Orta" if anlama_pct >= 70 else "Zayıf"
     el.append(RLPara(f"4. Okuduğunu Anlama Becerileri — %{anlama_pct}", styles['SectOBA']))
 
@@ -1898,8 +1900,8 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
         el.append(t_a)
 
     # ── 6. PROZODİK OKUMA ──
-    proz = rapor.get("prozodik", {})
-    proz_toplam = rapor.get("prozodik_toplam", 0)
+    proz = rapor.get("prozodik") or {}
+    proz_toplam = rapor.get("prozodik_toplam") or 0
     proz_sev = "Çok İyi" if proz_toplam >= 18 else "İyi" if proz_toplam >= 14 else "Orta" if proz_toplam >= 10 else "Geliştirilmeli"
     el.append(RLPara("5. Prozodik Okuma Ölçeği", styles['SectOBA']))
 
