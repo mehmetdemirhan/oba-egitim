@@ -234,6 +234,92 @@ export function Skor({ deger }) {
   return <div className="mt-3 text-center text-sm font-bold text-green-600">Skor: {deger}</div>;
 }
 
+// ── Skor kaydı + kişisel rekor ───────────────────────────────────────────
+// Tur bitince kaydet({dogru,yanlis,sure_sn,zorluk}) çağrılır; backend doğruluk+
+// süre+zorluk bazlı skoru hesaplar ve kişisel rekoru döner.
+export function useSkorKayit(tip) {
+  const [rekor, setRekor] = useState(null);
+  const [sonSonuc, setSonSonuc] = useState(null); // {skor, rekor, yeni_rekor}
+  useEffect(() => {
+    let iptal = false;
+    axios.get(`${API}/egzersiz/goz/rekorlar`)
+      .then((r) => { if (!iptal) setRekor(r.data?.[tip]?.rekor ?? 0); })
+      .catch(() => { if (!iptal) setRekor(0); });
+    return () => { iptal = true; };
+  }, [tip]);
+  const kaydet = useCallback(async ({ dogru, yanlis, sure_sn, zorluk }) => {
+    try {
+      const r = await axios.post(`${API}/egzersiz/goz/skor`, { tip, dogru, yanlis, sure_sn, zorluk });
+      setSonSonuc(r.data);
+      if (typeof r.data?.rekor === "number") setRekor(r.data.rekor);
+      return r.data;
+    } catch (e) { return null; }
+  }, [tip]);
+  return { rekor, sonSonuc, kaydet };
+}
+
+export function RekorRozeti({ rekor, sonSonuc }) {
+  if (rekor == null && !sonSonuc) return null;
+  const enYuksek = Math.max(rekor || 0, sonSonuc?.skor || 0);
+  return (
+    <div className="mt-3 text-center space-y-0.5">
+      {sonSonuc && (
+        <div className={`text-sm font-bold ${sonSonuc.yeni_rekor ? "text-amber-600" : "text-green-600"}`}>
+          {sonSonuc.yeni_rekor ? "🏆 Yeni Rekor! " : "Skor: "}{sonSonuc.skor}
+        </div>
+      )}
+      <div className="text-xs text-gray-500">🏆 En Yüksek Skor: <b>{enYuksek}</b></div>
+    </div>
+  );
+}
+
+// ── Zorluk: manuel taban (kalıcı) + adaptif (oturum içi kademeli) ─────────
+// Efektif zorluk = min(max, taban + adaptif). bildirSonuc(dogruMu): arka arkaya
+// `adaptifEsik` doğru → +1 seviye; yanlış → -1 (0'a kadar). Egzersiz bu `zorluk`
+// değerini kendi zorluk parametresine (kelime uzunluğu, çeldirici, süre vb.) çevirir.
+export function useZorluk(tip, { min = 1, max = 5, adaptifEsik = 3 } = {}) {
+  const anahtar = `oba.goz.zorluk.${tip}`;
+  const [taban, setTabanState] = useState(() => {
+    try { const v = parseInt(localStorage.getItem(anahtar) || "", 10); return v >= min && v <= max ? v : min; } catch { return min; }
+  });
+  const [adaptif, setAdaptif] = useState(0);
+  const streakRef = useRef(0);
+  const setTaban = useCallback((v) => {
+    const n = Math.min(max, Math.max(min, v));
+    setTabanState(n); try { localStorage.setItem(anahtar, String(n)); } catch {}
+  }, [anahtar, min, max]);
+  const zorluk = Math.min(max, taban + adaptif);
+  const bildirSonuc = useCallback((dogruMu) => {
+    if (dogruMu) {
+      streakRef.current += 1;
+      if (streakRef.current >= adaptifEsik) { streakRef.current = 0; setAdaptif((a) => Math.min(max - min, a + 1)); }
+    } else { streakRef.current = 0; setAdaptif((a) => Math.max(0, a - 1)); }
+  }, [adaptifEsik, max, min]);
+  const sifirla = useCallback(() => { streakRef.current = 0; setAdaptif(0); }, []);
+  return { zorluk, taban, setTaban, min, max, bildirSonuc, sifirla };
+}
+
+export function ZorlukKontrol({ taban, setTaban, min = 1, max = 5, efektif }) {
+  return (
+    <div>
+      <label className="text-xs text-gray-500 block mb-1">
+        Zorluk (taban){efektif != null && efektif > taban ? ` · anlık ${efektif}` : ""}
+      </label>
+      <div className="flex gap-1">
+        {Array.from({ length: max - min + 1 }, (_, i) => min + i).map((n) => (
+          <button key={n} onClick={() => setTaban(n)}
+            className={`w-8 h-8 rounded-lg text-sm font-bold border transition ${taban === n ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
+            {n}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Zorluk seviyesini bir aralığa oransal çevir (1..5 → düşük..yüksek).
+export const zorlukOrani = (zorluk, min, max) => min + ((Math.min(5, Math.max(1, zorluk)) - 1) / 4) * (max - min);
+
 // Türkçe karakter havuzları (grid/harf egzersizleri için).
 export const TR_HARFLER = "ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZ";
 export const TR_KELIMELER = "okuma kitap harf sözcük metin sayfa satır anlam kalem defter sınıf tahta pencere kapı masa hikaye masal roman şiir yazar çocuk anne baba kardeş arkadaş oyun park bahçe çiçek ağaç güneş yıldız bulut rüzgar yağmur deniz nehir orman kuş kedi köpek balık araba tren uçak gemi yol sokak şehir köy".split(" ");

@@ -38,6 +38,7 @@ router = APIRouter()
 # Bir içerik bu kadar kez kullanılınca (havuzdaki en az kullanılan bile) arka
 # planda taze içerik üretilir — kullanıcı beklemeden çeşitlilik korunur.
 YENILEME_ESIGI = 20
+KUTUPHANE_KAP = 100   # (tip, sınıf) başına azami özgün içerik — dolunca AI üretimi DURUR
 
 # Aynı (tip, sınıf) için aynı anda birden fazla arka plan üretimi tetiklenmesin.
 _yenileme_aktif: set = set()
@@ -251,33 +252,61 @@ def _aktif_sorgu(tip: str, sinif: int) -> dict:
     return {"tip": tip, "sinif": sinif, **_AKTIF}
 
 
+async def _ogrenci_gorulen_icerik(ogrenci_id: str | None, tip: str) -> dict:
+    """Öğrencinin bu tipte gördüğü {icerik_id: en_son_görülme_tarihi} eşlemesi
+    (öğrenci bazlı tekrarsızlık için). Öğrenci yoksa boş döner."""
+    if not ogrenci_id:
+        return {}
+    kayitlar = await db.egzersiz_oturumlari.find(
+        {"ogrenci_id": ogrenci_id, "tip": tip, "icerik_id": {"$ne": None}},
+        {"icerik_id": 1, "baslama_t": 1},
+    ).to_list(length=5000)
+    gorulen = {}
+    for k in kayitlar:
+        iid = k.get("icerik_id"); t = k.get("baslama_t") or ""
+        if iid and (iid not in gorulen or t > gorulen[iid]):
+            gorulen[iid] = t
+    return gorulen
+
+
 async def _icerik_sec_veya_uret(tip: str, sinif: int, ekleyen_id: str,
                                 ogrenci_id: str | None = None) -> dict:
-    """Oturum için kalıcı kütüphaneden içerik seçer.
+    """Oturum için kalıcı kütüphaneden içerik seçer — KÜTÜPHANE KAPI + TEKRARSIZLIK.
 
-    1. (tip, sınıf) için durum="aktif" içerikleri kullanım sayısı artan, eşitlikte
-       son kullanımı en eski olacak şekilde getirir (round-robin etkisi); en az
-       kullanılanların oluşturduğu küçük banttan RASTGELE seçer (çeşitlilik).
-    2. Hiç aktif içerik yoksa SADECE O ZAMAN AI ile üretir ve kütüphaneye ekler.
-    3. Havuzdaki en az kullanılan içerik bile YENILEME_ESIGI'ye ulaştıysa
-       (tüm havuz "sıcak"), arka planda taze içerik üretmeyi sıraya koyar.
+    1. Öğrencinin bu tipte GÖRMEDİĞİ, en az kullanılan aktif içeriklerden RASTGELE
+       seçilir (çeşitlilik). Aynı öğrenciye aynı içerik ikinci kez gösterilmez.
+    2. Öğrenci tüm havuzu gördüyse ya da havuz boşsa: kütüphane KUTUPHANE_KAP'ın
+       altındaysa AI ile taze içerik üretilir (hem havuz büyür hem öğrenci yeni görür).
+    3. Kütüphane DOLUYSA (KUTUPHANE_KAP) yeni AI üretimi YAPILMAZ (maliyet sınırı);
+       öğrencinin en ESKİ gördüğü içerik yeniden gösterilir — tüm havuz döndükten
+       sonra makul bir aralıkla tekrar (spaced) demektir.
     """
     adaylar = await db.egzersiz_icerikler.find(_aktif_sorgu(tip, sinif)).sort(
         [("kullanim_sayisi", 1), ("son_kullanim_tarihi", 1)]
-    ).to_list(length=30)
+    ).to_list(length=KUTUPHANE_KAP + 30)
+    aktif_sayi = len(adaylar)
+    gorulen = await _ogrenci_gorulen_icerik(ogrenci_id, tip)
 
-    if adaylar:
-        en_az = adaylar[0].get("kullanim_sayisi", 0)
-        havuz = [a for a in adaylar if a.get("kullanim_sayisi", 0) <= en_az + 2]
+    # 1) Öğrencinin görmediği (en az kullanılan bantından rastgele)
+    gorulmeyen = [a for a in adaylar if a["id"] not in gorulen]
+    if gorulmeyen:
+        en_az = gorulmeyen[0].get("kullanim_sayisi", 0)
+        havuz = [a for a in gorulmeyen if a.get("kullanim_sayisi", 0) <= en_az + 2]
         secilen = random.choice(havuz)
-        if en_az >= YENILEME_ESIGI:
-            # Bloklamadan arka planda yeni içerik üret (kullanıcı bunu beklemez).
+        # Havuz "sıcak" ve kap dolmadıysa arka planda büyütmeyi sıraya koy
+        if aktif_sayi and adaylar[0].get("kullanim_sayisi", 0) >= YENILEME_ESIGI and aktif_sayi < KUTUPHANE_KAP:
             asyncio.create_task(_arka_plan_uret(tip, sinif, ekleyen_id))
         return secilen
 
-    icerik, mock = await _icerik_uret(tip, sinif, None, None, ogrenci_id)
-    return await _icerik_kaydet(tip, sinif, None, None, icerik, ekleyen_id, mock,
-                                kaynak="ai_uretim")
+    # 2) Öğrenci hepsini görmüş / havuz boş → kap dolmadıysa taze üret
+    if aktif_sayi < KUTUPHANE_KAP:
+        icerik, mock = await _icerik_uret(tip, sinif, None, None, ogrenci_id)
+        return await _icerik_kaydet(tip, sinif, None, None, icerik, ekleyen_id, mock,
+                                    kaynak="ai_uretim")
+
+    # 3) Kap dolu + öğrenci hepsini görmüş → en ESKİ görüleni tekrar göster (üretim yok)
+    adaylar.sort(key=lambda a: gorulen.get(a["id"], ""))
+    return adaylar[0]
 
 
 # ─────────────────────────────────────────────
