@@ -4,6 +4,7 @@ import axios from "axios";
 import { useAuth } from "./context/AuthContext";
 import LoginPage from "./pages/LoginPage";
 import SifreSifirla from "./pages/SifreSifirla";
+import VeliAnketPublic from "./pages/VeliAnketPublic";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
@@ -13,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./components/ui/dialog";
 import { Badge } from "./components/ui/badge";
-import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send, Bell, Database, RefreshCw, GitBranch, AlertTriangle, Package, ClipboardList, Flame, Target, Award, Heart, FlaskConical, Medal, Lock, Sparkles, Lightbulb, MessageCircle, TrendingUp, Palette, Brain, XCircle, Check, Clock, Save, Image as ImageIcon, ArrowLeft, ArrowRight, Play, Pause, Settings, Music, Printer, Search, Link2, Pin, Upload, Activity, ScrollText, HelpCircle } from "lucide-react";
+import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send, Bell, Database, RefreshCw, GitBranch, AlertTriangle, Package, ClipboardList, Flame, Target, Award, Heart, FlaskConical, Medal, Lock, Sparkles, Lightbulb, MessageCircle, TrendingUp, Palette, Brain, XCircle, Check, Clock, Save, Image as ImageIcon, ArrowLeft, ArrowRight, Play, Pause, Settings, Music, Printer, Search, Link2, Pin, Upload, Activity, ScrollText, HelpCircle, Archive, ArchiveRestore } from "lucide-react";
 import { useToast } from "./hooks/use-toast";
 import { IkonCoz } from "./lib/ikonlar";
 import { Toaster } from "./components/ui/toaster";
@@ -56,6 +57,7 @@ import YoneticiAdimlar from "./components/aiceo/YoneticiAdimlar";
 import GorevTanimYonetimi from "./components/aiceo/GorevTanimYonetimi";
 import AnalizHavuzBakim from "./components/admin/AnalizHavuzBakim";
 import MetinKaliteRiski from "./components/admin/MetinKaliteRiski";
+import MetinOneriKuyrugu from "./components/admin/MetinOneriKuyrugu";
 import SinavYonetimi from "./components/admin/SinavYonetimi";
 import SinavCozum from "./components/SinavCozum";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
@@ -78,9 +80,38 @@ import { saveAs } from 'file-saver';
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
+// Genel hata metni çözücü — axios/FastAPI hatasını GÜVENLE okunur string'e çevirir.
+// FastAPI `detail` alanı string, {msg,loc,...} objesi VEYA obje dizisi (Pydantic v2
+// 422 doğrulama hataları: [{type,loc,msg,input,url}]) olabilir. Ham objeyi asla JSX'e
+// basmayız — aksi halde React #31 ("Objects are not valid as a React child") çöker.
+// `kaynak` bir hata objesi, bir detail değeri veya düz string olabilir.
+const hataMetniCoz = (kaynak, varsayilan = "İşlem başarısız oldu. Lütfen tekrar deneyin.") => {
+  if (kaynak == null) return varsayilan;
+  if (typeof kaynak === "string") return kaynak || varsayilan;
+  const coz = (d) => {
+    if (d == null) return "";
+    if (typeof d === "string") return d;
+    if (Array.isArray(d)) return d.map(coz).filter(Boolean).join("; ");
+    if (typeof d === "object") {
+      if (typeof d.msg === "string") {
+        const yer = Array.isArray(d.loc) ? d.loc.filter((x) => x !== "body").join(".") : "";
+        return yer ? `${yer}: ${d.msg}` : d.msg;
+      }
+      try { return JSON.stringify(d); } catch { return String(d); }
+    }
+    return String(d);
+  };
+  // axios hata nesnesi mi, doğrudan detail değeri mi?
+  const detail = kaynak?.response?.data?.detail ?? kaynak?.detail ?? kaynak;
+  const metin = coz(detail);
+  return metin || kaynak?.message || varsayilan;
+};
+
 // Ortak hata bildirimi — sessiz catch'ler yerine tutarlı kullanıcı uyarısı.
+// `mesaj` string, axios hatası veya ham FastAPI detail (obje/dizi) olabilir; hepsi
+// hataMetniCoz'dan geçirilir → toast'a asla ham obje verilmez.
 const hataBildir = (toast, mesaj = "İşlem başarısız oldu. Lütfen tekrar deneyin.") =>
-  toast?.({ title: mesaj, variant: "destructive" });
+  toast?.({ title: hataMetniCoz(mesaj), variant: "destructive" });
 const LIG_ESIKLERI_FE = { bronz: 0, gumus: 200, altin: 500, elmas: 1000 };
 
 function roleLabel(role) {
@@ -471,6 +502,12 @@ function AppContent() {
         </div>
       </div>
     );
+  }
+
+  // Girişsiz veli anketi: /veli-anket?token=... → auth durumundan bağımsız (login olsa da olmasa da) anket ekranı
+  {
+    const _atok = new URLSearchParams(window.location.search).get("token");
+    if (window.location.pathname === "/veli-anket" && _atok) return <VeliAnketPublic token={_atok} />;
   }
 
   if (!user) {
@@ -2548,16 +2585,24 @@ function MetinDuzenleEkrani({ metin, user, onGeri }) {
     finally { setGorselYukleniyor(false); if (fileRef.current) fileRef.current.value = ""; }
   };
 
+  // Öğretmen düzenlemesi CANLIYA yazılmaz → koordinatör/yönetici onay kuyruğuna düşer.
+  // Admin/koordinatör doğrudan (canlı) kaydeder.
+  const onayGerekli = user?.role === "teacher";
+
   const kaydet = async () => {
     if (!baslik.trim() || !icerik.trim()) { toast({ title: "Başlık ve içerik zorunlu", variant: "destructive" }); return; }
     setKaydediyor(true);
     try {
-      await axios.put(`${API}/diagnostic/texts/${metin.id}`, {
-        baslik, icerik, tur, zorluk, sinif_seviyesi: sinif || null, sorular, acik_sorular: acikSorular,
-      });
-      toast({ title: "✅ Metin kaydedildi" });
+      const govde = { baslik, icerik, tur, zorluk, sinif_seviyesi: sinif || null, sorular, acik_sorular: acikSorular };
+      if (onayGerekli) {
+        const r = await axios.post(`${API}/diagnostic/texts/${metin.id}/oneri`, govde);
+        toast({ title: "📝 Öneri onaya gönderildi", description: r.data?.mesaj || "Koordinatör/yönetici onayından sonra havuza işlenecek." });
+      } else {
+        await axios.put(`${API}/diagnostic/texts/${metin.id}`, govde);
+        toast({ title: "✅ Metin kaydedildi" });
+      }
       onGeri && onGeri();
-    } catch (e) { toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
+    } catch (e) { hataBildir(toast, hataMetniCoz(e, "Kaydedilemedi")); }
     finally { setKaydediyor(false); }
   };
 
@@ -2570,9 +2615,16 @@ function MetinDuzenleEkrani({ metin, user, onGeri }) {
           <h2 className="inline-flex items-center gap-2 text-xl font-bold truncate"><Edit2 className="h-5 w-5" />Metni Düzenle</h2>
         </div>
         <Button onClick={kaydet} disabled={kaydediyor} className="bg-green-600 hover:bg-green-700 text-white shrink-0">
-          <Save className="h-4 w-4 mr-1" />{kaydediyor ? "Kaydediliyor…" : "Kaydet"}
+          <Save className="h-4 w-4 mr-1" />{kaydediyor ? "Gönderiliyor…" : (onayGerekli ? "Onaya Gönder" : "Kaydet")}
         </Button>
       </div>
+
+      {onayGerekli && (
+        <div className="text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-3 py-2 flex items-start gap-2">
+          <HelpCircle className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>Metin düzeltmeniz ve eklediğiniz sorular doğrudan havuza yazılmaz; koordinatör/yönetici onayına gönderilir. Onaylanınca havuza işlenir ve XP kazanırsınız (düzeltme +2, soru ekleme +2).</span>
+        </div>
+      )}
 
       {/* Temel bilgiler */}
       <Card className="border border-line shadow-sm"><CardContent className="p-5 space-y-4">
@@ -3472,6 +3524,9 @@ JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
         oturum_id: oturum.id,
         anlama: anlamaFull,
         prozodik: prozodikFull,
+        // Öğretmenin elle girdiği genel anlama yüzdesi (varsa) backend'de
+        // seviyelerden hesaplanan değerin yerine kullanılsın.
+        anlama_yuzde: Number.isFinite(anlama.genel_yuzde) && anlama.genel_yuzde > 0 ? anlama.genel_yuzde : undefined,
         ogretmen_notu: tamNot,
       });
 
@@ -3481,7 +3536,7 @@ JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
       toast({ title: "✅ Rapor oluşturuldu!" });
       onRaporTamamla(raporData);
     } catch(e) {
-      toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" });
+      hataBildir(toast, hataMetniCoz(e, "Rapor oluşturulamadı"));
     }
   };
 
@@ -5244,14 +5299,15 @@ function GirisAnaliziModul({ user, students, teachers }) {
             oturum_id: aktifOturumId,
             anlama: veri.anlama,
             prozodik: veri.prozodik,
+            anlama_yuzde: Number.isFinite(veri.anlama?.genel_yuzde) && veri.anlama.genel_yuzde > 0 ? veri.anlama.genel_yuzde : undefined,
             ogretmen_notu: veri.ogretmen_notu || "",
           });
           setAktifRapor(rRapor.data);
           setAdim("rapor-goruntule");
-        } catch(e2) { setAdim("sonuc"); hataBildir(toast, "Rapor kaydedilemedi; sonuç ekranına geçildi"); }
+        } catch(e2) { setAdim("sonuc"); hataBildir(toast, hataMetniCoz(e2, "Rapor kaydedilemedi; sonuç ekranına geçildi")); }
       } else { setAdim("sonuc"); }
     } catch(e) {
-      toast({ title: "Hata", description: e.response?.data?.detail || "Analiz tamamlanamadı", variant: "destructive" });
+      hataBildir(toast, hataMetniCoz(e, "Analiz tamamlanamadı"));
     }
   };
 
@@ -5543,6 +5599,161 @@ function GirisAnaliziModul({ user, students, teachers }) {
 
 
 
+
+// Öğrenci profilinde: o öğrenciye ait TÜM Giriş Analizi raporları
+// (tamamlanmış → PDF indirilebilir) + erişilebilir yarım taslaklar (silinebilir).
+function AnalizRaporlariKart({ ogrenciId, ogrenci, user, toast }) {
+  const [raporlar, setRaporlar] = useState(null);
+  const [taslaklar, setTaslaklar] = useState([]);
+  const [pdfYuk, setPdfYuk] = useState("");
+
+  const yukle = useCallback(async () => {
+    if (!ogrenciId) { setRaporlar([]); setTaslaklar([]); return; }
+    try {
+      const [rRapor, rOturum] = await Promise.all([
+        axios.get(`${API}/diagnostic/rapor/ogrenci/${ogrenciId}`).catch(() => ({ data: [] })),
+        axios.get(`${API}/diagnostic/sessions/student/${ogrenciId}`).catch(() => ({ data: [] })),
+      ]);
+      setRaporlar(Array.isArray(rRapor.data) ? rRapor.data : []);
+      setTaslaklar((Array.isArray(rOturum.data) ? rOturum.data : []).filter(o => o.durum === "devam"));
+    } catch (e) { setRaporlar([]); setTaslaklar([]); }
+  }, [ogrenciId]);
+
+  useEffect(() => { yukle(); }, [yukle]);
+
+  const pdfIndir = async (rapor) => {
+    setPdfYuk(rapor.id);
+    try {
+      const r = await axios.get(`${API}/diagnostic/rapor/${rapor.id}/pdf`, { responseType: "blob" });
+      const url = URL.createObjectURL(r.data);
+      const a = document.createElement("a"); a.href = url;
+      a.download = `Analiz_Raporu_${(ogrenci?.ad || "ogrenci").trim()}.pdf`; a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) { hataBildir(toast, hataMetniCoz(e, "PDF indirilemedi")); } finally { setPdfYuk(""); }
+  };
+
+  const taslakSil = async (o) => {
+    if (!window.confirm("Bu yarım kalan analizi silmek istediğinize emin misiniz?")) return;
+    try {
+      await axios.delete(`${API}/diagnostic/sessions/${o.id}`);
+      toast({ title: "🗑️ Yarım analiz silindi" });
+      yukle();
+    } catch (e) { hataBildir(toast, hataMetniCoz(e, "Silinemedi")); }
+  };
+
+  if (raporlar === null) return null;
+  const gTarih = (t) => t ? new Date(t).toLocaleDateString("tr-TR") : "-";
+  const silebilir = (o) => user?.role === "admin" || o.ogretmen_id === user?.id;
+
+  return (
+    <Card className="border border-line shadow-sm">
+      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><FileText className="h-4 w-4" />Analiz Raporları (Giriş / Okuma)</CardTitle></CardHeader>
+      <CardContent className="space-y-3">
+        {/* Tamamlanmış raporlar */}
+        {raporlar.length > 0 ? (
+          <div className="space-y-1.5">
+            {raporlar.map(r => (
+              <div key={r.id} className="flex items-center justify-between gap-2 text-xs border border-line rounded-lg px-2.5 py-1.5">
+                <span className="text-content font-medium">{gTarih(r.olusturma_tarihi)}</span>
+                <span className="text-subtle flex-1 text-center tabular-nums">Anlama %{r.anlama_yuzde ?? "-"} • Prozodi {r.prozodik_toplam ?? "-"}/20</span>
+                <button onClick={() => pdfIndir(r)} disabled={pdfYuk === r.id} className="inline-flex items-center gap-1 text-primary hover:underline disabled:opacity-50"><Download className="h-3.5 w-3.5" />PDF</button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-xs text-subtle">Tamamlanmış analiz raporu yok</div>
+        )}
+
+        {/* Erişilebilir yarım taslaklar */}
+        {taslaklar.length > 0 && (
+          <div className="pt-2 border-t border-line">
+            <div className="text-xs font-semibold text-amber-700 mb-1">Yarım Kalan Taslaklar ({taslaklar.length})</div>
+            <div className="space-y-1">
+              {taslaklar.map(o => (
+                <div key={o.id} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="inline-flex items-center gap-1"><span className="text-[9px] font-bold uppercase bg-amber-200 text-amber-800 px-1 rounded">Yarım</span>{o.metin_baslik || "Metin"}</span>
+                  <span className="text-subtle">{gTarih(o.taslak_tarihi || o.olusturma_tarihi)}</span>
+                  {silebilir(o) && (
+                    <button onClick={() => taslakSil(o)} title="Yarım analizi sil" className="text-red-600 hover:text-red-700"><Trash2 className="h-3.5 w-3.5" /></button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// Öğrenci profilinde: girişsiz veli memnuniyet anketi linki üret + (ops.) SMS/WhatsApp gönder.
+function AnketLinkKart({ ogrenci, user, toast }) {
+  const [link, setLink] = useState("");
+  const [gonder, setGonder] = useState(false);
+  const [kanal, setKanal] = useState("sms");
+  const [yuk, setYuk] = useState(false);
+  const [gonderim, setGonderim] = useState(null);
+  const [kopyalandi, setKopyalandi] = useState(false);
+
+  const ogretmenId = user?.role === "teacher" ? user.id : (ogrenci?.ogretmen_id || "");
+  const telefon = ogrenci?.veli_telefon || "";
+
+  const olustur = async () => {
+    if (!ogrenci?.id) return;
+    setYuk(true); setGonderim(null);
+    try {
+      const r = await axios.post(`${API}/anketler/token`, {
+        ogretmen_id: ogretmenId,
+        ogrenci_id: ogrenci.id,
+        ogrenci_ad: `${ogrenci.ad || ""} ${ogrenci.soyad || ""}`.trim(),
+        veli_ad: ogrenci.veli_ad || "",
+        veli_telefon: telefon,
+        gonder: gonder && !!telefon,
+        kanal,
+      });
+      setLink(r.data?.link || "");
+      setGonderim(r.data?.gonderim || null);
+      if (r.data?.gonderim?.ok) toast({ title: "📤 Anket linki gönderildi" });
+      else if (gonder && !telefon) toast({ title: "Veli telefonu yok", description: "Link üretildi; elle paylaşabilirsiniz.", variant: "destructive" });
+      else toast({ title: "🔗 Anket linki oluşturuldu" });
+    } catch (e) { hataBildir(toast, hataMetniCoz(e, "Anket linki oluşturulamadı")); } finally { setYuk(false); }
+  };
+
+  const kopyala = async () => {
+    try { await navigator.clipboard.writeText(link); setKopyalandi(true); setTimeout(() => setKopyalandi(false), 1500); } catch (e) {}
+  };
+
+  return (
+    <Card className="border border-line shadow-sm">
+      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><Star className="h-4 w-4" />Veli Memnuniyet Anketi (girişsiz link)</CardTitle></CardHeader>
+      <CardContent className="space-y-2">
+        <p className="text-xs text-subtle">Veli panele girmeden, süreli tek-kullanımlık linkle öğretmeni değerlendirir. Sonuç doğrudan "Veli Değerlendirme Özeti"ne işlenir.</p>
+        <label className="flex items-center gap-2 text-xs text-content">
+          <input type="checkbox" checked={gonder} onChange={e => setGonder(e.target.checked)} disabled={!telefon} />
+          Linki veliye {telefon ? `(${telefon})` : "(telefon yok)"} gönder
+          {gonder && telefon && (
+            <select value={kanal} onChange={e => setKanal(e.target.value)} className="ml-1 border border-line rounded px-1 py-0.5 text-xs">
+              <option value="sms">SMS</option>
+              <option value="whatsapp">WhatsApp</option>
+            </select>
+          )}
+        </label>
+        <Button onClick={olustur} disabled={yuk || !ogrenci?.id} size="sm" className="bg-primary hover:bg-primary-hover text-white text-xs h-8">
+          {yuk ? "Oluşturuluyor…" : "Anket Linki Oluştur"}
+        </Button>
+        {link && (
+          <div className="flex items-center gap-2 mt-1">
+            <input readOnly value={link} className="flex-1 min-w-0 text-[11px] border border-line rounded-lg px-2 py-1 bg-app text-subtle" onFocus={e => e.target.select()} />
+            <button onClick={kopyala} className="text-xs text-primary hover:underline shrink-0">{kopyalandi ? "✓ Kopyalandı" : "Kopyala"}</button>
+          </div>
+        )}
+        {gonderim && !gonderim.ok && (
+          <div className="text-[11px] text-amber-600">Gönderim yapılamadı ({gonderim.hata || gonderim.durum || "kanal yapılandırılmamış"}). Linki elle paylaşabilirsiniz.</div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 // ═══════════════════════════════════════════════
 // ÖĞRETMEN PANELİ — Sadece kendi öğrencileri, görev, analiz, mesaj
@@ -5857,6 +6068,10 @@ function OgretmenPaneli({ user, logout }) {
 
             {/* TIMI Çoklu Zeka özeti */}
             <TimiOzetKart ogrenci={seciliOgrenci} />
+
+            <AnalizRaporlariKart ogrenciId={seciliOgrenci?.id} ogrenci={seciliOgrenci} user={user} toast={toast} />
+
+            <AnketLinkKart ogrenci={seciliOgrenci} user={user} toast={toast} />
 
             {/* 🤖 AI Koçluk Butonu + Sonuçlar */}
             {(() => {
@@ -8622,7 +8837,8 @@ function MesajlarPanel({ user }) {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  const gelenMesajlar = mesajlar.filter(m => m.alici_id === user.id);
+  const gelenMesajlar = mesajlar.filter(m => m.alici_id === user.id && !m.arsiv);
+  const arsivlenenler = mesajlar.filter(m => m.alici_id === user.id && m.arsiv);
   const gidenMesajlar = mesajlar.filter(m => m.gonderen_id === user.id);
   const okunmamislar = gelenMesajlar.filter(m => !m.okundu);
 
@@ -8648,6 +8864,14 @@ function MesajlarPanel({ user }) {
 
   const mesajOkundu = async (id) => { try { await axios.put(`${API}/mesajlar/${id}/okundu`); fetchAll(); } catch(e) {} };
 
+  const mesajArsivle = async (id, arsiv) => {
+    try {
+      await axios.put(`${API}/mesajlar/${id}/arsiv`, { arsiv });
+      toast({ title: arsiv ? "🗄️ Mesaj arşivlendi" : "↩️ Arşivden çıkarıldı" });
+      fetchAll();
+    } catch (e) { hataBildir(toast, hataMetniCoz(e, "Arşivleme başarısız")); }
+  };
+
   const rolRenk = (r) => ({ admin: "bg-red-100 text-red-700", coordinator: "bg-orange-100 text-orange-700", teacher: "bg-blue-100 text-blue-700", student: "bg-green-100 text-green-700", parent: "bg-purple-100 text-purple-700" })[r] || "bg-gray-100 text-subtle";
 
   return (
@@ -8667,6 +8891,7 @@ function MesajlarPanel({ user }) {
         {[
           { v: "gelen", l: "Gelen Kutusu", badge: okunmamisSayisi },
           { v: "giden", l: "Gönderilenler" },
+          { v: "arsiv", l: "🗄️ Arşiv", badge: arsivlenenler.length },
           { v: "yeni", l: "Yeni Mesaj" },
           ...(user.role === "admin" ? [{ v: "funnel", l: "📣 Veli Mesajları / Funnel" }] : []),
         ].map(t => (
@@ -8741,10 +8966,53 @@ function MesajlarPanel({ user }) {
                       {m.konu && <div className="font-bold text-sm text-content mt-1">{m.konu}</div>}
                       <p className="text-sm text-subtle mt-1 line-clamp-2">{m.icerik}</p>
                     </div>
-                    <div className="text-xs text-subtle whitespace-nowrap">{new Date(m.tarih).toLocaleDateString('tr-TR')}</div>
+                    <div className="flex flex-col items-end gap-2 shrink-0">
+                      <div className="text-xs text-subtle whitespace-nowrap">{new Date(m.tarih).toLocaleDateString('tr-TR')}</div>
+                      {m.okundu && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); mesajArsivle(m.id, true); }}
+                          title="Arşivle"
+                          className="inline-flex items-center gap-1 text-[11px] text-subtle hover:text-primary border border-line rounded-lg px-2 py-0.5 transition-all">
+                          <Archive className="h-3 w-3" />Arşivle
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Arşiv (arşivlenmiş gelen mesajlar) */}
+      {gorunum === "arsiv" && (
+        <div className="space-y-3">
+          {arsivlenenler.length === 0 ? (
+            <div className="text-center py-12"><Archive className="h-12 w-12 text-subtle mx-auto mb-3" /><p className="text-subtle">Arşivlenmiş mesaj yok</p></div>
+          ) : (
+            arsivlenenler.map(m => (
+              <Card key={m.id} className="border border-line shadow-sm bg-app/40"><CardContent className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${rolRenk(m.gonderen_rol)}`}>{({admin:"Yönetici",coordinator:"Koord.",teacher:"Öğretmen",student:"Öğrenci",parent:"Veli"})[m.gonderen_rol] || "—"}</span>
+                      <span className="font-medium text-sm text-content">{m.gonderen_ad}</span>
+                    </div>
+                    {m.konu && <div className="font-bold text-sm text-content mt-1">{m.konu}</div>}
+                    <p className="text-sm text-subtle mt-1 whitespace-pre-wrap">{m.icerik}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-2 shrink-0">
+                    <div className="text-xs text-subtle whitespace-nowrap">{new Date(m.tarih).toLocaleDateString('tr-TR')}</div>
+                    <button
+                      onClick={() => mesajArsivle(m.id, false)}
+                      title="Arşivden çıkar"
+                      className="inline-flex items-center gap-1 text-[11px] text-subtle hover:text-primary border border-line rounded-lg px-2 py-0.5 transition-all">
+                      <ArchiveRestore className="h-3 w-3" />Geri al
+                    </button>
+                  </div>
+                </div>
+              </CardContent></Card>
             ))
           )}
         </div>
@@ -10103,7 +10371,9 @@ function SistemAyarlari({ user }) {
       {ayarSekme === "timi_anahtar" && <TimiAnahtarPaneli />}
       {ayarSekme === "timi_metin" && <TimiRaporMetinPaneli />}
       {ayarSekme === "analiz_havuz" && user?.role === "admin" && <AnalizHavuzBakim apiBase={API} />}
-      {ayarSekme === "metin_kalite" && (user?.role === "admin" || user?.role === "coordinator") && <MetinKaliteRiski apiBase={API} />}
+      {ayarSekme === "metin_kalite" && (user?.role === "admin" || user?.role === "coordinator") && (
+        <><MetinKaliteRiski apiBase={API} /><MetinOneriKuyrugu apiBase={API} /></>
+      )}
 
       {ayarSekme === "ozellikler" && (
         <Card className="border border-line shadow-sm">
