@@ -59,8 +59,11 @@ export default function Kolonlar({ onTamamla }) {
         <Slider etiket="Süre" deger={sure} min={10} max={120} step={10} birim="sn" onChange={setSure} />
       </>}>
       <div className="h-full overflow-auto p-4">
-        {!calisiyor && (rekor != null || sonSonuc) && (
-          <div className="mb-2"><RekorRozeti rekor={rekor} sonSonuc={sonSonuc} /></div>
+        {!calisiyor && (
+          <div className="mb-2 flex flex-col items-center">
+            <ZorlukKontrol taban={taban} setTaban={setTaban} min={min} max={max} efektif={zorluk} />
+            <RekorRozeti rekor={rekor} sonSonuc={sonSonuc} />
+          </div>
         )}
         <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${kolon}, 1fr)` }}>
           {Array.from({ length: kolon }).map((_, c) => (
