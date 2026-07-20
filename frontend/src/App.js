@@ -2994,12 +2994,12 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, onAnasayfayaD
       {/* Ana içerik: sol metin, sağ panel */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* Sol: Metin + altında Okuduğunu Anlama Soruları (geniş, ferah) */}
-        <div className="flex-1 overflow-y-auto bg-amber-50 p-6">
+        {/* Sol: Metin + altında Okuduğunu Anlama Soruları (geniş ekranda ferah, yaygın) */}
+        <div className="flex-1 overflow-y-auto bg-amber-50 px-6 md:px-10 lg:px-14 py-6">
           <h3 className="text-xl font-bold text-content mb-4 text-center">{metin.baslik}</h3>
-          <MetinGorseli />
+          <MetinGorseli maxWidth="max-w-3xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl" />
           {((metin?.sorular?.length || 0) > 0 || (metin?.acik_sorular?.length || 0) > 0) && (
-            <div className="mt-8 max-w-3xl mx-auto">
+            <div className="mt-8 max-w-3xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl mx-auto">
               <h3 className="text-lg font-bold text-content mb-4 flex items-center gap-2"><HelpCircle className="h-5 w-5 text-primary" />Okuduğunu Anlama Soruları</h3>
               <div className="space-y-4">
                 {(metin?.sorular || []).map((s, i) => (
