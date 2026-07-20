@@ -1,16 +1,21 @@
 // Kelime Arama — harf gridinde gizli kelimeleri bul. Kelimeler yatay veya
 // dikey yerleştirilir; kullanıcı kelimenin ilk ve son harfine tıklayarak seçer.
 // Görsel tarama hızını ve dikkati geliştirir.
-import React, { useEffect, useMemo, useState } from "react";
-import { EgzersizDuzen, Slider, Skor, TR_HARFLER, dogruSes, yanlisSes, useEgzersizOturum, useKelimeHavuzu } from "./ortak";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  EgzersizDuzen, Slider, Skor, TR_HARFLER, dogruSes, yanlisSes, useEgzersizOturum, useKelimeHavuzu,
+  useSkorKayit, RekorRozeti, useZorluk, ZorlukKontrol,
+} from "./ortak";
+
+const TIP = "kelime_arama";
 
 // Havuz yüklenene / boş olursa yedek liste (büyük harf).
 const YEDEK_HAVUZ = ["KİTAP", "OKUMA", "KALEM", "DEFTER", "HARF", "SAYFA", "METİN", "ANLAM", "MASA", "OKUL", "ÖĞRENCİ", "SATIR"];
 const yon = [[0, 1], [1, 0]]; // yatay, dikey
 
-function gridUret(N, kelimeSayi, havuz) {
+function gridUret(N, kelimeSayi, havuz, minLen = 3) {
   const g = Array.from({ length: N }, () => Array(N).fill(null));
-  let uygun = (havuz || []).filter((w) => w && w.length <= N && w.length >= 3);
+  let uygun = (havuz || []).filter((w) => w && w.length <= N && w.length >= minLen);
   if (uygun.length < kelimeSayi) uygun = uygun.concat(YEDEK_HAVUZ.filter((w) => w.length <= N));
   const secili = uygun.sort(() => Math.random() - 0.5).slice(0, kelimeSayi);
   const yerlesen = [];
@@ -40,18 +45,33 @@ function gridUret(N, kelimeSayi, havuz) {
 export default function KelimeArama({ onTamamla }) {
   const [boyut, setBoyut] = useState(9);
   const [sure, setSure] = useState(90);
-  const { calisiyor, kalan, baslat, durdur } = useEgzersizOturum({ sure, onTamamla });
   const [tur, setTur] = useState(0);
   const [bulunan, setBulunan] = useState([]);
   const [secim, setSecim] = useState(null); // ilk tıklanan {r,c}
   const [skor, setSkor] = useState(0);
   const havuz = useKelimeHavuzu({ buyuk: true, maxLen: 12 });
+  const { rekor, sonSonuc, kaydet } = useSkorKayit(TIP);
+  const { zorluk, taban, setTaban, min, max, bildirSonuc, sifirla } = useZorluk(TIP);
 
-  const { g, kelimeler } = useMemo(() => gridUret(boyut, Math.min(6, boyut - 2), havuz), [boyut, tur, havuz]);
+  const dogruRef = useRef(0), yanlisRef = useRef(0), zorlukRef = useRef(zorluk);
+  useEffect(() => { zorlukRef.current = zorluk; }, [zorluk]);
+  const bitince = () => {
+    kaydet({ dogru: dogruRef.current, yanlis: yanlisRef.current, sure_sn: sure, zorluk: zorlukRef.current });
+    onTamamla?.();
+  };
+  const { calisiyor, kalan, baslat, durdur } = useEgzersizOturum({ sure, onTamamla: bitince });
+
+  // Zorluk arttıkça daha çok ve daha uzun kelime. z1..5 → kelime 4..8, minUzunluk 3..5.
+  const kelimeSayi = Math.min(boyut - 2, 3 + zorluk);
+  const minUzunluk = 3 + Math.floor((zorluk - 1) / 2);
+  const { g, kelimeler } = useMemo(() => gridUret(boyut, kelimeSayi, havuz, minUzunluk), [boyut, tur, havuz, kelimeSayi, minUzunluk]);
   const [bulunanHucre, setBulunanHucre] = useState(new Set());
 
   useEffect(() => { setBulunan([]); setSecim(null); setBulunanHucre(new Set()); }, [tur, boyut]);
-  useEffect(() => { if (!calisiyor) { setSkor(0); setTur(0); } }, [calisiyor]);
+  useEffect(() => {
+    if (!calisiyor) { setSkor(0); setTur(0); dogruRef.current = 0; yanlisRef.current = 0; sifirla(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calisiyor]);
 
   const hatCiz = (a, b) => {
     // Aynı satır/sütun mu?
@@ -79,11 +99,11 @@ export default function KelimeArama({ onTamamla }) {
     if (eslesen) {
       setBulunan((b) => [...b, eslesen]);
       setBulunanHucre((s) => { const n = new Set(s); hat.hucreler.forEach((h) => n.add(h)); return n; });
-      setSkor((s) => s + 1);
+      setSkor((s) => s + 1); dogruRef.current += 1; bildirSonuc(true);
       dogruSes();
       if (bulunan.length + 1 >= kelimeler.length) setTimeout(() => setTur((t) => t + 1), 700);
     } else {
-      yanlisSes();
+      yanlisRef.current += 1; bildirSonuc(false); yanlisSes();
     }
   };
 
@@ -91,13 +111,15 @@ export default function KelimeArama({ onTamamla }) {
     <EgzersizDuzen calisiyor={calisiyor} kalan={kalan} sure={sure} baslat={baslat} durdur={durdur} koyu={false}
       aciklama="Kelimeleri gözünüzle tarayın; bulduğunuzda ilk ve son harfine tıklayın."
       ayarlar={<>
+        <ZorlukKontrol taban={taban} setTaban={setTaban} min={min} max={max} efektif={zorluk} />
         <Slider etiket="Grid Boyutu" deger={boyut} min={7} max={12} onChange={setBoyut} />
         <Slider etiket="Süre" deger={sure} min={30} max={180} step={10} birim="sn" onChange={setSure} />
       </>}>
       <div className="h-full overflow-auto p-4">
         {!calisiyor ? (
-          <div className="h-[380px] flex items-center justify-center text-gray-400 text-sm text-center px-6">
-            ▶ Başlat'a basın. Gizli kelimenin <strong className="mx-1">ilk ve son harfine</strong> tıklayarak seçin (yatay/dikey).
+          <div className="h-[380px] flex flex-col items-center justify-center text-gray-400 text-sm text-center px-6">
+            <div>▶ Başlat'a basın. Gizli kelimenin <strong className="mx-1">ilk ve son harfine</strong> tıklayarak seçin (yatay/dikey).</div>
+            <RekorRozeti rekor={rekor} sonSonuc={sonSonuc} />
           </div>
         ) : (
           <div className="flex flex-col md:flex-row gap-4 items-start justify-center">
