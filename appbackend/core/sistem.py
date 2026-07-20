@@ -147,6 +147,9 @@ VARSAYILAN_PUANLAR = {
     "cevap_duzeltme": 2,       # bir MCQ'nun doğru cevabını ilk kez düzelten
     "gorsel_ekleme": 2,        # bir metne ilk kez görsel ekleyen
     "metin_kalite_geri_bildirim": 3,  # bir metne İLK kez kalite puanı veren (metin başına anti-farm)
+    # Öneri kuyruğu (öğretmen düzenleme/soru önerisi ONAYLANINCA ödüllendirilir)
+    "metin_duzeltme": 2,       # onaylanan metin düzeltme önerisi başına
+    "soru_ekleme": 2,          # onaylanan yeni soru (MCQ/açık uçlu) önerisi başına
 }
 
 

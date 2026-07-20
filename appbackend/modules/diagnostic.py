@@ -539,25 +539,11 @@ class MetinGuncelle(BaseModel):
     acik_sorular: Optional[List[dict]] = None   # açık uçlu soru listesi
 
 
-@router.put("/diagnostic/texts/{metin_id}")
-async def metin_guncelle(metin_id: str, data: MetinGuncelle, current_user=Depends(get_current_user)):
-    """Metnin içeriğini/sorularını/cevap anahtarını düzenler (tam ekran editör).
-
-    Öğretmen/Koordinatör/Yönetici EŞİT yetkili. Görsel, gorsel_prompt, durum,
-    oylar, ekleyen ve kaynak alanlarına DOKUNULMAZ (onlar ayrı akışlarla yönetilir).
-    XP yalnız satır-içi hızlı düzeltmede (PATCH .../soru/...) verilir; toplu formda
-    verilmez (farming önlemi) — ama XP anti-farm meta'sı korunur.
-    """
+def _metin_guncel_dict(metin: dict, data: "MetinGuncelle", uygulayan_id: str) -> dict:
+    """MetinGuncelle verisini mevcut metinle birleştirip `$set` sözlüğü üretir.
+    Hem canlı PUT hem de onay kuyruğu (öneri onayı) aynı birleştirmeyi kullanır."""
     from core.acik_soru import normalize_kategori
-    role = current_user.get("role", "")
-    if role not in KATKI_ROLLERI:
-        raise HTTPException(status_code=403, detail="Yetkisiz")
-
-    metin = await db.analiz_metinler.find_one({"id": metin_id})
-    if not metin:
-        raise HTTPException(status_code=404, detail="Metin bulunamadı")
-
-    now = datetime.now(timezone.utc).isoformat()
+    now = iso()
     guncel = {}
 
     if data.baslik is not None:
@@ -612,7 +598,7 @@ async def metin_guncelle(metin_id: str, data: MetinGuncelle, current_user=Depend
             if dogru and dogru != onceki.get("dogru_cevap"):
                 birlesik["dogru_cevap_kaynak"] = "manuel"
                 birlesik["kontrol_gerekli"] = False
-                birlesik["son_duzelten_id"] = current_user["id"]
+                birlesik["son_duzelten_id"] = uygulayan_id
                 birlesik["son_duzelten_tarih"] = now
             yeni.append(birlesik)
         guncel["sorular"] = yeni
@@ -636,11 +622,131 @@ async def metin_guncelle(metin_id: str, data: MetinGuncelle, current_user=Depend
             })
         guncel["acik_sorular"] = yeni_a
 
+    return guncel
+
+
+@router.put("/diagnostic/texts/{metin_id}")
+async def metin_guncelle(metin_id: str, data: MetinGuncelle, current_user=Depends(get_current_user)):
+    """Metnin içeriğini/sorularını/cevap anahtarını düzenler (tam ekran editör).
+
+    Öğretmen/Koordinatör/Yönetici EŞİT yetkili. Görsel, gorsel_prompt, durum,
+    oylar, ekleyen ve kaynak alanlarına DOKUNULMAZ (onlar ayrı akışlarla yönetilir).
+    XP yalnız satır-içi hızlı düzeltmede (PATCH .../soru/...) verilir; toplu formda
+    verilmez (farming önlemi) — ama XP anti-farm meta'sı korunur.
+    """
+    role = current_user.get("role", "")
+    if role not in KATKI_ROLLERI:
+        raise HTTPException(status_code=403, detail="Yetkisiz")
+
+    metin = await db.analiz_metinler.find_one({"id": metin_id})
+    if not metin:
+        raise HTTPException(status_code=404, detail="Metin bulunamadı")
+
+    guncel = _metin_guncel_dict(metin, data, current_user["id"])
     if guncel:
         await db.analiz_metinler.update_one({"id": metin_id}, {"$set": guncel})
 
     yeni_metin = await db.analiz_metinler.find_one({"id": metin_id})
     return _serialize_metin(yeni_metin, role)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# ÖNERİ KUYRUĞU — öğretmen metin düzeltme / soru ekleme önerileri
+# Öğretmenin düzenlemesi CANLI havuza yazılmaz; koordinatör/admin onayına düşer.
+# Onaylanınca _metin_guncel_dict ile uygulanır + öneren XP kazanır (anti-farm:
+# ödül yalnız onay anında, öneri başına).
+# ═══════════════════════════════════════════════════════════════════
+
+class OneriKarar(BaseModel):
+    karar: str            # "onayla" | "reddet"
+    karar_not: str = ""
+
+
+@router.post("/diagnostic/texts/{metin_id}/oneri")
+async def metin_oneri_gonder(metin_id: str, data: MetinGuncelle, current_user=Depends(get_current_user)):
+    """Katkı rolü (öğretmen dâhil) metin düzeltme / soru ekleme önerisi gönderir.
+    Canlıya YAZILMAZ; onay kuyruğuna (durum=beklemede) düşer."""
+    role = current_user.get("role", "")
+    if role not in KATKI_ROLLERI:
+        raise HTTPException(status_code=403, detail="Yetkisiz")
+    metin = await db.analiz_metinler.find_one({"id": metin_id})
+    if not metin:
+        raise HTTPException(status_code=404, detail="Metin bulunamadı")
+
+    degisiklikler = {k: v for k, v in data.model_dump().items() if v is not None}
+    if not degisiklikler:
+        raise HTTPException(status_code=400, detail="Öneride değişiklik yok")
+
+    eski_soru = len(metin.get("sorular") or []) + len(metin.get("acik_sorular") or [])
+    yeni_soru = len(degisiklikler.get("sorular", metin.get("sorular") or [])) + \
+                len(degisiklikler.get("acik_sorular", metin.get("acik_sorular") or []))
+    soru_eklendi = yeni_soru > eski_soru
+    metin_degisti = any(k in degisiklikler for k in ("baslik", "icerik", "zorluk", "tur", "sinif_seviyesi", "kelime_sayisi"))
+
+    doc = {
+        "id": str(uuid.uuid4()),
+        "metin_id": metin_id,
+        "metin_baslik": metin.get("baslik", ""),
+        "bolum": metin.get("bolum", ""),
+        "oneren_id": current_user["id"],
+        "oneren_ad": f"{current_user.get('ad', '')} {current_user.get('soyad', '')}".strip() or current_user.get("email", ""),
+        "degisiklikler": degisiklikler,
+        "soru_eklendi": soru_eklendi,
+        "metin_degisti": metin_degisti,
+        "durum": "beklemede",
+        "olusturma_tarihi": iso(),
+    }
+    await db.metin_oneri_kuyrugu.insert_one(doc)
+    return {"ok": True, "id": doc["id"], "durum": "beklemede",
+            "mesaj": "Öneriniz koordinatör/yönetici onayına gönderildi."}
+
+
+@router.get("/diagnostic/oneri-kuyrugu")
+async def oneri_kuyrugu(current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+    items = await db.metin_oneri_kuyrugu.find({"durum": "beklemede"}).sort("olusturma_tarihi", 1).to_list(length=500)
+    for it in items:
+        it.pop("_id", None)
+    return items
+
+
+@router.post("/diagnostic/oneri/{oneri_id}/karar")
+async def oneri_karar(oneri_id: str, karar: OneriKarar,
+                      current_user=Depends(require_role(UserRole.ADMIN, UserRole.COORDINATOR))):
+    o = await db.metin_oneri_kuyrugu.find_one({"id": oneri_id})
+    if not o:
+        raise HTTPException(status_code=404, detail="Öneri bulunamadı")
+    if o.get("durum") != "beklemede":
+        raise HTTPException(status_code=400, detail="Bu öneri zaten sonuçlanmış")
+
+    yeni_durum = "onaylandi" if karar.karar == "onayla" else "reddedildi"
+    uygulanan = None
+
+    if yeni_durum == "onaylandi":
+        metin = await db.analiz_metinler.find_one({"id": o["metin_id"]})
+        if not metin:
+            raise HTTPException(status_code=404, detail="İlgili metin artık mevcut değil")
+        data = MetinGuncelle(**{k: v for k, v in o.get("degisiklikler", {}).items()
+                                if k in MetinGuncelle.model_fields})
+        guncel = _metin_guncel_dict(metin, data, o["oneren_id"])
+        if guncel:
+            await db.analiz_metinler.update_one({"id": o["metin_id"]}, {"$set": guncel})
+        uygulanan = list(guncel.keys())
+        # XP ödülü (öneren'e) — düzeltme ve/veya soru ekleme
+        puanlar = await get_puan_ayarlari()
+        kazanc = 0
+        if o.get("metin_degisti"):
+            kazanc += int(puanlar.get("metin_duzeltme", 2))
+        if o.get("soru_eklendi"):
+            kazanc += int(puanlar.get("soru_ekleme", 2))
+        if kazanc > 0:
+            await db.users.update_one({"id": o["oneren_id"]}, {"$inc": {"puan": kazanc}})
+
+    await db.metin_oneri_kuyrugu.update_one(
+        {"id": oneri_id},
+        {"$set": {"durum": yeni_durum, "karar_veren_id": current_user["id"],
+                  "karar_tarihi": iso(), "karar_not": karar.karar_not}},
+    )
+    return {"ok": True, "durum": yeni_durum, "uygulanan": uygulanan}
 
 
 # ★ Metin listeleme endpoint'i (frontend: axios.get(`${API}/diagnostic/texts`))

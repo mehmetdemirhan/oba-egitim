@@ -57,6 +57,7 @@ import YoneticiAdimlar from "./components/aiceo/YoneticiAdimlar";
 import GorevTanimYonetimi from "./components/aiceo/GorevTanimYonetimi";
 import AnalizHavuzBakim from "./components/admin/AnalizHavuzBakim";
 import MetinKaliteRiski from "./components/admin/MetinKaliteRiski";
+import MetinOneriKuyrugu from "./components/admin/MetinOneriKuyrugu";
 import SinavYonetimi from "./components/admin/SinavYonetimi";
 import SinavCozum from "./components/SinavCozum";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
@@ -2584,16 +2585,24 @@ function MetinDuzenleEkrani({ metin, user, onGeri }) {
     finally { setGorselYukleniyor(false); if (fileRef.current) fileRef.current.value = ""; }
   };
 
+  // Öğretmen düzenlemesi CANLIYA yazılmaz → koordinatör/yönetici onay kuyruğuna düşer.
+  // Admin/koordinatör doğrudan (canlı) kaydeder.
+  const onayGerekli = user?.role === "teacher";
+
   const kaydet = async () => {
     if (!baslik.trim() || !icerik.trim()) { toast({ title: "Başlık ve içerik zorunlu", variant: "destructive" }); return; }
     setKaydediyor(true);
     try {
-      await axios.put(`${API}/diagnostic/texts/${metin.id}`, {
-        baslik, icerik, tur, zorluk, sinif_seviyesi: sinif || null, sorular, acik_sorular: acikSorular,
-      });
-      toast({ title: "✅ Metin kaydedildi" });
+      const govde = { baslik, icerik, tur, zorluk, sinif_seviyesi: sinif || null, sorular, acik_sorular: acikSorular };
+      if (onayGerekli) {
+        const r = await axios.post(`${API}/diagnostic/texts/${metin.id}/oneri`, govde);
+        toast({ title: "📝 Öneri onaya gönderildi", description: r.data?.mesaj || "Koordinatör/yönetici onayından sonra havuza işlenecek." });
+      } else {
+        await axios.put(`${API}/diagnostic/texts/${metin.id}`, govde);
+        toast({ title: "✅ Metin kaydedildi" });
+      }
       onGeri && onGeri();
-    } catch (e) { toast({ title: "Hata", description: e.response?.data?.detail, variant: "destructive" }); }
+    } catch (e) { hataBildir(toast, hataMetniCoz(e, "Kaydedilemedi")); }
     finally { setKaydediyor(false); }
   };
 
@@ -2606,9 +2615,16 @@ function MetinDuzenleEkrani({ metin, user, onGeri }) {
           <h2 className="inline-flex items-center gap-2 text-xl font-bold truncate"><Edit2 className="h-5 w-5" />Metni Düzenle</h2>
         </div>
         <Button onClick={kaydet} disabled={kaydediyor} className="bg-green-600 hover:bg-green-700 text-white shrink-0">
-          <Save className="h-4 w-4 mr-1" />{kaydediyor ? "Kaydediliyor…" : "Kaydet"}
+          <Save className="h-4 w-4 mr-1" />{kaydediyor ? "Gönderiliyor…" : (onayGerekli ? "Onaya Gönder" : "Kaydet")}
         </Button>
       </div>
+
+      {onayGerekli && (
+        <div className="text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-3 py-2 flex items-start gap-2">
+          <HelpCircle className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>Metin düzeltmeniz ve eklediğiniz sorular doğrudan havuza yazılmaz; koordinatör/yönetici onayına gönderilir. Onaylanınca havuza işlenir ve XP kazanırsınız (düzeltme +2, soru ekleme +2).</span>
+        </div>
+      )}
 
       {/* Temel bilgiler */}
       <Card className="border border-line shadow-sm"><CardContent className="p-5 space-y-4">
@@ -10355,7 +10371,9 @@ function SistemAyarlari({ user }) {
       {ayarSekme === "timi_anahtar" && <TimiAnahtarPaneli />}
       {ayarSekme === "timi_metin" && <TimiRaporMetinPaneli />}
       {ayarSekme === "analiz_havuz" && user?.role === "admin" && <AnalizHavuzBakim apiBase={API} />}
-      {ayarSekme === "metin_kalite" && (user?.role === "admin" || user?.role === "coordinator") && <MetinKaliteRiski apiBase={API} />}
+      {ayarSekme === "metin_kalite" && (user?.role === "admin" || user?.role === "coordinator") && (
+        <><MetinKaliteRiski apiBase={API} /><MetinOneriKuyrugu apiBase={API} /></>
+      )}
 
       {ayarSekme === "ozellikler" && (
         <Card className="border border-line shadow-sm">
