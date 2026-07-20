@@ -141,6 +141,31 @@ def aktif_grup_anahtarlari(cfg: dict | None, sinif) -> list:
     return [g for g in ANLAMA_GRUP_ANAHTARLARI if g not in pasif] + ["4.5"]
 
 
+# Her ölçüm grubunun ölçüt (kriter) anahtarları — % hesabından pasif grupları
+# çıkarmak için (EK #3). 4.5 Bloom soru performansı her zaman aktif.
+ANLAMA_GRUP_OLCUTLERI = {
+    "4.1": ["cumle_anlama", "bilinmeyen_sozcuk", "baglac_zamir"],
+    "4.2": ["ana_fikir", "yardimci_fikir", "konu", "baslik_onerme"],
+    "4.3": ["neden_sonuc", "cikarim", "ipuclari", "yorumlama"],
+    "4.4": ["gorus_bildirme", "yazar_amaci", "alternatif_fikir", "guncelle_hayat"],
+    "4.5": ["bilgi", "kavrama", "uygulama", "analiz", "sentez", "degerlendirme"],
+}
+
+
+def pasif_olcut_anahtarlari(cfg: dict | None, sinif) -> set:
+    keys = set()
+    for g in pasif_gruplar(cfg, sinif):
+        keys.update(ANLAMA_GRUP_OLCUTLERI.get(g, []))
+    return keys
+
+
+def aktif_anlama_dict(anlama: dict | None, cfg: dict | None, sinif) -> dict:
+    """Pasif grupların ölçütlerini anlama sözlüğünden ÇIKARIR — % orantısı yalnız
+    mevcut (aktif) kategoriler üzerinden hesaplansın diye (EK #3, forma bağlı değil)."""
+    pasif = pasif_olcut_anahtarlari(cfg, sinif)
+    return {k: v for k, v in (anlama or {}).items() if k not in pasif}
+
+
 # ═══════════════════════════════════════════════════════════════════
 # A) "SONUÇ VE GENEL YORUM" METİN BANKASI (bantlı, deterministik, düzenlenebilir)
 # ═══════════════════════════════════════════════════════════════════

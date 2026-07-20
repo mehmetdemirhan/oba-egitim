@@ -1414,13 +1414,16 @@ async def olustur_rapor(data: RaporOlusturCreate, current_user=Depends(get_curre
     ogretmen = await db.users.find_one({"id": oturum.get("ogretmen_id")})
 
     prozodik_toplam = sum(int(v) for v in (data.prozodik or {}).values())
-    anlama_pct = data.anlama_yuzde if data.anlama_yuzde else anlama_yuzde_hesapla(data.anlama)
 
     # EK: bu raporun sınıfı için AKTİF anlama gruplarını sabitle (snapshot). Böylece
     # kural değişse bile bu rapor tutarlı kalır; eski raporlarda alan yoksa hepsi gösterilir.
-    from core.giris_rapor import get_sinif_kategorileri, aktif_grup_anahtarlari
+    from core.giris_rapor import get_sinif_kategorileri, aktif_grup_anahtarlari, aktif_anlama_dict
+    _sinif_sec = ogrenci.get("sinif", "") if ogrenci else ""
     _sinif_cfg = await get_sinif_kategorileri(db)
-    _aktif_gruplar = aktif_grup_anahtarlari(_sinif_cfg, ogrenci.get("sinif", "") if ogrenci else "")
+    _aktif_gruplar = aktif_grup_anahtarlari(_sinif_cfg, _sinif_sec)
+    # EK #3: % yalnız AKTİF kategoriler üzerinden (pasif grup ölçütleri hariç, forma bağlı değil)
+    _anlama_temiz = aktif_anlama_dict(data.anlama, _sinif_cfg, _sinif_sec)
+    anlama_pct = data.anlama_yuzde if data.anlama_yuzde else anlama_yuzde_hesapla(_anlama_temiz)
 
     rapor_data = {
         "id": str(uuid.uuid4()),
