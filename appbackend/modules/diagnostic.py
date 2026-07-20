@@ -1163,6 +1163,63 @@ async def sil_rapor(rapor_id: str, current_user=Depends(get_current_user)):
     return {"message": "Rapor silindi", "oturum_silindi": bool(oturum_id)}
 
 
+# ═══════════════════════════════════════════════════════════════════
+# GİRİŞ ANALİZİ RAPOR AYARLARI — Sonuç metin bankası (A) + sınıf kategorileri (EK)
+# ═══════════════════════════════════════════════════════════════════
+_AD_YETKI = require_role(UserRole.ADMIN, UserRole.COORDINATOR)
+
+
+@router.get("/diagnostic/rapor-metinleri")
+async def get_giris_rapor_metinleri_ep(current_user=Depends(_AD_YETKI)):
+    from core.giris_rapor import get_giris_rapor_metinleri, GIRIS_RAPOR_METIN_VARSAYILAN
+    metinler, tarih = await get_giris_rapor_metinleri(db)
+    return {"metinler": metinler, "varsayilan": GIRIS_RAPOR_METIN_VARSAYILAN, "guncelleme_tarihi": tarih}
+
+
+@router.put("/diagnostic/rapor-metinleri")
+async def put_giris_rapor_metinleri_ep(data: dict = Body(...), current_user=Depends(_AD_YETKI)):
+    from core.giris_rapor import set_giris_rapor_metinleri
+    metinler = data.get("metinler")
+    if not isinstance(metinler, dict):
+        raise HTTPException(status_code=400, detail="metinler sözlük olmalı")
+    ad = f"{current_user.get('ad', '')} {current_user.get('soyad', '')}".strip()
+    tarih = await set_giris_rapor_metinleri(db, metinler, guncelleyen=ad)
+    return {"ok": True, "guncelleme_tarihi": tarih}
+
+
+@router.post("/diagnostic/rapor-metinleri/varsayilana-don")
+async def giris_rapor_metinleri_reset(current_user=Depends(_AD_YETKI)):
+    await db.sistem_ayarlari.delete_one({"tip": "giris_rapor_metinleri"})
+    from core.giris_rapor import GIRIS_RAPOR_METIN_VARSAYILAN
+    return {"ok": True, "metinler": GIRIS_RAPOR_METIN_VARSAYILAN}
+
+
+@router.get("/diagnostic/sinif-kategorileri")
+async def get_sinif_kategorileri_ep(current_user=Depends(_AD_YETKI)):
+    from core.giris_rapor import get_sinif_kategorileri, ANLAMA_GRUP_ANAHTARLARI
+    cfg = await get_sinif_kategorileri(db)
+    return {"kategoriler": cfg, "gruplar": ANLAMA_GRUP_ANAHTARLARI}
+
+
+@router.put("/diagnostic/sinif-kategorileri")
+async def put_sinif_kategorileri_ep(data: dict = Body(...), current_user=Depends(_AD_YETKI)):
+    from core.giris_rapor import set_sinif_kategorileri
+    cfg = data.get("kategoriler")
+    if not isinstance(cfg, dict):
+        raise HTTPException(status_code=400, detail="kategoriler sözlük olmalı")
+    ad = f"{current_user.get('ad', '')} {current_user.get('soyad', '')}".strip()
+    tarih = await set_sinif_kategorileri(db, cfg, guncelleyen=ad)
+    return {"ok": True, "guncelleme_tarihi": tarih}
+
+
+@router.get("/diagnostic/anlama-gruplari")
+async def anlama_gruplari_ep(sinif: str = Query(""), current_user=Depends(get_current_user)):
+    """Veri giriş ekranı için: verilen sınıfta AKTİF anlama grupları (pasifler gizlenir)."""
+    from core.giris_rapor import get_sinif_kategorileri, aktif_grup_anahtarlari, pasif_gruplar
+    cfg = await get_sinif_kategorileri(db)
+    return {"aktif": aktif_grup_anahtarlari(cfg, sinif), "pasif": sorted(pasif_gruplar(cfg, sinif))}
+
+
 async def _analiz_temizlik() -> dict:
     """15 günü geçmiş tamamlanmamış analiz oturumlarını siler; 13-15 gün arasındakilere başlatan
     öğretmene uyarı. Ortak temizleyici (core.temizlik) — TIMI taslak temizliğiyle aynı mekanizma."""
@@ -1357,7 +1414,16 @@ async def olustur_rapor(data: RaporOlusturCreate, current_user=Depends(get_curre
     ogretmen = await db.users.find_one({"id": oturum.get("ogretmen_id")})
 
     prozodik_toplam = sum(int(v) for v in (data.prozodik or {}).values())
-    anlama_pct = data.anlama_yuzde if data.anlama_yuzde else anlama_yuzde_hesapla(data.anlama)
+
+    # EK: bu raporun sınıfı için AKTİF anlama gruplarını sabitle (snapshot). Böylece
+    # kural değişse bile bu rapor tutarlı kalır; eski raporlarda alan yoksa hepsi gösterilir.
+    from core.giris_rapor import get_sinif_kategorileri, aktif_grup_anahtarlari, aktif_anlama_dict
+    _sinif_sec = ogrenci.get("sinif", "") if ogrenci else ""
+    _sinif_cfg = await get_sinif_kategorileri(db)
+    _aktif_gruplar = aktif_grup_anahtarlari(_sinif_cfg, _sinif_sec)
+    # EK #3: % yalnız AKTİF kategoriler üzerinden (pasif grup ölçütleri hariç, forma bağlı değil)
+    _anlama_temiz = aktif_anlama_dict(data.anlama, _sinif_cfg, _sinif_sec)
+    anlama_pct = data.anlama_yuzde if data.anlama_yuzde else anlama_yuzde_hesapla(_anlama_temiz)
 
     rapor_data = {
         "id": str(uuid.uuid4()),
@@ -1381,6 +1447,7 @@ async def olustur_rapor(data: RaporOlusturCreate, current_user=Depends(get_curre
         "prozodik": data.prozodik,
         "prozodik_toplam": prozodik_toplam,
         "ogretmen_notu": data.ogretmen_notu,
+        "aktif_anlama_gruplari": _aktif_gruplar,   # EK: sınıfa göre gösterilecek gruplar
         "rapor_tipi": "olcum",   # olcum | gelisim
         "olusturma_tarihi": iso(),
     }
@@ -1645,8 +1712,8 @@ def _gelisim_raporu_pdf(rapor: dict):
     el.append(RLPara("4. Hata Analizi Gelişimi", styles['GSect']))
     ha = rapor.get("hata_analizi", {}) or {}
     def _hmap(lst):
-        etk = {"atlama": "Atlama", "yanlis_okuma": "Yanlış Okuma", "takilma": "Takılma", "tekrar": "Tekrar"}
-        d = {etk.get(x.get("tur"), x.get("tur")): x.get("sayi", 0) for x in (lst or [])}
+        from core.giris_rapor import hata_turu_ad
+        d = {hata_turu_ad(x.get("tur")): x.get("sayi", 0) for x in (lst or [])}
         return d
     on_h, son_h = _hmap(ha.get("on_test")), _hmap(ha.get("son_test"))
     turler = ["Atlama", "Yanlış Okuma", "Takılma", "Tekrar"]
@@ -1745,6 +1812,27 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
 
     el = []  # elements
 
+    # Giriş Analizi rapor yapılandırması (etiketler + metin bankası + sınıf kategorileri)
+    from core.giris_rapor import (
+        metin_turu_ad, hata_turu_ad, hata_turu_aciklama,
+        get_giris_rapor_metinleri, sonuc_paragrafi_uret,
+    )
+    rapor_metinleri, _ = await get_giris_rapor_metinleri(db)
+    # Aktif anlama grupları: YENİ raporlarda snapshot saklıdır (kural uygulanır);
+    # ESKİ raporlarda alan yoksa hepsini göster (geriye dönük — eski raporlar as-is).
+    aktif_gruplar = rapor.get("aktif_anlama_gruplari") or ["4.1", "4.2", "4.3", "4.4", "4.5"]
+
+    # D: sunucu tarafı vektör grafikler
+    import core.rapor_grafik as grafik
+    # Sınıf okuma hızı normu (gauge + karşılaştırma için) — "yeterli" eşiği hedef alınır
+    _norm_wpm = 0
+    try:
+        from core.rapor_ayarlari import get_rapor_ayari
+        _normlar = await get_rapor_ayari("okuma_hizi_normlari")
+        _norm_wpm = float((_normlar or {}).get(str(rapor.get("ogrenci_sinif", "")).strip(), {}).get("yeterli", 0) or 0)
+    except Exception:
+        _norm_wpm = 0
+
     hdr_bg = colors.HexColor('#1F4E79')
     alt_bg = colors.HexColor('#F2F7FB')
     bdr = colors.HexColor('#CCCCCC')
@@ -1805,7 +1893,7 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     sure_sn = int(sure_sn_total) % 60
     metin_info = [
         ["Metnin Adı:", _tr_upper(rapor.get("metin_adi", "-"))],
-        ["Metnin Türü:", _tr_upper(rapor.get("metin_turu", "-"))],
+        ["Metnin Türü:", metin_turu_ad(rapor.get("metin_turu"))],
         ["Toplam Kelime Sayısı:", str(kelime_s)],
         ["Doğru Okunan Kelime:", str(dogru_k)],
         ["Yanlış Okunan Kelime:", str(yanlis_k)],
@@ -1833,24 +1921,33 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     el.append(Spacer(1, 4))
     sinif = rapor.get("ogrenci_sinif", "")
     el.append(RLPara(f"Öğrencinin okuma hızı dakikada <b>{wpm} kelime</b>dir. Bu okuma hızı, öğrencinin bulunduğu sınıf düzeyi normlarına göre <b>{hiz_label.lower()} düzeydedir</b>.", styles['BodyOBA']))
+    # D: okuma hızı göstergesi + sınıf normu karşılaştırma (yan yana)
+    _gt = RLTable([[grafik.hiz_gauge(wpm, _norm_wpm), grafik.norm_karsilastirma(wpm, _norm_wpm)]],
+                  colWidths=[7*cm, 8.5*cm])
+    _gt.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'MIDDLE'), ('ALIGN', (0, 0), (-1, -1), 'CENTER')]))
+    el.append(_gt)
 
     # ── 4. DOĞRU OKUMA ORANI ──
     el.append(RLPara("3.1. Doğru Okuma Oranı", styles['SubSectOBA']))
-    el.append(RLPara(f"Doğruluk: <b>%{round(dogruluk)}</b>", styles['BodyOBA']))
+    _dt = RLTable([[grafik.dogruluk_donut(dogruluk),
+                    RLPara(f"Doğru okuma oranı <b>%{round(dogruluk)}</b>. Toplam {kelime_s} kelimeden "
+                           f"<b>{dogru_k}</b> doğru, <b>{yanlis_k}</b> hatalı okunmuştur.", styles['BodyOBA'])]],
+                  colWidths=[4*cm, 11.5*cm])
+    _dt.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'MIDDLE')]))
+    el.append(_dt)
     hatalar = rapor.get("hata_sayilari") or []
     # Dict formatındaysa listeye çevir: {"atlama": 2, ...} → [{"tur": "atlama", "sayi": 2}]
     if isinstance(hatalar, dict):
         hatalar = [{"tur": k, "sayi": v} for k, v in hatalar.items()]
     if hatalar:
-        hata_labels = {"atlama": "Atlama", "yanlis_okuma": "Yanlış Okuma", "yanlis": "Yanlış Okuma", "takilma": "Takılma", "tekrar": "Tekrar"}
-        hata_desc = {"atlama": "Kelime veya satır atlama", "yanlis_okuma": "Kelimeyi farklı okuma", "yanlis": "Kelimeyi farklı okuma", "takilma": "Kelimede duraksama", "tekrar": "Aynı kelimeyi tekrar okuma"}
+        # C: TÜM hata türleri tutarlı, okunabilir Türkçe etiketle (18 tür haritası).
         hata_rows = [["Hata Türü", "Açıklama", "Sayı"]]
         toplam_hata = 0
         for h in hatalar:
             tur = h.get("tur", "")
             sayi = h.get("sayi", 0)
             toplam_hata += sayi
-            hata_rows.append([hata_labels.get(tur, tur), hata_desc.get(tur, ""), str(sayi)])
+            hata_rows.append([hata_turu_ad(tur), hata_turu_aciklama(tur), str(sayi)])
         hata_rows.append(["TOPLAM", "", str(toplam_hata)])
         t3 = RLTable(hata_rows, colWidths=[3.5*cm, 6.5*cm, 2*cm])
         t3.setStyle(TableStyle(tbl_style(len(hata_rows)) + [
@@ -1859,6 +1956,9 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
             ('ALIGN', (2,0), (2,-1), 'CENTER'),
         ]))
         el.append(t3)
+        # D: hata türü dağılımı bar grafiği
+        _hbar = grafik.yatay_bar_dagilim([(hata_turu_ad(h.get("tur", "")), h.get("sayi", 0)) for h in hatalar])
+        el.append(_hbar)
 
     # ── 5. OKUDUĞUNU ANLAMA ──
     anlama = rapor.get("anlama") or {}
@@ -1866,32 +1966,34 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     anlama_sev = "İyi" if anlama_pct >= 85 else "Orta" if anlama_pct >= 70 else "Zayıf"
     el.append(RLPara(f"4. Okuduğunu Anlama Becerileri — %{anlama_pct}", styles['SectOBA']))
 
-    # Anlama alt grupları
-    anlama_gruplari = [
-        ("4.1 Sözcük Düzeyinde Anlama", [
+    # Anlama alt grupları — (grup_anahtar, başlık, ölçütler). EK: pasif gruplar
+    # (ör. 1. sınıfta 4.1–4.4) rapora BASILMAZ; başlıklar numarasız gösterilir
+    # (görünen grup sayısı değişse de tutarlı, boşluklu numara kalmaz). 4.5 hep aktif.
+    _anlama_ham = [
+        ("4.1", "Sözcük Düzeyinde Anlama", [
             ("Cümle anlamını kavrama", "cumle_anlama"),
             ("Bilinmeyen sözcük tahmini", "bilinmeyen_sozcuk"),
             ("Bağlaç ve zamirleri anlama", "baglac_zamir"),
         ]),
-        ("4.2 Metnin Ana Yapısını Anlama", [
+        ("4.2", "Metnin Ana Yapısını Anlama", [
             ("Ana fikir belirleme", "ana_fikir"),
             ("Yardımcı fikirleri ifade etme", "yardimci_fikir"),
             ("Metnin konusunu ifade etme", "konu"),
             ("Başlık önerme", "baslik_onerme"),
         ]),
-        ("4.3 Metinler Arasılık ve Derin Anlama", [
+        ("4.3", "Metinler Arasılık ve Derin Anlama", [
             ("Neden-sonuç ilişkisini belirleme", "neden_sonuc"),
             ("Çıkarım yapma", "cikarim"),
             ("Metindeki ipuçlarını kullanma", "ipuclari"),
             ("Yorumlama", "yorumlama"),
         ]),
-        ("4.4 Eleştirel ve Yaratıcı Okuma", [
+        ("4.4", "Eleştirel ve Yaratıcı Okuma", [
             ("Metne yönelik görüş bildirme", "gorus_bildirme"),
             ("Yazarın amacını sezme", "yazar_amaci"),
             ("Alternatif son / fikir üretme", "alternatif_fikir"),
             ("Metni günlük hayatla ilişkilendirme", "guncelle_hayat"),
         ]),
-        ("4.5 Soru Performans Analizi", [
+        ("4.5", "Soru Performans Analizi (Bloom)", [
             ("Bilgi", "bilgi"),
             ("Kavrama", "kavrama"),
             ("Uygulama", "uygulama"),
@@ -1900,6 +2002,7 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
             ("Değerlendirme", "degerlendirme"),
         ]),
     ]
+    anlama_gruplari = [(ad, ol) for (gk, ad, ol) in _anlama_ham if gk in aktif_gruplar]
 
     seviye_map = {"zayif": "Zayıf", "orta": "Orta", "iyi": "İyi"}
     for grup_baslik, olcutler in anlama_gruplari:
@@ -1922,6 +2025,31 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
         st.append(('ALIGN', (1,0), (-1,-1), 'CENTER'))
         t_a.setStyle(TableStyle(st))
         el.append(t_a)
+
+    # D: RADAR grafikleri — 4.1-4.4 anlama boyutları + 4.5 Bloom (Zayıf/Orta/İyi → 1/2/3)
+    _spuan = {"zayif": 1, "orta": 2, "iyi": 3}
+    _kisa = {"4.1": "Sözcük", "4.2": "Ana Yapı", "4.3": "Derin Anlama", "4.4": "Eleştirel"}
+    _boyut_eksen, _boyut_deger = [], []
+    for gk, _ad, olcutler in _anlama_ham:
+        if gk == "4.5" or gk not in aktif_gruplar:
+            continue
+        puanlar = [_spuan.get(anlama.get(k, "orta"), 2) for _l, k in olcutler]
+        if puanlar:
+            _boyut_eksen.append(_kisa.get(gk, gk))
+            _boyut_deger.append(round(sum(puanlar) / len(puanlar), 2))
+    _radar1 = grafik.anlama_radar(_boyut_eksen, _boyut_deger) if len(_boyut_eksen) >= 3 else None
+    _bloom_eksen = ["Bilgi", "Kavrama", "Uygulama", "Analiz", "Sentez", "Değerlend."]
+    _bloom_key = ["bilgi", "kavrama", "uygulama", "analiz", "sentez", "degerlendirme"]
+    _bloom_deger = [_spuan.get(anlama.get(k, "orta"), 2) for k in _bloom_key]
+    _radar2 = grafik.anlama_radar(_bloom_eksen, _bloom_deger) if "4.5" in aktif_gruplar else None
+    _radarlar = [r for r in (_radar1, _radar2) if r is not None]
+    if _radarlar:
+        _basliklar = []
+        if _radar1 is not None: _basliklar.append(RLPara("Anlama Boyutları", styles['SmallOBA']))
+        if _radar2 is not None: _basliklar.append(RLPara("Bloom Soru Performansı", styles['SmallOBA']))
+        _rt = RLTable([_radarlar, _basliklar], colWidths=[7.5*cm] * len(_radarlar))
+        _rt.setStyle(TableStyle([('ALIGN', (0, 0), (-1, -1), 'CENTER'), ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')]))
+        el.append(_rt)
 
     # ── 6. PROZODİK OKUMA ──
     proz = rapor.get("prozodik") or {}
@@ -1968,10 +2096,18 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     t_p.setStyle(TableStyle(ps))
     el.append(t_p)
     el.append(RLPara(f"Prozodik okuma performansı: <b>{proz_sev}</b> (Toplam {proz_toplam}/20)", styles['BodyOBA']))
+    el.append(grafik.prozodik_bar(proz_toplam))  # D: renk bantlı prozodik göstergesi
 
-    # ── 7. SONUÇ VE GENEL YORUM ──
+    # ── 6. SONUÇ VE GENEL YORUM ──
     el.append(RLPara("6. Sonuç ve Genel Yorum", styles['SectOBA']))
+    # A: Kural-tabanlı metin bankasından deterministik sonuç paragrafı (AI icat etmez).
+    # 1. sınıf gibi 4.1–4.4 pasif olan durumda anlama cümlesi eklenmez.
+    _anlama_var = any(g in aktif_gruplar for g in ("4.1", "4.2", "4.3", "4.4"))
+    for cumle in sonuc_paragrafi_uret(rapor, rapor_metinleri, anlama_var=_anlama_var):
+        el.append(RLPara(cumle, styles['BodyOBA']))
+    el.append(Spacer(1, 4))
     if rapor.get("ogretmen_notu"):
+        el.append(RLPara("<b>Eğitimci Notu:</b>", styles['SubSectOBA']))
         for line in rapor.get("ogretmen_notu", "").split("\n"):
             if line.strip():
                 el.append(RLPara(line.strip(), styles['BodyOBA']))
