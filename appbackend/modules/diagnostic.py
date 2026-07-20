@@ -1819,6 +1819,17 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     # ESKİ raporlarda alan yoksa hepsini göster (geriye dönük — eski raporlar as-is).
     aktif_gruplar = rapor.get("aktif_anlama_gruplari") or ["4.1", "4.2", "4.3", "4.4", "4.5"]
 
+    # D: sunucu tarafı vektör grafikler
+    import core.rapor_grafik as grafik
+    # Sınıf okuma hızı normu (gauge + karşılaştırma için) — "yeterli" eşiği hedef alınır
+    _norm_wpm = 0
+    try:
+        from core.rapor_ayarlari import get_rapor_ayari
+        _normlar = await get_rapor_ayari("okuma_hizi_normlari")
+        _norm_wpm = float((_normlar or {}).get(str(rapor.get("ogrenci_sinif", "")).strip(), {}).get("yeterli", 0) or 0)
+    except Exception:
+        _norm_wpm = 0
+
     hdr_bg = colors.HexColor('#1F4E79')
     alt_bg = colors.HexColor('#F2F7FB')
     bdr = colors.HexColor('#CCCCCC')
@@ -1907,10 +1918,20 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     el.append(Spacer(1, 4))
     sinif = rapor.get("ogrenci_sinif", "")
     el.append(RLPara(f"Öğrencinin okuma hızı dakikada <b>{wpm} kelime</b>dir. Bu okuma hızı, öğrencinin bulunduğu sınıf düzeyi normlarına göre <b>{hiz_label.lower()} düzeydedir</b>.", styles['BodyOBA']))
+    # D: okuma hızı göstergesi + sınıf normu karşılaştırma (yan yana)
+    _gt = RLTable([[grafik.hiz_gauge(wpm, _norm_wpm), grafik.norm_karsilastirma(wpm, _norm_wpm)]],
+                  colWidths=[7*cm, 8.5*cm])
+    _gt.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'MIDDLE'), ('ALIGN', (0, 0), (-1, -1), 'CENTER')]))
+    el.append(_gt)
 
     # ── 4. DOĞRU OKUMA ORANI ──
     el.append(RLPara("3.1. Doğru Okuma Oranı", styles['SubSectOBA']))
-    el.append(RLPara(f"Doğruluk: <b>%{round(dogruluk)}</b>", styles['BodyOBA']))
+    _dt = RLTable([[grafik.dogruluk_donut(dogruluk),
+                    RLPara(f"Doğru okuma oranı <b>%{round(dogruluk)}</b>. Toplam {kelime_s} kelimeden "
+                           f"<b>{dogru_k}</b> doğru, <b>{yanlis_k}</b> hatalı okunmuştur.", styles['BodyOBA'])]],
+                  colWidths=[4*cm, 11.5*cm])
+    _dt.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'MIDDLE')]))
+    el.append(_dt)
     hatalar = rapor.get("hata_sayilari") or []
     # Dict formatındaysa listeye çevir: {"atlama": 2, ...} → [{"tur": "atlama", "sayi": 2}]
     if isinstance(hatalar, dict):
@@ -1932,6 +1953,9 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
             ('ALIGN', (2,0), (2,-1), 'CENTER'),
         ]))
         el.append(t3)
+        # D: hata türü dağılımı bar grafiği
+        _hbar = grafik.yatay_bar_dagilim([(hata_turu_ad(h.get("tur", "")), h.get("sayi", 0)) for h in hatalar])
+        el.append(_hbar)
 
     # ── 5. OKUDUĞUNU ANLAMA ──
     anlama = rapor.get("anlama") or {}
@@ -1999,6 +2023,31 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
         t_a.setStyle(TableStyle(st))
         el.append(t_a)
 
+    # D: RADAR grafikleri — 4.1-4.4 anlama boyutları + 4.5 Bloom (Zayıf/Orta/İyi → 1/2/3)
+    _spuan = {"zayif": 1, "orta": 2, "iyi": 3}
+    _kisa = {"4.1": "Sözcük", "4.2": "Ana Yapı", "4.3": "Derin Anlama", "4.4": "Eleştirel"}
+    _boyut_eksen, _boyut_deger = [], []
+    for gk, _ad, olcutler in _anlama_ham:
+        if gk == "4.5" or gk not in aktif_gruplar:
+            continue
+        puanlar = [_spuan.get(anlama.get(k, "orta"), 2) for _l, k in olcutler]
+        if puanlar:
+            _boyut_eksen.append(_kisa.get(gk, gk))
+            _boyut_deger.append(round(sum(puanlar) / len(puanlar), 2))
+    _radar1 = grafik.anlama_radar(_boyut_eksen, _boyut_deger) if len(_boyut_eksen) >= 3 else None
+    _bloom_eksen = ["Bilgi", "Kavrama", "Uygulama", "Analiz", "Sentez", "Değerlend."]
+    _bloom_key = ["bilgi", "kavrama", "uygulama", "analiz", "sentez", "degerlendirme"]
+    _bloom_deger = [_spuan.get(anlama.get(k, "orta"), 2) for k in _bloom_key]
+    _radar2 = grafik.anlama_radar(_bloom_eksen, _bloom_deger) if "4.5" in aktif_gruplar else None
+    _radarlar = [r for r in (_radar1, _radar2) if r is not None]
+    if _radarlar:
+        _basliklar = []
+        if _radar1 is not None: _basliklar.append(RLPara("Anlama Boyutları", styles['SmallOBA']))
+        if _radar2 is not None: _basliklar.append(RLPara("Bloom Soru Performansı", styles['SmallOBA']))
+        _rt = RLTable([_radarlar, _basliklar], colWidths=[7.5*cm] * len(_radarlar))
+        _rt.setStyle(TableStyle([('ALIGN', (0, 0), (-1, -1), 'CENTER'), ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')]))
+        el.append(_rt)
+
     # ── 6. PROZODİK OKUMA ──
     proz = rapor.get("prozodik") or {}
     proz_toplam = rapor.get("prozodik_toplam") or 0
@@ -2044,6 +2093,7 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     t_p.setStyle(TableStyle(ps))
     el.append(t_p)
     el.append(RLPara(f"Prozodik okuma performansı: <b>{proz_sev}</b> (Toplam {proz_toplam}/20)", styles['BodyOBA']))
+    el.append(grafik.prozodik_bar(proz_toplam))  # D: renk bantlı prozodik göstergesi
 
     # ── 6. SONUÇ VE GENEL YORUM ──
     el.append(RLPara("6. Sonuç ve Genel Yorum", styles['SectOBA']))
