@@ -55,6 +55,7 @@ export default function AiCeo({ apiBase }) {
   const [genelCevap, setGenelCevap] = useState(null);
   const [pazar, setPazar] = useState(null);
   const [pazarYukleniyor, setPazarYukleniyor] = useState(false);
+  const [pazarModal, setPazarModal] = useState(false);   // pazar araştırması tam metin modalı
   const [skor, setSkor] = useState(null);
   const [kuyrukVeri, setKuyrukVeri] = useState(null);
   const [planlar, setPlanlar] = useState([]);
@@ -398,21 +399,42 @@ export default function AiCeo({ apiBase }) {
         )}
       </div>
 
-      {/* ── Ayda'ya Sor (genel) ── */}
-      <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
-        <h3 className="font-bold text-content text-sm mb-2 flex items-center gap-2"><AydaAvatar size={22} ring={false} />Ayda'ya Sor</h3>
-        <div className="flex gap-2">
-          <input value={genelSoru} onChange={e => setGenelSoru(e.target.value)} onKeyDown={e => e.key === "Enter" && genelSor()}
-            placeholder="Örn: bu ayki tahsilat düşüşünün sebebi ne olabilir?" className="flex-1 px-3 py-2 rounded-xl border border-line text-sm outline-none focus:border-indigo-400" />
-          <button onClick={genelSor} className="bg-indigo-600 text-white px-3 rounded-xl"><Send className="h-4 w-4" /></button>
-        </div>
-        {genelCevap && (
-          <div className="mt-2 text-sm rounded-xl bg-app border border-line p-3">
-            {genelCevap.bekliyor ? "Ayda düşünüyor…" : genelCevap.hata ? <span className="text-red-600">{genelCevap.hata}</span> : (
-              <><div className="text-content whitespace-pre-wrap">{genelCevap.cevap}</div>{genelCevap.zayif_dayanak && <div className="text-[11px] text-amber-600 mt-1">⚠ Bu cevaptaki bazı sayılar fotoğrafta doğrulanamadı.</div>}</>
-            )}
+      {/* ── Ayda'ya Sor + Senaryo Simülasyonu (yan yana) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+        {/* Ayda'ya Sor (genel) */}
+        <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+          <h3 className="font-bold text-content text-sm mb-2 flex items-center gap-2"><AydaAvatar size={22} ring={false} />Ayda'ya Sor</h3>
+          <div className="flex gap-2">
+            <input value={genelSoru} onChange={e => setGenelSoru(e.target.value)} onKeyDown={e => e.key === "Enter" && genelSor()}
+              placeholder="Örn: bu ayki tahsilat düşüşünün sebebi ne olabilir?" className="flex-1 min-w-0 px-3 py-2 rounded-xl border border-line text-sm outline-none focus:border-indigo-400" />
+            <button onClick={genelSor} className="bg-indigo-600 text-white px-3 rounded-xl shrink-0"><Send className="h-4 w-4" /></button>
           </div>
-        )}
+          {genelCevap && (
+            <div className="mt-2 text-sm rounded-xl bg-app border border-line p-3 max-h-80 overflow-y-auto">
+              {genelCevap.bekliyor ? "Ayda düşünüyor…" : genelCevap.hata ? <span className="text-red-600">{genelCevap.hata}</span> : (
+                <><div className="text-content whitespace-pre-wrap break-words">{genelCevap.cevap}</div>{genelCevap.zayif_dayanak && <div className="text-[11px] text-amber-600 mt-1">⚠ Bu cevaptaki bazı sayılar fotoğrafta doğrulanamadı.</div>}</>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Senaryo Simülasyonu (S6e) */}
+        <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-2"><h3 className="font-bold text-content text-sm">Senaryo Simülasyonu</h3><BilgiIkonu nasil="Kur ücreti / öğretmen payı / vergi değişiminin gelir-marja deterministik etkisi. Esneklik girilirse hacim etkisi varsayım olarak eklenir (açıkça etiketli)." ne="Fiyat/pay/vergi kararlarının kâra etkisini uygulamadan önce görmek için." /></div>
+          <div className="flex flex-wrap gap-2 items-end">
+            {[["kur_ucreti_degisim_yuzde", "Kur ücreti %"], ["ogretmen_payi_degisim_yuzde", "Öğretmen payı %"], ["esneklik", "Esneklik (ops.)"]].map(([k, l]) => (
+              <div key={k}><label className="text-[10px] text-subtle block">{l}</label><input value={senForm[k]} onChange={e => setSenForm({ ...senForm, [k]: e.target.value })} className="w-28 px-2 py-1 rounded border border-line text-sm" placeholder="0" /></div>
+            ))}
+            <button onClick={senaryoCalistir} className="bg-indigo-600 text-white text-sm rounded-lg px-3 py-1.5">Hesapla</button>
+          </div>
+          {senSonuc && (
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="rounded-lg border border-line p-2"><div className="text-xs text-subtle mb-1">Mevcut</div><div className="text-sm tabular-nums">Net: <b>{fmt(senSonuc.mevcut.net)}₺</b></div></div>
+              <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-2"><div className="text-xs text-subtle mb-1">Senaryo</div><div className="text-sm tabular-nums">Net: <b>{fmt(senSonuc.senaryo.net)}₺</b> <span className={senSonuc.net_delta >= 0 ? "text-emerald-600" : "text-red-600"}>({senSonuc.net_delta >= 0 ? "+" : ""}{fmt(senSonuc.net_delta)}₺)</span></div></div>
+              <div className="sm:col-span-2 text-[11px] text-amber-600">⚠ {senSonuc.varsayim}</div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Kurul Özeti PDF + NPS (S6d/S6f) ── */}
@@ -460,24 +482,6 @@ export default function AiCeo({ apiBase }) {
           </div>
         </div>
       )}
-
-      {/* ── Senaryo Simülasyonu (S6e) ── */}
-      <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
-        <div className="flex items-center justify-between mb-2"><h3 className="font-bold text-content text-sm">Senaryo Simülasyonu</h3><BilgiIkonu nasil="Kur ücreti / öğretmen payı / vergi değişiminin gelir-marja deterministik etkisi. Esneklik girilirse hacim etkisi varsayım olarak eklenir (açıkça etiketli)." ne="Fiyat/pay/vergi kararlarının kâra etkisini uygulamadan önce görmek için." /></div>
-        <div className="flex flex-wrap gap-2 items-end">
-          {[["kur_ucreti_degisim_yuzde", "Kur ücreti %"], ["ogretmen_payi_degisim_yuzde", "Öğretmen payı %"], ["esneklik", "Esneklik (ops.)"]].map(([k, l]) => (
-            <div key={k}><label className="text-[10px] text-subtle block">{l}</label><input value={senForm[k]} onChange={e => setSenForm({ ...senForm, [k]: e.target.value })} className="w-28 px-2 py-1 rounded border border-line text-sm" placeholder="0" /></div>
-          ))}
-          <button onClick={senaryoCalistir} className="bg-indigo-600 text-white text-sm rounded-lg px-3 py-1.5">Hesapla</button>
-        </div>
-        {senSonuc && (
-          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="rounded-lg border border-line p-2"><div className="text-xs text-subtle mb-1">Mevcut</div><div className="text-sm tabular-nums">Net: <b>{fmt(senSonuc.mevcut.net)}₺</b></div></div>
-            <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-2"><div className="text-xs text-subtle mb-1">Senaryo</div><div className="text-sm tabular-nums">Net: <b>{fmt(senSonuc.senaryo.net)}₺</b> <span className={senSonuc.net_delta >= 0 ? "text-emerald-600" : "text-red-600"}>({senSonuc.net_delta >= 0 ? "+" : ""}{fmt(senSonuc.net_delta)}₺)</span></div></div>
-            <div className="sm:col-span-2 text-[11px] text-amber-600">⚠ {senSonuc.varsayim}</div>
-          </div>
-        )}
-      </div>
 
       {/* ── Stratejik Plan (S5) ── */}
       <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
@@ -536,7 +540,14 @@ export default function AiCeo({ apiBase }) {
         <div className="text-[11px] text-subtle mb-2">Web araması (grounding) kullanır — seyrek/elle tetikleyin (maliyetli).</div>
         {pazar && (pazar.ok ? (
           <div className="text-sm space-y-2">
-            <div className="text-content whitespace-pre-wrap">{pazar.arastirma?.ozet}</div>
+            {/* Panelde kırpılmış önizleme; tıklayınca kaydırılabilir tam metin modalı açılır */}
+            <button type="button" onClick={() => setPazarModal(true)} className="w-full text-left group">
+              <div className="text-content whitespace-pre-wrap max-h-32 overflow-hidden relative rounded-lg group-hover:bg-app/40 transition-colors">
+                {pazar.arastirma?.ozet}
+                <div className="absolute bottom-0 inset-x-0 h-10 bg-gradient-to-t from-surface to-transparent" />
+              </div>
+              <span className="mt-1 inline-flex items-center gap-1 text-xs text-indigo-600 group-hover:underline">Tam raporu gör →</span>
+            </button>
             {(pazar.arastirma?.kaynaklar || []).length > 0 && (
               <div><div className="text-xs font-semibold text-content mb-1">Kaynaklar</div>
                 <ul className="space-y-0.5">{pazar.arastirma.kaynaklar.map((k, i) => (
@@ -577,6 +588,27 @@ export default function AiCeo({ apiBase }) {
                 <button key={d} onClick={() => durumGuncelle(secili, d)} className="text-xs px-3 py-1.5 rounded-lg border border-line hover:bg-app">{DURUM_ETIKET[d]}</button>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Pazar Araştırması tam metin modalı ── */}
+      {pazarModal && pazar?.arastirma && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setPazarModal(false)}>
+          <div className="bg-surface rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-auto p-5" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-2 mb-3">
+              <h3 className="font-bold text-content flex items-center gap-2"><AydaAvatar size={22} ring={false} />Pazar Araştırması</h3>
+              <button onClick={() => setPazarModal(false)} className="text-subtle hover:text-content text-xl leading-none">×</button>
+            </div>
+            <div className="text-sm text-content whitespace-pre-wrap break-words">{pazar.arastirma.ozet}</div>
+            {(pazar.arastirma.kaynaklar || []).length > 0 && (
+              <div className="mt-4 pt-3 border-t border-line">
+                <div className="text-xs font-semibold text-content mb-1">Kaynaklar</div>
+                <ul className="space-y-0.5">{pazar.arastirma.kaynaklar.map((k, i) => (
+                  <li key={i}><a href={k.url} target="_blank" rel="noreferrer" className="text-xs text-indigo-600 hover:underline break-all">🔗 {k.baslik}</a></li>
+                ))}</ul>
+              </div>
+            )}
           </div>
         </div>
       )}
