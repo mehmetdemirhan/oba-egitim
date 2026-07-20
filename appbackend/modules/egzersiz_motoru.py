@@ -98,6 +98,78 @@ def _pool_ciftler_uret(havuz: list[dict], soru_sayisi: int, zorluk: str | None) 
     return {"ciftler": [{"sol": c["kelime"], "sag": _kisa_anlam(c["anlam"])} for c in secilen]}
 
 
+# ── Cloze (boşluk doldurma) — ONAYLI OKUMA METİNLERİNDEN ─────────────────────
+# AI metin üretemese bile: analiz_metinler havuzundaki gerçek okuma metinlerinden
+# içerik kelimeleri boşluğa çevrilir, çeldiriciler onaylı kelime havuzundan gelir.
+_POOL_CLOZE_TIPLERI = {"cloze_bosluk_doldurma"}
+_DURAK_KELIMELER = {
+    "ve", "ile", "ama", "fakat", "çünkü", "gibi", "için", "bir", "bu", "şu", "onu", "ona",
+    "da", "de", "ki", "mi", "ne", "çok", "daha", "en", "her", "hiç", "ya", "veya", "ancak",
+    "yani", "ise", "göre", "kadar", "sonra", "önce", "ben", "sen", "biz", "siz", "onlar",
+}
+
+# AI'sız, onaylı havuzdan üretilen tüm tipler (kap dolana dek her oturumda taze).
+_POOL_TIPLERI = _POOL_CIFTLER_TIPLERI | _POOL_CLOZE_TIPLERI
+
+
+def _ic_kelime(w: str) -> str:
+    return w.strip(".,;:!?\"'()[]…«»").lower()
+
+
+def _cumlelere_bol(metin: str) -> list[str]:
+    import re
+    return [c.strip() for c in re.split(r"[.!?…]+", metin or "") if len(c.strip().split()) >= 4]
+
+
+async def _analiz_metin_sec(sinif: int) -> dict | None:
+    """Onaylı okuma metni havuzundan (durum=havuzda) rastgele yeterli uzunlukta bir metin."""
+    try:
+        sorgu = {"bolum": {"$in": ["analiz", "okuma_parcalari"]}, "durum": "havuzda",
+                 "icerik": {"$nin": [None, ""]}}
+        docs = await db.analiz_metinler.find(sorgu, {"icerik": 1, "baslik": 1}).to_list(length=300)
+        docs = [d for d in docs if len((d.get("icerik") or "").split()) >= 30]
+        return random.choice(docs) if docs else None
+    except Exception as ex:
+        logging.warning(f"[egzersiz_motoru] okuma metni seçme hatası: {ex}")
+        return None
+
+
+def _pool_cloze_uret(metin: str, soru_sayisi: int, zorluk: str | None, distraktor_havuz: list[str]) -> dict | None:
+    """Okuma metninden boşluk-doldurma soruları üretir. Boşluğa uygun içerik
+    kelimeleri (durak değil, yeterince uzun) seçilir; 4 seçenek = doğru + 3 çeldirici.
+    Zorluk arttıkça daha uzun kelime boşluğu ve daha benzer çeldiriciler."""
+    cumleler = _cumlelere_bol(metin)
+    if len(cumleler) < 2 or len(distraktor_havuz) < 4:
+        return None
+    random.shuffle(cumleler)
+    z = {"kolay": 1, "orta": 2, "zor": 3}.get((zorluk or "orta").lower(), 2)
+    min_uzunluk = 3 + z  # kolay 4, orta 5, zor 6
+    sorular, kullanilan = [], set()
+    for c in cumleler:
+        if len(sorular) >= soru_sayisi:
+            break
+        kelimeler = c.split()
+        adaylar = [(i, w) for i, w in enumerate(kelimeler)
+                   if _ic_kelime(w).isalpha() and len(_ic_kelime(w)) >= min_uzunluk
+                   and _ic_kelime(w) not in _DURAK_KELIMELER and _ic_kelime(w) not in kullanilan]
+        if not adaylar:
+            continue
+        idx, ham = random.choice(adaylar)
+        dogru = _ic_kelime(ham)
+        kaynak = [w for w in distraktor_havuz if w != dogru]
+        benzer = [w for w in kaynak if abs(len(w) - len(dogru)) <= 1 or (z >= 3 and w[:1] == dogru[:1])]
+        cel_havuz = benzer if len(benzer) >= 3 else kaynak
+        if len(cel_havuz) < 3:
+            continue
+        cel = random.sample(cel_havuz, 3)
+        secenekler = cel + [dogru]
+        random.shuffle(secenekler)
+        kelimeler[idx] = "___"
+        sorular.append({"soru": " ".join(kelimeler), "secenekler": secenekler, "dogru": secenekler.index(dogru)})
+        kullanilan.add(dogru)
+    return {"sorular": sorular} if len(sorular) >= 2 else None
+
+
 # ─────────────────────────────────────────────
 # Yardımcılar
 # ─────────────────────────────────────────────
@@ -184,6 +256,20 @@ async def _icerik_uret(tip: str, sinif: int, konu: str | None, zorluk: str | Non
         if pool_icerik:
             return pool_icerik, False   # mock değil — onaylı havuzdan gerçek içerik
         # Havuz yetersizse (o sınıfta anlamlı kelime yok) AI/mock akışına düş.
+
+    # Cloze (boşluk doldurma): onaylı okuma metninden + havuz çeldiricileriyle (AI'sız)
+    if tip in _POOL_CLOZE_TIPLERI:
+        metin_doc = await _analiz_metin_sec(sinif)
+        if metin_doc:
+            metin = metin_doc.get("icerik", "")
+            meb = await _meb_kelimeler(sinif, limit=200) or []
+            ic_kelimeler = list({_ic_kelime(w) for w in metin.split()
+                                 if _ic_kelime(w).isalpha() and len(_ic_kelime(w)) >= 4})
+            havuz = list({w.lower() for w in meb} | set(ic_kelimeler))
+            cloze = _pool_cloze_uret(metin, soru_sayisi, zorluk, havuz)
+            if cloze:
+                return cloze, False
+        # Uygun metin/kelime yoksa AI/mock akışına düş.
 
     system, user_msg = prompt_uret(tip, sinif, konu, soru_sayisi, zorluk)
     if not user_msg:
@@ -334,14 +420,14 @@ async def _icerik_sec_veya_uret(tip: str, sinif: int, ekleyen_id: str,
        öğrencinin en ESKİ gördüğü içerik yeniden gösterilir — tüm havuz döndükten
        sonra makul bir aralıkla tekrar (spaced) demektir.
     """
-    # Pool tabanlı tipler (kelime-anlam): AI'sız + ucuz → kap dolana kadar HER
-    # oturumda TAZE üret (bayat mock'lar yerine hep farklı içerik). Kap dolunca
-    # aşağıdaki tekrarsız/en-eski akışına düşer.
-    if tip in _POOL_CIFTLER_TIPLERI:
+    # Pool tabanlı tipler (kelime-anlam eşleştirme / hafıza kartı / cloze): AI'sız +
+    # ucuz → kap dolana kadar HER oturumda TAZE üret (bayat mock'lar yerine hep
+    # farklı içerik). Kap dolunca aşağıdaki tekrarsız/en-eski akışına düşer.
+    if tip in _POOL_TIPLERI:
         mevcut = await db.egzersiz_icerikler.count_documents(_aktif_sorgu(tip, sinif))
         if mevcut < KUTUPHANE_KAP:
             icerik, mock = await _icerik_uret(tip, sinif, None, None, ogrenci_id)
-            if not mock and icerik.get("ciftler"):
+            if not mock and (icerik.get("ciftler") or icerik.get("sorular")):
                 return await _icerik_kaydet(tip, sinif, None, None, icerik, ekleyen_id, mock, kaynak="havuz_uretim")
 
     adaylar = await db.egzersiz_icerikler.find(_aktif_sorgu(tip, sinif)).sort(
