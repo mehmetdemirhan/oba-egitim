@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./components/ui/dialog";
 import { Badge } from "./components/ui/badge";
-import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send, Bell, Database, RefreshCw, GitBranch, AlertTriangle, Package, ClipboardList, Flame, Target, Award, Heart, FlaskConical, Medal, Lock, Sparkles, Lightbulb, MessageCircle, TrendingUp, Palette, Brain, XCircle, Check, Clock, Save, Image as ImageIcon, ArrowLeft, ArrowRight, Play, Pause, Settings, Music, Printer, Search, Link2, Pin, Upload, Activity, ScrollText, HelpCircle } from "lucide-react";
+import { Users, BookOpen, CreditCard, Plus, Edit2, Trash2, UserCheck, Calendar, ChevronDown, ChevronRight, Download, BarChart3, LogOut, Shield, Trophy, CheckCircle, BookMarked, Film, GraduationCap, Star, Stethoscope, Timer, FileText, Eye, Mail, Send, Bell, Database, RefreshCw, GitBranch, AlertTriangle, Package, ClipboardList, Flame, Target, Award, Heart, FlaskConical, Medal, Lock, Sparkles, Lightbulb, MessageCircle, TrendingUp, Palette, Brain, XCircle, Check, Clock, Save, Image as ImageIcon, ArrowLeft, ArrowRight, Play, Pause, Settings, Music, Printer, Search, Link2, Pin, Upload, Activity, ScrollText, HelpCircle, Archive, ArchiveRestore } from "lucide-react";
 import { useToast } from "./hooks/use-toast";
 import { IkonCoz } from "./lib/ikonlar";
 import { Toaster } from "./components/ui/toaster";
@@ -8655,7 +8655,8 @@ function MesajlarPanel({ user }) {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  const gelenMesajlar = mesajlar.filter(m => m.alici_id === user.id);
+  const gelenMesajlar = mesajlar.filter(m => m.alici_id === user.id && !m.arsiv);
+  const arsivlenenler = mesajlar.filter(m => m.alici_id === user.id && m.arsiv);
   const gidenMesajlar = mesajlar.filter(m => m.gonderen_id === user.id);
   const okunmamislar = gelenMesajlar.filter(m => !m.okundu);
 
@@ -8681,6 +8682,14 @@ function MesajlarPanel({ user }) {
 
   const mesajOkundu = async (id) => { try { await axios.put(`${API}/mesajlar/${id}/okundu`); fetchAll(); } catch(e) {} };
 
+  const mesajArsivle = async (id, arsiv) => {
+    try {
+      await axios.put(`${API}/mesajlar/${id}/arsiv`, { arsiv });
+      toast({ title: arsiv ? "🗄️ Mesaj arşivlendi" : "↩️ Arşivden çıkarıldı" });
+      fetchAll();
+    } catch (e) { hataBildir(toast, hataMetniCoz(e, "Arşivleme başarısız")); }
+  };
+
   const rolRenk = (r) => ({ admin: "bg-red-100 text-red-700", coordinator: "bg-orange-100 text-orange-700", teacher: "bg-blue-100 text-blue-700", student: "bg-green-100 text-green-700", parent: "bg-purple-100 text-purple-700" })[r] || "bg-gray-100 text-subtle";
 
   return (
@@ -8700,6 +8709,7 @@ function MesajlarPanel({ user }) {
         {[
           { v: "gelen", l: "Gelen Kutusu", badge: okunmamisSayisi },
           { v: "giden", l: "Gönderilenler" },
+          { v: "arsiv", l: "🗄️ Arşiv", badge: arsivlenenler.length },
           { v: "yeni", l: "Yeni Mesaj" },
           ...(user.role === "admin" ? [{ v: "funnel", l: "📣 Veli Mesajları / Funnel" }] : []),
         ].map(t => (
@@ -8774,10 +8784,53 @@ function MesajlarPanel({ user }) {
                       {m.konu && <div className="font-bold text-sm text-content mt-1">{m.konu}</div>}
                       <p className="text-sm text-subtle mt-1 line-clamp-2">{m.icerik}</p>
                     </div>
-                    <div className="text-xs text-subtle whitespace-nowrap">{new Date(m.tarih).toLocaleDateString('tr-TR')}</div>
+                    <div className="flex flex-col items-end gap-2 shrink-0">
+                      <div className="text-xs text-subtle whitespace-nowrap">{new Date(m.tarih).toLocaleDateString('tr-TR')}</div>
+                      {m.okundu && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); mesajArsivle(m.id, true); }}
+                          title="Arşivle"
+                          className="inline-flex items-center gap-1 text-[11px] text-subtle hover:text-primary border border-line rounded-lg px-2 py-0.5 transition-all">
+                          <Archive className="h-3 w-3" />Arşivle
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Arşiv (arşivlenmiş gelen mesajlar) */}
+      {gorunum === "arsiv" && (
+        <div className="space-y-3">
+          {arsivlenenler.length === 0 ? (
+            <div className="text-center py-12"><Archive className="h-12 w-12 text-subtle mx-auto mb-3" /><p className="text-subtle">Arşivlenmiş mesaj yok</p></div>
+          ) : (
+            arsivlenenler.map(m => (
+              <Card key={m.id} className="border border-line shadow-sm bg-app/40"><CardContent className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${rolRenk(m.gonderen_rol)}`}>{({admin:"Yönetici",coordinator:"Koord.",teacher:"Öğretmen",student:"Öğrenci",parent:"Veli"})[m.gonderen_rol] || "—"}</span>
+                      <span className="font-medium text-sm text-content">{m.gonderen_ad}</span>
+                    </div>
+                    {m.konu && <div className="font-bold text-sm text-content mt-1">{m.konu}</div>}
+                    <p className="text-sm text-subtle mt-1 whitespace-pre-wrap">{m.icerik}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-2 shrink-0">
+                    <div className="text-xs text-subtle whitespace-nowrap">{new Date(m.tarih).toLocaleDateString('tr-TR')}</div>
+                    <button
+                      onClick={() => mesajArsivle(m.id, false)}
+                      title="Arşivden çıkar"
+                      className="inline-flex items-center gap-1 text-[11px] text-subtle hover:text-primary border border-line rounded-lg px-2 py-0.5 transition-all">
+                      <ArchiveRestore className="h-3 w-3" />Geri al
+                    </button>
+                  </div>
+                </div>
+              </CardContent></Card>
             ))
           )}
         </div>

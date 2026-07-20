@@ -4,13 +4,13 @@ server.py'dan birebir taşındı. Yollar ve davranış değişmedi.
 Bildirim üretimi için modules.bildirim.bildirim_olustur kullanılır.
 """
 import uuid
-from datetime import datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from core.db import db
 from core.auth import get_current_user
+from core.zaman import iso
 from modules.bildirim import bildirim_olustur
 
 router = APIRouter()
@@ -33,7 +33,8 @@ class MesajModel(BaseModel):
     konu: str = ""
     icerik: str
     okundu: bool = False
-    tarih: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    arsiv: bool = False   # alıcı okunmuş mesajı arşivleyebilir (gelen kutusundan gizlenir, silinmez)
+    tarih: str = Field(default_factory=iso)
 
 
 @router.post("/mesajlar")
@@ -84,7 +85,27 @@ async def mesaj_okundu(mesaj_id: str, current_user=Depends(get_current_user)):
     return {"ok": True}
 
 
+class ArsivIstek(BaseModel):
+    arsiv: bool = True
+
+
+@router.put("/mesajlar/{mesaj_id}/arsiv")
+async def mesaj_arsivle(mesaj_id: str, istek: ArsivIstek = ArsivIstek(), current_user=Depends(get_current_user)):
+    """Alıcı, gelen kutusundaki bir mesajı arşivler (arsiv=True) veya geri alır (arsiv=False).
+    Mesaj silinmez; yalnız gelen kutusundan gizlenip Arşiv görünümüne taşınır."""
+    sonuc = await db.mesajlar.update_one(
+        {"id": mesaj_id, "alici_id": current_user["id"]},
+        {"$set": {"arsiv": bool(istek.arsiv)}},
+    )
+    if sonuc.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Mesaj bulunamadı veya arşivleme yetkiniz yok")
+    return {"ok": True, "arsiv": bool(istek.arsiv)}
+
+
 @router.get("/mesajlar/okunmamis-sayisi")
 async def okunmamis_sayisi(current_user=Depends(get_current_user)):
-    sayi = await db.mesajlar.count_documents({"alici_id": current_user["id"], "okundu": False})
+    # Arşivlenmiş mesajlar okunmamış sayısına dahil edilmez.
+    sayi = await db.mesajlar.count_documents(
+        {"alici_id": current_user["id"], "okundu": False, "arsiv": {"$ne": True}}
+    )
     return {"sayi": sayi}
