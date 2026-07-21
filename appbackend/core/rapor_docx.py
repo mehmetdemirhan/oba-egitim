@@ -136,15 +136,19 @@ def rapor_docx_uret(rapor: dict, ctx: dict) -> bytes:
             if bold:
                 rr.font.color.rgb = LACIVERT
 
-    # ── 2. METİN BİLGİLERİ ──
+    # ── 2. METİN BİLGİLERİ ── (PDF ile birebir aynı 6 alan — Word Tablo 1 paritesi)
     _baslik(doc, "2. Metin Bilgileri")
     kelime_s = ctx["kelime_s"]; dogru_k = ctx["dogru_k"]; yanlis_k = ctx["yanlis_k"]
-    tb2 = doc.add_table(rows=3, cols=2); tb2.style = "Table Grid"
+    _sst = int(rapor.get("sure_saniye") or 0)
     metin_satir = [
-        ("Metnin Adı", rapor.get("metin_baslik") or rapor.get("metin_adi") or "-"),
-        ("Metin Türü", metin_turu_ad(rapor.get("metin_turu"))),
-        ("Kelime Sayısı", f"{kelime_s} (Doğru: {dogru_k} · Yanlış: {yanlis_k})"),
+        ("Metnin Adı", (rapor.get("metin_adi") or rapor.get("metin_baslik") or "-")),
+        ("Metnin Türü", metin_turu_ad(rapor.get("metin_turu"))),
+        ("Toplam Kelime Sayısı", str(kelime_s)),
+        ("Doğru Okunan Kelime", str(dogru_k)),
+        ("Yanlış Okunan Kelime", str(yanlis_k)),
+        ("Tamamlama Süresi", f"{_sst // 60}:{str(_sst % 60).zfill(2)} ({_sst} sn)"),
     ]
+    tb2 = doc.add_table(rows=len(metin_satir), cols=2); tb2.style = "Table Grid"
     for ri, (a, b) in enumerate(metin_satir):
         cells = tb2.rows[ri].cells
         cells[0].text = ""; rr = cells[0].paragraphs[0].add_run(a); rr.bold = True; rr.font.size = Pt(9); rr.font.color.rgb = LACIVERT
