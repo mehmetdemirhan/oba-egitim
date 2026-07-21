@@ -28,6 +28,41 @@ METIN_TURU_ETIKET = {
 }
 
 
+# ═══════════════════════════════════════════════════════════════════
+# OKUMA HIZI MAKUL ARALIK KONTROLÜ (v2 #1) — bozuk/ölçülemeyen veriyi veliye
+# "672 kelime/dk, İleri Düzey" gibi yanlış güvenle sunmayı engelle.
+# İnsan okuma hızı en hızlı okuyucularda bile ~400 kelime/dk altındadır; 1. sınıf
+# alt sınırı ~20. Aralık dışı → rapor "anomali" işaretlenir, uyarı gösterilir.
+# ═══════════════════════════════════════════════════════════════════
+WPM_MAKUL_MIN = 20
+WPM_MAKUL_MAX = 400
+SURE_MIN_SANIYE = 10   # 30+ kelimelik metinde <10 sn = kronometre gerçek okumayı ölçmemiş
+
+
+def wpm_anomali(wpm, sure_saniye=None, kelime_sayisi=None) -> tuple:
+    """(anomali: bool, sebep: str). Okuma hızı/süre olağandışıysa anomali işaretler."""
+    try:
+        w = float(wpm or 0)
+    except Exception:
+        return True, "Okuma hızı hesaplanamadı — veri kontrol edilmeli."
+    if w <= 0:
+        return True, "Okuma hızı ölçülemedi (0) — süre/kelime verisi kontrol edilmeli."
+    if w > WPM_MAKUL_MAX:
+        return True, (f"Okuma hızı olağandışı YÜKSEK ({int(w)} kelime/dk) — okuma süresi çok "
+                      "kısa görünüyor; kronometre gerçek okuma süresini yansıtmıyor olabilir.")
+    if w < WPM_MAKUL_MIN:
+        return True, (f"Okuma hızı olağandışı DÜŞÜK ({int(w)} kelime/dk) — süre/kelime ölçümü "
+                      "kontrol edilmeli.")
+    try:
+        s = float(sure_saniye) if sure_saniye is not None else None
+    except Exception:
+        s = None
+    if s is not None and 0 < s < SURE_MIN_SANIYE and (kelime_sayisi or 0) > 30:
+        return True, (f"Okuma süresi çok kısa ({int(s)} sn) — kronometre gerçek okuma süresini "
+                      "yansıtmıyor olabilir.")
+    return False, ""
+
+
 def metin_turu_ad(deger: str | None) -> str:
     """Ham metin türü kodunu okunabilir Türkçe etikete çevirir (ham kodu asla gösterme)."""
     if not deger:
