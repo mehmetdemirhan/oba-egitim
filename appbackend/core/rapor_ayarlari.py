@@ -21,10 +21,16 @@ VARSAYILAN_NORMLAR = {
     "6": {"dusuk": 100, "orta": 135, "yeterli": 170},
     "7": {"dusuk": 110, "orta": 150, "yeterli": 185},
     "8": {"dusuk": 120, "orta": 160, "yeterli": 200},
+    # Word şablonu paritesi (#5): 9–12. sınıf normları da eklendi.
+    "9": {"dusuk": 130, "orta": 170, "yeterli": 210},
+    "10": {"dusuk": 140, "orta": 180, "yeterli": 220},
+    "11": {"dusuk": 150, "orta": 190, "yeterli": 230},
+    "12": {"dusuk": 160, "orta": 200, "yeterli": 240},
 }
 
-# ── b) Doğru okuma oranı eşikleri (%) ──
-# dogruluk >= iyi → "İyi"; >= gelistirilmeli → "Geliştirilmeli"; aksi "Yetersiz".
+# ── b) Doğru okuma oranı eşikleri (%) — Informal Reading Inventory standardı ──
+# dogruluk >= iyi(98) → "Bağımsız Düzey"; >= gelistirilmeli(90) → "Geliştirilmeli";
+# aksi "Yetersiz". (Word şablonu: %98–100 / %90–97 / <%90.)
 DOGRULUK_ESIKLERI_DEFAULT = {"iyi": 98, "gelistirilmeli": 90}
 
 # Kur önerisi eşikleri (kur_onerisi_hesapla için — koda gömülü 97/93 buraya taşındı).
@@ -83,6 +89,11 @@ PROZODIK_OLCUTLER_DEFAULT = [
         "1": "Kelime kelime", "2": "Kısa gruplar", "3": "Anlamlı gruplar", "4": "Doğal anlam grupları"}},
 ]
 
+# ── d2) Prozodik toplam puan (0–20) → düzey eşikleri ──
+# toplam >= cokiyi(13) → "Çok İyi"; >= iyi(10) → "İyi"; >= orta(7) → "Orta"; aksi "Zayıf".
+# Word şablonu / kullanıcı bandı: 4–6 Zayıf · 7–9 Orta · 10–12 İyi · 13–20 Çok İyi.
+PROZODIK_ESIKLERI_DEFAULT = {"cokiyi": 13, "iyi": 10, "orta": 7}
+
 # ── e) Gelişim raporu değişim eşikleri (metrik → anlamlı/gerileme sınırları) ──
 # değişim >= anlamli → "Anlamlı Gelişim"; <= gerileme → "Gerileme"; aksi "Sabit/Sınırlı".
 GELISIM_DEGISIM_ESIKLERI_DEFAULT = {
@@ -99,6 +110,7 @@ RAPOR_AYAR_VARSAYILAN = {
     "kur_onerisi_esikleri": KUR_ONERISI_ESIKLERI_DEFAULT,
     "anlama_rubrik_maddeleri": ANLAMA_RUBRIK_DEFAULT,
     "prozodik_olcutler": PROZODIK_OLCUTLER_DEFAULT,
+    "prozodik_esikleri": PROZODIK_ESIKLERI_DEFAULT,
     "gelisim_degisim_esikleri": GELISIM_DEGISIM_ESIKLERI_DEFAULT,
 }
 

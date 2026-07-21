@@ -63,6 +63,53 @@ def wpm_anomali(wpm, sure_saniye=None, kelime_sayisi=None) -> tuple:
     return False, ""
 
 
+# ═══════════════════════════════════════════════════════════════════
+# DÜZEY ETİKETLERİ + AÇIKLAMALARI (Word şablonu paritesi)
+#   Doğru okuma oranı: %98–100 Bağımsız · %90–97 Geliştirilmeli · <%90 Yetersiz
+#   Prozodik (0–20):   13–20 Çok İyi · 10–12 İyi · 7–9 Orta · 4–6 (ve altı) Zayıf
+# Eşikler admin/koordinatör tarafından Ayarlar'dan düzenlenir (rapor_ayarlari):
+#   dogruluk_esikleri {iyi, gelistirilmeli} · prozodik_esikleri {cokiyi, iyi, orta}
+# ═══════════════════════════════════════════════════════════════════
+DOGRULUK_DUZEY_ACIKLAMA = {
+    "Bağımsız Düzey": "Okuduklarını büyük oranda anlayabilir ve organize edebilir.",
+    "Geliştirilmeli": "Okuduklarının bir kısmını anlamlandırabilir; ancak anlam kopuklukları "
+                      "yaşayabilir. Öğretmen eşliğinde eğitim alınmalıdır.",
+    "Yetersiz": "Okuduklarını anlayamaz ve organize edemez; anlam kopukluğu olur. Öğretmen "
+                "eşliğinde eğitim alınmalıdır.",
+}
+DOGRULUK_ESIK_VARSAYILAN = {"iyi": 98, "gelistirilmeli": 90}
+PROZODIK_ESIK_VARSAYILAN = {"cokiyi": 13, "iyi": 10, "orta": 7}
+PROZODIK_DUZEY_AD = {"cokiyi": "Çok İyi", "iyi": "İyi", "orta": "Orta", "gelistirilmeli": "Zayıf"}
+
+
+def dogruluk_duzey_ad(dogruluk, esikler=None) -> str:
+    """Doğru okuma oranını (%) düzey adına çevirir (Bağımsız/Geliştirilmeli/Yetersiz)."""
+    e = esikler or DOGRULUK_ESIK_VARSAYILAN
+    d = float(dogruluk or 0)
+    if d >= e.get("iyi", 98):
+        return "Bağımsız Düzey"
+    if d >= e.get("gelistirilmeli", 90):
+        return "Geliştirilmeli"
+    return "Yetersiz"
+
+
+def dogruluk_duzey_aciklama(dogruluk, esikler=None) -> str:
+    return DOGRULUK_DUZEY_ACIKLAMA.get(dogruluk_duzey_ad(dogruluk, esikler), "")
+
+
+def prozodik_duzey_ad(toplam, esikler=None) -> str:
+    """Prozodik toplam puanı (0–20) düzey adına çevirir (Çok İyi/İyi/Orta/Zayıf)."""
+    e = esikler or PROZODIK_ESIK_VARSAYILAN
+    t = float(toplam or 0)
+    if t >= e.get("cokiyi", 13):
+        return "Çok İyi"
+    if t >= e.get("iyi", 10):
+        return "İyi"
+    if t >= e.get("orta", 7):
+        return "Orta"
+    return "Zayıf"
+
+
 def metin_turu_ad(deger: str | None) -> str:
     """Ham metin türü kodunu okunabilir Türkçe etikete çevirir (ham kodu asla gösterme)."""
     if not deger:
@@ -206,9 +253,9 @@ def aktif_anlama_dict(anlama: dict | None, cfg: dict | None, sinif) -> dict:
 # ═══════════════════════════════════════════════════════════════════
 # Bantlar:
 #   hiz_duzey:  dusuk | orta | yeterli | ileri
-#   dogruluk:   zayif (<85) | orta (85–94) | iyi (>=95)
+#   dogruluk:   zayif=Yetersiz (<90) | orta=Geliştirilmeli (90–97) | iyi=Bağımsız (>=98)
 #   anlama:     zayif (<70) | orta (70–84) | iyi (>=85)
-#   prozodik:   gelistirilmeli (<10) | orta (10–13) | iyi (14–17) | cokiyi (>=18)
+#   prozodik:   gelistirilmeli=Zayıf (<7) | orta (7–9) | iyi (10–12) | cokiyi=Çok İyi (>=13)
 #   kapanis:    genel düzey → dusuk | orta | iyi
 # {ad} yer tutucusu öğrenci adıyla değiştirilir.
 
@@ -227,10 +274,14 @@ GIRIS_RAPOR_METIN_VARSAYILAN = {
                  "Daha zengin ve uzun metinlerle bu güç desteklenebilir.",
     },
     "dogruluk": {
-        "zayif": "Doğru okuma oranı geliştirilmelidir; kelime tanıma ve dikkat çalışmaları "
-                 "hata sayısını azaltacaktır.",
-        "orta": "Doğru okuma oranı iyi seviyededir; birkaç türde hata dikkatle azaltılabilir.",
-        "iyi": "Doğru okuma oranı çok iyidir; öğrenci metni yüksek doğrulukla okumaktadır.",
+        "zayif": "Doğru okuma oranı Yetersiz düzeydedir; öğrenci metindeki kelimeleri büyük "
+                 "oranda doğru okuyamamaktadır. Kelime tanıma ve dikkat çalışmalarıyla, öğretmen "
+                 "eşliğinde hata sayısı azaltılmalıdır.",
+        "orta": "Doğru okuma oranı Geliştirilmeli düzeydedir; öğrenci kelimelerin bir kısmını "
+                "doğru okumakta, ancak anlam kopuklukları yaşayabilmektedir. Öğretmen eşliğinde "
+                "düzenli okuma çalışmaları önerilir.",
+        "iyi": "Doğru okuma oranı Bağımsız düzeydedir; öğrenci metni yüksek doğrulukla, "
+               "neredeyse hatasız okumaktadır.",
     },
     "anlama": {
         "zayif": "Okuduğunu anlama becerisi desteklenmelidir; okuma sonrası soru-cevap ve "
@@ -241,14 +292,15 @@ GIRIS_RAPOR_METIN_VARSAYILAN = {
                "kavramaktadır.",
     },
     "prozodik": {
-        "gelistirilmeli": "Prozodik okuma (vurgu, tonlama, noktalamaya uyum) geliştirilmelidir; "
-                          "örnek okuma dinleme ve model okuma faydalı olacaktır.",
-        "orta": "Prozodik okuma gelişmektedir; noktalama ve vurguya dikkat ederek okuma "
-                "akıcılığı artırılabilir.",
-        "iyi": "Prozodik okuma iyi düzeydedir; öğrenci metni anlamlı gruplara ayırarak "
-               "okuyabilmektedir.",
-        "cokiyi": "Prozodik okuma çok iyidir; öğrenci doğal ve etkileyici bir tonlamayla "
-                  "okumaktadır.",
+        "gelistirilmeli": "Prozodik okuma performansı Zayıf düzeydedir; vurgu, tonlama ve "
+                          "noktalamaya uyum becerileri henüz yetersizdir. Örnek (model) okuma "
+                          "dinletme ve eşli okuma çalışmaları faydalı olacaktır.",
+        "orta": "Prozodik okuma performansı Orta düzeydedir; noktalama ve vurguya kısmen dikkat "
+                "edilmekte, okuma akıcılığı geliştirilebilir.",
+        "iyi": "Prozodik okuma performansı İyi düzeydedir; öğrenci metni anlamlı gruplara "
+               "ayırarak, noktalamaya büyük ölçüde uyarak okuyabilmektedir.",
+        "cokiyi": "Prozodik okuma performansı Çok İyi düzeydedir; öğrenci doğal, akıcı ve "
+                  "etkileyici bir tonlamayla, metnin duygu yapısını yansıtarak okumaktadır.",
     },
     "kapanis": {
         "dusuk": "Genel olarak okuma becerilerinin temelleri atılmakta olup düzenli okuma "
@@ -298,22 +350,27 @@ def _uc_band(pct: float, dusuk_esik: float, iyi_esik: float) -> str:
     return "zayif"
 
 
-def _prozodik_band(toplam: float) -> str:
-    if toplam >= 18:
+def _prozodik_band(toplam: float, esikler: dict | None = None) -> str:
+    """4 bant (Word paritesi): 13–20 cokiyi · 10–12 iyi · 7–9 orta · <7 gelistirilmeli(Zayıf)."""
+    e = esikler or PROZODIK_ESIK_VARSAYILAN
+    t = float(toplam or 0)
+    if t >= e.get("cokiyi", 13):
         return "cokiyi"
-    if toplam >= 14:
+    if t >= e.get("iyi", 10):
         return "iyi"
-    if toplam >= 10:
+    if t >= e.get("orta", 7):
         return "orta"
     return "gelistirilmeli"
 
 
-def _kapanis_band(hiz_deger: str, dogruluk: float, anlama: float, proz: float, anlama_var: bool) -> str:
+def _kapanis_band(hiz_deger: str, dogruluk: float, anlama: float, proz: float, anlama_var: bool,
+                  esik_dogruluk: dict | None = None, esik_prozodik: dict | None = None) -> str:
     """Genel düzey → dusuk/orta/iyi. Pasif kategorili sınıfta anlama hesaba katılmaz."""
+    ed = esik_dogruluk or DOGRULUK_ESIK_VARSAYILAN
     puan = 0
     puan += {"dusuk": 0, "orta": 1, "yeterli": 2, "ileri": 3}.get(_hiz_band(hiz_deger), 1)
-    puan += {"zayif": 0, "orta": 1, "iyi": 2}.get(_uc_band(dogruluk, 85, 95), 1)
-    puan += {"gelistirilmeli": 0, "orta": 1, "iyi": 2, "cokiyi": 3}.get(_prozodik_band(proz), 1)
+    puan += {"zayif": 0, "orta": 1, "iyi": 2}.get(_uc_band(dogruluk, ed.get("gelistirilmeli", 90), ed.get("iyi", 98)), 1)
+    puan += {"gelistirilmeli": 0, "orta": 1, "iyi": 2, "cokiyi": 3}.get(_prozodik_band(proz, esik_prozodik), 1)
     bolen = 8.0
     if anlama_var:
         puan += {"zayif": 0, "orta": 1, "iyi": 2}.get(_uc_band(anlama, 70, 85), 1)
@@ -326,10 +383,13 @@ def _kapanis_band(hiz_deger: str, dogruluk: float, anlama: float, proz: float, a
     return "dusuk"
 
 
-def sonuc_paragrafi_uret(rapor: dict, metinler: dict | None = None, anlama_var: bool = True) -> list:
+def sonuc_paragrafi_uret(rapor: dict, metinler: dict | None = None, anlama_var: bool = True,
+                         esik_dogruluk: dict | None = None, esik_prozodik: dict | None = None) -> list:
     """Metin bankasından deterministik olarak birleştirilmiş sonuç cümleleri (liste).
-    `anlama_var=False` ise (ör. 1. sınıf) anlama cümlesi eklenmez."""
+    `anlama_var=False` ise (ör. 1. sınıf) anlama cümlesi eklenmez.
+    Doğruluk/prozodik bantları admin eşiklerine (esik_*) göre seçilir."""
     m = {**GIRIS_RAPOR_METIN_VARSAYILAN, **(metinler or {})}
+    ed = esik_dogruluk or DOGRULUK_ESIK_VARSAYILAN
     ad = (rapor.get("ogrenci_ad") or "Öğrenci").strip()
     hiz = _hiz_band(rapor.get("hiz_deger", ""))
     dogruluk = float(rapor.get("dogruluk_yuzde") or 0)
@@ -338,11 +398,11 @@ def sonuc_paragrafi_uret(rapor: dict, metinler: dict | None = None, anlama_var: 
 
     cumleler = [m["giris"].replace("{ad}", ad)]
     cumleler.append(m["hiz"].get(hiz, ""))
-    cumleler.append(m["dogruluk"].get(_uc_band(dogruluk, 85, 95), ""))
+    cumleler.append(m["dogruluk"].get(_uc_band(dogruluk, ed.get("gelistirilmeli", 90), ed.get("iyi", 98)), ""))
     if anlama_var:
         cumleler.append(m["anlama"].get(_uc_band(anlama_pct, 70, 85), ""))
-    cumleler.append(m["prozodik"].get(_prozodik_band(proz), ""))
-    kb = _kapanis_band(rapor.get("hiz_deger", ""), dogruluk, anlama_pct, proz, anlama_var)
+    cumleler.append(m["prozodik"].get(_prozodik_band(proz, esik_prozodik), ""))
+    kb = _kapanis_band(rapor.get("hiz_deger", ""), dogruluk, anlama_pct, proz, anlama_var, ed, esik_prozodik)
     cumleler.append(m["kapanis"].get(kb, ""))
     return [c.replace("{ad}", ad) for c in cumleler if c and c.strip()]
 

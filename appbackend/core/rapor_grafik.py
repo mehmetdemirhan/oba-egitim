@@ -14,6 +14,7 @@ from reportlab.graphics.shapes import Drawing, String, Rect, Wedge, Line, Polygo
 LACIVERT = colors.HexColor('#1F4E79')
 MAVI = colors.HexColor('#2E75B6')
 YESIL = colors.HexColor('#2E9E5B')
+KOYU_YESIL = colors.HexColor('#1E7A44')   # 4. bant (Çok İyi) — mevcut yeşilden farklı ton
 SARI = colors.HexColor('#E8B93B')
 KIRMIZI = colors.HexColor('#D9534F')
 GRI = colors.HexColor('#B8C4CE')
@@ -75,16 +76,20 @@ def dogruluk_donut(yuzde: float, genislik=120, yukseklik=120) -> Drawing:
     return d
 
 
-def prozodik_bar(toplam: float, genislik=300, yukseklik=54) -> Drawing:
+def prozodik_bar(toplam: float, genislik=320, yukseklik=54) -> Drawing:
+    """4 bantlı prozodik göstergesi (Word paritesi): 4–6 Zayıf · 7–9 Orta · 10–12 İyi · 13–20 Çok İyi.
+    Dördüncü segment (Çok İyi) için mevcut yeşilden farklı KOYU YEŞİL ton kullanılır."""
     toplam = max(0, min(20, float(toplam or 0)))
     d = Drawing(genislik, yukseklik)
     x0, bar_w, bar_h, y0 = 10, genislik - 20, 16, 22
-    for a, b, renk in [(0, 10, KIRMIZI), (10, 14, SARI), (14, 20, YESIL)]:
+    # Segment sınırları (0–20 ölçekte): tamsayı puanlar → [.,6.5) Zayıf, [6.5,9.5) Orta,
+    # [9.5,12.5) İyi, [12.5,20] Çok İyi. Renkler: kırmızı/sarı/yeşil/koyu yeşil.
+    for a, b, renk in [(0, 6.5, KIRMIZI), (6.5, 9.5, SARI), (9.5, 12.5, YESIL), (12.5, 20, KOYU_YESIL)]:
         d.add(Rect(x0 + bar_w * a / 20, y0, bar_w * (b - a) / 20, bar_h, fillColor=renk, strokeColor=colors.white, strokeWidth=0.5))
     mx = x0 + bar_w * toplam / 20
     d.add(Polygon([mx, y0 + bar_h + 6, mx - 5, y0 + bar_h + 14, mx + 5, y0 + bar_h + 14], fillColor=LACIVERT, strokeColor=colors.white))
     d.add(String(mx, y0 + bar_h + 16, f"{int(round(toplam))}/20", fontSize=9, fillColor=LACIVERT, textAnchor='middle', fontName=_FONTB))
-    for etk, xo in [("Zayıf", 2.5), ("Orta", 11.5), ("İyi", 17)]:
+    for etk, xo in [("Zayıf", 3.2), ("Orta", 8), ("İyi", 11), ("Çok İyi", 16.2)]:
         d.add(String(x0 + bar_w * xo / 20, y0 - 10, etk, fontSize=7, fillColor=colors.grey, textAnchor='middle', fontName=_FONT))
     return d
 

@@ -81,7 +81,10 @@ async def get_norm_tablosu():
 
 async def hiz_degerlendirme(sinif: str, wpm: float) -> str:
     normlar = await get_norm_tablosu()
-    sinif_no = sinif.replace("-", "").replace(".", "").strip()[:1]
+    # Sınıf no: baştaki rakamları al (2 haneli 10–12. sınıf da doğru eşleşsin — [:1] BUG'ı düzeltildi)
+    import re as _re
+    _m = _re.match(r"\d+", str(sinif or "").replace("-", "").replace(".", "").strip())
+    sinif_no = _m.group(0) if _m else ""
     n = normlar.get(sinif_no, normlar.get("4", VARSAYILAN_NORMLAR["4"]))
     if wpm <= n["dusuk"]:
         return "dusuk"
@@ -106,13 +109,11 @@ async def kur_onerisi_hesapla(wpm: float, dogruluk: float, sinif: str) -> str:
 
 
 async def dogruluk_seviyesi(dogruluk: float) -> str:
-    """Doğru okuma oranını (dogruluk_esikleri ayarına göre) etikete çevirir."""
+    """Doğru okuma oranını (dogruluk_esikleri ayarına göre) düzey adına çevirir
+    (Bağımsız Düzey / Geliştirilmeli / Yetersiz — IRI standardı, Word paritesi)."""
+    from core.giris_rapor import dogruluk_duzey_ad
     esik = await get_rapor_ayari("dogruluk_esikleri")
-    if dogruluk >= esik.get("iyi", 98):
-        return "İyi"
-    if dogruluk >= esik.get("gelistirilmeli", 90):
-        return "Geliştirilmeli"
-    return "Yetersiz"
+    return dogruluk_duzey_ad(dogruluk, esik)
 
 
 # ── Norm Tablosu Yönetimi ──
@@ -1472,11 +1473,13 @@ def anlama_yuzde_hesapla(anlama: dict) -> int:
 def hiz_metni(hiz_deger: str) -> str:
     return {"dusuk": "düşük", "orta": "orta", "yeterli": "yeterli", "ileri": "ileri"}.get(hiz_deger, "orta")
 
-def prozodik_seviye(toplam: int) -> str:
-    if toplam >= 18: return "çok iyi"
-    elif toplam >= 14: return "iyi"
-    elif toplam >= 10: return "orta"
-    else: return "geliştirilmeli"
+def prozodik_seviye(toplam: int, esikler: dict | None = None) -> str:
+    """Prozodik toplam (0–20) → düzey (Word bandı: 13+ çok iyi · 10–12 iyi · 7–9 orta · <7 zayıf)."""
+    e = esikler or {"cokiyi": 13, "iyi": 10, "orta": 7}
+    if toplam >= e.get("cokiyi", 13): return "çok iyi"
+    elif toplam >= e.get("iyi", 10): return "iyi"
+    elif toplam >= e.get("orta", 7): return "orta"
+    else: return "zayıf"
 
 def anlama_seviye(pct: int) -> str:
     if pct >= 85: return "iyi"
@@ -1661,7 +1664,7 @@ async def olustur_gelisim_raporu(data: GelisimRaporCreate,
         elif anahtar == "dogruluk":
             duzey = await dogruluk_seviyesi(son)
         elif anahtar == "prozodik":
-            duzey = prozodik_seviye(int(son)).capitalize()
+            duzey = prozodik_seviye(int(son), await get_rapor_ayari("prozodik_esikleri")).title()
         else:
             duzey = anlama_seviye(int(son)).capitalize()
         ozet_tablo.append({
@@ -1937,8 +1940,12 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     from core.giris_rapor import (
         metin_turu_ad, hata_turu_ad, hata_turu_aciklama,
         get_giris_rapor_metinleri, sonuc_paragrafi_uret,
+        dogruluk_duzey_ad, dogruluk_duzey_aciklama, prozodik_duzey_ad,
     )
     rapor_metinleri, _ = await get_giris_rapor_metinleri(db)
+    # Düzey eşikleri (admin/koordinatör düzenler) — doğruluk + prozodik düzey etiketleri
+    _esik_dogruluk = await get_rapor_ayari("dogruluk_esikleri")
+    _esik_prozodik = await get_rapor_ayari("prozodik_esikleri")
     # Aktif anlama grupları: YENİ raporlarda snapshot saklıdır (kural uygulanır);
     # ESKİ raporlarda alan yoksa hepsini göster (geriye dönük — eski raporlar as-is).
     aktif_gruplar = rapor.get("aktif_anlama_gruplari") or ["4.1", "4.2", "4.3", "4.4", "4.5"]
@@ -1955,7 +1962,6 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     # Sınıf okuma hızı normu (gauge + karşılaştırma için) — "yeterli" eşiği hedef alınır
     _norm_wpm = 0
     try:
-        from core.rapor_ayarlari import get_rapor_ayari
         _normlar = await get_rapor_ayari("okuma_hizi_normlari")
         _norm_wpm = float((_normlar or {}).get(str(rapor.get("ogrenci_sinif", "")).strip(), {}).get("yeterli", 0) or 0)
     except Exception:
@@ -2092,9 +2098,14 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     # ── 4. DOĞRU OKUMA ORANI ──
     el.append(RLPara("3.1. Doğru Okuma Oranı", styles['SubSectOBA']))
     el.append(RLPara("<i>Doğru Okuma Oranı = Doğru okunan kelime sayısı / Metnin tamamındaki kelime sayısı × 100</i>", styles['SmallOBA']))
+    # Düzey etiketi (Bağımsız/Geliştirilmeli/Yetersiz) + açıklama — Okuma Hızı'ndaki gibi (item 2)
+    _dog_duzey = dogruluk_duzey_ad(dogruluk, _esik_dogruluk)
+    _dog_acikla = dogruluk_duzey_aciklama(dogruluk, _esik_dogruluk)
+    _dog_renk = {"Bağımsız Düzey": "#2E9E5B", "Geliştirilmeli": "#E8B93B", "Yetersiz": "#D9534F"}.get(_dog_duzey, "#333333")
     _dt = RLTable([[grafik.dogruluk_donut(dogruluk),
-                    RLPara(f"Doğru okuma oranı <b>%{round(dogruluk)}</b>. Toplam {kelime_s} kelimeden "
-                           f"<b>{dogru_k}</b> doğru, <b>{yanlis_k}</b> hatalı okunmuştur.", styles['BodyOBA'])]],
+                    RLPara(f"Doğru okuma oranı <b>%{round(dogruluk)}</b> — <b><font color='{_dog_renk}'>{_dog_duzey}</font></b>. "
+                           f"Toplam {kelime_s} kelimeden <b>{dogru_k}</b> doğru, <b>{yanlis_k}</b> hatalı okunmuştur.<br/>"
+                           f"<font color='#555555'>{_dog_acikla}</font>", styles['BodyOBA'])]],
                   colWidths=[4*cm, 11.5*cm])
     _dt.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'MIDDLE')]))
     el.append(_dt)
@@ -2221,7 +2232,7 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     # ── 6. PROZODİK OKUMA ──
     proz = rapor.get("prozodik") or {}
     proz_toplam = rapor.get("prozodik_toplam") or 0
-    proz_sev = "Çok İyi" if proz_toplam >= 18 else "İyi" if proz_toplam >= 14 else "Orta" if proz_toplam >= 10 else "Geliştirilmeli"
+    proz_sev = prozodik_duzey_ad(proz_toplam, _esik_prozodik)   # 4 bant: Çok İyi/İyi/Orta/Zayıf
     el.append(RLPara("5. Prozodik Okuma Ölçeği", styles['SectOBA']))
 
     proz_desc = {
@@ -2262,8 +2273,11 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     ps.append(('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#E8F0FE')))
     t_p.setStyle(TableStyle(ps))
     el.append(t_p)
-    el.append(RLPara(f"Prozodik okuma performansı: <b>{proz_sev}</b> (Toplam {proz_toplam}/20)", styles['BodyOBA']))
-    el.append(grafik.prozodik_bar(proz_toplam))  # D: renk bantlı prozodik göstergesi
+    _proz_renk = {"Çok İyi": "#1E7A44", "İyi": "#2E9E5B", "Orta": "#E8B93B", "Zayıf": "#D9534F"}.get(proz_sev, "#333333")
+    el.append(RLPara(f"Prozodik okuma performansı: <b><font color='{_proz_renk}'>{proz_sev}</font></b> (Toplam {proz_toplam}/20)", styles['BodyOBA']))
+    el.append(Spacer(1, 8))                       # item 3: özet metin ile bant göstergesi çakışmasın
+    el.append(grafik.prozodik_bar(proz_toplam))   # D: 4 renk bantlı prozodik göstergesi (Zayıf/Orta/İyi/Çok İyi)
+    el.append(Spacer(1, 6))
 
     # ── GELİŞİM (ÖNCEKİ RAPORA GÖRE) — DİNAMİK numaralı üst düzey bölüm ──
     # Anomalili raporlarda (bu veya önceki) trend anlamsız → gösterilmez (item 1).
@@ -2305,7 +2319,8 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     # A: Kural-tabanlı metin bankasından deterministik sonuç paragrafı (AI icat etmez).
     # 1. sınıf gibi 4.1–4.4 pasif olan durumda anlama cümlesi eklenmez.
     _anlama_var = any(g in aktif_gruplar for g in ("4.1", "4.2", "4.3", "4.4"))
-    for cumle in sonuc_paragrafi_uret(rapor, rapor_metinleri, anlama_var=_anlama_var):
+    for cumle in sonuc_paragrafi_uret(rapor, rapor_metinleri, anlama_var=_anlama_var,
+                                      esik_dogruluk=_esik_dogruluk, esik_prozodik=_esik_prozodik):
         el.append(RLPara(cumle, styles['BodyOBA']))
     el.append(Spacer(1, 6))
 
@@ -2358,5 +2373,140 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )
+
+
+# Anlama grup şeması (PDF ile paylaşılan tek kaynak — DOCX de kullanır)
+_ANLAMA_HAM = [
+    ("4.1", "Sözcük Düzeyinde Anlama", [
+        ("Cümle anlamını kavrama", "cumle_anlama"), ("Bilinmeyen sözcük tahmini", "bilinmeyen_sozcuk"),
+        ("Bağlaç ve zamirleri anlama", "baglac_zamir")]),
+    ("4.2", "Metnin Ana Yapısını Anlama", [
+        ("Ana fikir belirleme", "ana_fikir"), ("Yardımcı fikirleri ifade etme", "yardimci_fikir"),
+        ("Metnin konusunu ifade etme", "konu"), ("Başlık önerme", "baslik_onerme")]),
+    ("4.3", "Metinler Arasılık ve Derin Anlama", [
+        ("Neden-sonuç ilişkisini belirleme", "neden_sonuc"), ("Çıkarım yapma", "cikarim"),
+        ("Metindeki ipuçlarını kullanma", "ipuclari"), ("Yorumlama", "yorumlama")]),
+    ("4.4", "Eleştirel ve Yaratıcı Okuma", [
+        ("Metne yönelik görüş bildirme", "gorus_bildirme"), ("Yazarın amacını sezme", "yazar_amaci"),
+        ("Alternatif son / fikir üretme", "alternatif_fikir"), ("Metni günlük hayatla ilişkilendirme", "guncelle_hayat")]),
+    ("4.5", "Soru Performans Analizi (Bloom)", [
+        ("Bilgi", "bilgi"), ("Kavrama", "kavrama"), ("Uygulama", "uygulama"),
+        ("Analiz", "analiz"), ("Sentez", "sentez"), ("Değerlendirme", "degerlendirme")]),
+]
+
+
+async def _rapor_docx_ctx(rapor: dict) -> dict:
+    """DOCX render'ı için PDF ile AYNI hesaplanmış değer kümesini (ctx) üretir."""
+    import core.rapor_grafik as grafik
+    from core.giris_rapor import (
+        get_giris_rapor_metinleri, sonuc_paragrafi_uret,
+        dogruluk_duzey_ad, dogruluk_duzey_aciklama, prozodik_duzey_ad,
+    )
+    FONT, FONTB = _tr_font()
+    grafik.set_font(FONT, FONTB)
+    metinler, _ = await get_giris_rapor_metinleri(db)
+    esik_dogruluk = await get_rapor_ayari("dogruluk_esikleri")
+    esik_prozodik = await get_rapor_ayari("prozodik_esikleri")
+    normlar = await get_rapor_ayari("okuma_hizi_normlari")
+    sinif = str(rapor.get("ogrenci_sinif", "")).strip()
+    sinif_norm = (normlar or {}).get(sinif, {})
+    norm_wpm = float(sinif_norm.get("yeterli", 0) or 0)
+
+    kelime_s = rapor.get("kelime_sayisi") or 0
+    dogruluk = rapor.get("dogruluk_yuzde") or 0
+    dogru_k = int(rapor.get("dogru_kelime") or 0)
+    yanlis_k = int(rapor.get("yanlis_kelime") or 0)
+    wpm = round(rapor.get("wpm") or 0)
+    hiz_label = {"dusuk": "Düşük", "orta": "Orta", "yeterli": "Yeterli", "ileri": "İleri"}.get(rapor.get("hiz_deger", ""), "?")
+
+    hatalar = rapor.get("hata_sayilari") or []
+    if isinstance(hatalar, dict):
+        hatalar = [{"tur": k, "sayi": v} for k, v in hatalar.items()]
+
+    aktif_gruplar = rapor.get("aktif_anlama_gruplari") or ["4.1", "4.2", "4.3", "4.4", "4.5"]
+    anlama = rapor.get("anlama") or {}
+    # radar görselleri (PDF ile aynı çizim)
+    _spuan = {"zayif": 1, "orta": 2, "iyi": 3}
+    _kisa = {"4.1": "Sözcük", "4.2": "Ana Yapı", "4.3": "Derin Anlama", "4.4": "Eleştirel"}
+    b_eksen, b_deger = [], []
+    for gk, _ad, olc in _ANLAMA_HAM:
+        if gk == "4.5" or gk not in aktif_gruplar:
+            continue
+        puan = [_spuan.get(anlama.get(k, "orta"), 2) for _l, k in olc]
+        if puan:
+            b_eksen.append(_kisa.get(gk, gk)); b_deger.append(round(sum(puan) / len(puan), 2))
+    from core.rapor_docx import _png as _rpng
+    radar1 = grafik.anlama_radar(b_eksen, b_deger) if len(b_eksen) >= 3 else None
+    bloom_key = ["bilgi", "kavrama", "uygulama", "analiz", "sentez", "degerlendirme"]
+    bloom_deger = [_spuan.get(anlama.get(k, "orta"), 2) for k in bloom_key]
+    radar2 = grafik.anlama_radar(["Bilgi", "Kavrama", "Uygulama", "Analiz", "Sentez", "Değerlend."], bloom_deger) if "4.5" in aktif_gruplar else None
+
+    # gelişim (önceki ölçüm raporu)
+    onceki = await db.diagnostic_raporlar.find_one(
+        {"ogrenci_id": rapor.get("ogrenci_id"), "rapor_tipi": "olcum",
+         "olusturma_tarihi": {"$lt": rapor.get("olusturma_tarihi", "")}, "id": {"$ne": rapor.get("id")}},
+        sort=[("olusturma_tarihi", -1)])
+    gelisim = None
+    gelisim_goster = bool(onceki and not rapor.get("veri_anomali") and not (onceki or {}).get("veri_anomali"))
+    sonuc_no = 7 if gelisim_goster else 6
+    if gelisim_goster:
+        def _d(s, o, birim=""):
+            try:
+                dd = float(s or 0) - float(o or 0)
+            except Exception:
+                dd = 0
+            if abs(dd) > 500:
+                return "—"
+            return ("+" if dd > 0 else "") + f"{round(dd, 1)}{birim}"
+        satirlar = [
+            ["Okuma Hızı (kelime/dk)", str(round(onceki.get("wpm") or 0)), str(wpm), _d(rapor.get("wpm"), onceki.get("wpm"))],
+            ["Doğru Okuma (%)", f"%{round(onceki.get('dogruluk_yuzde') or 0)}", f"%{round(dogruluk)}", _d(rapor.get("dogruluk_yuzde"), onceki.get("dogruluk_yuzde"))],
+            ["Prozodik (/20)", str(onceki.get("prozodik_toplam") or 0), str(rapor.get("prozodik_toplam") or 0), _d(rapor.get("prozodik_toplam"), onceki.get("prozodik_toplam"))],
+            ["Anlama (%)", f"%{round(onceki.get('anlama_yuzde') or 0)}", f"%{round(anlama_pct := (rapor.get('anlama_yuzde') or 0))}", _d(rapor.get("anlama_yuzde"), onceki.get("anlama_yuzde"))],
+        ]
+        gelisim = {"no": 6, "onceki_tarih": str(onceki.get("olusturma_tarihi", ""))[:10], "satirlar": satirlar}
+
+    _anlama_var = any(g in aktif_gruplar for g in ("4.1", "4.2", "4.3", "4.4"))
+    sonuc_cumleler = sonuc_paragrafi_uret(rapor, metinler, anlama_var=_anlama_var,
+                                          esik_dogruluk=esik_dogruluk, esik_prozodik=esik_prozodik)
+
+    return {
+        "metinler": metinler, "kelime_s": kelime_s, "dogruluk": dogruluk, "dogru_k": dogru_k,
+        "yanlis_k": yanlis_k, "wpm": wpm, "hiz_label": hiz_label, "sinif_norm": sinif_norm, "norm_wpm": norm_wpm,
+        "dog_duzey": dogruluk_duzey_ad(dogruluk, esik_dogruluk), "dog_acikla": dogruluk_duzey_aciklama(dogruluk, esik_dogruluk),
+        "hatalar": hatalar, "aktif_gruplar": aktif_gruplar, "anlama_ham": _ANLAMA_HAM,
+        "radar1_png": _rpng(radar1), "radar2_png": _rpng(radar2),
+        "proz_sev": prozodik_duzey_ad(rapor.get("prozodik_toplam") or 0, esik_prozodik),
+        "proz_desc": {
+            "noktalama": ["Uymuyor", "Kısmen", "Çoğunlukla", "Tam ve bilinçli"],
+            "vurgu": ["Tek düze", "Yer yer", "Anlama uygun", "Etkili ve bilinçli"],
+            "tonlama": ["Monoton", "Sınırlı", "Metne uygun", "Doğal ve etkileyici"],
+            "akicilik": ["Sık duraklama", "Kısmi akış", "Genel akıcı", "Kesintisiz"],
+            "anlamli_gruplama": ["Sözcük sözcük", "Kısmen", "Çoğunlukla", "Tam ve tutarlı"]},
+        "proz_labels": {"noktalama": "Noktalama ve Duraklama", "vurgu": "Vurgu", "tonlama": "Tonlama",
+                        "akicilik": "Akıcılık", "anlamli_gruplama": "Anlamlı Gruplama"},
+        "gelisim": gelisim, "sonuc_no": sonuc_no, "sonuc_cumleler": sonuc_cumleler,
+    }
+
+
+@router.get("/diagnostic/rapor/{rapor_id}/docx")
+async def get_rapor_docx(rapor_id: str, current_user=Depends(get_current_user)):
+    """Raporu .docx (Word) olarak indir — PDF ile aynı veri/görsel (kullanıcı #4)."""
+    rapor = await db.diagnostic_raporlar.find_one({"id": rapor_id})
+    if not rapor:
+        raise HTTPException(status_code=404, detail="Rapor bulunamadı")
+    rapor.pop("_id", None)
+    if rapor.get("rapor_tipi") == "gelisim":
+        raise HTTPException(status_code=400, detail="Gelişim raporu Word formatında henüz desteklenmiyor; PDF kullanın.")
+    from core.rapor_docx import rapor_docx_uret
+    ctx = await _rapor_docx_ctx(rapor)
+    data = rapor_docx_uret(rapor, ctx)
+    ogrenci_ad = _ascii_dosya(rapor.get("ogrenci_ad", "ogrenci"))
+    tarih = str(rapor.get("olusturma_tarihi", ""))[:10]
+    filename = f"Rapor_{ogrenci_ad}_{tarih}.docx"
+    return StreamingResponse(
+        io.BytesIO(data),
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
