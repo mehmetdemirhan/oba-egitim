@@ -89,8 +89,8 @@ def prozodik_bar(toplam: float, genislik=320, yukseklik=54) -> Drawing:
     mx = x0 + bar_w * toplam / 20
     d.add(Polygon([mx, y0 + bar_h + 6, mx - 5, y0 + bar_h + 14, mx + 5, y0 + bar_h + 14], fillColor=LACIVERT, strokeColor=colors.white))
     d.add(String(mx, y0 + bar_h + 16, f"{int(round(toplam))}/20", fontSize=9, fillColor=LACIVERT, textAnchor='middle', fontName=_FONTB))
-    for etk, xo in [("Zayıf", 3.2), ("Orta", 8), ("İyi", 11), ("Çok İyi", 16.2)]:
-        d.add(String(x0 + bar_w * xo / 20, y0 - 10, etk, fontSize=7, fillColor=colors.grey, textAnchor='middle', fontName=_FONT))
+    for etk, xo in [("Zayıf", 3.2), ("Geliştirilmeli", 8), ("İyi", 11), ("Çok İyi", 16.2)]:
+        d.add(String(x0 + bar_w * xo / 20, y0 - 10, etk, fontSize=6.5, fillColor=colors.grey, textAnchor='middle', fontName=_FONT))
     return d
 
 

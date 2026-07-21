@@ -10266,13 +10266,13 @@ function RaporOlcutleriPaneli() {
 
       {/* 🎵 Prozodik Ölçütler (ekle/düzenle/sil + 1-4 çapa) */}
       {bolum === "prozodik" && a.prozodik_esikleri && (
-        <Card className="border border-line shadow-sm mb-4"><CardHeader><CardTitle>Prozodik Düzey Eşikleri (Toplam /20)</CardTitle><p className="text-sm text-subtle">Toplam puana göre düzey: 4 bant. Varsayılan → 4–6 Zayıf · 7–9 Orta · 10–12 İyi · 13–20 Çok İyi.</p></CardHeader><CardContent className="space-y-4">
+        <Card className="border border-line shadow-sm mb-4"><CardHeader><CardTitle>Prozodik Düzey Eşikleri (Toplam /20)</CardTitle><p className="text-sm text-subtle">Toplam puana göre düzey: 4 bant. Varsayılan → 4–6 Zayıf · 7–9 Geliştirilmeli · 10–12 İyi · 13–20 Çok İyi (Word şablonu).</p></CardHeader><CardContent className="space-y-4">
           <div className="grid grid-cols-3 gap-3 max-w-lg">
             <div><Label className="text-sm">Çok İyi (≥)</Label><Input type="number" value={a.prozodik_esikleri.cokiyi} onChange={e => setTip("prozodik_esikleri", { ...a.prozodik_esikleri, cokiyi: parseInt(e.target.value) || 0 })} /></div>
             <div><Label className="text-sm">İyi (≥)</Label><Input type="number" value={a.prozodik_esikleri.iyi} onChange={e => setTip("prozodik_esikleri", { ...a.prozodik_esikleri, iyi: parseInt(e.target.value) || 0 })} /></div>
-            <div><Label className="text-sm">Orta (≥)</Label><Input type="number" value={a.prozodik_esikleri.orta} onChange={e => setTip("prozodik_esikleri", { ...a.prozodik_esikleri, orta: parseInt(e.target.value) || 0 })} /></div>
+            <div><Label className="text-sm">Geliştirilmeli (≥)</Label><Input type="number" value={a.prozodik_esikleri.orta} onChange={e => setTip("prozodik_esikleri", { ...a.prozodik_esikleri, orta: parseInt(e.target.value) || 0 })} /></div>
           </div>
-          <p className="text-xs text-subtle">≥Çok İyi → "Çok İyi", ≥İyi → "İyi", ≥Orta → "Orta", altı → "Zayıf".</p>
+          <p className="text-xs text-subtle">≥Çok İyi → "Çok İyi", ≥İyi → "İyi", ≥Geliştirilmeli → "Geliştirilmeli", altı → "Zayıf".</p>
           <KaydetBtn tip="prozodik_esikleri" />
         </CardContent></Card>
       )}
