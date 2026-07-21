@@ -58,6 +58,7 @@ import GorevTanimYonetimi from "./components/aiceo/GorevTanimYonetimi";
 import AnalizHavuzBakim from "./components/admin/AnalizHavuzBakim";
 import MetinKaliteRiski from "./components/admin/MetinKaliteRiski";
 import MetinOneriKuyrugu from "./components/admin/MetinOneriKuyrugu";
+import GirisRaporAyarlari from "./components/admin/GirisRaporAyarlari";
 import SinavYonetimi from "./components/admin/SinavYonetimi";
 import SinavCozum from "./components/SinavCozum";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
@@ -3337,6 +3338,15 @@ function RaporFormu({ oturum, sonuc, ogrenci, metin, onRaporTamamla }) {
   const [yeniProzodikAdi, setYeniProzodikAdi] = useState("");
   const [anlamaEkleAcik, setAnlamaEkleAcik] = useState(false);
   const [prozodikEkleAcik, setProzodikEkleAcik] = useState(false);
+  // EK#2: öğrencinin sınıfında pasif olan anlama grupları (1. sınıfta 4.1-4.4) formda gizlenir
+  const [pasifGruplar, setPasifGruplar] = useState([]);
+  useEffect(() => {
+    const s = ogrenci?.sinif;
+    if (!s) { setPasifGruplar([]); return; }
+    axios.get(`${API}/diagnostic/anlama-gruplari`, { params: { sinif: s } })
+      .then(r => setPasifGruplar(r.data?.pasif || []))
+      .catch(() => setPasifGruplar([]));
+  }, [ogrenci?.sinif]);
 
   // ★ AI yorumları (her bölüm için)
   const [aiYorumlar, setAiYorumlar] = useState({
@@ -3643,7 +3653,7 @@ JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
           )}
 
           {/* 4.1 Sözcük */}
-          <div>
+          {!pasifGruplar.includes("4.1") && (<div>
             <h4 className="text-sm font-semibold text-subtle mb-2 bg-app p-2 rounded-lg">4.1 Sözcük Düzeyinde Anlama</h4>
             <SeviyeSecici alan="cumle_anlama" etiket="Cümle anlamını kavrama" />
             <SeviyeSecici alan="bilinmeyen_sozcuk" etiket="Bilinmeyen sözcük tahmini" />
@@ -3651,10 +3661,10 @@ JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
             {ekAnlamaOlcutleri.filter(o => o.kategori === "sozcuk").map(o => (
               <SeviyeSecici key={o.id} isEk ekId={o.id} etiket={o.etiket} />
             ))}
-          </div>
+          </div>)}
 
           {/* 4.2 Ana yapı */}
-          <div>
+          {!pasifGruplar.includes("4.2") && (<div>
             <h4 className="text-sm font-semibold text-subtle mb-2 bg-app p-2 rounded-lg">4.2 Metnin Ana Yapısını Anlama</h4>
             <SeviyeSecici alan="ana_fikir" etiket="Ana fikir belirleme" />
             <SeviyeSecici alan="yardimci_fikir" etiket="Yardımcı fikirleri ifade etme" />
@@ -3663,10 +3673,10 @@ JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
             {ekAnlamaOlcutleri.filter(o => o.kategori === "ana_yapi").map(o => (
               <SeviyeSecici key={o.id} isEk ekId={o.id} etiket={o.etiket} />
             ))}
-          </div>
+          </div>)}
 
           {/* 4.3 Derin anlama */}
-          <div>
+          {!pasifGruplar.includes("4.3") && (<div>
             <h4 className="text-sm font-semibold text-subtle mb-2 bg-app p-2 rounded-lg">4.3 Metinler Arasılık ve Derin Anlama</h4>
             <SeviyeSecici alan="neden_sonuc" etiket="Neden-sonuç ilişkisini belirleme" />
             <SeviyeSecici alan="cikarim" etiket="Çıkarım yapma" />
@@ -3675,10 +3685,10 @@ JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
             {ekAnlamaOlcutleri.filter(o => o.kategori === "derin").map(o => (
               <SeviyeSecici key={o.id} isEk ekId={o.id} etiket={o.etiket} />
             ))}
-          </div>
+          </div>)}
 
           {/* 4.4 Eleştirel */}
-          <div>
+          {!pasifGruplar.includes("4.4") && (<div>
             <h4 className="text-sm font-semibold text-subtle mb-2 bg-app p-2 rounded-lg">4.4 Eleştirel ve Yaratıcı Okuma</h4>
             <SeviyeSecici alan="gorus_bildirme" etiket="Metne yönelik görüş bildirme" />
             <SeviyeSecici alan="yazar_amaci" etiket="Yazarın amacını sezme" />
@@ -3687,7 +3697,7 @@ JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
             {ekAnlamaOlcutleri.filter(o => o.kategori === "elestirel").map(o => (
               <SeviyeSecici key={o.id} isEk ekId={o.id} etiket={o.etiket} />
             ))}
-          </div>
+          </div>)}
 
           {/* 4.5 Soru performans */}
           <div>
@@ -5637,6 +5647,9 @@ function AnalizRaporlariKart({ ogrenciId, ogrenci, user, toast }) {
   const [raporlar, setRaporlar] = useState(null);
   const [taslaklar, setTaslaklar] = useState([]);
   const [pdfYuk, setPdfYuk] = useState("");
+  const [duzenlenen, setDuzenlenen] = useState(null);            // manuel düzelt edilen rapor
+  const [dform, setDform] = useState({ sure_saniye: "", dogru_kelime: "", wpm: "" });
+  const [dkaydet, setDkaydet] = useState(false);
 
   const yukle = useCallback(async () => {
     if (!ogrenciId) { setRaporlar([]); setTaslaklar([]); return; }
@@ -5677,6 +5690,25 @@ function AnalizRaporlariKart({ ogrenciId, ogrenci, user, toast }) {
     } catch (e) { hataBildir(toast, hataMetniCoz(e, "Rapor silinemedi")); }
   };
 
+  const acDuzenle = (r) => {
+    setDform({ sure_saniye: r.sure_saniye ?? "", dogru_kelime: r.dogru_kelime ?? "", wpm: r.wpm ?? "" });
+    setDuzenlenen(r);
+  };
+  const kaydetDuzelt = async () => {
+    setDkaydet(true);
+    try {
+      // Yalnız DEĞİŞEN alanları gönder (backend öncelik: WPM > süre > otomatik)
+      const body = {};
+      if (String(dform.wpm) !== String(duzenlenen.wpm ?? "") && dform.wpm !== "") body.wpm = parseFloat(dform.wpm);
+      if (String(dform.sure_saniye) !== String(duzenlenen.sure_saniye ?? "") && dform.sure_saniye !== "") body.sure_saniye = parseFloat(dform.sure_saniye);
+      if (String(dform.dogru_kelime) !== String(duzenlenen.dogru_kelime ?? "") && dform.dogru_kelime !== "") body.dogru_kelime = parseInt(dform.dogru_kelime);
+      if (Object.keys(body).length === 0) { setDuzenlenen(null); setDkaydet(false); return; }
+      const r = await axios.patch(`${API}/diagnostic/rapor/${duzenlenen.id}/manuel-duzelt`, body);
+      toast({ title: "✓ Rapor güncellendi", description: `WPM: ${r.data.wpm} · ${r.data.hiz_deger || ""}${r.data.tutarlilik_notu ? " · ⚠ tutarlılık kontrol!" : ""}` });
+      setDuzenlenen(null); yukle();
+    } catch (e) { hataBildir(toast, hataMetniCoz(e, "Güncellenemedi")); } finally { setDkaydet(false); }
+  };
+
   if (raporlar === null) return null;
   const gTarih = (t) => t ? new Date(t).toLocaleDateString("tr-TR") : "-";
   // Silme yetkisi: admin/koordinatör her zaman; öğretmen yalnız kendi raporu (backend de doğrular).
@@ -5693,7 +5725,11 @@ function AnalizRaporlariKart({ ogrenciId, ogrenci, user, toast }) {
               <div key={r.id} className="flex items-center justify-between gap-2 text-xs border border-line rounded-lg px-2.5 py-1.5">
                 <span className="text-content font-medium">{gTarih(r.olusturma_tarihi)}</span>
                 <span className="text-subtle flex-1 text-center tabular-nums">Anlama %{r.anlama_yuzde ?? "-"} • Prozodi {r.prozodik_toplam ?? "-"}/20</span>
+                <span className="text-subtle tabular-nums">{r.wpm ?? "-"} kl/dk{r.ogretmen_onayli ? " ✓" : ""}</span>
                 <button onClick={() => pdfIndir(r)} disabled={pdfYuk === r.id} className="inline-flex items-center gap-1 text-primary hover:underline disabled:opacity-50"><Download className="h-3.5 w-3.5" />PDF</button>
+                {silebilir(r) && (
+                  <button onClick={() => acDuzenle(r)} title="Süre / doğru kelime / WPM düzelt" className="text-indigo-600 hover:text-indigo-700 shrink-0"><Edit2 className="h-3.5 w-3.5" /></button>
+                )}
                 {silebilir(r) && (
                   <button onClick={() => raporSil(r)} title="Analiz raporunu sil" className="text-red-600 hover:text-red-700 shrink-0"><Trash2 className="h-3.5 w-3.5" /></button>
                 )}
@@ -5722,6 +5758,35 @@ function AnalizRaporlariKart({ ogrenciId, ogrenci, user, toast }) {
           </div>
         )}
       </CardContent>
+
+      {/* Manuel düzelt modalı: süre / doğru kelime / WPM */}
+      {duzenlenen && (
+        <div className="fixed inset-0 z-[70] bg-black/40 flex items-center justify-center p-4" onClick={() => setDuzenlenen(null)}>
+          <div className="bg-surface rounded-2xl shadow-xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
+            <div className="font-bold text-content mb-1">Ölçümü Düzelt</div>
+            <p className="text-xs text-subtle mb-3">Süre veya WPM'den birini gir; diğeri otomatik türetilir. Toplam kelime: <b>{duzenlenen.kelime_sayisi ?? "-"}</b>.</p>
+            <div className="space-y-2.5">
+              <label className="block text-xs text-subtle">Doğru okunan kelime
+                <input type="number" value={dform.dogru_kelime} onChange={e => setDform({ ...dform, dogru_kelime: e.target.value })}
+                  className="mt-1 w-full px-3 py-2 rounded-lg border border-line text-sm" />
+              </label>
+              <label className="block text-xs text-subtle">Tamamlama süresi (sn)
+                <input type="number" value={dform.sure_saniye} onChange={e => setDform({ ...dform, sure_saniye: e.target.value, wpm: "" })}
+                  className="mt-1 w-full px-3 py-2 rounded-lg border border-line text-sm" />
+              </label>
+              <div className="text-[10px] text-subtle text-center">— veya —</div>
+              <label className="block text-xs text-subtle">Dakikada Kelime Sayısı (WPM) — manuel
+                <input type="number" value={dform.wpm} onChange={e => setDform({ ...dform, wpm: e.target.value, sure_saniye: "" })}
+                  className="mt-1 w-full px-3 py-2 rounded-lg border border-line text-sm" />
+              </label>
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <button onClick={() => setDuzenlenen(null)} className="px-3 py-1.5 rounded-lg border border-line text-sm text-subtle">Vazgeç</button>
+              <button onClick={kaydetDuzelt} disabled={dkaydet} className="px-3 py-1.5 rounded-lg bg-primary text-white text-sm font-semibold disabled:opacity-50">{dkaydet ? "Kaydediliyor…" : "Kaydet"}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }
@@ -10292,7 +10357,7 @@ function SistemAyarlari({ user }) {
       <p className="text-subtle text-sm">Rozet, XP, lig ve anket ayarlarını buradan yönetin. Değişiklikler anında uygulanır.</p>
 
       <div className="flex gap-2 flex-wrap">
-        {[{id:"ozellikler",l:"Özellik Yönetimi"},{id:"xp",l:"XP Değerleri"},{id:"ogretmen_xp",l:"Öğretmen XP"},{id:"lig",l:"Lig Eşikleri"},{id:"ogretmen_rozet",l:"Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"Öğrenci Rozetleri"},{id:"anket",l:"Anket Soruları"},{id:"kutulu_okuma",l:"Kutulu Okuma"},{id:"rapor_olcutleri",l:"Rapor Ölçütleri"},{id:"timi_anahtar",l:"TIMI Puanlama Anahtarı"},{id:"timi_metin",l:"TIMI Rapor Metinleri"},{id:"profil_gorunurluk",l:"Profil Görünürlüğü"},{id:"instagram",l:"Instagram"},{id:"kvkk",l:"Veri & KVKK"},{id:"sezon",l:"Sezonluk Reset"},...(user?.role === "admin" ? [{id:"analiz_havuz",l:"📚 Analiz Havuzu Bakımı"},{id:"metin_kalite",l:"🚩 Kalite Denetimi"},{id:"duyurular",l:"✨ Yeni Ne Var"},{id:"altyapi",l:"☁️ Altyapı"},{id:"bakim",l:"🔧 Bakım Modu"}] : [])].map(s => (
+        {[{id:"ozellikler",l:"Özellik Yönetimi"},{id:"xp",l:"XP Değerleri"},{id:"ogretmen_xp",l:"Öğretmen XP"},{id:"lig",l:"Lig Eşikleri"},{id:"ogretmen_rozet",l:"Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"Öğrenci Rozetleri"},{id:"anket",l:"Anket Soruları"},{id:"kutulu_okuma",l:"Kutulu Okuma"},{id:"rapor_olcutleri",l:"Rapor Ölçütleri"},{id:"timi_anahtar",l:"TIMI Puanlama Anahtarı"},{id:"timi_metin",l:"TIMI Rapor Metinleri"},{id:"giris_rapor",l:"Giriş Analizi Rapor"},{id:"profil_gorunurluk",l:"Profil Görünürlüğü"},{id:"instagram",l:"Instagram"},{id:"kvkk",l:"Veri & KVKK"},{id:"sezon",l:"Sezonluk Reset"},...(user?.role === "admin" ? [{id:"analiz_havuz",l:"📚 Analiz Havuzu Bakımı"},{id:"metin_kalite",l:"🚩 Kalite Denetimi"},{id:"duyurular",l:"✨ Yeni Ne Var"},{id:"altyapi",l:"☁️ Altyapı"},{id:"bakim",l:"🔧 Bakım Modu"}] : [])].map(s => (
           <button key={s.id} onClick={() => setAyarSekme(s.id)}
             className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${ayarSekme === s.id ? 'bg-primary text-white border-blue-600' : 'bg-surface text-subtle border-line'}`}>{s.l}</button>
         ))}
@@ -10410,6 +10475,7 @@ function SistemAyarlari({ user }) {
       {ayarSekme === "rapor_olcutleri" && <RaporOlcutleriPaneli />}
       {ayarSekme === "timi_anahtar" && <TimiAnahtarPaneli />}
       {ayarSekme === "timi_metin" && <TimiRaporMetinPaneli />}
+      {ayarSekme === "giris_rapor" && (user?.role === "admin" || user?.role === "coordinator") && <GirisRaporAyarlari apiBase={API} />}
       {ayarSekme === "analiz_havuz" && user?.role === "admin" && <AnalizHavuzBakim apiBase={API} />}
       {ayarSekme === "metin_kalite" && (user?.role === "admin" || user?.role === "coordinator") && (
         <><MetinKaliteRiski apiBase={API} /><MetinOneriKuyrugu apiBase={API} /></>
