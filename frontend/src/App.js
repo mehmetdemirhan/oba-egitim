@@ -4063,6 +4063,8 @@ function RaporGoruntule({ rapor, ogrenci, onGeri }) {
       <div className="flex gap-3 pb-8">
         <Button onClick={() => dosyaIndir(`${API}/diagnostic/rapor/${rapor.id}/pdf`, `Rapor_${(rapor.ogrenci_ad || "ogrenci").replace(/\s/g,'_')}_${(rapor.olusturma_tarihi || "").slice(0,10)}.pdf`, toast, "Rapor PDF'i oluşturulamadı.")}
           className="flex-1 bg-primary hover:bg-primary-hover text-white"><FileText className="h-4 w-4 mr-1" />PDF İndir</Button>
+        <Button onClick={() => dosyaIndir(`${API}/diagnostic/rapor/${rapor.id}/docx`, `Rapor_${(rapor.ogrenci_ad || "ogrenci").replace(/\s/g,'_')}_${(rapor.olusturma_tarihi || "").slice(0,10)}.docx`, toast, "Rapor Word dosyası oluşturulamadı.")}
+          variant="outline" className="flex-1 border-indigo-300 text-indigo-700"><FileText className="h-4 w-4 mr-1" />Word İndir</Button>
         <Button onClick={() => window.print()} variant="outline" className="flex-1"><Printer className="h-4 w-4 mr-1" />Yazdır</Button>
         <Button onClick={onGeri} variant="outline" className="flex-1"><ArrowLeft className="h-4 w-4 mr-1" />Geri</Button>
       </div>
@@ -4647,6 +4649,7 @@ function GelisimRaporuButonu({ students }) {
   };
 
   const pdfIndir = () => dosyaIndir(`${API}/diagnostic/rapor/${sonucRapor.id}/pdf`, `Analiz_Raporu.pdf`, toast, "Rapor PDF'i oluşturulamadı.");
+  const docxIndir = () => dosyaIndir(`${API}/diagnostic/rapor/${sonucRapor.id}/docx`, `Analiz_Raporu.docx`, toast, "Rapor Word dosyası oluşturulamadı.");
 
   const ot = (o) => `${new Date(o.olusturma_tarihi).toLocaleDateString("tr-TR")} • ${o.wpm} wpm • %${o.dogruluk_yuzde} • ${o.oturum_tipi || "analiz"}`;
 
@@ -4698,7 +4701,10 @@ function GelisimRaporuButonu({ students }) {
                       </div>
                     ))}
                   </div>
-                  <Button onClick={pdfIndir} className="w-full bg-primary hover:bg-primary-hover text-white"><FileText className="h-4 w-4 mr-1" />PDF İndir</Button>
+                  <div className="flex gap-2">
+                    <Button onClick={pdfIndir} className="flex-1 bg-primary hover:bg-primary-hover text-white"><FileText className="h-4 w-4 mr-1" />PDF İndir</Button>
+                    <Button onClick={docxIndir} variant="outline" className="flex-1 border-indigo-300 text-indigo-700"><FileText className="h-4 w-4 mr-1" />Word İndir</Button>
+                  </div>
                 </div>
               )}
             </>)}
@@ -5716,6 +5722,13 @@ function AnalizRaporlariKart({ ogrenciId, ogrenci, user, toast }) {
     } finally { setPdfYuk(""); }
   };
 
+  const docxIndir = async (rapor) => {
+    setPdfYuk(rapor.id + "_docx");
+    try {
+      await dosyaIndir(`${API}/diagnostic/rapor/${rapor.id}/docx`, `Analiz_Raporu_${(ogrenci?.ad || "ogrenci").trim()}.docx`, toast, "Rapor Word dosyası oluşturulamadı.");
+    } finally { setPdfYuk(""); }
+  };
+
   const taslakSil = async (o) => {
     if (!window.confirm("Bu yarım kalan analizi silmek istediğinize emin misiniz?")) return;
     try {
@@ -5771,6 +5784,7 @@ function AnalizRaporlariKart({ ogrenciId, ogrenci, user, toast }) {
                 <span className="text-subtle flex-1 text-center tabular-nums">Anlama %{r.anlama_yuzde ?? "-"} • Prozodi {r.prozodik_toplam ?? "-"}/20</span>
                 <span className="text-subtle tabular-nums">{r.wpm ?? "-"} kl/dk{r.ogretmen_onayli ? " ✓" : ""}</span>
                 <button onClick={() => pdfIndir(r)} disabled={pdfYuk === r.id} className="inline-flex items-center gap-1 text-primary hover:underline disabled:opacity-50"><Download className="h-3.5 w-3.5" />PDF</button>
+                <button onClick={() => docxIndir(r)} disabled={pdfYuk === r.id + "_docx"} title="Word (.docx) indir" className="inline-flex items-center gap-1 text-indigo-600 hover:underline disabled:opacity-50"><FileText className="h-3.5 w-3.5" />Word</button>
                 {silebilir(r) && (
                   <button onClick={() => acDuzenle(r)} title="Süre / doğru kelime / WPM düzelt" className="text-indigo-600 hover:text-indigo-700 shrink-0"><Edit2 className="h-3.5 w-3.5" /></button>
                 )}
@@ -10211,12 +10225,12 @@ function RaporOlcutleriPaneli() {
 
       {/* 🎯 Doğruluk & Kur Eşikleri */}
       {bolum === "dogruluk" && (
-        <Card className="border border-line shadow-sm"><CardHeader><CardTitle>Doğru Okuma Oranı Eşikleri (%)</CardTitle></CardHeader><CardContent className="space-y-4">
+        <Card className="border border-line shadow-sm"><CardHeader><CardTitle>Doğru Okuma Oranı Düzey Eşikleri (%)</CardTitle></CardHeader><CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-3 max-w-md">
-            <div><Label className="text-sm">İyi (≥)</Label><Input type="number" value={a.dogruluk_esikleri.iyi} onChange={e => setTip("dogruluk_esikleri", { ...a.dogruluk_esikleri, iyi: parseInt(e.target.value) || 0 })} /></div>
+            <div><Label className="text-sm">Bağımsız Düzey (≥)</Label><Input type="number" value={a.dogruluk_esikleri.iyi} onChange={e => setTip("dogruluk_esikleri", { ...a.dogruluk_esikleri, iyi: parseInt(e.target.value) || 0 })} /></div>
             <div><Label className="text-sm">Geliştirilmeli (≥)</Label><Input type="number" value={a.dogruluk_esikleri.gelistirilmeli} onChange={e => setTip("dogruluk_esikleri", { ...a.dogruluk_esikleri, gelistirilmeli: parseInt(e.target.value) || 0 })} /></div>
           </div>
-          <p className="text-xs text-subtle">≥İyi → "İyi", ≥Geliştirilmeli → "Geliştirilmeli", altı → "Yetersiz".</p>
+          <p className="text-xs text-subtle">≥Bağımsız → "Bağımsız Düzey", ≥Geliştirilmeli → "Geliştirilmeli", altı → "Yetersiz" (IRI standardı; varsayılan %98 / %90).</p>
           <KaydetBtn tip="dogruluk_esikleri" />
           <div className="border-t pt-3">
             <Label className="text-sm font-bold">Kur Önerisi Eşikleri (doğruluk %)</Label>
@@ -10251,6 +10265,17 @@ function RaporOlcutleriPaneli() {
       )}
 
       {/* 🎵 Prozodik Ölçütler (ekle/düzenle/sil + 1-4 çapa) */}
+      {bolum === "prozodik" && a.prozodik_esikleri && (
+        <Card className="border border-line shadow-sm mb-4"><CardHeader><CardTitle>Prozodik Düzey Eşikleri (Toplam /20)</CardTitle><p className="text-sm text-subtle">Toplam puana göre düzey: 4 bant. Varsayılan → 4–6 Zayıf · 7–9 Orta · 10–12 İyi · 13–20 Çok İyi.</p></CardHeader><CardContent className="space-y-4">
+          <div className="grid grid-cols-3 gap-3 max-w-lg">
+            <div><Label className="text-sm">Çok İyi (≥)</Label><Input type="number" value={a.prozodik_esikleri.cokiyi} onChange={e => setTip("prozodik_esikleri", { ...a.prozodik_esikleri, cokiyi: parseInt(e.target.value) || 0 })} /></div>
+            <div><Label className="text-sm">İyi (≥)</Label><Input type="number" value={a.prozodik_esikleri.iyi} onChange={e => setTip("prozodik_esikleri", { ...a.prozodik_esikleri, iyi: parseInt(e.target.value) || 0 })} /></div>
+            <div><Label className="text-sm">Orta (≥)</Label><Input type="number" value={a.prozodik_esikleri.orta} onChange={e => setTip("prozodik_esikleri", { ...a.prozodik_esikleri, orta: parseInt(e.target.value) || 0 })} /></div>
+          </div>
+          <p className="text-xs text-subtle">≥Çok İyi → "Çok İyi", ≥İyi → "İyi", ≥Orta → "Orta", altı → "Zayıf".</p>
+          <KaydetBtn tip="prozodik_esikleri" />
+        </CardContent></Card>
+      )}
       {bolum === "prozodik" && (
         <Card className="border border-line shadow-sm"><CardHeader><CardTitle>Prozodik Okuma Ölçütleri</CardTitle><p className="text-sm text-subtle">Her ölçüt 1-4 puan; toplam puan ölçüt sayısına göre dinamik hesaplanır.</p></CardHeader><CardContent className="space-y-3">
           {(a.prozodik_olcutler || []).map((olcut, oi) => (
