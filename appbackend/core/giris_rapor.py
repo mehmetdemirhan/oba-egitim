@@ -261,6 +261,27 @@ GIRIS_RAPOR_METIN_VARSAYILAN = {
                "hazır ve isteklidir. Önerilen adım: okuma çeşitliliğini artırarak bu "
                "başarının sürdürülmesi.",
     },
+    # Word şablonu paritesi: "Eğitsel ve Ev Temelli Gelişim Önerileri" (okul + ev maddeleri)
+    "oneriler_baslik": "Eğitsel ve Ev Temelli Gelişim Önerileri",
+    "oneriler_okul_baslik": "Eğitsel Ortamda (Okul / Kurs / Bireysel Ders) Yapılacak Çalışmalar",
+    "oneriler_okul": [
+        "Öğrencinin düzeyine uygun metinlerle düzenli sesli okuma çalışmaları planlanmalı; "
+        "hızdan çok doğruluk ve anlam önceliklendirilmelidir.",
+        "Model okuma (eğitimcinin örnek okuması) ve ardından birlikte/eşli okuma teknikleri kullanılmalıdır.",
+        "Sık yapılan hata türlerine (atlama, ekleme, tersten okuma vb.) yönelik hedeflenmiş "
+        "kelime çözümleme ve hece çalışmaları yürütülmelidir.",
+        "Noktalama işaretlerine uyum, vurgu ve anlamlı gruplama için tekrarlı (yankılı) okuma çalışmaları yapılmalıdır.",
+        "Okuma sonrası soru-cevap, özetleme ve tahmin etkinlikleriyle okuduğunu anlama becerisi desteklenmelidir.",
+    ],
+    "oneriler_ev_baslik": "Evde Yapılması Önerilen Çalışmalar",
+    "oneriler_ev": [
+        "Öğrencinin her gün 10–15 dakika sesli okuma yapması sağlanmalı; hızdan çok doğruluk ve anlam önceliklendirilmelidir.",
+        "Yetişkin, öğrenciye model olacak biçimde okuma yapmalı; ardından öğrenciyle birlikte okuma çalışmaları yürütülmelidir.",
+        "Okuma sonrasında “Metin ne anlatıyor?”, “En önemli bölüm hangisiydi?” gibi kısa ve yönlendirici sorular sorulmalıdır.",
+        "Öğrencinin seviyesine uygun, ilgi alanlarına hitap eden metinler tercih edilerek okuma motivasyonu artırılmalıdır.",
+        "Okuma süreci düzeltici ve destekleyici bir yaklaşımla ele alınmalı; hatalar üzerinde durulurken okuma isteğini "
+        "azaltacak tutumlardan kaçınılmalıdır.",
+    ],
 }
 
 

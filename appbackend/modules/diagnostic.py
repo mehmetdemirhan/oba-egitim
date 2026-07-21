@@ -1935,10 +1935,21 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
 
     # ── 3. OKUMA HIZI ──
     el.append(RLPara("3. Okuma Hızı", styles['SectOBA']))
+    # Word paritesi: hesaplama formülü
+    el.append(RLPara("<i>Okuma Hızı = Doğru okunan kelime sayısı / Metnin tamamının okunduğu süre (sn) × 60</i>", styles['SmallOBA']))
     wpm = round(rapor.get("wpm") or 0)
     hiz_map = {"dusuk": "Düşük", "orta": "Orta", "yeterli": "Yeterli", "ileri": "İleri"}
     hiz_label = hiz_map.get(rapor.get("hiz_deger", ""), "?")
     sinif = rapor.get("ogrenci_sinif", "")
+    # Word paritesi: sınıf düzeyi REFERANS DEĞERLER satırı
+    try:
+        _snorm = (_normlar or {}).get(str(sinif).strip(), {})
+        if _snorm:
+            _dd, _oo, _yy = int(_snorm.get("dusuk", 0)), int(_snorm.get("orta", 0)), int(_snorm.get("yeterli", 0))
+            el.append(RLPara(f"<b>Referans (Sınıf {sinif}):</b> Düşük 0–{_dd} · Orta {_dd+1}–{_oo} · "
+                             f"Yeterli {_oo+1}–{_yy} · İleri {_yy+1}+ kelime/dk", styles['SmallOBA']))
+    except Exception:
+        pass
     _anomali = rapor.get("veri_anomali")
     if _anomali:
         # v2 #1: Anomali → güvenli düzey SUNMA, kırmızı uyarı kutusu göster
@@ -1961,6 +1972,7 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
 
     # ── 4. DOĞRU OKUMA ORANI ──
     el.append(RLPara("3.1. Doğru Okuma Oranı", styles['SubSectOBA']))
+    el.append(RLPara("<i>Doğru Okuma Oranı = Doğru okunan kelime sayısı / Metnin tamamındaki kelime sayısı × 100</i>", styles['SmallOBA']))
     _dt = RLTable([[grafik.dogruluk_donut(dogruluk),
                     RLPara(f"Doğru okuma oranı <b>%{round(dogruluk)}</b>. Toplam {kelime_s} kelimeden "
                            f"<b>{dogru_k}</b> doğru, <b>{yanlis_k}</b> hatalı okunmuştur.", styles['BodyOBA'])]],
@@ -2172,7 +2184,21 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     _anlama_var = any(g in aktif_gruplar for g in ("4.1", "4.2", "4.3", "4.4"))
     for cumle in sonuc_paragrafi_uret(rapor, rapor_metinleri, anlama_var=_anlama_var):
         el.append(RLPara(cumle, styles['BodyOBA']))
-    el.append(Spacer(1, 4))
+    el.append(Spacer(1, 6))
+
+    # Word paritesi: Eğitsel ve Ev Temelli Gelişim Önerileri (okul + ev maddeleri)
+    _oneri_baslik = rapor_metinleri.get("oneriler_baslik") or "Eğitsel ve Ev Temelli Gelişim Önerileri"
+    el.append(RLPara(_oneri_baslik, styles['SubSectOBA']))
+    for _blk_ad, _blk_key in [("oneriler_okul_baslik", "oneriler_okul"), ("oneriler_ev_baslik", "oneriler_ev")]:
+        _liste = rapor_metinleri.get(_blk_key) or []
+        if _liste:
+            _bas = rapor_metinleri.get(_blk_ad, "")
+            if _bas:
+                el.append(RLPara(f"<b>{_bas}</b>", styles['BodyOBA']))
+            for _m in _liste:
+                el.append(RLPara(f"• {_m}", styles['BodyOBA']))
+            el.append(Spacer(1, 3))
+
     if rapor.get("ogretmen_notu"):
         el.append(RLPara("<b>Eğitimci Notu:</b>", styles['SubSectOBA']))
         for line in rapor.get("ogretmen_notu", "").split("\n"):
