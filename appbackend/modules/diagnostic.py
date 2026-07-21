@@ -1478,7 +1478,7 @@ def prozodik_seviye(toplam: int, esikler: dict | None = None) -> str:
     e = esikler or {"cokiyi": 13, "iyi": 10, "orta": 7}
     if toplam >= e.get("cokiyi", 13): return "çok iyi"
     elif toplam >= e.get("iyi", 10): return "iyi"
-    elif toplam >= e.get("orta", 7): return "orta"
+    elif toplam >= e.get("orta", 7): return "geliştirilmeli"   # Word paritesi (7–9 bandı)
     else: return "zayıf"
 
 def anlama_seviye(pct: int) -> str:
@@ -2273,7 +2273,7 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     ps.append(('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#E8F0FE')))
     t_p.setStyle(TableStyle(ps))
     el.append(t_p)
-    _proz_renk = {"Çok İyi": "#1E7A44", "İyi": "#2E9E5B", "Orta": "#E8B93B", "Zayıf": "#D9534F"}.get(proz_sev, "#333333")
+    _proz_renk = {"Çok İyi": "#1E7A44", "İyi": "#2E9E5B", "Geliştirilmeli": "#E8B93B", "Zayıf": "#D9534F"}.get(proz_sev, "#333333")
     el.append(RLPara(f"Prozodik okuma performansı: <b><font color='{_proz_renk}'>{proz_sev}</font></b> (Toplam {proz_toplam}/20)", styles['BodyOBA']))
     el.append(Spacer(1, 8))                       # item 3: özet metin ile bant göstergesi çakışmasın
     el.append(grafik.prozodik_bar(proz_toplam))   # D: 4 renk bantlı prozodik göstergesi (Zayıf/Orta/İyi/Çok İyi)

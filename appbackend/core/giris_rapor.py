@@ -79,7 +79,9 @@ DOGRULUK_DUZEY_ACIKLAMA = {
 }
 DOGRULUK_ESIK_VARSAYILAN = {"iyi": 98, "gelistirilmeli": 90}
 PROZODIK_ESIK_VARSAYILAN = {"cokiyi": 13, "iyi": 10, "orta": 7}
-PROZODIK_DUZEY_AD = {"cokiyi": "Çok İyi", "iyi": "İyi", "orta": "Orta", "gelistirilmeli": "Zayıf"}
+# Word şablonu paritesi: 2. bant "Geliştirilmeli" (7–9). Eşik anahtarı "orta" kalır
+# (geriye dönük uyum); yalnız GÖSTERİLEN etiket "Geliştirilmeli"dir.
+PROZODIK_DUZEY_AD = {"cokiyi": "Çok İyi", "iyi": "İyi", "orta": "Geliştirilmeli", "gelistirilmeli": "Zayıf"}
 
 
 def dogruluk_duzey_ad(dogruluk, esikler=None) -> str:
@@ -106,7 +108,7 @@ def prozodik_duzey_ad(toplam, esikler=None) -> str:
     if t >= e.get("iyi", 10):
         return "İyi"
     if t >= e.get("orta", 7):
-        return "Orta"
+        return "Geliştirilmeli"   # Word paritesi (7–9 bandı)
     return "Zayıf"
 
 
@@ -255,7 +257,7 @@ def aktif_anlama_dict(anlama: dict | None, cfg: dict | None, sinif) -> dict:
 #   hiz_duzey:  dusuk | orta | yeterli | ileri
 #   dogruluk:   zayif=Yetersiz (<90) | orta=Geliştirilmeli (90–97) | iyi=Bağımsız (>=98)
 #   anlama:     zayif (<70) | orta (70–84) | iyi (>=85)
-#   prozodik:   gelistirilmeli=Zayıf (<7) | orta (7–9) | iyi (10–12) | cokiyi=Çok İyi (>=13)
+#   prozodik:   gelistirilmeli=Zayıf (<7) | orta=Geliştirilmeli (7–9) | iyi=İyi (10–12) | cokiyi=Çok İyi (>=13)
 #   kapanis:    genel düzey → dusuk | orta | iyi
 # {ad} yer tutucusu öğrenci adıyla değiştirilir.
 
@@ -295,8 +297,8 @@ GIRIS_RAPOR_METIN_VARSAYILAN = {
         "gelistirilmeli": "Prozodik okuma performansı Zayıf düzeydedir; vurgu, tonlama ve "
                           "noktalamaya uyum becerileri henüz yetersizdir. Örnek (model) okuma "
                           "dinletme ve eşli okuma çalışmaları faydalı olacaktır.",
-        "orta": "Prozodik okuma performansı Orta düzeydedir; noktalama ve vurguya kısmen dikkat "
-                "edilmekte, okuma akıcılığı geliştirilebilir.",
+        "orta": "Prozodik okuma performansı Geliştirilmeli düzeydedir; noktalama ve vurguya kısmen "
+                "dikkat edilmekte, okuma akıcılığı geliştirilmeye açıktır.",
         "iyi": "Prozodik okuma performansı İyi düzeydedir; öğrenci metni anlamlı gruplara "
                "ayırarak, noktalamaya büyük ölçüde uyarak okuyabilmektedir.",
         "cokiyi": "Prozodik okuma performansı Çok İyi düzeydedir; öğrenci doğal, akıcı ve "
