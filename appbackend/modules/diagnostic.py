@@ -1049,6 +1049,7 @@ class AnalizTamamla(BaseModel):
     hatalar: List[HataKaydi]
     gozlem_notu: str = ""
     ogretmen_kur: str = ""
+    manuel_wpm: Optional[float] = None   # öğretmenin el ile girdiği dakikada kelime (varsa esas)
 
 class DiagnosticOturum(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -1379,7 +1380,11 @@ async def tamamla_oturum(oturum_id: str, data: AnalizTamamla, current_user=Depen
     toplam_hata = len(data.hatalar)                    # yanlış okunan kelime sayısı
     dogru_kelime = max(0, kelime_sayisi - toplam_hata)  # doğru okunan kelime
     sure_dakika = data.sure_saniye / 60 if data.sure_saniye > 0 else 1
-    wpm = round(dogru_kelime / sure_dakika, 1)          # = doğru okunan / süre × 60
+    # Öğretmen el ile WPM girdiyse ESAS al; yoksa WCPM (doğru okunan / süre × 60)
+    if data.manuel_wpm is not None and float(data.manuel_wpm) > 0:
+        wpm = round(float(data.manuel_wpm), 1)
+    else:
+        wpm = round(dogru_kelime / sure_dakika, 1)
     dogruluk = round(max(0, dogru_kelime / kelime_sayisi * 100), 1) if kelime_sayisi else 0
 
     hiz_deger = await hiz_degerlendirme(sinif_seviyesi, wpm)

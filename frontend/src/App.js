@@ -2877,6 +2877,9 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, onAnasayfayaD
   const [prozodik, setProzodik] = useState({ noktalama:3, vurgu:3, tonlama:3, akicilik:3, anlamli_gruplama:3 });
   const [ogretmenNotu, setOgretmenNotu] = useState("");
   const [kurKarari, setKurKarari] = useState("");
+  // Kur & Bitir: el ile dakikada okunan kelime + zorunlu doğru okuma oranı hesabı
+  const [manuelWpm, setManuelWpm] = useState("");
+  const [hesapSonuc, setHesapSonuc] = useState(null); // {dogru_kelime, yanlis_kelime, dogruluk, wpm}
   const [raporAdim, setRaporAdim] = useState(0); // 0=analiz, 1=anlama, 2=prozodik, 3=kur+bitir
 
   useEffect(() => () => clearInterval(intervalRef.current), []);
@@ -2915,11 +2918,30 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, onAnasayfayaD
     ogretmen_notu: ogretmenNotu, ogretmen_kur: kurKarari, sure, raporAdim,
   });
 
+  // Zorunlu hesap: doğru okuma oranı = (toplam − yanlış) / toplam × 100.
+  // Dakikada okunan kelime: el ile girildiyse o; girilmediyse süreden (doğru/süre×60).
+  const dogruOkumaHesapla = () => {
+    const toplam = parseInt(metin?.kelime_sayisi || 0) || 0;
+    const yanlis = (hatalar || []).length;
+    const dogru = Math.max(0, toplam - yanlis);
+    const dogruluk = toplam ? Math.round((dogru / toplam) * 1000) / 10 : 0;
+    const elWpm = parseFloat(manuelWpm);
+    const wpm = Number.isFinite(elWpm) && elWpm > 0
+      ? Math.round(elWpm * 10) / 10
+      : (sure > 0 ? Math.round((dogru / (sure / 60)) * 10) / 10 : 0);
+    setHesapSonuc({ dogru_kelime: dogru, yanlis_kelime: yanlis, dogruluk, wpm, toplam });
+  };
+
   const tamamla = () => {
-    if (sure === 0) return;
+    if (sure === 0 || !hesapSonuc) return;
     clearInterval(intervalRef.current);
     setCalisıyor(false);
-    onTamamla({ sure_saniye: sure, hatalar, gozlem_notu: gozlemNotu, anlama, prozodik, ogretmen_notu: ogretmenNotu, ogretmen_kur: kurKarari });
+    const elWpm = parseFloat(manuelWpm);
+    onTamamla({
+      sure_saniye: sure, hatalar, gozlem_notu: gozlemNotu, anlama, prozodik,
+      ogretmen_notu: ogretmenNotu, ogretmen_kur: kurKarari,
+      manuel_wpm: Number.isFinite(elWpm) && elWpm > 0 ? elWpm : undefined,
+    });
   };
 
   const anasayfayaDon = () => {
@@ -3142,6 +3164,27 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, onAnasayfayaD
             {/* Adım 3: Kur & Bitir */}
             {raporAdim === 3 && (
               <div className="space-y-4">
+                {/* El ile dakikada okunan kelime + ZORUNLU doğru okuma oranı hesabı */}
+                <div className="bg-app rounded-xl p-3 space-y-2 border border-line">
+                  <label className="text-xs font-medium text-subtle block">Dakikada Okunan Kelime Sayısı (el ile — opsiyonel)</label>
+                  <div className="flex items-center gap-2">
+                    <input type="number" min="0" value={manuelWpm}
+                      onChange={e => { setManuelWpm(e.target.value); setHesapSonuc(null); }}
+                      placeholder="örn. 90" className="flex-1 min-w-0 border border-line rounded-lg px-3 py-2 text-sm" />
+                    <button onClick={dogruOkumaHesapla}
+                      className="shrink-0 inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg px-3 py-2">
+                      <BarChart3 className="h-4 w-4" />Doğru Okuma Oranını Hesapla
+                    </button>
+                  </div>
+                  {hesapSonuc ? (
+                    <div className="text-xs text-content bg-surface rounded-lg p-2 border border-line">
+                      Doğru okunan: <b>{hesapSonuc.dogru_kelime}</b>/{hesapSonuc.toplam} · Doğru okuma oranı: <b className="text-green-600">%{hesapSonuc.dogruluk}</b> · Hız: <b>{hesapSonuc.wpm}</b> kelime/dk
+                      {manuelWpm ? " (el ile)" : ""}
+                    </div>
+                  ) : (
+                    <div className="text-[11px] text-amber-600">⚠ Kur kararını tamamlamak için önce "Doğru Okuma Oranını Hesapla"ya basın.</div>
+                  )}
+                </div>
                 <div>
                   <label className="text-xs font-medium text-subtle">Öğretmen Notu</label>
                   <textarea value={ogretmenNotu} onChange={e => setOgretmenNotu(e.target.value)} rows={4}
@@ -3164,9 +3207,9 @@ function CanlıAnalizEkrani({ ogrenci, metin, oturumId, onTamamla, onAnasayfayaD
                   <div className="flex items-center gap-1.5"><XCircle className="h-3.5 w-3.5" />Toplam hata: <strong className="tabular-nums">{hatalar.length}</strong></div>
                   <div className="flex items-center gap-1.5"><BarChart3 className="h-3.5 w-3.5" />Prozodik: <strong className="tabular-nums">{prozodikToplam}/20</strong></div>
                 </div>
-                <button onClick={tamamla} disabled={sure===0 || !kurKarari}
+                <button onClick={tamamla} disabled={sure===0 || !kurKarari || !hesapSonuc}
                   className="w-full inline-flex items-center justify-center gap-1.5 py-4 bg-primary hover:bg-primary-hover text-white font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all">
-                  {sure===0 ? "Önce süre sayacını başlatın" : !kurKarari ? "Kur kararı seçin" : <><CheckCircle className="h-5 w-5" />Analizi Tamamla ve Raporu Oluştur</>}
+                  {sure===0 ? "Önce süre sayacını başlatın" : !hesapSonuc ? "Önce doğru okuma oranını hesaplayın" : !kurKarari ? "Kur kararı seçin" : <><CheckCircle className="h-5 w-5" />Analizi Tamamla ve Raporu Oluştur</>}
                 </button>
               </div>
             )}
@@ -5331,6 +5374,7 @@ function GirisAnaliziModul({ user, students, teachers }) {
         hatalar: veri.hatalar,
         gozlem_notu: veri.gozlem_notu,
         ogretmen_kur: veri.ogretmen_kur,
+        manuel_wpm: veri.manuel_wpm,   // el ile girilen dakikada kelime (varsa esas alınır)
       });
       setSonuc({ ...r.data, atanan_kur: veri.ogretmen_kur });
       fetchGecmis();
