@@ -1163,6 +1163,68 @@ async def sil_rapor(rapor_id: str, current_user=Depends(get_current_user)):
     return {"message": "Rapor silindi", "oturum_silindi": bool(oturum_id)}
 
 
+class ManuelDuzeltIstek(BaseModel):
+    sure_saniye: Optional[float] = None
+    dogru_kelime: Optional[int] = None
+
+
+@router.patch("/diagnostic/rapor/{rapor_id}/manuel-duzelt")
+async def rapor_manuel_duzelt(rapor_id: str, data: ManuelDuzeltIstek, current_user=Depends(get_current_user)):
+    """EK: Öğretmen/idare, üretilmiş raporun tamamlama süresini ve/veya doğru kelime
+    sayısını MANUEL onaylar/düzeltir (otomatik kronometre güvenilmezliğine 2. katman).
+    Hız WCPM formülüyle (doğru/süre×60) YENİDEN hesaplanır; hız VE doğruluk aynı,
+    öğretmen onaylı veri kümesinden türetilir. Otomatik + onaylı değer birlikte saklanır,
+    %20'den fazla fark rapora not düşülür."""
+    rapor = await db.diagnostic_raporlar.find_one({"id": rapor_id})
+    if not rapor:
+        raise HTTPException(status_code=404, detail="Rapor bulunamadı")
+    rol = current_user.get("role")
+    sahip = rapor.get("ogretmen_id") == current_user.get("id")
+    if not (rol in ("admin", "coordinator") or (rol == "teacher" and sahip)):
+        raise HTTPException(status_code=403, detail="Bu raporu düzenleme yetkiniz yok")
+
+    from core.giris_rapor import wpm_anomali
+    kelime = int(rapor.get("kelime_sayisi") or 0)
+    # Otomatik (ilk) değerleri KORU
+    oto_sure = rapor.get("otomatik_sure_saniye", rapor.get("sure_saniye"))
+    oto_wpm = rapor.get("otomatik_wpm", rapor.get("wpm"))
+    oto_dogru = rapor.get("otomatik_dogru_kelime", rapor.get("dogru_kelime"))
+
+    yeni_sure = float(data.sure_saniye) if data.sure_saniye is not None else float(rapor.get("sure_saniye") or 0)
+    if data.dogru_kelime is not None:
+        yeni_dogru = int(data.dogru_kelime)
+    elif rapor.get("dogru_kelime") is not None:
+        yeni_dogru = int(rapor.get("dogru_kelime"))
+    else:  # eski rapor: doğruluk yüzdesinden türet
+        yeni_dogru = round(kelime * (rapor.get("dogruluk_yuzde") or 0) / 100)
+    yeni_dogru = max(0, min(kelime, yeni_dogru))
+
+    sure_dk = yeni_sure / 60 if yeni_sure > 0 else 1
+    yeni_wpm = round(yeni_dogru / sure_dk, 1)                       # WCPM (madde 1 ile aynı mantık)
+    yeni_dogruluk = round(yeni_dogru / kelime * 100, 1) if kelime else 0
+    yeni_hiz = await hiz_degerlendirme(str(rapor.get("ogrenci_sinif", "")), yeni_wpm)
+    anomali, anomali_notu = wpm_anomali(yeni_wpm, yeni_sure, kelime)
+
+    fark_notu = ""
+    try:
+        if oto_sure and yeni_sure and abs(yeni_sure - float(oto_sure)) / max(float(oto_sure), 1) > 0.20:
+            fark_notu = (f"Otomatik ölçüm: {int(float(oto_sure))} sn, öğretmen onaylı: {int(yeni_sure)} sn — "
+                         "öğretmen onaylı değer esas alındı.")
+    except Exception:
+        pass
+
+    await db.diagnostic_raporlar.update_one({"id": rapor_id}, {"$set": {
+        "sure_saniye": yeni_sure, "dogru_kelime": yeni_dogru, "yanlis_kelime": max(0, kelime - yeni_dogru),
+        "wpm": yeni_wpm, "dogruluk_yuzde": yeni_dogruluk, "hiz_deger": yeni_hiz,
+        "veri_anomali": anomali, "anomali_notu": anomali_notu,
+        "otomatik_sure_saniye": oto_sure, "otomatik_wpm": oto_wpm, "otomatik_dogru_kelime": oto_dogru,
+        "ogretmen_onayli": True, "olcum_farki_notu": fark_notu,
+        "manuel_duzelten_id": current_user.get("id"), "manuel_duzelt_tarihi": iso(),
+    }})
+    return {"ok": True, "wpm": yeni_wpm, "dogruluk_yuzde": yeni_dogruluk, "hiz_deger": yeni_hiz,
+            "veri_anomali": anomali, "olcum_farki_notu": fark_notu}
+
+
 # ═══════════════════════════════════════════════════════════════════
 # GİRİŞ ANALİZİ RAPOR AYARLARI — Sonuç metin bankası (A) + sınıf kategorileri (EK)
 # ═══════════════════════════════════════════════════════════════════
@@ -1980,6 +2042,12 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
                       colWidths=[7*cm, 8.5*cm])
         _gt.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'MIDDLE'), ('ALIGN', (0, 0), (-1, -1), 'CENTER')]))
         el.append(_gt)
+
+    # EK: öğretmen onaylı ölçüm + otomatik/onaylı fark notu
+    if rapor.get("ogretmen_onayli"):
+        el.append(RLPara("✓ <b>Öğretmen onaylı ölçüm.</b>", styles['SmallOBA']))
+        if rapor.get("olcum_farki_notu"):
+            el.append(RLPara(f"<i>{rapor.get('olcum_farki_notu')}</i>", styles['SmallOBA']))
 
     # ── 4. DOĞRU OKUMA ORANI ──
     el.append(RLPara("3.1. Doğru Okuma Oranı", styles['SubSectOBA']))
