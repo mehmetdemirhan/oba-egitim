@@ -102,6 +102,10 @@ def _pool_ciftler_uret(havuz: list[dict], soru_sayisi: int, zorluk: str | None) 
 # AI metin üretemese bile: analiz_metinler havuzundaki gerçek okuma metinlerinden
 # içerik kelimeleri boşluğa çevrilir, çeldiriciler onaylı kelime havuzundan gelir.
 _POOL_CLOZE_TIPLERI = {"cloze_bosluk_doldurma"}
+
+# Okuma-anlama / yorumlama tipleri: paragraf AI'a UYDURTULMAZ; onaylı okuma metni
+# ({metin, sorular} şeması) kaynak olarak verilir, AI yalnız soru üretir.
+_METINLI_ANLAMA_TIPLERI = {"bes_n_bir_k", "ana_fikir", "cikarim", "sebep_sonuc", "tahmin_et", "diyalog"}
 _DURAK_KELIMELER = {
     "ve", "ile", "ama", "fakat", "çünkü", "gibi", "için", "bir", "bu", "şu", "onu", "ona",
     "da", "de", "ki", "mi", "ne", "çok", "daha", "en", "her", "hiç", "ya", "veya", "ancak",
@@ -309,17 +313,33 @@ async def _icerik_uret(tip: str, sinif: int, konu: str | None, zorluk: str | Non
                     user_msg += ("\n\nZORUNLU KAYNAK: Bu egzersizi ÖNCELİKLE aşağıdaki "
                                  "öğretmenin girdiği deyim/atasözü havuzundan üret:\n" + liste)
 
+    # Okuma-ANLAMA/YORUMLAMA tipleri: onaylı okuma metnini KAYNAK olarak enjekte et.
+    # AI metin UYDURMAZ; yalnız verilen gerçek metne dayalı soru üretir (havuz temelli).
+    _grounded_metin = None
+    if tip in _METINLI_ANLAMA_TIPLERI:
+        _md = await _analiz_metin_sec(sinif)
+        if _md and _md.get("icerik"):
+            _grounded_metin = str(_md["icerik"]).strip()
+            user_msg += ("\n\nZORUNLU KAYNAK METİN: Aşağıdaki metni AYNEN kullan; YENİ metin/olay "
+                         "UYDURMA. Tüm soruları SADECE bu metne dayandır ve 'metin' alanına bu metni koy:\n"
+                         f'"""\n{_grounded_metin}\n"""')
+
     for deneme in range(2):
         try:
             res = await call_claude(system, user_msg, max_tokens=3000)
             parsed = res.get("parsed")
             if isinstance(parsed, dict) and parsed:
+                if _grounded_metin:
+                    parsed["metin"] = _grounded_metin   # gösterilen paragraf onaylı havuzdan
                 return parsed, False
         except Exception as ex:
             logging.warning(f"[egzersiz_motoru] AI üretim hatası ({tip}, deneme {deneme}): {ex}")
-    # Fallback
+    # Fallback — mock içerik. Anlama tipinde metni yine de onaylı havuzdan göster.
     logging.info(f"[egzersiz_motoru] '{tip}' için mock içerik kullanılıyor")
-    return mock_uret(tip, sinif, konu, soru_sayisi), True
+    _mock = mock_uret(tip, sinif, konu, soru_sayisi)
+    if _grounded_metin and isinstance(_mock, dict) and "metin" in _mock:
+        _mock["metin"] = _grounded_metin
+    return _mock, True
 
 
 async def _icerik_kaydet(tip: str, sinif: int, konu: str | None, zorluk: str | None,
