@@ -1417,13 +1417,18 @@ async def olustur_rapor(data: RaporOlusturCreate, current_user=Depends(get_curre
 
     # EK: bu raporun sınıfı için AKTİF anlama gruplarını sabitle (snapshot). Böylece
     # kural değişse bile bu rapor tutarlı kalır; eski raporlarda alan yoksa hepsi gösterilir.
-    from core.giris_rapor import get_sinif_kategorileri, aktif_grup_anahtarlari, aktif_anlama_dict
+    from core.giris_rapor import get_sinif_kategorileri, aktif_grup_anahtarlari, aktif_anlama_dict, wpm_anomali
     _sinif_sec = ogrenci.get("sinif", "") if ogrenci else ""
     _sinif_cfg = await get_sinif_kategorileri(db)
     _aktif_gruplar = aktif_grup_anahtarlari(_sinif_cfg, _sinif_sec)
     # EK #3: % yalnız AKTİF kategoriler üzerinden (pasif grup ölçütleri hariç, forma bağlı değil)
     _anlama_temiz = aktif_anlama_dict(data.anlama, _sinif_cfg, _sinif_sec)
     anlama_pct = data.anlama_yuzde if data.anlama_yuzde else anlama_yuzde_hesapla(_anlama_temiz)
+
+    # v2 #1: OKUMA HIZI MAKUL ARALIK KONTROLÜ — bozuk veriyi veliye güvenle sunma
+    _wpm_val = oturum.get("wpm", 0)
+    _kelime = metin.get("kelime_sayisi", 0) if metin else 0
+    _anomali, _anomali_notu = wpm_anomali(_wpm_val, oturum.get("sure_saniye"), _kelime)
 
     rapor_data = {
         "id": str(uuid.uuid4()),
@@ -1448,6 +1453,8 @@ async def olustur_rapor(data: RaporOlusturCreate, current_user=Depends(get_curre
         "prozodik_toplam": prozodik_toplam,
         "ogretmen_notu": data.ogretmen_notu,
         "aktif_anlama_gruplari": _aktif_gruplar,   # EK: sınıfa göre gösterilecek gruplar
+        "veri_anomali": _anomali,                  # v2 #1: okuma hızı makul aralık dışı mı
+        "anomali_notu": _anomali_notu,
         "rapor_tipi": "olcum",   # olcum | gelisim
         "olusturma_tarihi": iso(),
     }
@@ -1456,6 +1463,15 @@ async def olustur_rapor(data: RaporOlusturCreate, current_user=Depends(get_curre
     # Veliye bildirim gönder (metin adıyla; eski hatalı "baslik" anahtarı düzeltildi)
     try: await bildirim_rapor_tamamlandi(rapor_data.get("ogrenci_id"), rapor_data.get("metin_adi") or "Giriş Analizi Raporu")
     except: pass
+    # v2 #1: Anomali varsa öğretmeni uyar (bozuk veri sessizce yayınlanmasın)
+    if _anomali:
+        try:
+            from modules.bildirim import bildirim_olustur
+            await bildirim_olustur(oturum.get("ogretmen_id"), "analiz_veri_anomali",
+                                   f"{rapor_data.get('ogrenci_ad','Öğrenci')} raporunda okuma hızı anomalisi: {_anomali_notu}",
+                                   rapor_data.get("id"))
+        except Exception:
+            pass
     return rapor_data
 
 @router.get("/diagnostic/rapor/ogrenci/{ogrenci_id}")
@@ -1828,8 +1844,9 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
          "olusturma_tarihi": {"$lt": rapor.get("olusturma_tarihi", "")}, "id": {"$ne": rapor.get("id")}},
         sort=[("olusturma_tarihi", -1)])
 
-    # D: sunucu tarafı vektör grafikler
+    # D: sunucu tarafı vektör grafikler — PDF gövdesiyle AYNI Türkçe fontu kullan (v2 #2)
     import core.rapor_grafik as grafik
+    grafik.set_font(FONT, FONTB)
     # Sınıf okuma hızı normu (gauge + karşılaştırma için) — "yeterli" eşiği hedef alınır
     _norm_wpm = 0
     try:
@@ -1918,23 +1935,44 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
 
     # ── 3. OKUMA HIZI ──
     el.append(RLPara("3. Okuma Hızı", styles['SectOBA']))
+    # Word paritesi: hesaplama formülü
+    el.append(RLPara("<i>Okuma Hızı = Doğru okunan kelime sayısı / Metnin tamamının okunduğu süre (sn) × 60</i>", styles['SmallOBA']))
     wpm = round(rapor.get("wpm") or 0)
     hiz_map = {"dusuk": "Düşük", "orta": "Orta", "yeterli": "Yeterli", "ileri": "İleri"}
     hiz_label = hiz_map.get(rapor.get("hiz_deger", ""), "?")
-    hiz_renk = {"dusuk": "#E74C3C", "orta": "#F39C12", "yeterli": "#27AE60", "ileri": "#2E86C1"}.get(rapor.get("hiz_deger", ""), "#333")
-    el.append(RLPara(f'<font size="28" color="{hiz_renk}"><b>{wpm}</b></font>  <font size="10">kelime/dakika</font>', styles['HizBig']))
-    el.append(RLPara(f'<font size="12" color="{hiz_renk}"><b>{hiz_label} Düzey</b></font>', styles['BodyOBA']))
-    el.append(Spacer(1, 4))
     sinif = rapor.get("ogrenci_sinif", "")
-    el.append(RLPara(f"Öğrencinin okuma hızı dakikada <b>{wpm} kelime</b>dir. Bu okuma hızı, öğrencinin bulunduğu sınıf düzeyi normlarına göre <b>{hiz_label.lower()} düzeydedir</b>.", styles['BodyOBA']))
-    # D: okuma hızı göstergesi + sınıf normu karşılaştırma (yan yana)
-    _gt = RLTable([[grafik.hiz_gauge(wpm, _norm_wpm), grafik.norm_karsilastirma(wpm, _norm_wpm)]],
-                  colWidths=[7*cm, 8.5*cm])
-    _gt.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'MIDDLE'), ('ALIGN', (0, 0), (-1, -1), 'CENTER')]))
-    el.append(_gt)
+    # Word paritesi: sınıf düzeyi REFERANS DEĞERLER satırı
+    try:
+        _snorm = (_normlar or {}).get(str(sinif).strip(), {})
+        if _snorm:
+            _dd, _oo, _yy = int(_snorm.get("dusuk", 0)), int(_snorm.get("orta", 0)), int(_snorm.get("yeterli", 0))
+            el.append(RLPara(f"<b>Referans (Sınıf {sinif}):</b> Düşük 0–{_dd} · Orta {_dd+1}–{_oo} · "
+                             f"Yeterli {_oo+1}–{_yy} · İleri {_yy+1}+ kelime/dk", styles['SmallOBA']))
+    except Exception:
+        pass
+    _anomali = rapor.get("veri_anomali")
+    if _anomali:
+        # v2 #1: Anomali → güvenli düzey SUNMA, kırmızı uyarı kutusu göster
+        _uy = RLTable([[RLPara(f"<b>⚠ Veri Anomalisi:</b> {rapor.get('anomali_notu') or 'Okuma hızı olağandışı, kontrol edilmeli.'} "
+                               "Bu ölçüm güvenilir kabul edilmemeli; okuma yeniden ölçülmelidir.", styles['BodyOBA'])]],
+                      colWidths=[15.5*cm])
+        _uy.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#FDECEA')),
+                                 ('BOX', (0, 0), (-1, -1), 0.8, colors.HexColor('#D9534F')),
+                                 ('LEFTPADDING', (0, 0), (-1, -1), 8), ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+                                 ('TOPPADDING', (0, 0), (-1, -1), 6), ('BOTTOMPADDING', (0, 0), (-1, -1), 6)]))
+        el.append(_uy)
+        el.append(RLPara(f"Kaydedilen okuma hızı: <b>{wpm} kelime/dakika</b> (kontrol edilmeli — düzey belirlenmedi).", styles['BodyOBA']))
+    else:
+        # Büyük tekrar rakamı KALDIRILDI (item 3): değer zaten göstergede. Yalnız gösterge + norm barı.
+        el.append(RLPara(f"Öğrencinin okuma hızı dakikada <b>{wpm} kelime</b>dir. Bu okuma hızı, öğrencinin bulunduğu sınıf düzeyi normlarına göre <b>{hiz_label.lower()} düzeydedir</b>.", styles['BodyOBA']))
+        _gt = RLTable([[grafik.hiz_gauge(wpm, _norm_wpm), grafik.norm_karsilastirma(wpm, _norm_wpm)]],
+                      colWidths=[7*cm, 8.5*cm])
+        _gt.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'MIDDLE'), ('ALIGN', (0, 0), (-1, -1), 'CENTER')]))
+        el.append(_gt)
 
     # ── 4. DOĞRU OKUMA ORANI ──
     el.append(RLPara("3.1. Doğru Okuma Oranı", styles['SubSectOBA']))
+    el.append(RLPara("<i>Doğru Okuma Oranı = Doğru okunan kelime sayısı / Metnin tamamındaki kelime sayısı × 100</i>", styles['SmallOBA']))
     _dt = RLTable([[grafik.dogruluk_donut(dogruluk),
                     RLPara(f"Doğru okuma oranı <b>%{round(dogruluk)}</b>. Toplam {kelime_s} kelimeden "
                            f"<b>{dogru_k}</b> doğru, <b>{yanlis_k}</b> hatalı okunmuştur.", styles['BodyOBA'])]],
@@ -2008,7 +2046,9 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
             ("Değerlendirme", "degerlendirme"),
         ]),
     ]
-    anlama_gruplari = [(ad, ol) for (gk, ad, ol) in _anlama_ham if gk in aktif_gruplar]
+    # item 3: TÜM kategoriler mevcutsa 4.1-4.5 numaralı; EK hariç tutma devredeyse numarasız.
+    _hepsi_aktif = set(aktif_gruplar) >= {"4.1", "4.2", "4.3", "4.4", "4.5"}
+    anlama_gruplari = [((f"{gk} {ad}" if _hepsi_aktif else ad), ol) for (gk, ad, ol) in _anlama_ham if gk in aktif_gruplar]
 
     seviye_map = {"zayif": "Zayıf", "orta": "Orta", "iyi": "İyi"}
     for grup_baslik, olcutler in anlama_gruplari:
@@ -2104,9 +2144,10 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     el.append(RLPara(f"Prozodik okuma performansı: <b>{proz_sev}</b> (Toplam {proz_toplam}/20)", styles['BodyOBA']))
     el.append(grafik.prozodik_bar(proz_toplam))  # D: renk bantlı prozodik göstergesi
 
-    # ── E. GELİŞİM (ÖNCEKİ RAPORA GÖRE) ──
-    if _onceki:
-        el.append(RLPara("5.1. Gelişim (Önceki Rapora Göre)", styles['SubSectOBA']))
+    # ── 6. GELİŞİM (ÖNCEKİ RAPORA GÖRE) — üst düzey bölüm (item 3) ──
+    # Anomalili raporlarda (bu veya önceki) trend anlamsız → gösterilmez (item 1).
+    if _onceki and not rapor.get("veri_anomali") and not _onceki.get("veri_anomali"):
+        el.append(RLPara("6. Gelişim (Önceki Rapora Göre)", styles['SectOBA']))
         _onceki_t = str(_onceki.get("olusturma_tarihi", ""))[:10]
         el.append(RLPara(f"Önceki ölçüm: <b>{_onceki_t}</b> tarihli rapor ile karşılaştırma:", styles['BodyOBA']))
 
@@ -2115,6 +2156,9 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
                 d = float(simdi_v or 0) - float(once_v or 0)
             except Exception:
                 d = 0
+            # item 1: mantıksız devasa değişim (bozuk veri kalıntısı) → "—"
+            if abs(d) > 500:
+                return '<font color="#888888">—</font>'
             ok = "▲" if d > 0 else ("▼" if d < 0 else "▬")
             renk = "#2E9E5B" if d > 0 else ("#D9534F" if d < 0 else "#888888")
             isaret = "+" if d > 0 else ""
@@ -2133,14 +2177,28 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
         t_tr.setStyle(TableStyle(tbl_style(len(trend_rows)) + [('ALIGN', (1, 0), (-1, -1), 'CENTER')]))
         el.append(t_tr)
 
-    # ── 6. SONUÇ VE GENEL YORUM ──
-    el.append(RLPara("6. Sonuç ve Genel Yorum", styles['SectOBA']))
+    # ── 7. SONUÇ VE GENEL YORUM ──
+    el.append(RLPara("7. Sonuç ve Genel Yorum", styles['SectOBA']))
     # A: Kural-tabanlı metin bankasından deterministik sonuç paragrafı (AI icat etmez).
     # 1. sınıf gibi 4.1–4.4 pasif olan durumda anlama cümlesi eklenmez.
     _anlama_var = any(g in aktif_gruplar for g in ("4.1", "4.2", "4.3", "4.4"))
     for cumle in sonuc_paragrafi_uret(rapor, rapor_metinleri, anlama_var=_anlama_var):
         el.append(RLPara(cumle, styles['BodyOBA']))
-    el.append(Spacer(1, 4))
+    el.append(Spacer(1, 6))
+
+    # Word paritesi: Eğitsel ve Ev Temelli Gelişim Önerileri (okul + ev maddeleri)
+    _oneri_baslik = rapor_metinleri.get("oneriler_baslik") or "Eğitsel ve Ev Temelli Gelişim Önerileri"
+    el.append(RLPara(_oneri_baslik, styles['SubSectOBA']))
+    for _blk_ad, _blk_key in [("oneriler_okul_baslik", "oneriler_okul"), ("oneriler_ev_baslik", "oneriler_ev")]:
+        _liste = rapor_metinleri.get(_blk_key) or []
+        if _liste:
+            _bas = rapor_metinleri.get(_blk_ad, "")
+            if _bas:
+                el.append(RLPara(f"<b>{_bas}</b>", styles['BodyOBA']))
+            for _m in _liste:
+                el.append(RLPara(f"• {_m}", styles['BodyOBA']))
+            el.append(Spacer(1, 3))
+
     if rapor.get("ogretmen_notu"):
         el.append(RLPara("<b>Eğitimci Notu:</b>", styles['SubSectOBA']))
         for line in rapor.get("ogretmen_notu", "").split("\n"):
