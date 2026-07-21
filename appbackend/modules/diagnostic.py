@@ -1279,12 +1279,13 @@ async def tamamla_oturum(oturum_id: str, data: AnalizTamamla, current_user=Depen
     kelime_sayisi = oturum.get("metin_kelime_sayisi") or (metin.get("kelime_sayisi", 100) if metin else 100)
     sinif_seviyesi = (metin.get("sinif_seviyesi") if metin else None) or oturum.get("metin_sinif_seviyesi") or "4"
 
-    # Hesaplamalar
+    # Hesaplamalar — WCPM standardı: okuma hızı DOĞRU okunan kelimeden hesaplanır
+    # (rapordaki "Okuma Hızı = Doğru okunan kelime / süre × 60" formülüyle birebir).
+    toplam_hata = len(data.hatalar)                    # yanlış okunan kelime sayısı
+    dogru_kelime = max(0, kelime_sayisi - toplam_hata)  # doğru okunan kelime
     sure_dakika = data.sure_saniye / 60 if data.sure_saniye > 0 else 1
-    wpm = round(kelime_sayisi / sure_dakika, 1)
-
-    toplam_hata = len(data.hatalar)
-    dogruluk = round(max(0, (kelime_sayisi - toplam_hata) / kelime_sayisi * 100), 1)
+    wpm = round(dogru_kelime / sure_dakika, 1)          # = doğru okunan / süre × 60
+    dogruluk = round(max(0, dogru_kelime / kelime_sayisi * 100), 1) if kelime_sayisi else 0
 
     hiz_deger = await hiz_degerlendirme(sinif_seviyesi, wpm)
     sistem_kur = await kur_onerisi_hesapla(wpm, dogruluk, sinif_seviyesi)
@@ -1297,13 +1298,15 @@ async def tamamla_oturum(oturum_id: str, data: AnalizTamamla, current_user=Depen
         if tip:
             hata_sayilari[tip] = hata_sayilari.get(tip, 0) + 1
 
-    now = datetime.utcnow().isoformat()
+    now = iso()
     guncelle = {
         "durum": "tamamlandi",
         "sure_saniye": data.sure_saniye,
         "hatalar": [h.dict() if hasattr(h, "dict") else h for h in data.hatalar],
         "gozlem_notu": data.gozlem_notu,
         "wpm": wpm,
+        "dogru_kelime": dogru_kelime,      # doğru okunan (WCPM ile tutarlı)
+        "yanlis_kelime": toplam_hata,      # yanlış okunan
         "dogruluk_yuzde": dogruluk,
         "hiz_deger": hiz_deger,
         "sistem_kur": sistem_kur,
@@ -1443,6 +1446,8 @@ async def olustur_rapor(data: RaporOlusturCreate, current_user=Depends(get_curre
         "kelime_sayisi": metin.get("kelime_sayisi", 0) if metin else 0,
         "sure_saniye": oturum.get("sure_saniye", 0),
         "wpm": oturum.get("wpm", 0),
+        "dogru_kelime": oturum.get("dogru_kelime"),
+        "yanlis_kelime": oturum.get("yanlis_kelime"),
         "dogruluk_yuzde": oturum.get("dogruluk_yuzde", 0),
         "hiz_deger": oturum.get("hiz_deger", ""),
         "atanan_kur": oturum.get("ogretmen_kur", ""),
@@ -1909,8 +1914,14 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     # anahtarda geçerli) → round(None)/int(None) çöker. Bu yüzden `or 0` ile normalize.
     kelime_s = rapor.get("kelime_sayisi") or 0
     dogruluk = rapor.get("dogruluk_yuzde") or 0
-    yanlis_k = round(kelime_s * (100 - dogruluk) / 100) if kelime_s else 0
-    dogru_k = kelime_s - yanlis_k
+    # Kayıtlı KESİN doğru/yanlış kelime varsa onu kullan (WCPM/hız ile tutarlı);
+    # yoksa (eski rapor) dogruluk yüzdesinden türet.
+    if rapor.get("dogru_kelime") is not None:
+        dogru_k = int(rapor.get("dogru_kelime") or 0)
+        yanlis_k = int(rapor.get("yanlis_kelime") or 0)
+    else:
+        yanlis_k = round(kelime_s * (100 - dogruluk) / 100) if kelime_s else 0
+        dogru_k = kelime_s - yanlis_k
     sure_sn_total = rapor.get("sure_saniye") or 0
     sure_dk = int(sure_sn_total) // 60
     sure_sn = int(sure_sn_total) % 60
@@ -1984,25 +1995,27 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     if isinstance(hatalar, dict):
         hatalar = [{"tur": k, "sayi": v} for k, v in hatalar.items()]
     if hatalar:
-        # C: TÜM hata türleri tutarlı, okunabilir Türkçe etiketle (18 tür haritası).
-        hata_rows = [["Hata Türü", "Açıklama", "Sayı"]]
+        # C: TÜM hata türleri tutarlı okunabilir Türkçe etiketle. item 3: hücreler
+        # Paragraph'a sarıldı → uzun etiketler ("Harflerin Sırasını Değiştirme")
+        # sütuna sığmayıp yan hücreyle ÇAKIŞMASIN (satır kaydırır). Ayrıca gereksiz
+        # (etiketleri kırpan) bar grafik KALDIRILDI — düz tablo yeterli.
+        _hc = ParagraphStyle('hcell', fontSize=8, leading=10, fontName=FONT)
+        _hcH = ParagraphStyle('hcellH', fontSize=8.5, leading=10, fontName=FONTB, textColor=colors.white)
+        _hcB = ParagraphStyle('hcellB', fontSize=8, leading=10, fontName=FONTB)
+        hata_rows = [[RLPara("Hata Türü", _hcH), RLPara("Açıklama", _hcH), RLPara("Sayı", _hcH)]]
         toplam_hata = 0
         for h in hatalar:
             tur = h.get("tur", "")
             sayi = h.get("sayi", 0)
             toplam_hata += sayi
-            hata_rows.append([hata_turu_ad(tur), hata_turu_aciklama(tur), str(sayi)])
-        hata_rows.append(["TOPLAM", "", str(toplam_hata)])
-        t3 = RLTable(hata_rows, colWidths=[3.5*cm, 6.5*cm, 2*cm])
+            hata_rows.append([RLPara(hata_turu_ad(tur), _hc), RLPara(hata_turu_aciklama(tur), _hc), RLPara(str(sayi), _hc)])
+        hata_rows.append([RLPara("TOPLAM", _hcB), RLPara("", _hc), RLPara(str(toplam_hata), _hcB)])
+        t3 = RLTable(hata_rows, colWidths=[4.5*cm, 8.6*cm, 1.9*cm])
         t3.setStyle(TableStyle(tbl_style(len(hata_rows)) + [
-            ('FONTNAME', (0,-1), (-1,-1), FONTB),
-            ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor('#E8F0FE')),
-            ('ALIGN', (2,0), (2,-1), 'CENTER'),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#E8F0FE')),
+            ('ALIGN', (2, 0), (2, -1), 'CENTER'), ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ]))
         el.append(t3)
-        # D: hata türü dağılımı bar grafiği
-        _hbar = grafik.yatay_bar_dagilim([(hata_turu_ad(h.get("tur", "")), h.get("sayi", 0)) for h in hatalar])
-        el.append(_hbar)
 
     # ── 5. OKUDUĞUNU ANLAMA ──
     anlama = rapor.get("anlama") or {}
@@ -2144,9 +2157,11 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
     el.append(RLPara(f"Prozodik okuma performansı: <b>{proz_sev}</b> (Toplam {proz_toplam}/20)", styles['BodyOBA']))
     el.append(grafik.prozodik_bar(proz_toplam))  # D: renk bantlı prozodik göstergesi
 
-    # ── 6. GELİŞİM (ÖNCEKİ RAPORA GÖRE) — üst düzey bölüm (item 3) ──
+    # ── GELİŞİM (ÖNCEKİ RAPORA GÖRE) — DİNAMİK numaralı üst düzey bölüm ──
     # Anomalili raporlarda (bu veya önceki) trend anlamsız → gösterilmez (item 1).
-    if _onceki and not rapor.get("veri_anomali") and not _onceki.get("veri_anomali"):
+    _gelisim_goster = bool(_onceki and not rapor.get("veri_anomali") and not _onceki.get("veri_anomali"))
+    _sonuc_no = 7 if _gelisim_goster else 6   # Gelişim yoksa Sonuç "6." olur (boşluk kalmaz)
+    if _gelisim_goster:
         el.append(RLPara("6. Gelişim (Önceki Rapora Göre)", styles['SectOBA']))
         _onceki_t = str(_onceki.get("olusturma_tarihi", ""))[:10]
         el.append(RLPara(f"Önceki ölçüm: <b>{_onceki_t}</b> tarihli rapor ile karşılaştırma:", styles['BodyOBA']))
@@ -2177,8 +2192,8 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
         t_tr.setStyle(TableStyle(tbl_style(len(trend_rows)) + [('ALIGN', (1, 0), (-1, -1), 'CENTER')]))
         el.append(t_tr)
 
-    # ── 7. SONUÇ VE GENEL YORUM ──
-    el.append(RLPara("7. Sonuç ve Genel Yorum", styles['SectOBA']))
+    # ── SONUÇ VE GENEL YORUM (dinamik no: Gelişim varsa 7, yoksa 6) ──
+    el.append(RLPara(f"{_sonuc_no}. Sonuç ve Genel Yorum", styles['SectOBA']))
     # A: Kural-tabanlı metin bankasından deterministik sonuç paragrafı (AI icat etmez).
     # 1. sınıf gibi 4.1–4.4 pasif olan durumda anlama cümlesi eklenmez.
     _anlama_var = any(g in aktif_gruplar for g in ("4.1", "4.2", "4.3", "4.4"))
