@@ -72,7 +72,8 @@ const RENDER_MAP = {
   kelime_gezmece: KelimeGezmece,
   // Deyim / Atasözü / Tekerleme (FAZ 4)
   deyim_eslestirme: EslestirmeRender,   // ciftler (deyim/atasözü ↔ anlam)
-  deyim_bosluk: SecmeliRender,          // çoktan seçmeli boşluk doldurma
+  deyim_bosluk: SecmeliRender,          // deyimin kendi metninde boşluk (çoktan seçmeli)
+  atasozu_bosluk: SecmeliRender,        // atasözünün kendi metninde boşluk (çoktan seçmeli)
   tekerleme_okuma: TekerlemeOkumaRender,
 };
 
