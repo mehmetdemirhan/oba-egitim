@@ -61,7 +61,8 @@ async def run():
         # tamamla
         r = await ac.post(f"/api/diagnostic/sessions/{ot1['id']}/complete", headers=H,
                           json={"sure_saniye": 60, "hatalar": [{"tip": "atlama", "kelime": "x"}], "ogretmen_kur": ""})
-        check(r.status_code == 200 and r.json()["wpm"] == 100.0, f"oturum tamamlandı wpm=100 ({r.json().get('wpm')})")
+        # WCPM: 100 kelime, 1 hata → 99 doğru; 60sn → 99 kelime/dk (doğru okunan/süre×60)
+        check(r.status_code == 200 and r.json()["wpm"] == 99.0, f"oturum tamamlandı wpm=99 (WCPM) ({r.json().get('wpm')})")
 
         # 2) İkinci oturum (ilk tamamlandı) → otomatik ara_analiz
         r = await ac.post("/api/diagnostic/sessions", headers=H, json={"ogrenci_id": ogr_id, "metin_id": metin_id})
@@ -115,9 +116,9 @@ async def run():
         check(gr.get("rapor_tipi") == "gelisim", "rapor_tipi=gelisim")
         check(len(gr.get("ozet_tablo", [])) == 4, f"özet tablo 4 metrik ({len(gr.get('ozet_tablo', []))})")
         metrikler = {m["metrik"]: m for m in gr["ozet_tablo"]}
-        # ot1: 60sn/100kelime=100wpm, 1 hata → dogruluk 99; ot3: 40sn=150wpm, 0 hata → 100
-        check(metrikler["wpm"]["son_test"] == 150.0 and metrikler["wpm"]["degisim"] == 50.0,
-              f"wpm ön=100 son=150 değişim=50 ({metrikler['wpm']})")
+        # WCPM: ot1 1 hata → 99 doğru/60sn=99wpm; ot3 0 hata → 100 doğru/40sn=150wpm
+        check(metrikler["wpm"]["son_test"] == 150.0 and metrikler["wpm"]["degisim"] == 51.0,
+              f"wpm ön=99 son=150 değişim=51 ({metrikler['wpm']})")
         check(metrikler["wpm"]["gelisim_duzeyi"] == "Anlamlı Gelişim", "wpm +50 → Anlamlı Gelişim")
         check(all("normlara_gore_duzey" in m for m in gr["ozet_tablo"]), "her metrikte normlara göre düzey var")
         check(bool(gr.get("hata_analizi", {}).get("on_test") is not None), "hata analizi ön/son var")
