@@ -51,7 +51,14 @@ _MEB_KELIME_TIPLERI = {
 }
 
 # Deyim/atasözü/tekerleme egzersizleri: AI içeriğine db.deyim_atasozu havuzunu enjekte et.
-_DEYIM_TIPLERI = {"deyim_eslestirme", "deyim_bosluk", "tekerleme_okuma"}
+# NOT: deyim_bosluk / atasozu_bosluk AI KULLANMAZ — aşağıdaki _POOL_DEYIM_BOSLUK ile
+# havuzdaki öğenin KENDİ metninden bir kelime boşluğa çevrilir (uydurma cümle yok).
+_DEYIM_TIPLERI = {"deyim_eslestirme", "tekerleme_okuma"}
+
+# Deyim/Atasözü Boşluk Doldurma: AI'sız, db.deyim_atasozu havuzundan üretilir.
+# Boşluk, deyimin/atasözünün KENDİ metnindeki bir kelimeye konur; çeldiriciler
+# diğer havuz öğelerinin kelimelerinden gelir. Zorluk = hangi kelimenin boşaltıldığı.
+_POOL_DEYIM_BOSLUK = {"deyim_bosluk", "atasozu_bosluk"}
 
 # Kelime-anlam ÇİFTİ tabanlı tipler: AI'a GEREK YOK — onaylı MEB havuzundaki
 # kelime+anlam çiftlerinden yerel ve HER SEFERİNDE TAZE üretilir (aynı içerik
@@ -113,7 +120,15 @@ _DURAK_KELIMELER = {
 }
 
 # AI'sız, onaylı havuzdan üretilen tüm tipler (kap dolana dek her oturumda taze).
-_POOL_TIPLERI = _POOL_CIFTLER_TIPLERI | _POOL_CLOZE_TIPLERI
+_POOL_TIPLERI = _POOL_CIFTLER_TIPLERI | _POOL_CLOZE_TIPLERI | _POOL_DEYIM_BOSLUK
+
+# Boşluk bırakıldığında cümleden kolay tahmin edilen bağlaç/edat/yardımcı sözcükler.
+# Bunlardan biri boşaltılırsa soru KOLAY; uzun anahtar içerik sözcüğü boşaltılırsa ZOR.
+_DEYIM_FONKSIYON = {
+    "ve", "ile", "ama", "gibi", "için", "bir", "bu", "şu", "da", "de", "ki",
+    "mi", "mı", "mu", "mü", "ne", "kadar", "daha", "çok", "her", "hiç", "ya",
+    "veya", "göre", "ise", "değil", "olur", "olmaz", "var", "yok", "ile",
+}
 
 
 def _ic_kelime(w: str) -> str:
@@ -171,6 +186,96 @@ def _pool_cloze_uret(metin: str, soru_sayisi: int, zorluk: str | None, distrakto
         kelimeler[idx] = "___"
         sorular.append({"soru": " ".join(kelimeler), "secenekler": secenekler, "dogru": secenekler.index(dogru)})
         kullanilan.add(dogru)
+    return {"sorular": sorular} if len(sorular) >= 2 else None
+
+
+# ── Deyim / Atasözü Boşluk Doldurma (AI'sız, havuzdan) ───────────────────────
+def _bosluk_soru_uret(icerik: str, anlam: str, zorluk: str | None,
+                      distraktor_havuz: list[str]) -> dict | None:
+    """Tek bir deyim/atasözünün KENDİ metninden bir kelime boşluğa çevrilir.
+
+    Zorluk = hangi kelimenin boşaltıldığı: 'kolay' → en tahmin edilebilir (kısa/
+    bağlaç) kelime; 'zor' → en anahtar (uzun, içerik) kelime; 'orta' → aradaki.
+    Çeldiriciler DİĞER havuz öğelerinin kelimelerinden (benzer uzunlukta) gelir —
+    hiçbir kelime UYDURULMAZ. Örn. 'Dereyi görmeden paçaları sıvama' → boşluk
+    'paçaları'.
+    """
+    tokens = (icerik or "").split()
+    if len(tokens) < 2:
+        return None
+    adaylar = [(i, _ic_kelime(w)) for i, w in enumerate(tokens)
+               if _ic_kelime(w).isalpha() and len(_ic_kelime(w)) >= 3]
+    if not adaylar:
+        return None
+
+    def anahtarlik(item):
+        _, c = item
+        s = len(c)
+        if c in _DEYIM_FONKSIYON:
+            s -= 5   # bağlaç/edat → daha az anahtar (tahmin edilebilir)
+        return s
+
+    adaylar.sort(key=anahtarlik)   # baş: tahmin edilebilir, son: anahtar
+    z = {"kolay": 1, "orta": 2, "zor": 3}.get((zorluk or "orta").lower(), 2)
+    if z <= 1:
+        idx, dogru = adaylar[0]
+    elif z >= 3:
+        idx, dogru = adaylar[-1]
+    else:
+        idx, dogru = adaylar[len(adaylar) // 2]
+
+    kaynak = [w for w in distraktor_havuz if w != dogru and abs(len(w) - len(dogru)) <= 2]
+    if len(kaynak) < 3:
+        kaynak = [w for w in distraktor_havuz if w != dogru]
+    if len(kaynak) < 3:
+        return None
+    cel = random.sample(kaynak, 3)
+    secenekler = cel + [dogru]
+    random.shuffle(secenekler)
+
+    kelimeler = list(tokens)
+    kelimeler[idx] = "____"
+    soru_metni = " ".join(kelimeler)
+    if anlam:
+        soru_metni += f"\n(İpucu: {anlam})"
+    return {
+        "soru": soru_metni,
+        "secenekler": secenekler,
+        "dogru": secenekler.index(dogru),
+        "tam": icerik,          # geri bildirim için tam metin
+        "_dogru_kelime": dogru,  # tekrarsızlık kontrolü (kullanımdan önce çıkarılır)
+    }
+
+
+def _pool_deyim_bosluk_uret(ogeler: list[dict], soru_sayisi: int,
+                            zorluk: str | None) -> dict | None:
+    """db.deyim_atasozu havuzundan boşluk-doldurma içeriği üretir (AI'sız, taze).
+    Her soru bir öğenin kendi metninden; çeldiriciler tüm havuzun kelimelerinden."""
+    if not ogeler or len(ogeler) < 4:
+        return None
+    havuz = set()
+    for o in ogeler:
+        for w in (o.get("icerik") or "").split():
+            c = _ic_kelime(w)
+            if c.isalpha() and len(c) >= 3:
+                havuz.add(c)
+    havuz = list(havuz)
+    if len(havuz) < 4:
+        return None
+
+    secilen = random.sample(ogeler, min(len(ogeler), max(soru_sayisi * 3, soru_sayisi)))
+    sorular, kullanilan = [], set()
+    for o in secilen:
+        if len(sorular) >= soru_sayisi:
+            break
+        s = _bosluk_soru_uret(o.get("icerik", ""), o.get("anlam", ""), zorluk, havuz)
+        if not s:
+            continue
+        dk = s.pop("_dogru_kelime")
+        if dk in kullanilan:
+            continue
+        kullanilan.add(dk)
+        sorular.append(s)
     return {"sorular": sorular} if len(sorular) >= 2 else None
 
 
@@ -236,6 +341,30 @@ def _toplam_soru(meta: dict, icerik: dict) -> int:
     return 1
 
 
+# Zorluk etiketi → skor çarpanı için sayısal seviye (göz egzersizi ölçeğiyle uyumlu).
+_ZORLUK_SEVIYE = {"kolay": 2, "orta": 3, "zor": 4}
+
+
+def _egz_skor(dogru: int, yanlis: int, sure_sn: int, zorluk_num: int) -> int:
+    """Egzersiz skoru — DOĞRULUK + SÜRE + ZORLUK (egzersiz.py._goz_skor ile AYNI formül).
+
+      accuracy = dogru / (dogru + yanlis)
+      hiz      = dogru / sure_sn
+      skor = round( dogru*10 * (0.5+0.5*accuracy) * (1+min(1,hiz)) * (0.8+0.1*zorluk) )
+
+    Hızlı ve doğru → yüksek skor; zor egzersiz daha çok puan. 'En Yüksek Skor'
+    (kişisel rekor) bu değerin tip bazlı maksimumudur.
+    """
+    dogru = max(0, int(dogru or 0))
+    yanlis = max(0, int(yanlis or 0))
+    toplam = dogru + yanlis
+    accuracy = (dogru / toplam) if toplam else 1.0
+    sure_sn = max(1, int(sure_sn or 1))
+    hiz = dogru / sure_sn
+    z = min(5, max(1, int(zorluk_num or 1)))
+    return round(dogru * 10 * (0.5 + 0.5 * accuracy) * (1 + min(1.0, hiz)) * (0.8 + 0.1 * z))
+
+
 async def _icerik_uret(tip: str, sinif: int, konu: str | None, zorluk: str | None,
                        ogrenci_id: str | None = None) -> tuple[dict, bool]:
     """AI ile içerik üretir. Başarısızsa 1 kez retry, yine olmazsa mock döner.
@@ -274,6 +403,21 @@ async def _icerik_uret(tip: str, sinif: int, konu: str | None, zorluk: str | Non
             if cloze:
                 return cloze, False
         # Uygun metin/kelime yoksa AI/mock akışına düş.
+
+    # Deyim / Atasözü Boşluk Doldurma: havuz öğesinin KENDİ metninden boşluk (AI'sız).
+    if tip in _POOL_DEYIM_BOSLUK:
+        try:
+            from modules.deyim_atasozu import deyim_ogeler
+            turler = ["atasozu"] if tip == "atasozu_bosluk" else ["deyim"]
+            ogeler = await deyim_ogeler(sinif, turler, limit=80)
+        except Exception as ex:
+            logging.warning(f"[egzersiz_motoru] deyim/atasözü havuzu hatası: {ex}")
+            ogeler = []
+        icerik = _pool_deyim_bosluk_uret(ogeler, soru_sayisi, zorluk)
+        if icerik:
+            return icerik, False
+        # Havuz henüz seed edilmemişse güvenli mock'a düş.
+        return mock_uret("deyim_bosluk", sinif, konu, soru_sayisi), True
 
     system, user_msg = prompt_uret(tip, sinif, konu, soru_sayisi, zorluk)
     if not user_msg:
@@ -428,8 +572,41 @@ async def _ogrenci_gorulen_icerik(ogrenci_id: str | None, tip: str) -> dict:
     return gorulen
 
 
+async def _zorluk_belirle(ogrenci_id: str | None, tip: str,
+                          manuel: str | None = None) -> str:
+    """Adaptif zorluk: manuel verildiyse (öğretmen/öğrenci seçimi) o kullanılır;
+    yoksa öğrencinin son oturumlarının başarısına göre KADEMELİ belirlenir.
+
+    - <2 oturum → 'kolay' (yeni başlayan).
+    - son ~5 oturumun ortalama doğruluk oranı: >=0.8 → 'zor', >=0.5 → 'orta',
+      aksi → 'kolay'. Başarı arttıkça zorluk otomatik yükselir.
+    """
+    if manuel in ("kolay", "orta", "zor"):
+        return manuel
+    if not ogrenci_id:
+        return "orta"
+    try:
+        kayitlar = await db.egzersiz_oturumlari.find(
+            {"ogrenci_id": ogrenci_id, "tip": tip, "durum": "tamamlandi"},
+            {"dogru_sayisi": 1, "toplam_soru": 1},
+        ).sort("bitis_t", -1).limit(5).to_list(5)
+        if len(kayitlar) < 2:
+            return "kolay"
+        oranlar = [k.get("dogru_sayisi", 0) / max(1, k.get("toplam_soru", 1)) for k in kayitlar]
+        ort = sum(oranlar) / len(oranlar)
+        if ort >= 0.8:
+            return "zor"
+        if ort >= 0.5:
+            return "orta"
+        return "kolay"
+    except Exception as ex:
+        logging.warning(f"[egzersiz_motoru] adaptif zorluk hatası: {ex}")
+        return "orta"
+
+
 async def _icerik_sec_veya_uret(tip: str, sinif: int, ekleyen_id: str,
-                                ogrenci_id: str | None = None) -> dict:
+                                ogrenci_id: str | None = None,
+                                manuel_zorluk: str | None = None) -> dict:
     """Oturum için kalıcı kütüphaneden içerik seçer — KÜTÜPHANE KAPI + TEKRARSIZLIK.
 
     1. Öğrencinin bu tipte GÖRMEDİĞİ, en az kullanılan aktif içeriklerden RASTGELE
@@ -444,11 +621,16 @@ async def _icerik_sec_veya_uret(tip: str, sinif: int, ekleyen_id: str,
     # ucuz → kap dolana kadar HER oturumda TAZE üret (bayat mock'lar yerine hep
     # farklı içerik). Kap dolunca aşağıdaki tekrarsız/en-eski akışına düşer.
     if tip in _POOL_TIPLERI:
+        # Deyim/Atasözü boşluk tiplerinde adaptif/manuel zorluk uygulanır;
+        # diğer havuz tiplerinde zorluk üreticinin kendi mantığına bırakılır.
+        z = None
+        if tip in _POOL_DEYIM_BOSLUK:
+            z = await _zorluk_belirle(ogrenci_id, tip, manuel_zorluk)
         mevcut = await db.egzersiz_icerikler.count_documents(_aktif_sorgu(tip, sinif))
         if mevcut < KUTUPHANE_KAP:
-            icerik, mock = await _icerik_uret(tip, sinif, None, None, ogrenci_id)
+            icerik, mock = await _icerik_uret(tip, sinif, None, z, ogrenci_id)
             if not mock and (icerik.get("ciftler") or icerik.get("sorular")):
-                return await _icerik_kaydet(tip, sinif, None, None, icerik, ekleyen_id, mock, kaynak="havuz_uretim")
+                return await _icerik_kaydet(tip, sinif, None, z, icerik, ekleyen_id, mock, kaynak="havuz_uretim")
 
     adaylar = await db.egzersiz_icerikler.find(_aktif_sorgu(tip, sinif)).sort(
         [("kullanim_sayisi", 1), ("son_kullanim_tarihi", 1)]
@@ -608,8 +790,11 @@ async def egzersiz_oturum_baslat(data: dict, current_user=Depends(get_current_us
         if not icerik_doc:
             raise HTTPException(status_code=404, detail="İçerik bulunamadı")
     else:
+        # Öğretmen/öğrenci manuel zorluk seçebilir (kolay/orta/zor); yoksa adaptif.
+        manuel_zorluk = data.get("zorluk")
         icerik_doc = await _icerik_sec_veya_uret(tip, sinif, current_user.get("id"),
-                                                 ogrenci_id=_ogrenci_id(current_user))
+                                                 ogrenci_id=_ogrenci_id(current_user),
+                                                 manuel_zorluk=manuel_zorluk)
 
     await db.egzersiz_icerikler.update_one(
         {"id": icerik_doc["id"]},
@@ -686,6 +871,26 @@ async def egzersiz_bitir(oturum_id: str, data: dict = None, current_user=Depends
     xp = round(baz_xp * oran)
     puan = dogru_sayisi * 2
 
+    # ── Doğruluk + süre + zorluk bazlı SKOR + kişisel rekor ("En Yüksek Skor").
+    #    İçeriğin zorluğu skoru etkiler; rekor tip bazlıdır (deyim_bosluk ile
+    #    atasozu_bosluk ayrı rekorlar tutar). ──
+    icerik_zorluk = "orta"
+    try:
+        _idoc = await db.egzersiz_icerikler.find_one(
+            {"id": oturum.get("icerik_id")}, {"zorluk": 1})
+        icerik_zorluk = (_idoc or {}).get("zorluk") or "orta"
+    except Exception:
+        pass
+    zorluk_num = _ZORLUK_SEVIYE.get(str(icerik_zorluk).lower(), 3)
+    yanlis = max(0, toplam - dogru_sayisi)
+    skor = _egz_skor(dogru_sayisi, yanlis, sure_sn, zorluk_num)
+    # Rekoru güncellemeden ÖNCE oku (bu oturum hariç önceki en yüksek).
+    _onceki = await db.egzersiz_oturumlari.find(
+        {"ogrenci_id": oturum.get("ogrenci_id"), "tip": oturum.get("tip"),
+         "durum": "tamamlandi", "skor": {"$gt": 0}},
+    ).sort("skor", -1).limit(1).to_list(1)
+    onceki_rekor = _onceki[0]["skor"] if _onceki else 0
+
     # ── Kelime-anlam egzersizi tamamlandı → öğrenci kelime durumu (Leitner) güncelle.
     #    Cevaba göre (soru_no eşleşirse) kelime-başı doğruluk; yoksa genel oran. Böylece
     #    öğrenilen kelimeler (kutu>=4) sonraki üretim/seçimlerde rotasyondan çıkar. ──
@@ -711,6 +916,8 @@ async def egzersiz_bitir(oturum_id: str, data: dict = None, current_user=Depends
             "sure_sn": sure_sn,
             "puan": puan,
             "xp": xp,
+            "skor": skor,
+            "zorluk": icerik_zorluk,
             "bitis_t": datetime.utcnow().isoformat(),
         }},
     )
@@ -733,6 +940,10 @@ async def egzersiz_bitir(oturum_id: str, data: dict = None, current_user=Depends
         "toplam_soru": toplam,
         "puan": puan,
         "xp": xp,
+        "skor": skor,
+        "rekor": max(skor, onceki_rekor),
+        "yeni_rekor": skor > onceki_rekor,
+        "zorluk": icerik_zorluk,
         "oran": round(oran * 100),
     }
 
@@ -875,6 +1086,28 @@ async def egzersiz_gecmis(ogrenci_id: str, current_user=Depends(get_current_user
     for o in oturumlar:
         o.pop("_id", None)
     return {"oturumlar": oturumlar}
+
+
+@router.get("/egzersiz/rekorlar")
+async def egzersiz_rekorlar(ogrenci_id: str | None = Query(None),
+                            current_user=Depends(get_current_user)):
+    """Öğrencinin tip bazlı kişisel rekorları ("En Yüksek Skor").
+
+    Dönüş: {tip: {ad, rekor, oynanma}}. Her egzersiz tipi (örn. deyim_bosluk ve
+    atasozu_bosluk) AYRI rekor tutar — karışmaz. ogrenci_id verilmezse aktif
+    kullanıcının kendi rekorları döner.
+    """
+    oid = ogrenci_id or _ogrenci_id(current_user)
+    cur = db.egzersiz_oturumlari.aggregate([
+        {"$match": {"ogrenci_id": oid, "durum": "tamamlandi", "skor": {"$gt": 0}}},
+        {"$group": {"_id": "$tip", "rekor": {"$max": "$skor"}, "oynanma": {"$sum": 1}}},
+    ])
+    out = {}
+    async for r in cur:
+        meta = tip_meta(r["_id"]) or {}
+        out[r["_id"]] = {"ad": meta.get("ad", r["_id"]),
+                         "rekor": r["rekor"], "oynanma": r["oynanma"]}
+    return out
 
 
 # ─────────────────────────────────────────────

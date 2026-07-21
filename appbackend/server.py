@@ -149,6 +149,9 @@ from core.db import ensure_indexes
 app.add_event_handler("startup", ensure_indexes)
 from modules.duyuru import duyurulari_seed
 app.add_event_handler("startup", duyurulari_seed)
+# 2018 atasözü/deyim derlemesini havuza bir kez aktar (idempotent)
+from modules.deyim_atasozu import deyim_atasozu_seed
+app.add_event_handler("startup", deyim_atasozu_seed)
 
 # MEVCUT MODELLER (değişmeden korunuyor)
 

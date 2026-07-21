@@ -40,7 +40,7 @@ export default function SecmeliRender({ icerik, onCevap, soruNo, soruGoster }) {
     <div className="space-y-4">
       <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
         {soruGoster ? soruGoster(soru) : (
-          <div className="text-lg font-bold text-gray-900 mb-4">{soru.soru}</div>
+          <div className="text-lg font-bold text-gray-900 mb-4 whitespace-pre-line">{soru.soru}</div>
         )}
         <div className="grid gap-2">
           {(soru.secenekler || []).map((s, i) => (

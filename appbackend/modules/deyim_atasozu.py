@@ -19,6 +19,8 @@ Yollar (api_router prefix=/api):
   POST   /deyim/ai-anlam         (admin/koord — boş anlamları AI ile doldur)
   GET    /deyim/istatistik       (eğitimci — özet)
 """
+import os
+import json
 import uuid
 import asyncio
 import logging
@@ -29,6 +31,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from core.db import db
 from core.auth import require_role, UserRole
 from core.ai import call_claude
+from core.zaman import iso
 
 router = APIRouter()
 
@@ -229,3 +232,91 @@ async def deyim_ogeler(sinif: int, turler: list[str], limit: int = 30) -> list[d
     except Exception as ex:
         logging.warning(f"[deyim_ogeler] {ex}")
         return []
+
+
+# ── Başlangıç içe aktarma (seed) ─────────────────────────────────────────────
+# 2018-2019 Sivas İl MEM atasözü/deyim derlemesi (955 öğe) — appbackend/data içinde
+# JSON olarak paketlenir; ilk açılışta bir kez db.deyim_atasozu havuzuna aktarılır.
+# İçerik İCAT EDİLMEZ; yalnız dosyadaki mevcut deyim/atasözü + anlam transkribe edilir.
+_SEED_VERSIYON = "atasozu_deyim_2018_v1"
+_SEED_DOSYA = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data",
+                           "deyim_atasozu_2018.json")
+
+
+async def deyim_atasozu_seed():
+    """Paketlenmiş 2018 atasözü/deyim derlemesini havuza bir kez aktarır (idempotent).
+
+    Tekrarlanan açılışlarda `db.sistem_ayarlari` işaretçisiyle atlanır; işaretçi
+    yoksa dosya okunur, mevcut (tur+içerik) çiftleri atlanarak yalnız YENİ öğeler
+    eklenir. Koordinatör/admin sonradan düzenleyebilir; bu akış onların eklediği
+    öğeleri SİLMEZ."""
+    try:
+        isaret = await db.sistem_ayarlari.find_one({"tip": "deyim_seed"})
+        if isaret and isaret.get("versiyon") == _SEED_VERSIYON:
+            return
+        if not os.path.exists(_SEED_DOSYA):
+            logging.warning(f"[deyim seed] veri dosyası yok: {_SEED_DOSYA}")
+            return
+        with open(_SEED_DOSYA, "r", encoding="utf-8") as f:
+            veri = json.load(f)
+        ogeler = veri.get("ogeler", [])
+        if not ogeler:
+            return
+
+        # Mevcut (tur, içerik) çiftlerini tek sorguda çek → hızlı dedup (cold start dostu).
+        mevcut = set()
+        async for d in db.deyim_atasozu.find({}, {"tur": 1, "icerik": 1}):
+            mevcut.add((d.get("tur"), (d.get("icerik") or "").strip()))
+
+        now = iso()
+        yeni_dokler, yeni = [], 0
+        for o in ogeler:
+            tur = str(o.get("tur", "")).strip()
+            icerik = str(o.get("icerik", "")).strip()
+            if tur not in _GECERLI_TUR or len(icerik) < 2:
+                continue
+            if (tur, icerik) in mevcut:
+                continue
+            mevcut.add((tur, icerik))
+            try:
+                sinif = int(o.get("sinif_seviyesi", 3))
+            except Exception:
+                sinif = 3
+            yeni_dokler.append({
+                "id": str(uuid.uuid4()),
+                "tur": tur,
+                "icerik": icerik,
+                "anlam": str(o.get("anlam", "")).strip(),
+                "ornek_cumle": str(o.get("ornek_cumle", "")).strip(),
+                "sinif_seviyesi": sinif,
+                "durum": "aktif",
+                "kullanim_sayisi": 0,
+                "yukleyen_id": None,
+                "yukleyen_ad": "Sistem (2018 derlemesi)",
+                "tarih": now,
+                "ai_uretim_tarihi": None,
+                "kaynak": _SEED_VERSIYON,
+            })
+            yeni += 1
+
+        if yeni_dokler:
+            await db.deyim_atasozu.insert_many(yeni_dokler)
+
+        await db.sistem_ayarlari.update_one(
+            {"tip": "deyim_seed"},
+            {"$set": {"tip": "deyim_seed", "versiyon": _SEED_VERSIYON,
+                      "eklenen": yeni, "tarih": now}},
+            upsert=True,
+        )
+        logging.info(f"[deyim seed] {yeni} yeni öğe aktarıldı (toplam kaynak {len(ogeler)})")
+    except Exception as ex:
+        logging.error(f"[deyim seed] hata: {ex}")
+
+
+@router.post("/deyim/seed")
+async def deyim_seed_endpoint(current_user=Depends(_YAZMA)):
+    """Admin/koordinatör — 2018 derlemesini elle tetikle (idempotent)."""
+    await deyim_atasozu_seed()
+    isaret = await db.sistem_ayarlari.find_one({"tip": "deyim_seed"})
+    return {"ok": True, "eklenen": (isaret or {}).get("eklenen", 0),
+            "versiyon": (isaret or {}).get("versiyon")}

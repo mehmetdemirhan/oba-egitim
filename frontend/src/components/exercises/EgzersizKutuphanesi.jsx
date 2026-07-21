@@ -30,6 +30,8 @@ export default function EgzersizKutuphanesi({ apiBase, sinif = 3, ogretmenModu =
   const tumMu = secliSinif === "tumu";
   // "Tümü" seçiliyken egzersiz başlatırken backend int sınıf bekler → tipin alt sınırını gönder.
   const sinifCozumle = (t) => (tumMu ? (t?.sinif_min || 3) : secliSinif);
+  // Manuel zorluk seçimi (öğretmen/öğrenci). "oto" → adaptif (backend başarıya göre ayarlar).
+  const [secliZorluk, setSecliZorluk] = useState("oto");
   const [tipler, setTipler] = useState([]);
   const [yukleniyor, setYukleniyor] = useState(true);
 
@@ -98,12 +100,15 @@ export default function EgzersizKutuphanesi({ apiBase, sinif = 3, ogretmenModu =
     try {
       const anahtar = `${secliSinif}:${tip.id}`;
       let data = null;
-      if (prefetchRef.current[anahtar]) {
+      // Manuel zorluk seçiliyse ön-yükleme (varsayılan zorlukla açılmış) atlanır.
+      if (secliZorluk === "oto" && prefetchRef.current[anahtar]) {
         data = await prefetchRef.current[anahtar];   // ön-yüklenmişse anında gelir
         delete prefetchRef.current[anahtar];          // tüketildi
       }
       if (!data) {
-        const r = await axios.post(`${apiBase}/egzersiz/oturum`, { tip: tip.id, sinif: sinifCozumle(tip) });
+        const govde = { tip: tip.id, sinif: sinifCozumle(tip) };
+        if (secliZorluk !== "oto") govde.zorluk = secliZorluk;
+        const r = await axios.post(`${apiBase}/egzersiz/oturum`, govde);
         data = r.data;
       }
       setSeciliTip(tip);
@@ -189,10 +194,20 @@ export default function EgzersizKutuphanesi({ apiBase, sinif = 3, ogretmenModu =
             {sonuc.dogru_sayisi}/{sonuc.toplam_soru}
           </div>
           <div className="text-sm text-gray-500 mt-1">Başarı: %{oran}</div>
-          <div className="flex items-center justify-center gap-4 mt-3 text-sm">
+          <div className="flex items-center justify-center gap-3 mt-3 text-sm flex-wrap">
             <span className="px-3 py-1 rounded-full bg-indigo-100 text-indigo-700 font-semibold">+{sonuc.xp || 0} XP</span>
             <span className="px-3 py-1 rounded-full bg-purple-100 text-purple-700 font-semibold">+{sonuc.puan || 0} puan</span>
+            {sonuc.skor != null && (
+              <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-700 font-semibold">⭐ {sonuc.skor} skor</span>
+            )}
           </div>
+          {sonuc.rekor != null && (
+            <div className="mt-2 text-sm font-semibold">
+              {sonuc.yeni_rekor
+                ? <span className="text-green-600">🏆 Yeni Rekor! En Yüksek Skor: {sonuc.rekor}</span>
+                : <span className="text-gray-500">En Yüksek Skor: {sonuc.rekor}</span>}
+            </div>
+          )}
         </div>
         <div className="flex items-center justify-center gap-2">
           <button onClick={tekrarDene}
@@ -280,17 +295,30 @@ export default function EgzersizKutuphanesi({ apiBase, sinif = 3, ogretmenModu =
           <h3 className="text-base font-bold text-gray-800">🎯 Egzersiz Kütüphanesi</h3>
           <p className="text-xs text-gray-500">Bir egzersiz seç ve hemen başla.</p>
         </div>
-        <label className="text-xs text-gray-600 flex items-center gap-1.5">
-          Sınıf:
-          <select value={secliSinif}
-            onChange={(e) => { const v = e.target.value; setSecliSinif(v === "tumu" ? "tumu" : Number(v)); }}
-            className="px-2 py-1 rounded-lg border border-gray-200 text-sm bg-white">
-            {ogretmenModu && <option value="tumu">Tümü</option>}
-            {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
-              <option key={s} value={s}>{s}. sınıf</option>
-            ))}
-          </select>
-        </label>
+        <div className="flex items-center gap-2 flex-wrap">
+          <label className="text-xs text-gray-600 flex items-center gap-1.5">
+            Zorluk:
+            <select value={secliZorluk}
+              onChange={(e) => setSecliZorluk(e.target.value)}
+              className="px-2 py-1 rounded-lg border border-gray-200 text-sm bg-white">
+              <option value="oto">Otomatik</option>
+              <option value="kolay">Kolay</option>
+              <option value="orta">Orta</option>
+              <option value="zor">Zor</option>
+            </select>
+          </label>
+          <label className="text-xs text-gray-600 flex items-center gap-1.5">
+            Sınıf:
+            <select value={secliSinif}
+              onChange={(e) => { const v = e.target.value; setSecliSinif(v === "tumu" ? "tumu" : Number(v)); }}
+              className="px-2 py-1 rounded-lg border border-gray-200 text-sm bg-white">
+              {ogretmenModu && <option value="tumu">Tümü</option>}
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
+                <option key={s} value={s}>{s}. sınıf</option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
 
       {hata && (
