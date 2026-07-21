@@ -1166,15 +1166,20 @@ async def sil_rapor(rapor_id: str, current_user=Depends(get_current_user)):
 class ManuelDuzeltIstek(BaseModel):
     sure_saniye: Optional[float] = None
     dogru_kelime: Optional[int] = None
+    wpm: Optional[float] = None   # (0) doğrudan dakikada kelime sayısı girişi
 
 
 @router.patch("/diagnostic/rapor/{rapor_id}/manuel-duzelt")
 async def rapor_manuel_duzelt(rapor_id: str, data: ManuelDuzeltIstek, current_user=Depends(get_current_user)):
-    """EK: Öğretmen/idare, üretilmiş raporun tamamlama süresini ve/veya doğru kelime
-    sayısını MANUEL onaylar/düzeltir (otomatik kronometre güvenilmezliğine 2. katman).
-    Hız WCPM formülüyle (doğru/süre×60) YENİDEN hesaplanır; hız VE doğruluk aynı,
-    öğretmen onaylı veri kümesinden türetilir. Otomatik + onaylı değer birlikte saklanır,
-    %20'den fazla fark rapora not düşülür."""
+    """EK/(0): Öğretmen/idare, üretilmiş raporun tamamlama süresini, doğru kelime
+    sayısını ve/veya DOĞRUDAN WPM'i (dakikada kelime) onaylar/düzeltir.
+
+    - WPM verilirse ESAS alınır; örtük süre = doğru_kelime / wpm × 60 geriye hesaplanır.
+    - Süre verilirse WPM = doğru_kelime / süre × 60 (WCPM).
+    - İkisi de verilmezse otomatik ölçüm kalır (doğru_kelime yine ayrı düzeltilebilir).
+    Efektif süre otomatik kronometre süresiyle karşılaştırılır; %20+ fark → not.
+    Ayrıca WPM ile hata/doğruluk çelişkiliyse (yüksek hız + düşük doğruluk) makul-luk notu.
+    """
     rapor = await db.diagnostic_raporlar.find_one({"id": rapor_id})
     if not rapor:
         raise HTTPException(status_code=404, detail="Rapor bulunamadı")
@@ -1185,31 +1190,55 @@ async def rapor_manuel_duzelt(rapor_id: str, data: ManuelDuzeltIstek, current_us
 
     from core.giris_rapor import wpm_anomali
     kelime = int(rapor.get("kelime_sayisi") or 0)
-    # Otomatik (ilk) değerleri KORU
     oto_sure = rapor.get("otomatik_sure_saniye", rapor.get("sure_saniye"))
-    oto_wpm = rapor.get("otomatik_wpm", rapor.get("wpm"))
-    oto_dogru = rapor.get("otomatik_dogru_kelime", rapor.get("dogru_kelime"))
 
-    yeni_sure = float(data.sure_saniye) if data.sure_saniye is not None else float(rapor.get("sure_saniye") or 0)
+    # Doğru kelime (her durumda ayrı düzeltilebilir)
     if data.dogru_kelime is not None:
         yeni_dogru = int(data.dogru_kelime)
     elif rapor.get("dogru_kelime") is not None:
         yeni_dogru = int(rapor.get("dogru_kelime"))
-    else:  # eski rapor: doğruluk yüzdesinden türet
+    else:
         yeni_dogru = round(kelime * (rapor.get("dogruluk_yuzde") or 0) / 100)
     yeni_dogru = max(0, min(kelime, yeni_dogru))
 
-    sure_dk = yeni_sure / 60 if yeni_sure > 0 else 1
-    yeni_wpm = round(yeni_dogru / sure_dk, 1)                       # WCPM (madde 1 ile aynı mantık)
+    # WPM ve SÜRE — hangisi girildiyse ondan diğerini türet (öncelik: WPM > süre > otomatik)
+    if data.wpm is not None and float(data.wpm) > 0:
+        yeni_wpm = round(float(data.wpm), 1)
+        yeni_sure = round(yeni_dogru / yeni_wpm * 60, 1) if yeni_wpm > 0 else float(rapor.get("sure_saniye") or 0)
+        kaynak = "wpm"
+    elif data.sure_saniye is not None and float(data.sure_saniye) > 0:
+        yeni_sure = float(data.sure_saniye)
+        yeni_wpm = round(yeni_dogru / (yeni_sure / 60), 1)
+        kaynak = "sure"
+    else:
+        # Ne WPM ne süre → mevcut süre kalır; doğru_kelime değiştiyse WPM tutarlı yeniden hesaplanır
+        yeni_sure = float(rapor.get("sure_saniye") or 0)
+        yeni_wpm = round(yeni_dogru / (yeni_sure / 60), 1) if yeni_sure > 0 else float(rapor.get("wpm") or 0)
+        kaynak = "otomatik"
+
     yeni_dogruluk = round(yeni_dogru / kelime * 100, 1) if kelime else 0
     yeni_hiz = await hiz_degerlendirme(str(rapor.get("ogrenci_sinif", "")), yeni_wpm)
     anomali, anomali_notu = wpm_anomali(yeni_wpm, yeni_sure, kelime)
 
+    # Çapraz doğrulama: efektif süre vs otomatik kronometre süresi (>%20 fark → not)
     fark_notu = ""
     try:
-        if oto_sure and yeni_sure and abs(yeni_sure - float(oto_sure)) / max(float(oto_sure), 1) > 0.20:
-            fark_notu = (f"Otomatik ölçüm: {int(float(oto_sure))} sn, öğretmen onaylı: {int(yeni_sure)} sn — "
-                         "öğretmen onaylı değer esas alındı.")
+        if kaynak != "otomatik" and oto_sure and yeni_sure and abs(yeni_sure - float(oto_sure)) / max(float(oto_sure), 1) > 0.20:
+            _kaynak_ad = "WPM" if kaynak == "wpm" else "süre"
+            fark_notu = (f"Otomatik ölçüm: {int(float(oto_sure))} sn, öğretmen onaylı ({_kaynak_ad}) ≈ "
+                         f"{int(yeni_sure)} sn — öğretmen onaylı değer esas alındı.")
+    except Exception:
+        pass
+
+    # Makul-luk: manuel WPM yüksek ama doğruluk düşük (çelişkili kombinasyon) → uyar
+    tutarlilik_notu = ""
+    try:
+        _normlar = await get_rapor_ayari("okuma_hizi_normlari")
+        _yeterli = float((_normlar or {}).get(str(rapor.get("ogrenci_sinif", "")).strip(), {}).get("yeterli", 0) or 0)
+        if data.wpm is not None and _yeterli and yeni_wpm > 1.3 * _yeterli and yeni_dogruluk < 90:
+            tutarlilik_notu = (f"Girilen okuma hızı ({int(yeni_wpm)} kelime/dk) sınıf normunun belirgin üzerinde "
+                               f"ancak doğru okuma oranı %{int(yeni_dogruluk)}; bu iki değerin birlikteliği "
+                               "olağandışı görünüyor, kontrol edilmesi önerilir.")
     except Exception:
         pass
 
@@ -1217,12 +1246,16 @@ async def rapor_manuel_duzelt(rapor_id: str, data: ManuelDuzeltIstek, current_us
         "sure_saniye": yeni_sure, "dogru_kelime": yeni_dogru, "yanlis_kelime": max(0, kelime - yeni_dogru),
         "wpm": yeni_wpm, "dogruluk_yuzde": yeni_dogruluk, "hiz_deger": yeni_hiz,
         "veri_anomali": anomali, "anomali_notu": anomali_notu,
-        "otomatik_sure_saniye": oto_sure, "otomatik_wpm": oto_wpm, "otomatik_dogru_kelime": oto_dogru,
-        "ogretmen_onayli": True, "olcum_farki_notu": fark_notu,
+        "otomatik_sure_saniye": rapor.get("otomatik_sure_saniye", rapor.get("sure_saniye")),
+        "otomatik_wpm": rapor.get("otomatik_wpm", rapor.get("wpm")),
+        "otomatik_dogru_kelime": rapor.get("otomatik_dogru_kelime", rapor.get("dogru_kelime")),
+        "ogretmen_onayli": True, "manuel_giris_kaynagi": kaynak,
+        "olcum_farki_notu": fark_notu, "tutarlilik_notu": tutarlilik_notu,
         "manuel_duzelten_id": current_user.get("id"), "manuel_duzelt_tarihi": iso(),
     }})
-    return {"ok": True, "wpm": yeni_wpm, "dogruluk_yuzde": yeni_dogruluk, "hiz_deger": yeni_hiz,
-            "veri_anomali": anomali, "olcum_farki_notu": fark_notu}
+    return {"ok": True, "wpm": yeni_wpm, "sure_saniye": yeni_sure, "dogru_kelime": yeni_dogru,
+            "dogruluk_yuzde": yeni_dogruluk, "hiz_deger": yeni_hiz, "veri_anomali": anomali,
+            "olcum_farki_notu": fark_notu, "tutarlilik_notu": tutarlilik_notu, "kaynak": kaynak}
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -2048,6 +2081,8 @@ async def get_rapor_pdf(rapor_id: str, current_user=Depends(get_current_user)):
         el.append(RLPara("✓ <b>Öğretmen onaylı ölçüm.</b>", styles['SmallOBA']))
         if rapor.get("olcum_farki_notu"):
             el.append(RLPara(f"<i>{rapor.get('olcum_farki_notu')}</i>", styles['SmallOBA']))
+        if rapor.get("tutarlilik_notu"):
+            el.append(RLPara(f"<font color='#D9534F'>⚠ {rapor.get('tutarlilik_notu')}</font>", styles['SmallOBA']))
 
     # ── 4. DOĞRU OKUMA ORANI ──
     el.append(RLPara("3.1. Doğru Okuma Oranı", styles['SubSectOBA']))
