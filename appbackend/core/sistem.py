@@ -150,7 +150,35 @@ VARSAYILAN_PUANLAR = {
     # Öneri kuyruğu (öğretmen düzenleme/soru önerisi ONAYLANINCA ödüllendirilir)
     "metin_duzeltme": 2,       # onaylanan metin düzeltme önerisi başına
     "soru_ekleme": 2,          # onaylanan yeni soru (MCQ/açık uçlu) önerisi başına
+    # Egzersiz Kalite Kontrol katkıları (öğretmen değerlendirmesi)
+    "egzersiz_degerlendirme": 1,   # bir egzersizi (uygun/değil) değerlendiren — oylama ölçeğinde
+    "degisiklik_talebi": 2,        # bir egzersize değişiklik talebi yazan — metin ekleme ölçeğinde
 }
+
+
+# ── Egzersiz Kalite Kontrol eşikleri (admin/koordinatör düzenler) ──
+# askiya_alma_esigi: kaç FARKLI öğretmen "uygun değil" VEYA değişiklik talebi bildirince
+#   egzersiz otomatik askıya alınır (öğrencilere sunulmaz).
+# sinif_uygunluk_esigi: bir sınıf seviyesi için kaç öğretmen "uygun" derse egzersiz o
+#   sınıf filtresinde görünür.
+# dogrulama_esigi: kaç "uygun" oyu alınca egzersiz "doğrulanmış" rozeti alır (opsiyonel).
+KALITE_KONTROL_DEFAULT = {"askiya_alma_esigi": 2, "sinif_uygunluk_esigi": 1, "dogrulama_esigi": 3}
+
+
+async def get_kalite_kontrol_ayarlari():
+    doc = await db.sistem_ayarlari.find_one({"tip": "egzersiz_kalite_ayarlari"})
+    if doc and isinstance(doc.get("degerler"), dict):
+        return {**KALITE_KONTROL_DEFAULT, **doc["degerler"]}
+    return dict(KALITE_KONTROL_DEFAULT)
+
+
+async def set_kalite_kontrol_ayarlari(degerler: dict, guncelleyen: str = "") -> None:
+    from core.zaman import iso
+    await db.sistem_ayarlari.update_one(
+        {"tip": "egzersiz_kalite_ayarlari"},
+        {"$set": {"tip": "egzersiz_kalite_ayarlari", "degerler": degerler,
+                  "guncelleyen": guncelleyen, "guncelleme_tarihi": iso()}},
+        upsert=True)
 
 
 async def get_puan_ayarlari():

@@ -552,7 +552,11 @@ _AKTIF = {"$or": [{"durum": "aktif"}, {"durum": {"$exists": False}}]}
 
 
 def _aktif_sorgu(tip: str, sinif: int) -> dict:
-    return {"tip": tip, "sinif": sinif, **_AKTIF}
+    # Sınıf eşleşmesi: içeriğin kendi sınıfı VEYA öğretmen kalite oylarıyla o sınıfa
+    # "uygun" işaretlenmiş içerikler (Egzersiz Kalite Kontrol #6). durum=aktif zorunlu
+    # (askida/retired _AKTIF ile dışlanır → öğrenciye sunulmaz).
+    return {"tip": tip,
+            "$and": [{"$or": [{"sinif": sinif}, {"kalite_uygun_siniflar": sinif}]}, _AKTIF]}
 
 
 async def _ogrenci_gorulen_icerik(ogrenci_id: str | None, tip: str) -> dict:
