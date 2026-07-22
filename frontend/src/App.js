@@ -28,6 +28,7 @@ import BildirimIzni from "./components/BildirimIzni";
 import { BildirimTercihleri } from "./components/BildirimTercihleri";
 import MebKelimeYonetimi from "./components/admin/MebKelimeYonetimi";
 import MuhasebePaneli from "./components/MuhasebePaneli";
+import { KaliteKontrolSekmesi, GunlukKaliteModal, KaliteBekleyenler } from "./components/KaliteKontrol";
 import OdemeTablosu from "./components/OdemeTablosu";
 import OgretmenDetayOzet from "./components/admin/OgretmenDetayOzet";
 import { bildirimYonlendir } from "./utils/bildirimYonlendirme";
@@ -2143,7 +2144,7 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
   const [form, setForm] = useState({ baslik: "", icerik: "", kelime_sayisi: 0, sinif_seviyesi: "4", tur: "hikaye" });
   const [redDialog, setRedDialog] = useState(null);
   const [redSebep, setRedSebep] = useState("");
-  const [puanAyarlari, setPuanAyarlari] = useState({ metin_ekleme: 5, oylama_katilim: 2, metin_havuza_girme: 10 });
+  const [puanAyarlari, setPuanAyarlari] = useState({ metin_ekleme: 5, oylama_katilim: 2, metin_havuza_girme: 10, egzersiz_degerlendirme: 1, degisiklik_talebi: 2 });
   const [puanDuzenle, setPuanDuzenle] = useState(false);
   // Seviye (kelime sayısı) aralık filtresi — akıcı okuma metinleri sınıfa değil
   // kelime sayısına göre seçilir.
@@ -2529,6 +2530,18 @@ function MetinYonetimi({ onMetinSec, secimModu = false, user, filtreSinif, tamEk
                 <span className="inline-flex items-center gap-1.5 text-subtle"><Star className="h-3.5 w-3.5" />Metin havuza girince</span>
                 <input type="number" min="0" value={puanAyarlari.metin_havuza_girme}
                   onChange={e => setPuanAyarlari({...puanAyarlari, metin_havuza_girme: parseInt(e.target.value) || 0})}
+                  className="w-20 border border-line rounded-lg p-1 text-center text-sm font-bold tabular-nums focus:outline-none focus:ring-2 focus:ring-primary" />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="inline-flex items-center gap-1.5 text-subtle"><Star className="h-3.5 w-3.5" />Egzersiz değerlendirince</span>
+                <input type="number" min="0" value={puanAyarlari.egzersiz_degerlendirme ?? 1}
+                  onChange={e => setPuanAyarlari({...puanAyarlari, egzersiz_degerlendirme: parseInt(e.target.value) || 0})}
+                  className="w-20 border border-line rounded-lg p-1 text-center text-sm font-bold tabular-nums focus:outline-none focus:ring-2 focus:ring-primary" />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="inline-flex items-center gap-1.5 text-subtle"><Star className="h-3.5 w-3.5" />Egzersize değişiklik talebi</span>
+                <input type="number" min="0" value={puanAyarlari.degisiklik_talebi ?? 2}
+                  onChange={e => setPuanAyarlari({...puanAyarlari, degisiklik_talebi: parseInt(e.target.value) || 0})}
                   className="w-20 border border-line rounded-lg p-1 text-center text-sm font-bold tabular-nums focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
               <Button size="sm" className="w-full bg-primary hover:bg-primary-hover text-white mt-2"
@@ -6154,6 +6167,7 @@ function OgretmenPaneli({ user, logout }) {
     ozellikAktif("ogretmen_giris_analizi") && { id: "giris-analizi",label: "Analiz",       icon: "🔬" },
     ozellikAktif("ogretmen_gelisim")       && { id: "gelisim",      label: "Gelişim",      icon: "🎓" },
     { id: "program", label: "Program", icon: "📅" },
+    { id: "kalite-kontrol", label: "Kalite Kontrol", icon: "✅" },
     ozellikAktif("ogretmen_mesajlar")      && { id: "mesajlar",     label: "Mesajlar",     icon: "✉️", badge: okunmamisSayisi || null },
     { id: "kocum-miran", label: "Danışmanım Miran", icon: "🧭" },
     { id: "profilim", label: "Profilim", icon: "👤" },
@@ -6165,6 +6179,7 @@ function OgretmenPaneli({ user, logout }) {
     const d = ogrenciDetay;
     return (
       <div className="min-h-screen bg-app">
+        <GunlukKaliteModal apiBase={API} user={user} toast={toast} />
         <div className="bg-surface border-b sticky top-0 z-30"><div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="outline" size="sm" onClick={() => setAktifSekme("ogrencilerim")}>← Geri</Button>
           <div><div className="font-bold">{seciliOgrenci.ad} {seciliOgrenci.soyad}</div><div className="text-xs text-subtle">{seciliOgrenci.sinif}. sınıf • {seciliOgrenci.kur ? `${seciliOgrenci.kur}. kur` : "Kur yok"}</div></div>
@@ -7127,6 +7142,8 @@ function OgretmenPaneli({ user, logout }) {
             <HaftalikTakvim apiBase={API} user={user} ogrenciler={ogrenciler} />
           </div>
         )}
+
+        {aktifSekme === "kalite-kontrol" && (<KaliteKontrolSekmesi apiBase={API} user={user} toast={toast} />)}
 
         {/* ═══ PROFİLİM ═══ */}
         {aktifSekme === "kocum-miran" && (<KocumMiran apiBase={API} onNavigate={setAktifSekme} />)}
@@ -10426,7 +10443,7 @@ function SistemAyarlari({ user }) {
       <p className="text-subtle text-sm">Rozet, XP, lig ve anket ayarlarını buradan yönetin. Değişiklikler anında uygulanır.</p>
 
       <div className="flex gap-2 flex-wrap">
-        {[{id:"ozellikler",l:"Özellik Yönetimi"},{id:"xp",l:"XP Değerleri"},{id:"ogretmen_xp",l:"Öğretmen XP"},{id:"lig",l:"Lig Eşikleri"},{id:"ogretmen_rozet",l:"Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"Öğrenci Rozetleri"},{id:"anket",l:"Anket Soruları"},{id:"kutulu_okuma",l:"Kutulu Okuma"},{id:"rapor_olcutleri",l:"Rapor Ölçütleri"},{id:"timi_anahtar",l:"TIMI Puanlama Anahtarı"},{id:"timi_metin",l:"TIMI Rapor Metinleri"},{id:"giris_rapor",l:"Giriş Analizi Rapor"},{id:"profil_gorunurluk",l:"Profil Görünürlüğü"},{id:"instagram",l:"Instagram"},{id:"kvkk",l:"Veri & KVKK"},{id:"sezon",l:"Sezonluk Reset"},...(user?.role === "admin" ? [{id:"analiz_havuz",l:"📚 Analiz Havuzu Bakımı"},{id:"metin_kalite",l:"🚩 Kalite Denetimi"},{id:"duyurular",l:"✨ Yeni Ne Var"},{id:"altyapi",l:"☁️ Altyapı"},{id:"bakim",l:"🔧 Bakım Modu"}] : [])].map(s => (
+        {[{id:"ozellikler",l:"Özellik Yönetimi"},{id:"xp",l:"XP Değerleri"},{id:"ogretmen_xp",l:"Öğretmen XP"},{id:"lig",l:"Lig Eşikleri"},{id:"ogretmen_rozet",l:"Öğretmen Rozetleri"},{id:"ogrenci_rozet",l:"Öğrenci Rozetleri"},{id:"anket",l:"Anket Soruları"},{id:"kutulu_okuma",l:"Kutulu Okuma"},{id:"rapor_olcutleri",l:"Rapor Ölçütleri"},{id:"timi_anahtar",l:"TIMI Puanlama Anahtarı"},{id:"timi_metin",l:"TIMI Rapor Metinleri"},{id:"giris_rapor",l:"Giriş Analizi Rapor"},{id:"egzersiz_kalite",l:"✅ Egzersiz Kalite"},{id:"profil_gorunurluk",l:"Profil Görünürlüğü"},{id:"instagram",l:"Instagram"},{id:"kvkk",l:"Veri & KVKK"},{id:"sezon",l:"Sezonluk Reset"},...(user?.role === "admin" ? [{id:"analiz_havuz",l:"📚 Analiz Havuzu Bakımı"},{id:"metin_kalite",l:"🚩 Kalite Denetimi"},{id:"duyurular",l:"✨ Yeni Ne Var"},{id:"altyapi",l:"☁️ Altyapı"},{id:"bakim",l:"🔧 Bakım Modu"}] : [])].map(s => (
           <button key={s.id} onClick={() => setAyarSekme(s.id)}
             className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${ayarSekme === s.id ? 'bg-primary text-white border-blue-600' : 'bg-surface text-subtle border-line'}`}>{s.l}</button>
         ))}
@@ -10545,6 +10562,7 @@ function SistemAyarlari({ user }) {
       {ayarSekme === "timi_anahtar" && <TimiAnahtarPaneli />}
       {ayarSekme === "timi_metin" && <TimiRaporMetinPaneli />}
       {ayarSekme === "giris_rapor" && (user?.role === "admin" || user?.role === "coordinator") && <GirisRaporAyarlari apiBase={API} />}
+      {ayarSekme === "egzersiz_kalite" && (user?.role === "admin" || user?.role === "coordinator") && <KaliteBekleyenler apiBase={API} toast={toast} />}
       {ayarSekme === "analiz_havuz" && user?.role === "admin" && <AnalizHavuzBakim apiBase={API} />}
       {ayarSekme === "metin_kalite" && (user?.role === "admin" || user?.role === "coordinator") && (
         <><MetinKaliteRiski apiBase={API} /><MetinOneriKuyrugu apiBase={API} /></>
