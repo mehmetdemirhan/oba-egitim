@@ -33,7 +33,8 @@ _ERISIM = require_role(UserRole.ADMIN, UserRole.ACCOUNTANT)
 # Satır içi düzenlemede izin verilen alanlar (whitelist) — tip bazlı.
 _DUZENLENEBILIR = {
     "ogrenci": {"ad", "soyad", "veli_ad", "veli_soyad", "veli_telefon", "sinif", "kur",
-                "yapilmasi_gereken_odeme", "yapilan_odeme", "ogretmene_yapilacak_odeme", "muhasebe_notu"},
+                "yapilmasi_gereken_odeme", "yapilan_odeme", "ogretmene_yapilacak_odeme", "muhasebe_notu",
+                "vergi_orani"},
     "ogretmen": {"ad", "soyad", "yapilmasi_gereken_odeme", "yapilan_odeme", "muhasebe_notu"},
 }
 _PARA_ALANLAR = {"yapilmasi_gereken_odeme", "yapilan_odeme", "ogretmene_yapilacak_odeme"}
@@ -206,6 +207,7 @@ async def muhasebe_kisiler(current_user=Depends(_ERISIM)):
             "ogretmen_id": 1, "olusturma_tarihi": 1,
             "yapilmasi_gereken_odeme": 1, "yapilan_odeme": 1, "ogretmene_yapilacak_odeme": 1,
             "ogretmen_odenen": 1,  # kur kaydı olmayan öğrencide öğr. avansı (fallback satır)
+            "vergi_orani": 1,      # öğrenci bazlı vergi oranı (None → global)
         }):
             ortak = {
                 "kisi_id": s.get("id"),  # PATCH hedefi (öğrenci alanları)
@@ -217,6 +219,7 @@ async def muhasebe_kisiler(current_user=Depends(_ERISIM)):
                 "ogretmen_ad": ogretmen_ad.get(s.get("ogretmen_id"), ""),
                 "ogretmen_id": s.get("ogretmen_id"),
                 "ogretmene_yapilacak_odeme": _num(s.get("ogretmene_yapilacak_odeme")),
+                "vergi_orani": s.get("vergi_orani"),  # None → global oran; sayı → öğrenci bazlı override
                 # "Ödenen" satır-içi düzenlemesi öğrencinin TOPLAM ödemesini (yapilan_odeme)
                 # hedefler; FIFO en-eski-borç-önce dağıtır. Frontend aşım uyarısını bu
                 # toplam beklenene göre verir (per-kur tutara göre değil).
@@ -380,7 +383,18 @@ async def muhasebe_kisi_duzenle(tip: str, kisi_id: str, data: dict, current_user
     for alan, deger in (data or {}).items():
         if alan not in izinli:
             continue
-        if alan in _PARA_ALANLAR:
+        if alan == "vergi_orani":
+            # Öğrenci bazlı vergi oranı (%). Boş → global orana dön (None sakla).
+            if deger in (None, ""):
+                deger = None
+            else:
+                try:
+                    deger = round(float(deger), 2)
+                except (TypeError, ValueError):
+                    raise HTTPException(status_code=422, detail="Vergi oranı sayısal olmalı")
+                if deger < 0 or deger > 100:
+                    raise HTTPException(status_code=422, detail="Vergi oranı 0–100 arası olmalı")
+        elif alan in _PARA_ALANLAR:
             try:
                 deger = round(float(deger), 2)
             except (TypeError, ValueError):
@@ -602,6 +616,39 @@ async def muhasebe_vergi_guncelle(data: dict, current_user=Depends(_ERISIM)):
     await islem_kaydet(current_user, "muhasebe", "ayar_vergi", "ayar", "vergi_ayarlari",
                        "vergi_orani", eski_oran, oran)
     return {"ok": True, "vergi_orani": oran}
+
+
+# ── Aylık Reklam Gideri (ay bazlı, geçmişe dönük düzenlenebilir) ──
+@router.get("/muhasebe/reklam-giderleri")
+async def reklam_giderleri_getir(current_user=Depends(_ERISIM)):
+    """Tüm ayların reklam giderleri (ay 'YYYY-MM' → tutar)."""
+    docs = await db.reklam_giderleri.find({}, {"_id": 0}).sort("ay", -1).to_list(length=None)
+    return {"giderler": docs}
+
+
+@router.put("/muhasebe/reklam-gideri")
+async def reklam_gideri_kaydet(data: dict, current_user=Depends(_ERISIM)):
+    """Bir ayın reklam giderini kaydeder/günceller. data: {ay:'YYYY-MM', tutar}."""
+    import re as _re
+    from core.zaman import iso as _iso
+    ay = str(data.get("ay", "")).strip()
+    if not _re.match(r"^\d{4}-\d{2}$", ay):
+        raise HTTPException(status_code=422, detail="Ay 'YYYY-MM' biçiminde olmalı")
+    try:
+        tutar = round(float(data.get("tutar") or 0), 2)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="Tutar sayısal olmalı")
+    if tutar < 0:
+        raise HTTPException(status_code=422, detail="Tutar negatif olamaz")
+    eski = await db.reklam_giderleri.find_one({"ay": ay})
+    await db.reklam_giderleri.update_one(
+        {"ay": ay},
+        {"$set": {"ay": ay, "tutar": tutar, "guncelleme_tarihi": _iso(),
+                  "guncelleyen": current_user.get("ad", "")}},
+        upsert=True)
+    await islem_kaydet(current_user, "muhasebe", "reklam_gideri", "reklam", ay,
+                       "tutar", (eski or {}).get("tutar"), tutar)
+    return {"ok": True, "ay": ay, "tutar": tutar}
 
 
 @router.put("/muhasebe/ayarlar/kur-ucretleri")

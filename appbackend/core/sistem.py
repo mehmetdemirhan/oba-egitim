@@ -202,11 +202,23 @@ async def get_vergi_ayarlari():
 
 
 async def get_vergi_orani() -> float:
-    """Güncel vergi oranını yüzde olarak döndürür (varsayılan 15)."""
+    """Güncel GLOBAL vergi oranını yüzde olarak döndürür (varsayılan 15)."""
     try:
         return float((await get_vergi_ayarlari()).get("vergi_orani", 15))
     except Exception:
         return 15.0
+
+
+async def get_ogrenci_vergi_orani(ogrenci_id: str) -> float:
+    """Öğrenci bazlı vergi oranı (varsa) — yoksa global orana düşer.
+    Öğrenci kaydında `vergi_orani` alanı None/eksikse global oran kullanılır."""
+    try:
+        st = await db.students.find_one({"id": ogrenci_id}, {"vergi_orani": 1})
+        if st and st.get("vergi_orani") is not None:
+            return float(st["vergi_orani"])
+    except Exception:
+        pass
+    return await get_vergi_orani()
 
 
 # ── Kur ücretleri (varsayılan alacak tutarları) ──

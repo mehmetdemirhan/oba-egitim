@@ -28,7 +28,7 @@ export default function Dashboard({
   sinifDagilimi, monthlyStats = [], api, formatCurrency,
   onTab, onYaslandirmaSec, onOgretmenSec, onOgrenciSec, ustSerit,
 }) {
-  const analitik = useAnalitik(api);
+  const [analitik, yukleAnalitik] = useAnalitik(api);
   const [egitimTuru, setEgitimTuru] = useState(null);
   useEffect(() => {
     let iptal = false;
@@ -126,7 +126,7 @@ export default function Dashboard({
               </div>
             </DashboardKart>
             <div className="xl:col-span-2">
-              {analitik ? <NakitKarti veri={analitik} onYaslandirmaSec={onYaslandirmaSec} />
+              {analitik ? <NakitKarti veri={analitik} onYaslandirmaSec={onYaslandirmaSec} apiBase={api} onGuncelle={yukleAnalitik} />
                 : <DashboardKart baslik="Nakit Akışı & Alacak Yaşlandırma" ikon={TrendingUp}><div className="h-40 grid place-items-center text-sm text-subtle">Yükleniyor…</div></DashboardKart>}
             </div>
           </div>
