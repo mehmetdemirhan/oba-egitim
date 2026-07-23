@@ -34,6 +34,8 @@ class _LazyGridFS:
 
 
 backup_fs = _LazyGridFS(db, bucket_name="backups")
+# Mesaj ekleri (görsel/belge) — aynı GridFS altyapısı, ayrı bucket (paralel sistem YOK).
+mesaj_fs = _LazyGridFS(db, bucket_name="mesaj_ekleri")
 
 
 def prepare_for_mongo(data):

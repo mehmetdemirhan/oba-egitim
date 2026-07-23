@@ -85,9 +85,9 @@ async def run():
         # C: changelog ajanı — teknik filtre + taslak + onay
         check(aj._teknik_mi("Merge: refactor registry") and not aj._teknik_mi("Öğretmen kalite değerlendirmesi"), "teknik commit filtresi")
 
-        async def sahte(son, limit=40):
-            return [{"sha": "s1", "mesaj": "Veli anketine TC alanı eklendi", "tarih": "2026-07-23"},
-                    {"sha": "s2", "mesaj": "Merge: refactor registry", "tarih": "2026-07-22"}]
+        async def sahte(limit=40):   # yeni imza: (liste, hata) döner
+            return ([{"sha": "s1", "mesaj": "Veli anketine TC alanı eklendi", "tarih": "2026-07-23"},
+                     {"sha": "s2", "mesaj": "Merge: refactor registry", "tarih": "2026-07-22"}], None)
 
         async def sahte_ai(sistem, msg, **kw):
             return {"parsed": {"girisler": [{"baslik": "Veli TC bilgisi", "icerik": "Veli kaydına T.C. kimlik alanı eklendi."}]}, "text": "", "error": None}

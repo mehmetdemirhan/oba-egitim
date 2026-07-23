@@ -29,7 +29,9 @@ export default function DuyuruTaslakKuyrugu({ apiBase, toast }) {
     setTara(true);
     try {
       const r = await axios.post(`${apiBase}/duyuru-taslak/tara`);
-      toast({ title: "🔎 Tarama tamamlandı", description: `${r.data.taranan_commit} commit tarandı · ${r.data.olusan_taslak} yeni taslak` });
+      const d = r.data;
+      const ozet = `${d.taranan_commit} commit · ${d.teknik_elenen} teknik elendi · ${d.aday} aday · ${d.olusan_taslak} taslak${d.ai_durum && d.ai_durum !== "ok" ? ` · AI: ${d.ai_durum}` : ""}${d.hata ? ` · ⚠ ${d.hata}` : ""}`;
+      toast({ title: d.olusan_taslak > 0 ? `🔎 ${d.olusan_taslak} yeni taslak` : "🔎 Tarama tamam (yeni taslak yok)", description: ozet });
       yukle();
     } catch (e) { toast({ title: "Tarama başarısız", description: e?.response?.data?.detail || "GitHub/AI erişimi gerekli", variant: "destructive" }); }
     finally { setTara(false); }

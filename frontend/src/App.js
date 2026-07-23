@@ -6160,6 +6160,7 @@ function OgretmenPaneli({ user, logout }) {
   const [hedefler, setHedefler] = useState([]);
   const [hedefEkleAcik, setHedefEkleAcik] = useState(false);
   const [hedefForm, setHedefForm] = useState({ kod: "", hedef_deger: 0, son_tarih: "" });
+  const [ozetSekme, setOzetSekme] = useState("kalite");   // birleşik özet kartı alt-sekmesi
   // Mesaj
   const [mesajAlici, setMesajAlici] = useState("");
   const [mesajForm, setMesajForm] = useState({ konu: "", icerik: "" });
@@ -6642,8 +6643,6 @@ function OgretmenPaneli({ user, logout }) {
                 <div className="flex items-center gap-1.5 text-xs text-subtle mt-1"><Mail className="w-3.5 h-3.5" /> Okunmamış Mesaj</div>
               </div>
             </div>
-            {/* Kalite Kontrol katkı özeti (A) — tıklanınca KK'ya gider */}
-            <div className="lg:col-span-3"><KaliteOzetKart apiBase={API} onGit={() => setAktifSekme("kalite-kontrol")} /></div>
           </div>
 
           {/* Acil Müdahale — en aksiyon-değerli blok, KPI'ların hemen altına alındı */}
@@ -7003,9 +7002,18 @@ function OgretmenPaneli({ user, logout }) {
           )}
           </div>
 
-          {/* Hedeflerim — kompakt ilerleme kartı */}
-          <div className="bg-surface rounded-2xl p-4 shadow-sm border border-line">
-            <div className="flex items-center justify-between mb-3">
+          {/* Birleşik özet kartı: Kalite Kontrol Katkım · Hedeflerim · Instagram (tek çerçeve, sekmeli) */}
+          <div className="bg-surface rounded-2xl shadow-sm border border-line overflow-hidden">
+            <div className="flex border-b border-line">
+              {[{v:"kalite",l:"Kalite Kontrol",ik:"✅"},{v:"hedef",l:"Hedeflerim",ik:"🎯"},{v:"instagram",l:"Instagram",ik:"📷"}].map(t => (
+                <button key={t.v} onClick={() => setOzetSekme(t.v)} className={`flex-1 px-3 py-2.5 text-xs font-medium transition border-b-2 ${ozetSekme===t.v ? "text-primary border-primary bg-primary/5" : "text-subtle border-transparent hover:bg-app"}`}>{t.ik} {t.l}</button>
+              ))}
+            </div>
+            <div className="p-4">
+              {ozetSekme === "kalite" && <KaliteOzetKart apiBase={API} onGit={() => setAktifSekme("kalite-kontrol")} />}
+              {ozetSekme === "hedef" && (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Target className="w-5 h-5 text-blue-600" />
                 <span className="font-bold text-sm text-content">Hedeflerim</span>
@@ -7089,9 +7097,11 @@ function OgretmenPaneli({ user, logout }) {
             )}
           </div>
 
-          {/* Instagram beslemesi — ikincil içerik, sönük; hover'da netleşir */}
-          <div className="opacity-60 hover:opacity-100 transition-opacity">
-            <InstagramWidget apiBase={API} compact />
+              )}
+              {ozetSekme === "instagram" && (
+                <div className="opacity-90"><InstagramWidget apiBase={API} compact /></div>
+              )}
+            </div>
           </div>
 
           {/* Yeni Ne Var — dashboard'un en altında */}
