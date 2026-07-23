@@ -39,6 +39,145 @@ def _tip_ad(tip: str) -> str:
     return meta.get("ad") or (tip or "").replace("_", " ").title()
 
 
+HAFTALIK_HEDEF = 10   # Kalite barı: haftalık katkı hedefi (Pazartesi sıfırlanır)
+
+
+def _seri_hesapla(tarihler: list) -> int:
+    """Ardışık gün serisi (streak): bugüne (veya düne) kadar kesintisiz katkı günü sayısı."""
+    from datetime import date, timedelta
+    gunler = set()
+    for t in tarihler:
+        try:
+            gunler.add(str(t)[:10])
+        except Exception:
+            pass
+    if not gunler:
+        return 0
+    from core.zaman import simdi
+    bugun = simdi().date()
+    # Seri bugünden ya da dünden başlıyor olmalı
+    if bugun.isoformat() not in gunler and (bugun - timedelta(days=1)).isoformat() not in gunler:
+        return 0
+    seri = 0
+    g = bugun if bugun.isoformat() in gunler else bugun - timedelta(days=1)
+    while g.isoformat() in gunler:
+        seri += 1
+        g = g - timedelta(days=1)
+    return seri
+
+
+async def _ogretmen_kalite_istatistik(ogretmen_id: str) -> dict:
+    """Bir öğretmenin Kalite Kontrol katkı istatistiği + kazandığı rozetler + bar verisi."""
+    from datetime import timedelta
+    from core.zaman import simdi
+    degler = await db.egzersiz_kalite_degerlendirme.find(
+        {"ogretmen_id": ogretmen_id}, {"tarih": 1, "degisiklik_talebi": 1, "uygun": 1}).to_list(length=None)
+    toplam = len(degler)
+    degisiklik = sum(1 for d in degler if (d.get("degisiklik_talebi") or "").strip())
+    tarihler = [d.get("tarih") for d in degler if d.get("tarih")]
+    seri = _seri_hesapla(tarihler)
+
+    # Kazanılan XP (deterministik: ayar ölçeğiyle) — mevcut puan ayarlarından
+    puanlar = await get_puan_ayarlari()
+    xp = toplam * int(puanlar.get("egzersiz_degerlendirme", 1)) + degisiklik * int(puanlar.get("degisiklik_talebi", 2))
+
+    # Bugün / bu hafta (Pazartesi başlangıç) — kalite barı
+    now = simdi()
+    bugun_s = now.date().isoformat()
+    hafta_bas = (now.date() - timedelta(days=now.weekday())).isoformat()
+    bugun_sayi = sum(1 for t in tarihler if str(t)[:10] == bugun_s)
+    hafta_sayi = sum(1 for t in tarihler if str(t)[:10] >= hafta_bas)
+
+    # Rozetler — MEVCUT rozet sisteminden (kategori "egzersiz_kalite"); kazanım kanonik
+    # db.kazanilan_rozetler'den, ilerleme metrik/eşikten. Ayrı rozet sistemi YOK.
+    from core.sistem import get_ogretmen_rozetleri
+    from core.rozet_kosullari import OGRETMEN_KOSULLARI
+    metrik_deger = {"egzersiz_kalite_sayisi": toplam, "egzersiz_kalite_degisiklik": degisiklik, "egzersiz_kalite_seri": seri}
+    tanimlar = [t for t in await get_ogretmen_rozetleri() if t.get("kategori") == "egzersiz_kalite"]
+    kazanilan_kodlar = set(await db.kazanilan_rozetler.distinct("rozet_kodu", {"kullanici_id": ogretmen_id}))
+    rozetler = []
+    for t in tanimlar:
+        kod = t.get("kod")
+        kos = OGRETMEN_KOSULLARI.get(kod, {})
+        esik = kos.get("esik", 1); metrik = kos.get("metrik", "egzersiz_kalite_sayisi")
+        rozetler.append({"id": kod, "ad": t.get("ad"), "ikon": t.get("ikon"),
+                         "aciklama": f"{metrik_deger.get(metrik, 0)}/{esik}",
+                         "kazanildi": kod in kazanilan_kodlar,
+                         "ilerleme": min(metrik_deger.get(metrik, 0), esik), "esik": esik})
+
+    return {
+        "toplam_degerlendirme": toplam, "degisiklik_talebi_sayisi": degisiklik,
+        "kazanilan_xp": xp, "seri": seri,
+        "bugun_sayi": bugun_sayi, "hafta_sayi": hafta_sayi, "haftalik_hedef": HAFTALIK_HEDEF,
+        "bar_dolum": round(min(1.0, hafta_sayi / HAFTALIK_HEDEF), 3) if HAFTALIK_HEDEF else 0,
+        "rozetler": rozetler,
+        "kazanilan_rozet_sayisi": sum(1 for r in rozetler if r["kazanildi"]),
+    }
+
+
+@router.get("/egzersiz-kalite/ozet")
+async def kalite_ozet(current_user=Depends(get_current_user)):
+    """Öğretmenin kendi Kalite Kontrol katkı özeti (dashboard kartı + kalite barı + rozetler)."""
+    if current_user.get("role") not in KATKI_ROLLERI:
+        raise HTTPException(status_code=403, detail="Bu işlem için yetkiniz yok")
+    return await _ogretmen_kalite_istatistik(current_user["id"])
+
+
+@router.get("/egzersiz-kalite/analitik")
+async def kalite_analitik(current_user=Depends(_YETKILI)):
+    """Admin/koordinatör için görsel analitik: kapsam, katılım, askıya alınanlar,
+    öğretmen liderlik tablosu, zaman içinde değerlendirme hacmi (B)."""
+    from datetime import timedelta
+    from core.zaman import simdi
+    # Kapsam: kaç egzersiz var, kaçı değerlendirildi (retired hariç)
+    toplam_egzersiz = await db.egzersiz_icerikler.count_documents({"durum": {"$ne": "retired"}})
+    degerlendirilmis = await db.egzersiz_icerikler.count_documents(
+        {"durum": {"$ne": "retired"}, "kalite_toplam_degerlendirme": {"$gt": 0}})
+    hic = max(0, toplam_egzersiz - degerlendirilmis)
+    askida = await db.egzersiz_icerikler.count_documents({"durum": "askida"})
+
+    # Katılım: kaç farklı öğretmen değerlendirdi / toplam öğretmen
+    katilan = await db.egzersiz_kalite_degerlendirme.distinct("ogretmen_id")
+    toplam_ogretmen = await db.users.count_documents({"role": "teacher"})
+    toplam_degerlendirme = await db.egzersiz_kalite_degerlendirme.count_documents({})
+    bekleyen_degisiklik = await db.egzersiz_kalite_degerlendirme.count_documents(
+        {"degisiklik_talebi": {"$nin": [None, ""]}})
+
+    # Öğretmen liderlik tablosu (en çok katkı) — top 10
+    pipeline = [
+        {"$group": {"_id": "$ogretmen_id", "ad": {"$last": "$ogretmen_ad"}, "sayi": {"$sum": 1},
+                    "degisiklik": {"$sum": {"$cond": [{"$and": [{"$ne": ["$degisiklik_talebi", None]}, {"$ne": ["$degisiklik_talebi", ""]}]}, 1, 0]}}}},
+        {"$sort": {"sayi": -1}}, {"$limit": 10},
+    ]
+    liderlik = []
+    async for r in db.egzersiz_kalite_degerlendirme.aggregate(pipeline):
+        liderlik.append({"ogretmen_id": r["_id"], "ad": r.get("ad") or "Öğretmen",
+                         "sayi": r["sayi"], "degisiklik": r.get("degisiklik", 0)})
+
+    # Trend: son 14 gün günlük değerlendirme sayısı
+    now = simdi()
+    gunler = [(now.date() - timedelta(days=i)).isoformat() for i in range(13, -1, -1)]
+    sayac = {g: 0 for g in gunler}
+    ilk = gunler[0]
+    async for d in db.egzersiz_kalite_degerlendirme.find(
+            {"tarih": {"$gte": ilk}}, {"tarih": 1}):
+        g = str(d.get("tarih", ""))[:10]
+        if g in sayac:
+            sayac[g] += 1
+    trend = [{"gun": g[5:], "sayi": sayac[g]} for g in gunler]
+
+    return {
+        "toplam_egzersiz": toplam_egzersiz, "degerlendirilmis": degerlendirilmis,
+        "hic_degerlendirilmemis": hic,
+        "kapsam_yuzde": round(degerlendirilmis / toplam_egzersiz * 100, 1) if toplam_egzersiz else 0,
+        "katilan_ogretmen": len(katilan), "toplam_ogretmen": toplam_ogretmen,
+        "katilim_yuzde": round(len(katilan) / toplam_ogretmen * 100, 1) if toplam_ogretmen else 0,
+        "toplam_degerlendirme": toplam_degerlendirme,
+        "askida_sayisi": askida, "bekleyen_degisiklik": bekleyen_degisiklik,
+        "liderlik": liderlik, "trend": trend,
+    }
+
+
 async def _ogretmenin_gordukleri(ogretmen_id: str) -> set:
     """Bu öğretmenin ZATEN değerlendirdiği egzersiz id'leri."""
     cur = db.egzersiz_kalite_degerlendirme.find({"ogretmen_id": ogretmen_id}, {"egzersiz_id": 1})
@@ -190,6 +329,14 @@ async def kalite_degerlendir(data: DegerlendirmeIstek, current_user=Depends(get_
     if talep:
         kazanilan += int(puanlar.get("degisiklik_talebi", 2))
     await db.users.update_one({"id": current_user["id"]}, {"$inc": {"puan": kazanilan}})
+
+    # Rozet değerlendirmesini tetikle (mevcut kanonik motor — fire-and-forget)
+    try:
+        import asyncio
+        from core.rozet_motor import rozet_tetikle
+        asyncio.create_task(rozet_tetikle(current_user["id"], "kalite_kontrol"))
+    except Exception:
+        pass
 
     askiya_alindi, agg = await _agregasyonu_guncelle(data.egzersiz_id)
     if askiya_alindi:

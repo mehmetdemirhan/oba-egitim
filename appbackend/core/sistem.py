@@ -57,6 +57,12 @@ OGRETMEN_ROZETLERI_DEFAULT = [
     {"kod": "kopru_kurucu", "ad": "Köprü Kurucu", "ikon": "🌉", "kategori": "iletisim", "seviye": "altin", "odul_puan":4},
     {"kod": "egz_ilk", "ad": "İlk Egzersiz", "ikon": "👁️", "kategori": "egzersiz", "seviye": "bronz", "odul_puan":1},
     {"kod": "egz_tamset", "ad": "Tam Set", "ikon": "🎖️", "kategori": "egzersiz", "seviye": "altin", "odul_puan":5},
+    # Egzersiz Kalite Kontrol (öğretmen değerlendirmesi) — KK ekranında gösterilir
+    {"kod": "ekk_ilk", "ad": "İlk Katkı", "ikon": "🌱", "kategori": "egzersiz_kalite", "seviye": "bronz", "odul_puan":2},
+    {"kod": "ekk_10", "ad": "10 Değerlendirme", "ikon": "🔟", "kategori": "egzersiz_kalite", "seviye": "gumus", "odul_puan":3},
+    {"kod": "ekk_50", "ad": "Kalite Gönüllüsü", "ikon": "⭐", "kategori": "egzersiz_kalite", "seviye": "altin", "odul_puan":5},
+    {"kod": "ekk_degisiklik", "ad": "Değişiklik Talebi Ustası", "ikon": "✍️", "kategori": "egzersiz_kalite", "seviye": "gumus", "odul_puan":3},
+    {"kod": "ekk_seri7", "ad": "7 Gün Üst Üste", "ikon": "🔥", "kategori": "egzersiz_kalite", "seviye": "altin", "odul_puan":5},
     # NOT (FAZ 1): ai_ilk/ai_5/ai_20/ai_50 rozetleri kaldırıldı — tanımlıydı ama
     # rozet_kontrol koşul listesinde yer almadığı için hiçbir zaman verilmiyordu
     # ("ölü rozet"). Bir metrik (ai_egitim_katkisi) tanımlanınca yeniden eklenebilir.

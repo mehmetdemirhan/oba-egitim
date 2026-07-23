@@ -28,7 +28,7 @@ import BildirimIzni from "./components/BildirimIzni";
 import { BildirimTercihleri } from "./components/BildirimTercihleri";
 import MebKelimeYonetimi from "./components/admin/MebKelimeYonetimi";
 import MuhasebePaneli from "./components/MuhasebePaneli";
-import { KaliteKontrolSekmesi, GunlukKaliteModal, KaliteBekleyenler } from "./components/KaliteKontrol";
+import { KaliteKontrolSekmesi, GunlukKaliteModal, KaliteBekleyenler, KaliteAnalitik, KaliteOzetKart } from "./components/KaliteKontrol";
 import OdemeTablosu from "./components/OdemeTablosu";
 import OgretmenDetayOzet from "./components/admin/OgretmenDetayOzet";
 import { bildirimYonlendir } from "./utils/bildirimYonlendirme";
@@ -62,6 +62,7 @@ import MetinOneriKuyrugu from "./components/admin/MetinOneriKuyrugu";
 import GirisRaporAyarlari from "./components/admin/GirisRaporAyarlari";
 import HerseyiAra from "./components/HerseyiAra";
 import MesajKutusu from "./components/MesajKutusu";
+import DuyuruTaslakKuyrugu from "./components/admin/DuyuruTaslakKuyrugu";
 import SinavYonetimi from "./components/admin/SinavYonetimi";
 import SinavCozum from "./components/SinavCozum";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
@@ -6277,16 +6278,21 @@ function OgretmenPaneli({ user, logout }) {
   const sekmeler = [
     ozellikAktif("ogretmen_dashboard")     && { id: "dashboard",    label: "Dashboard",    icon: "📊" },
     ozellikAktif("ogretmen_gorevler")      && { id: "ogrencilerim", label: "Öğrencilerim", icon: "👥" },
-    ozellikAktif("ogretmen_gorevler")      && { id: "gorevler",     label: "Görevler",     icon: "📌", badge: benimGorevlerim.filter(g => g.durum !== "tamamlandi").length || null },
     ozellikAktif("ogretmen_giris_analizi") && { id: "giris-analizi",label: "Analiz",       icon: "🔬" },
-    ozellikAktif("ogretmen_gelisim")       && { id: "gelisim",      label: "Gelişim",      icon: "🎓" },
+    // Gelişim = üst sekme; Görevler + Kalite Kontrol + Yardım onun ALT-sekmeleri (aşağıda GELISIM_ALT)
+    ozellikAktif("ogretmen_gelisim")       && { id: "gelisim",      label: "Gelişim",      icon: "🎓", badge: (benimGorevlerim.filter(g => g.durum !== "tamamlandi").length) || null },
     { id: "program", label: "Program", icon: "📅" },
-    { id: "kalite-kontrol", label: "Kalite Kontrol", icon: "✅" },
     ozellikAktif("ogretmen_mesajlar")      && { id: "mesajlar",     label: "Mesajlar",     icon: "✉️", badge: okunmamisSayisi || null },
     { id: "kocum-miran", label: "Danışmanım Miran", icon: "🧭" },
-    { id: "profilim", label: "Profilim", icon: "👤" },
-    { id: "sss", label: "Yardım", icon: "❓" },
   ].filter(Boolean);
+  // Gelişim üst-sekmesi altındaki alt bölümler (öğretmen navigasyon sadeleştirmesi - D)
+  const GELISIM_ALT = [
+    { id: "gelisim", label: "Gelişim", icon: "🎓" },
+    { id: "gorevler", label: "Görevler", icon: "📌", badge: benimGorevlerim.filter(g => g.durum !== "tamamlandi").length || null },
+    { id: "kalite-kontrol", label: "Kalite Kontrol", icon: "✅" },
+    { id: "sss", label: "Yardım", icon: "❓" },
+  ];
+  const gelisimAltAktif = GELISIM_ALT.some(s => s.id === aktifSekme);
 
   // ── ÖĞRENCİ DETAY ──
   if (aktifSekme === "ogrenci-detay" && seciliOgrenci) {
@@ -6543,6 +6549,7 @@ function OgretmenPaneli({ user, logout }) {
               setAktifSekme(sekme);
             }} />
             <HerseyiAra apiBase={API} user={user} onOgrenciSec={(o) => { ogrenciDetayCek(o); setAktifSekme("ogrenci-detay"); }} />
+            <button onClick={() => setAktifSekme("profilim")} title="Profilim" className={`h-9 w-9 rounded-full flex items-center justify-center text-sm transition ${aktifSekme === "profilim" ? "bg-primary text-white" : "bg-app text-subtle hover:text-content border border-line"}`}>👤</button>
             <ThemeToggle /><SifreDegistirButton />
             <Button variant="outline" size="sm" onClick={logout}><LogOut className="h-3 w-3 mr-1" />Çıkış</Button>
           </div>
@@ -6554,13 +6561,27 @@ function OgretmenPaneli({ user, logout }) {
       {!isFullscreen && (
       <div className="bg-surface border-b sticky top-[60px] z-20">
         <div className="max-w-4xl mx-auto px-2 flex gap-1 overflow-x-auto py-2">
-          {sekmeler.map(s => (
+          {sekmeler.map(s => {
+            const aktif = s.id === "gelisim" ? gelisimAltAktif : aktifSekme === s.id;
+            return (
             <button key={s.id} onClick={() => setAktifSekme(s.id)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all ${aktifSekme === s.id ? 'bg-primary text-white shadow' : 'text-subtle hover:bg-gray-100'}`}>
-              {s.icon} {s.label} {s.badge > 0 && <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${aktifSekme === s.id ? 'bg-white/30' : 'bg-red-100 text-red-600'}`}>{s.badge}</span>}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all ${aktif ? 'bg-primary text-white shadow' : 'text-subtle hover:bg-gray-100'}`}>
+              {s.icon} {s.label} {s.badge > 0 && <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${aktif ? 'bg-white/30' : 'bg-red-100 text-red-600'}`}>{s.badge}</span>}
             </button>
-          ))}
+            );
+          })}
         </div>
+        {/* Gelişim alt-navigasyonu (Görevler / Kalite Kontrol / Yardım artık burada) */}
+        {gelisimAltAktif && (
+          <div className="max-w-4xl mx-auto px-2 flex gap-1 overflow-x-auto pb-2 border-t border-line/60 pt-2">
+            {GELISIM_ALT.map(s => (
+              <button key={s.id} onClick={() => setAktifSekme(s.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${aktifSekme === s.id ? 'bg-primary/10 text-primary font-semibold' : 'text-subtle hover:bg-gray-100'}`}>
+                {s.icon} {s.label} {s.badge > 0 && <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-600">{s.badge}</span>}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       )}
 
@@ -6621,6 +6642,8 @@ function OgretmenPaneli({ user, logout }) {
                 <div className="flex items-center gap-1.5 text-xs text-subtle mt-1"><Mail className="w-3.5 h-3.5" /> Okunmamış Mesaj</div>
               </div>
             </div>
+            {/* Kalite Kontrol katkı özeti (A) — tıklanınca KK'ya gider */}
+            <div className="lg:col-span-3"><KaliteOzetKart apiBase={API} onGit={() => setAktifSekme("kalite-kontrol")} /></div>
           </div>
 
           {/* Acil Müdahale — en aksiyon-değerli blok, KPI'ların hemen altına alındı */}
@@ -10473,7 +10496,9 @@ function SistemAyarlari({ user }) {
       {ayarSekme === "timi_anahtar" && <TimiAnahtarPaneli />}
       {ayarSekme === "timi_metin" && <TimiRaporMetinPaneli />}
       {ayarSekme === "giris_rapor" && (user?.role === "admin" || user?.role === "coordinator") && <GirisRaporAyarlari apiBase={API} />}
-      {ayarSekme === "egzersiz_kalite" && (user?.role === "admin" || user?.role === "coordinator") && <KaliteBekleyenler apiBase={API} toast={toast} />}
+      {ayarSekme === "egzersiz_kalite" && (user?.role === "admin" || user?.role === "coordinator") && (
+        <div className="space-y-5"><KaliteAnalitik apiBase={API} /><KaliteBekleyenler apiBase={API} toast={toast} /></div>
+      )}
       {ayarSekme === "analiz_havuz" && user?.role === "admin" && <AnalizHavuzBakim apiBase={API} />}
       {ayarSekme === "metin_kalite" && (user?.role === "admin" || user?.role === "coordinator") && (
         <><MetinKaliteRiski apiBase={API} /><MetinOneriKuyrugu apiBase={API} /></>
@@ -10501,6 +10526,7 @@ function SistemAyarlari({ user }) {
       )}
       {ayarSekme === "duyurular" && user?.role === "admin" && (
         <div className="space-y-5">
+          <DuyuruTaslakKuyrugu apiBase={API} toast={toast} />
           <YeniNeVarKarti apiBase={API} />
           <DuyuruYonetimi apiBase={API} />
         </div>
