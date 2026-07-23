@@ -29,6 +29,7 @@ BILDIRIM_TURLERI = {
     "streak_tebrik":    {"baslik": "🎉 Streak Tebrik", "oncelik": "normal", "kategori": "ogrenci", "onem": "bilgi", "cooldown_saat": 24},
     "kur_atladi":       {"baslik": "🎓 Kur Atlama", "oncelik": "yuksek", "kategori": "ogrenci", "onem": "bilgi", "cooldown_saat": 0},
     "mesaj_geldi":      {"baslik": "✉️ Yeni Mesaj", "oncelik": "normal", "kategori": "veli", "onem": "bilgi", "cooldown_saat": 0},
+    "mesaj_ertelendi":  {"baslik": "⏰ Erteleme Hatırlatması", "oncelik": "normal", "kategori": "veli", "onem": "bilgi", "cooldown_saat": 0},
     "rozet_kazandi":    {"baslik": "🏅 Yeni Rozet", "oncelik": "normal", "kategori": "ogrenci", "onem": "bilgi", "cooldown_saat": 0},
     "risk_yuksek":      {"baslik": "🚨 Yüksek Risk", "oncelik": "yuksek", "kategori": "ogrenci", "onem": "kritik", "cooldown_saat": 24},
     "anket_hatirlatma": {"baslik": "⭐ Değerlendirme", "oncelik": "normal", "kategori": "veli", "onem": "bilgi", "cooldown_saat": 24},

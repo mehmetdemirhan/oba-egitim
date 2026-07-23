@@ -34,74 +34,139 @@ _TEKNIK_IZ = [
 ]
 
 
-async def _son_sha() -> str | None:
-    doc = await db.sistem_ayarlari.find_one({"tip": "changelog_son_sha"})
-    return (doc or {}).get("son_sha")
+# Repo bilgisi env'de yoksa BİLİNEN public repo'ya düş — public repo token'sız da okunur.
+# (Eski hata: env boşken _commitleri_cek [] dönüyordu → tarama daima 0 sonuç.)
+_REPO_OWNER = GITHUB_REPO_OWNER or "mehmetdemirhan"
+_REPO_NAME = GITHUB_REPO_NAME or "oba-egitim"
 
 
-async def _commitleri_cek(son_sha: str | None, limit: int = 40) -> list:
-    if not (GITHUB_REPO_OWNER and GITHUB_REPO_NAME):
-        return []
+async def _commitleri_cek(limit: int = 40):
+    """Son N production commit'ini çeker → (liste, hata). Hata None ise başarılı."""
     headers = {"Accept": "application/vnd.github+json"}
     if GITHUB_TOKEN:
         headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
-    base = f"https://api.github.com/repos/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}"
+    base = f"https://api.github.com/repos/{_REPO_OWNER}/{_REPO_NAME}"
     out = []
-    async with httpx.AsyncClient(timeout=20.0) as c:
-        r = await c.get(f"{base}/commits", params={"per_page": limit, "sha": "production"}, headers=headers)
-        if r.status_code != 200:
-            r = await c.get(f"{base}/commits", params={"per_page": limit}, headers=headers)
-        if r.status_code == 200:
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as c:
+            r = await c.get(f"{base}/commits", params={"per_page": limit, "sha": "production"}, headers=headers)
+            if r.status_code != 200:   # production yoksa varsayılan dala düş
+                r = await c.get(f"{base}/commits", params={"per_page": limit}, headers=headers)
+            if r.status_code != 200:
+                return [], f"GitHub {r.status_code}"
             for it in r.json():
-                sha = it.get("sha")
-                if son_sha and sha == son_sha:
-                    break   # buradan öncesi zaten taranmış
                 msg = (it.get("commit", {}).get("message", "") or "").split("\n")[0]
-                out.append({"sha": sha, "mesaj": msg,
+                out.append({"sha": it.get("sha"), "mesaj": msg,
                             "tarih": it.get("commit", {}).get("committer", {}).get("date", "")})
-    return out
+    except Exception as e:
+        return [], f"istisna: {str(e)[:120]}"
+    return out, None
 
 
 def _teknik_mi(mesaj: str) -> bool:
+    """SADECE ilk satıra bakar (Co-Authored-By vb. alt satırlar sayılmaz)."""
     m = (mesaj or "").lower()
     return any(iz in m for iz in _TEKNIK_IZ)
 
 
+async def _islenen_shalar() -> set:
+    """Baseline: daha önce taslağa dönüştürülmüş/atlanmış (yayınlanmış dahil) commit SHA'ları.
+    Fragile 'son_sha pointer' YERİNE — başarısız taramada commit kaybolmaz, tekrar denenir."""
+    seen = set()
+    async for d in db.changelog_islenen.find({}, {"_id": 0, "sha": 1}):
+        if d.get("sha"):
+            seen.add(d["sha"])
+    # Yayınlanmış/bekleyen taslakların kaynak SHA'ları da baseline (çift teklif olmasın)
+    async for t in db.duyuru_taslak.find({"kaynak_shalar": {"$exists": True}}, {"_id": 0, "kaynak_shalar": 1}):
+        for s in (t.get("kaynak_shalar") or []):
+            seen.add(s)
+    return seen
+
+
+_AI_SISTEM = (
+    "Sen bir eğitim yazılımının changelog editörüsün. Verilen git commit mesajlarından "
+    "SADECE son kullanıcıya (öğretmen/veli/öğrenci/yönetici) GÖRÜNÜR yenilik, iyileştirme "
+    "veya hata düzeltmelerini seç. Salt teknik/iç/refactor değişiklikleri ATLA. Her seçtiğin "
+    "için sade Türkçe bir başlık (kullanıcı faydası odaklı, örn. 'Artık ...') ve 1-2 cümlelik "
+    "açıklama yaz. Ham commit dilini kullanma. Cömert davran — şüphedeysen DAHİL ET. "
+    'YALNIZ JSON döndür: {"girisler":[{"baslik":"...","icerik":"..."}]}.'
+)
+
+
+async def _ai_changelog(adaylar: list):
+    """(girisler | None, ai_durum). None → AI kullanılamadı (fallback gerekir)."""
+    liste = "\n".join(f"- {c['mesaj']}" for c in adaylar)
+    r = await call_claude(_AI_SISTEM, f"Commit mesajları:\n{liste}", ozellik="changelog_ajan", max_tokens=1800)
+    if r.get("error"):
+        return None, f"AI hata: {str(r['error'])[:80]}"
+    parsed = r.get("parsed")
+    if not isinstance(parsed, dict):
+        return None, "AI yanıtı JSON değil"
+    return (parsed.get("girisler") or []), "ok"
+
+
 async def changelog_tara() -> dict:
-    """Commit'leri tara → teknik olmayanları AI ile changelog'a çevir → onay bekleyen taslak yaz."""
-    son = await _son_sha()
-    commitler = await _commitleri_cek(son)
-    en_yeni = commitler[0]["sha"] if commitler else son
-    adaylar = [c for c in commitler if not _teknik_mi(c["mesaj"])]
-    olusan = 0
-    if adaylar:
-        liste = "\n".join(f"- {c['mesaj']}" for c in adaylar[:25])
-        sistem = (
-            "Sen bir eğitim yazılımının changelog editörüsün. Verilen git commit mesajlarından "
-            "SADECE son kullanıcıya (öğretmen/veli/öğrenci/yönetici) GÖRÜNÜR, anlamlı yenilik, "
-            "iyileştirme veya hata düzeltmelerini seç. Salt teknik/iç/refactor değişiklikleri ATLA. "
-            "Her seçtiğin için sade, anlaşılır Türkçe bir başlık (kullanıcı faydası odaklı, örn. "
-            "'Artık ...') ve 1-2 cümlelik açıklama yaz. Ham commit dilini kullanma. "
-            'YALNIZ JSON döndür: {"girisler":[{"baslik":"...","icerik":"..."}]}. Uygun yoksa {"girisler":[]}.'
-        )
-        r = await call_claude(sistem, f"Commit mesajları:\n{liste}", ozellik="changelog_ajan", max_tokens=1500)
-        girisler = (r.get("parsed") or {}).get("girisler") or []
-        for g in girisler:
-            baslik = (g.get("baslik") or "").strip()
-            icerik = (g.get("icerik") or "").strip()
-            if not (baslik or icerik):
-                continue
-            await db.duyuru_taslak.insert_one({
-                "id": str(uuid.uuid4()), "baslik": baslik[:200], "icerik": icerik[:1200],
-                "durum": "bekliyor", "kaynak": "ajan", "olusturma": iso(),
-                "tarih": simdi().date().isoformat(),
-            })
-            olusan += 1
-    if en_yeni:
-        await db.sistem_ayarlari.update_one(
-            {"tip": "changelog_son_sha"},
-            {"$set": {"tip": "changelog_son_sha", "son_sha": en_yeni, "zaman": iso()}}, upsert=True)
-    return {"taranan_commit": len(commitler), "aday": len(adaylar), "olusan_taslak": olusan}
+    """Production git geçmişini tara → teknik-dışı YENİ commit'leri changelog taslağına çevir.
+    Baseline = işlenmiş/yayınlanmış SHA'lar (değişmeyen pointer değil). AI yoksa ham fallback.
+    Ayrıntılı tanı döner (neyin neden elendiği görünsün)."""
+    commitler, hata = await _commitleri_cek()
+    tani = {"taranan_commit": len(commitler), "onceden_islenmis": 0, "teknik_elenen": 0,
+            "teknik_ornek": [], "aday": 0, "aday_ornek": [], "ai_durum": "-", "olusan_taslak": 0,
+            "hata": hata, "repo": f"{_REPO_OWNER}/{_REPO_NAME}"}
+    if hata:
+        tani["not"] = f"GitHub'dan commit çekilemedi ({hata})"
+        return tani
+    if not commitler:
+        tani["not"] = "Hiç commit dönmedi"
+        return tani
+
+    islenen = await _islenen_shalar()
+    yeni = [c for c in commitler if c["sha"] not in islenen]
+    tani["onceden_islenmis"] = len(commitler) - len(yeni)
+
+    teknik = [c for c in yeni if _teknik_mi(c["mesaj"])]
+    adaylar = [c for c in yeni if not _teknik_mi(c["mesaj"])]
+    tani["teknik_elenen"] = len(teknik)
+    tani["teknik_ornek"] = [c["mesaj"][:70] for c in teknik[:5]]
+    tani["aday"] = len(adaylar)
+    tani["aday_ornek"] = [c["mesaj"][:70] for c in adaylar[:8]]
+
+    # Teknik olanları kalıcı işaretle (bir daha değerlendirme)
+    for c in teknik:
+        await db.changelog_islenen.update_one({"sha": c["sha"]},
+            {"$set": {"sha": c["sha"], "tur": "teknik", "tarih": iso()}}, upsert=True)
+
+    if not adaylar:
+        tani["not"] = "Yeni (teknik olmayan) commit yok"
+        return tani
+
+    girisler, ai_durum = await _ai_changelog(adaylar[:25])
+    if girisler is None:   # AI kullanılamadı → ham commit'ten taslak (admin düzenler)
+        girisler = [{"baslik": c["mesaj"][:140],
+                     "icerik": "(Otomatik taslak — commit mesajından üretildi; lütfen kullanıcı-dostu hale getirin.)"}
+                    for c in adaylar[:12]]
+        ai_durum = ai_durum + " → ham commit fallback"
+    tani["ai_durum"] = ai_durum
+
+    kaynak_shalar = [c["sha"] for c in adaylar]
+    for g in girisler:
+        baslik = (g.get("baslik") or "").strip()
+        icerik = (g.get("icerik") or "").strip()
+        if not (baslik or icerik):
+            continue
+        await db.duyuru_taslak.insert_one({
+            "id": str(uuid.uuid4()), "baslik": baslik[:200], "icerik": icerik[:1200],
+            "durum": "bekliyor", "kaynak": "ajan", "kaynak_shalar": kaynak_shalar,
+            "olusturma": iso(), "tarih": simdi().date().isoformat(),
+        })
+        tani["olusan_taslak"] += 1
+
+    # Aday commit'leri işlenmiş işaretle (tekrar önerilmez)
+    for c in adaylar:
+        await db.changelog_islenen.update_one({"sha": c["sha"]},
+            {"$set": {"sha": c["sha"], "tur": "aday", "tarih": iso()}}, upsert=True)
+
+    return tani
 
 
 async def _arka_tara():
