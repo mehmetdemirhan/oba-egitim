@@ -129,10 +129,14 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
     const ozet = {};
     sirali.forEach((k) => {
       const id = k.ogretmen_id || "_yok";
-      const o = ozet[id] || (ozet[id] = { ad: k.ogretmen_ad || "Atanmamış", beklenen: 0, odenen: 0, kalan: 0, sayi: 0 });
+      const o = ozet[id] || (ozet[id] = { ad: k.ogretmen_ad || "Atanmamış", beklenen: 0, odenen: 0, kalan: 0, sayi: 0, ogr_pay: 0, ogr_odenen: 0, ogr_kalan: 0 });
       o.beklenen += Number(k.yapilmasi_gereken_odeme || 0);
       o.odenen += Number(k.yapilan_odeme || 0);
       o.kalan += Number(k.kalan || 0);
+      // Öğretmen payı toplamları (kur satırı bazında) — item 3
+      o.ogr_pay += Number(k.ogretmen_pay || 0);
+      o.ogr_odenen += Number(k.ogretmen_odenen || 0);
+      o.ogr_kalan += Number(k.ogretmen_kalan || 0);
       o.sayi += 1;
     });
     return { siraliListe: sirali, grupOzet: ozet };
@@ -230,7 +234,7 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
     if (ok) { setKurForm({ kur_adi: "", tutar: "", baslangic_tarihi: "" }); toast({ title: "Kur ücreti eklendi", description: "Yeni satır olarak eklendi." }); }
   };
 
-  const kolonSayisi = ogrenciMi ? 14 : 7;
+  const kolonSayisi = ogrenciMi ? 15 : 7;
 
   return (
     <div className="space-y-3">
@@ -286,6 +290,7 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
                   <th className="px-3 py-2 text-right">Beklenen</th>
                   <th className="px-3 py-2 text-right">Ödenen</th>
                   <th className="px-3 py-2 text-right">Kalan</th>
+                  <th className="px-3 py-2 text-right" title="Öğrenci bazlı vergi oranı (%). Boş → genel oran. Yeni tahsilatlara uygulanır, geçmiş kayıtlar bozulmaz.">Vergi %</th>
                   <th className="px-3 py-2 text-right" title="Öğretmen payı — öğretmen bu sütunu görmez">Öğr. Payı</th>
                   <th className="px-3 py-2 text-right" title="Öğretmene bu kur için fiilen ödenen (avans/erken); kalan=Pay−Ödenen. Öğretmen bu sütunu görmez">Öğr. Ödenen</th>
                   <th className="px-3 py-2">Açıklama</th>
@@ -329,6 +334,10 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
                           <span className="text-subtle">Beklenen <b className="text-content">{formatTL(oz.beklenen)}</b></span>
                           <span className="text-subtle">Ödenen <b className="text-emerald-600">{formatTL(oz.odenen)}</b></span>
                           <span className="text-subtle">Kalan <b className={oz.kalan > 0 ? "text-amber-600" : "text-content"}>{formatTL(oz.kalan)}</b></span>
+                          <span className="h-4 w-px bg-indigo-300" />
+                          <span className="text-subtle" title="Bu öğretmenin öğrencilerinden toplam payı">Öğr. Payı <b className="text-content">{formatTL(oz.ogr_pay)}</b></span>
+                          <span className="text-subtle" title="Öğretmene ödenen (avans)">Öğr. Ödenen <b className="text-emerald-600">{formatTL(oz.ogr_odenen)}</b></span>
+                          <span className="text-subtle" title="Kalan = Öğr. Payı − Öğr. Ödenen">Öğr. Kalan <b className={oz.ogr_kalan > 0 ? "text-amber-600" : "text-content"}>{formatTL(oz.ogr_kalan)}</b></span>
                           <span className="ml-auto bg-indigo-600 text-white rounded-full px-2.5 py-0.5 text-xs font-semibold" title="Bu dönem hakedişi">Hakediş {formatTL(hakedis)}</span>
                         </div>
                       </td>
@@ -363,6 +372,11 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
                           baslik="Öğrencinin TOPLAM ödemesi — FIFO en eski borçtan dağıtılır"
                           onSave={(v) => odenenKaydet(k, v)} />
                         <td className={`px-3 py-2 text-right tabular-nums font-medium ${k.kalan > 0 ? "text-amber-600" : "text-subtle"}`}>{formatTL(k.kalan)}</td>
+                        <EditableCell value={k.vergi_orani} align="right"
+                          format={(v) => (v == null || v === "" ? <span className="text-slate-300">Genel</span> : `%${v}`)}
+                          placeholder="Genel"
+                          baslik="Öğrenci bazlı vergi oranı (%). Boş bırakınca genel oran kullanılır. Yalnız YENİ tahsilatlara uygulanır."
+                          onSave={(v) => alanKaydet(k.kisi_id, "vergi_orani", v)} />
                         <EditableCell value={k.ogretmen_pay} kind="number" align="right" format={formatTL}
                           placeholder="Pay"
                           baslik={k.kur_ucreti_id ? "Bu kur için öğretmen payı (hakedişe yansır)" : "Öğrenci için öğretmen payı (kur kaydı yok)"}

@@ -17,7 +17,7 @@ from core.db import db, prepare_for_mongo, parse_from_mongo
 from core.auth import get_current_user, require_role, UserRole, TeacherLevel, hash_password
 from core.audit import islem_kaydet, islem_listele
 from core.hesap import gecici_sifre_uret, OGRETMEN_ROLLERI
-from core.sistem import get_vergi_orani, get_kur_ucreti, get_ogretmen_payi
+from core.sistem import get_vergi_orani, get_ogrenci_vergi_orani, get_kur_ucreti, get_ogretmen_payi
 
 router = APIRouter()
 
@@ -112,6 +112,13 @@ class Student(BaseModel):
     tamamlama_tarihi: Optional[datetime] = None
     tamamlayan_id: Optional[str] = None
     tamamlayan_rol: Optional[str] = None
+    # Eğitime Devam Etmedi (ayrılma) akışı — yapılandırılmış: kategori + serbest metin
+    ayrildi: bool = False
+    ayrilma_kategori: Optional[str] = None      # Fiyat / Zaman / Memnuniyetsizlik / Ulaşılamadı / Diğer
+    ayrilma_nedeni: Optional[str] = None        # serbest metin
+    ayrilma_tarihi: Optional[datetime] = None
+    ayiran_id: Optional[str] = None
+    ayiran_rol: Optional[str] = None
     olusturma_tarihi: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class StudentCreate(BaseModel):
@@ -444,10 +451,12 @@ async def get_students(dahil_arsiv: bool = False, durum: Optional[str] = None,
     # da hariç tutar (mezun öğrenci aktiften düşer; muhasebe takibi ayrı sorgular kullanır).
     if durum == "mezun":
         sorgu = {"mezun": True}
+    elif durum == "ayrildi":
+        sorgu = {"ayrildi": True}   # Eğitime Devam Etmeyenler listesi (devam-etmeme analizi)
     elif dahil_arsiv:
         sorgu = {}
     else:
-        sorgu = {"arsivli": {"$ne": True}, "mezun": {"$ne": True}}
+        sorgu = {"arsivli": {"$ne": True}, "mezun": {"$ne": True}, "ayrildi": {"$ne": True}}
     students = await db.students.find(sorgu).to_list(length=None)
     sonuc = [Student(**parse_from_mongo(s)).dict() for s in students]
     # Öğretmen + Koordinatör mali alanları görmemeli (muhasebe yalnızca admin'e ait).
@@ -656,9 +665,13 @@ async def kur_gecis(student_id: str, req: KurGecisRequest, current_user=Depends(
     #   öğrencinin kendi öğretmeni (teachers.id); işlemi kim tetiklerse XP ona gider.
     await kur_atlama_xp_kaydet(student, yeni_kur_adi, eski_kur=mevcut_kur, kaynak="kur_gecis")
 
-    # Audit
+    # Audit — admin/koordinatör başka öğretmenin öğrencisi için VEKALETEN yaptıysa işaretle
+    _ekstra = None
+    _sahip = student.get("ogretmen_id")
+    if current_user.get("role") in ("admin", "coordinator") and _sahip and _sahip != _ogretmen_id(current_user):
+        _ekstra = {"vekaleten_ogretmen_id": _sahip}
     await islem_kaydet(current_user, "ogrenci", "kur_gecis", "ogrenci", student_id,
-                       "kur", mevcut_kur, yeni_kur_adi)
+                       "kur", mevcut_kur, yeni_kur_adi, ekstra=_ekstra)
 
     # Bildirim: admin + accountant (fonksiyon-içi import — yükleme sırası bağımsız)
     try:
@@ -784,6 +797,74 @@ async def egitim_tamamla_geri_al(student_id: str, current_user=Depends(get_curre
     return {"ok": True, "mezun": False, "mesaj": "Eğitim tamamlama geri alındı, öğrenci aktife döndü"}
 
 
+class AyrilmaIstek(BaseModel):
+    kategori: Optional[str] = None   # Fiyat / Zaman / Memnuniyetsizlik / Ulaşılamadı / Diğer
+    neden: Optional[str] = None      # serbest metin
+
+
+@router.post("/students/{student_id}/ayril")
+async def ogrenci_ayril(student_id: str, data: AyrilmaIstek, current_user=Depends(get_current_user)):
+    """Öğrenciyi 'Eğitime Devam Etmedi' (ayrıldı) olarak işaretler — mezuniyetten FARKLI
+    bir durum. Yapılandırılmış neden (kategori + serbest metin) saklanır; öğrenci aktif
+    sayımlardan düşer ama borcu görünür kalır (arşive kaldırılmaz)."""
+    from core.zaman import iso as _iso
+    rol = current_user.get("role")
+    if rol not in ("admin", "coordinator", "teacher"):
+        raise HTTPException(status_code=403, detail="Bu işlem için yetkiniz yok")
+    student = await db.students.find_one({"id": student_id})
+    if not student:
+        raise HTTPException(status_code=404, detail="Öğrenci bulunamadı")
+    _ogrenci_sahiplik_kontrol(current_user, student)
+    if student.get("ayrildi"):
+        raise HTTPException(status_code=409, detail="Öğrenci zaten 'ayrıldı' olarak işaretli")
+    now = _iso()
+    guncelle = {
+        "ayrildi": True, "ayrilma_kategori": (data.kategori or None),
+        "ayrilma_nedeni": (data.neden or "").strip() or None, "ayrilma_tarihi": now,
+        "ayiran_id": current_user.get("id"), "ayiran_rol": rol,
+    }
+    await db.students.update_one({"id": student_id}, {"$set": guncelle})
+    # Vekaleten işlem işareti: admin/koordinatör başka bir öğretmenin öğrencisi için yaptıysa
+    ekstra = {"kategori": data.kategori}
+    _sahip = student.get("ogretmen_id")
+    if rol in ("admin", "coordinator") and _sahip and _sahip != _ogretmen_id(current_user):
+        ekstra["vekaleten_ogretmen_id"] = _sahip
+    await islem_kaydet(current_user, "ogrenci", "egitime_devam_etmedi", "ogrenci", student_id,
+                       "ayrildi", False, True, ekstra=ekstra)
+    try:
+        from modules.bildirim import bildirim_olustur
+        ad = f"{student.get('ad','')} {student.get('soyad','')}".strip()
+        icerik = f"{ad} eğitime devam etmedi ({data.kategori or 'sebep belirtilmedi'})."
+        async for u in db.users.find({"role": {"$in": ["admin", "accountant"]}}, {"_id": 0, "id": 1}):
+            if u.get("id"):
+                await bildirim_olustur(u["id"], "egitime_devam_etmedi", icerik, student_id)
+    except Exception as ex:
+        logging.warning(f"[ogrenci_ayril] bildirim hatası: {ex}")
+    return {"ok": True, "ayrildi": True, "mesaj": "Öğrenci 'eğitime devam etmedi' olarak işaretlendi"}
+
+
+@router.post("/students/{student_id}/ayril-geri-al")
+async def ogrenci_ayril_geri_al(student_id: str, current_user=Depends(get_current_user)):
+    """'Eğitime devam etmedi' işaretini geri alır — öğrenci aktife döner. Admin/koordinatör
+    her zaman; öğretmen yalnız kendi öğrencisi için."""
+    rol = current_user.get("role")
+    student = await db.students.find_one({"id": student_id})
+    if not student:
+        raise HTTPException(status_code=404, detail="Öğrenci bulunamadı")
+    if not student.get("ayrildi"):
+        raise HTTPException(status_code=400, detail="Öğrenci zaten aktif")
+    if rol == "teacher":
+        _ogrenci_sahiplik_kontrol(current_user, student)
+    elif rol not in ("admin", "coordinator"):
+        raise HTTPException(status_code=403, detail="Bu işlem için yetkiniz yok")
+    await db.students.update_one({"id": student_id}, {"$set": {
+        "ayrildi": False, "ayrilma_kategori": None, "ayrilma_nedeni": None,
+        "ayrilma_tarihi": None, "ayiran_id": None, "ayiran_rol": None}})
+    await islem_kaydet(current_user, "ogrenci", "ayrilma_geri_al", "ogrenci", student_id,
+                       "ayrildi", True, False)
+    return {"ok": True, "ayrildi": False, "mesaj": "Öğrenci aktife döndü"}
+
+
 @router.get("/islem-log")
 async def islem_log_listesi(modul: str | None = None, hedef_id: str | None = None,
                             kullanici_id: str | None = None, hedef_tip: str | None = None,
@@ -893,8 +974,9 @@ async def create_payment(payment_data: PaymentCreate,
     payment = Payment(**{k: v for k, v in payment_data.dict().items() if v is not None})
     doc = payment.dict()
     if payment.tip == "ogrenci":
-        # İŞ 1 — Vergi: oranı tahsilat anındaki ayardan SABİTLE (sonradan değişse eski kayıt korunur)
-        orani = await get_vergi_orani()
+        # İŞ 1 — Vergi: ÖĞRENCİ BAZLI oran (varsa) yoksa global; tahsilat anında SABİTLE
+        # (sonradan oran değişse bile bu kayıt korunur → geçmiş bozulmaz).
+        orani = await get_ogrenci_vergi_orani(payment.kisi_id)
         m = round(float(payment.miktar), 2)
         doc["brut"] = m
         doc["vergi_orani"] = orani

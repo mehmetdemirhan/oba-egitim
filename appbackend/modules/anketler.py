@@ -190,6 +190,17 @@ async def anket_token_olustur(
     if istek.gonder and istek.veli_telefon:
         gonderim = await _anket_link_gonder(istek.kanal, istek.veli_telefon, istek.ogrenci_ad, link)
 
+    # Audit — admin/koordinatör bir öğretmen ADINA anket gönderdiyse VEKALETEN işaretle
+    try:
+        from core.audit import islem_kaydet
+        ekstra = {"kanal": istek.kanal, "gonderildi": bool(gonderim and gonderim.get("ok"))}
+        if current_user.get("role") in ("admin", "coordinator") and istek.ogretmen_id:
+            ekstra["vekaleten_ogretmen_id"] = istek.ogretmen_id
+        await islem_kaydet(current_user, "anket", "veli_anket_link", "ogrenci",
+                           istek.ogrenci_id, ekstra=ekstra)
+    except Exception:
+        pass
+
     return {"ok": True, "token": raw, "link": link, "donem": donem, "gonderim": gonderim}
 
 

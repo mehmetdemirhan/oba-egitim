@@ -48,7 +48,7 @@ export function useAnalitik(apiBase) {
     try { const r = await axios.get(`${apiBase}/dashboard/analitik`); setVeri(r.data); } catch { /* yetkisiz/sessiz */ }
   }, [apiBase]);
   useEffect(() => { yukle(); }, [yukle]);
-  return veri;
+  return [veri, yukle];
 }
 
 // ── 1) Kur Yenileme Hunisi ──
@@ -155,9 +155,18 @@ export function SatisKarti({ veri }) {
 }
 
 // ── 3) Nakit Akışı + Yaşlandırma ──
-export function NakitKarti({ veri, onYaslandirmaSec }) {
+export function NakitKarti({ veri, onYaslandirmaSec, apiBase, onGuncelle }) {
+  const [ay, setAy] = React.useState(() => new Date().toISOString().slice(0, 7));
+  const [tutar, setTutar] = React.useState("");
+  const [kaydet, setKaydet] = React.useState(false);
   if (!veri) return null;
-  const nakit = anlamliDilim((veri.nakit_akisi || []).map((n) => ({ ...n, ayK: ayEtiket(n.ay) })), ["tahsilat", "vergi", "ogretmen_odeme"]);
+  const nakit = anlamliDilim((veri.nakit_akisi || []).map((n) => ({ ...n, ayK: ayEtiket(n.ay) })), ["tahsilat", "vergi", "ogretmen_odeme", "reklam"]);
+  const reklamKaydet = async () => {
+    if (!/^\d{4}-\d{2}$/.test(ay)) return;
+    setKaydet(true);
+    try { await axios.put(`${apiBase}/muhasebe/reklam-gideri`, { ay, tutar: parseFloat(tutar) || 0 }); setTutar(""); onGuncelle && onGuncelle(); }
+    catch (e) { /* yut */ } finally { setKaydet(false); }
+  };
   const yas = veri.yaslandirma || {};
   const KOVA = [["0-30", "0-30 gün", "bg-emerald-50 border-emerald-200 text-emerald-700"],
                 ["31-60", "31-60 gün", "bg-amber-50 border-amber-200 text-amber-700"],
@@ -176,11 +185,20 @@ export function NakitKarti({ veri, onYaslandirmaSec }) {
               <Bar dataKey="tahsilat" fill={GRAFIK.bilgi} name="Tahsilat" />
               <Bar dataKey="vergi" fill={GRAFIK.tehlike} name="Vergi" />
               <Bar dataKey="ogretmen_odeme" fill={GRAFIK.uyari} name="Öğretmen Ödemesi" />
-              <Line type="monotone" dataKey="net" stroke={GRAFIK.basari} strokeWidth={2.5} name="Net" dot={{ r: 3 }} />
+              <Bar dataKey="reklam" fill="#9333EA" name="Reklam Gideri" />
+              <Line type="monotone" dataKey="net" stroke={GRAFIK.basari} strokeWidth={2.5} name="Net (Tahsilat−Vergi−Öğr.−Reklam)" dot={{ r: 3 }} />
             </ComposedChart>
           </ResponsiveContainer>
         ) : <VeriYok mesaj="Henüz ödeme kaydı yok — tahsilat girildikçe akış burada oluşur." />}
       </div>
+      {apiBase && (
+        <div className="mt-3 flex flex-wrap items-end gap-2 bg-app rounded-xl p-3">
+          <div className="text-xs text-subtle w-full">Aylık Reklam Gideri (geçmişe dönük girilebilir; Net'ten düşülür)</div>
+          <input type="month" value={ay} onChange={(e) => setAy(e.target.value)} className="border border-line rounded-lg px-2 py-1.5 text-sm" />
+          <input type="number" min="0" value={tutar} onChange={(e) => setTutar(e.target.value)} placeholder="Tutar (₺)" className="border border-line rounded-lg px-2 py-1.5 text-sm w-32" />
+          <button onClick={reklamKaydet} disabled={kaydet} className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-3 py-1.5 text-sm font-semibold disabled:opacity-50">{kaydet ? "…" : "Kaydet"}</button>
+        </div>
+      )}
       <div className="mt-4">
         <div className="text-xs text-subtle mb-2" title={veri.yaslandirma_tanim}>Alacak Yaşlandırma — {veri.yaslandirma_tanim} (kovaya tıkla → tabloyu filtrele)</div>
         <div className="grid grid-cols-3 gap-3">
@@ -276,13 +294,13 @@ export function OgretmenPerfKarti({ veri, onOgretmenSec }) {
 
 // Geriye uyum: hepsini tek blokta render eden varsayılan bileşen.
 export default function DashboardAnalitik({ apiBase, onYaslandirmaSec, onOgretmenSec }) {
-  const veri = useAnalitik(apiBase);
+  const [veri, yukleAnalitik] = useAnalitik(apiBase);
   if (!veri) return null;
   return (
     <div className="space-y-6">
       <HuniKarti veri={veri} />
       <SatisKarti veri={veri} />
-      <NakitKarti veri={veri} onYaslandirmaSec={onYaslandirmaSec} />
+      <NakitKarti veri={veri} onYaslandirmaSec={onYaslandirmaSec} apiBase={apiBase} onGuncelle={yukleAnalitik} />
       <OgretmenPerfKarti veri={veri} onOgretmenSec={onOgretmenSec} />
     </div>
   );

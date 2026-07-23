@@ -416,6 +416,7 @@ function AppContent() {
   const [sssBekleyenSayi, setSssBekleyenSayi] = useState(0);
   const [teachers, setTeachers] = useState([]);
   const [students, setStudents] = useState([]);
+  const [detayOgrenci, setDetayOgrenci] = useState(null);   // admin/koord öğrenci detay modalı
   const [ogrenciGorunum, setOgrenciGorunum] = useState("aktif"); // aktif | mezun
   const [odemeGorunum, setOdemeGorunum] = useState("duz"); // duz | gruplu (SPEC B)
   const [muhasebeKisiler, setMuhasebeKisiler] = useState({ ogrenciler: [], ogretmenler: [] });
@@ -1055,7 +1056,7 @@ function AppContent() {
                         const riskIcon = risk ? (risk.risk_seviye === "yuksek" ? "🔴" : risk.risk_seviye === "orta" ? "🟡" : "🟢") : "⚪";
                         return (
                           <TableRow key={s.id} className={s.arsivli ? 'opacity-50 bg-app' : ''}>
-                            <TableCell className="font-medium">{s.ad} {s.soyad}</TableCell>
+                            <TableCell className="font-medium cursor-pointer hover:text-primary hover:underline" onClick={() => setDetayOgrenci(s)} title="Öğrenci detayını aç">{s.ad} {s.soyad}{s.ayrildi ? <span className="ml-1 text-[10px] text-orange-600">(ayrıldı)</span> : ""}</TableCell>
                             <TableCell>{s.sinif}</TableCell>
                             <TableCell><span className="text-xs bg-blue-100 text-primary px-1.5 py-0.5 rounded-full">{s.kur || "—"}</span></TableCell>
                             <TableCell><span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${riskRenk}`}>{riskIcon} {risk?.risk_skoru || 0}</span></TableCell>
@@ -1063,7 +1064,7 @@ function AppContent() {
                             <TableCell><span className="text-xs font-medium text-orange-600">{risk?.toplam_xp || s.toplam_xp || 0}</span></TableCell>
                             <TableCell>{t ? `${t.ad} ${t.soyad}` : '-'}</TableCell>
                             {user.role !== "coordinator" && <TableCell className="text-green-600 font-semibold">{formatCurrency(Math.max(0, s.yapilmasi_gereken_odeme - s.yapilan_odeme))}</TableCell>}
-                            <TableCell><div className="flex gap-2">{user.role !== "coordinator" && <Button variant="outline" size="sm" className="text-green-600 border-green-300 hover:bg-green-50" onClick={() => setTahsilatDialog({tip:'ogrenci', kisi:s, miktar:0, aciklama:''})}><CreditCard className="h-4 w-4" /></Button>}<Button variant="outline" size="sm" onClick={() => { setEditingItem({type:'student',data:s}); setEditDialogOpen(true); }}><Edit2 className="h-4 w-4" /></Button><Button variant="outline" size="sm" className={s.arsivli ? "text-green-600 border-green-300" : "text-yellow-600 border-yellow-300"} onClick={() => toggleArsiv('student', s.id, s.arsivli)} title={s.arsivli ? "Arşivden Çıkar" : "Arşivle"}>{s.arsivli ? "📂" : "📦"}</Button>{s.mezun ? <Button variant="outline" size="sm" className="text-blue-600 border-blue-300" onClick={() => egitimGeriAl(s)} title="Eğitim tamamlamayı geri al">↩️</Button> : <Button variant="outline" size="sm" className="text-indigo-600 border-indigo-300 hover:bg-indigo-50" onClick={() => egitimTamamla(s)} title="Eğitimi Tamamladı">🎓</Button>}<Button variant="destructive" size="sm" onClick={() => deleteStudent(s.id)}><Trash2 className="h-4 w-4" /></Button></div></TableCell>
+                            <TableCell><div className="flex gap-2">{user.role !== "coordinator" && <Button variant="outline" size="sm" className="text-green-600 border-green-300 hover:bg-green-50" onClick={() => setTahsilatDialog({tip:'ogrenci', kisi:s, miktar:0, aciklama:''})}><CreditCard className="h-4 w-4" /></Button>}<Button variant="outline" size="sm" onClick={() => { setEditingItem({type:'student',data:s}); setEditDialogOpen(true); }}><Edit2 className="h-4 w-4" /></Button><Button variant="outline" size="sm" className={s.arsivli ? "text-green-600 border-green-300" : "text-yellow-600 border-yellow-300"} onClick={() => toggleArsiv('student', s.id, s.arsivli)} title={s.arsivli ? "Arşivden Çıkar" : "Arşivle"}>{s.arsivli ? "📂" : "📦"}</Button>{s.mezun ? <Button variant="outline" size="sm" className="text-blue-600 border-blue-300" onClick={() => egitimGeriAl(s)} title="Eğitim tamamlamayı geri al">↩️</Button> : <Button variant="outline" size="sm" className="text-indigo-600 border-indigo-300 hover:bg-indigo-50" onClick={() => egitimTamamla(s)} title="Eğitimi Tamamladı">🎓</Button>}<EgitimeDevamEtmediBtn ogrenci={s} compact onDone={fetchStudents} /><Button variant="destructive" size="sm" onClick={() => deleteStudent(s.id)}><Trash2 className="h-4 w-4" /></Button></div></TableCell>
                           </TableRow>
                         );
                       })}
@@ -1072,6 +1073,11 @@ function AppContent() {
                 </CardContent>
               </Card>
             </div>
+            {detayOgrenci && (
+              <OgrenciDetayModal ogrenci={detayOgrenci} user={user} teachers={teachers}
+                onKapat={() => setDetayOgrenci(null)}
+                onGuncelle={() => { fetchStudents(); }} />
+            )}
           </TabsContent>
 
           {/* Courses */}
@@ -5931,6 +5937,97 @@ function AnketLinkKart({ ogrenci, user, toast }) {
   );
 }
 
+// Öğrenci "Eğitime Devam Etmedi" (ayrılma) — kategori çipleri + serbest metin.
+// Mezuniyetten FARKLI bir durum; devam-etmeme analizinde kullanılacak yapılandırılmış veri.
+const AYRILMA_KATEGORILERI = ["Fiyat", "Zaman uyuşmazlığı", "Memnuniyetsizlik", "Ulaşılamadı", "Diğer"];
+function EgitimeDevamEtmediBtn({ ogrenci, onDone, className, compact }) {
+  const { toast } = useToast();
+  const [acik, setAcik] = useState(false);
+  const [kategori, setKategori] = useState("");
+  const [neden, setNeden] = useState("");
+  const [kaydet, setKaydet] = useState(false);
+  if (ogrenci?.ayrildi) {
+    return (
+      <Button variant="outline" size="sm" className={className || "text-blue-600 border-blue-300"} title="Ayrılmayı geri al — öğrenci aktife döner"
+        onClick={async () => { try { await axios.post(`${API}/students/${ogrenci.id}/ayril-geri-al`); toast({ title: "↩️ Öğrenci aktife döndü" }); onDone && onDone(); } catch (e) { hataBildir(toast, hataMetniCoz(e, "İşlem başarısız")); } }}>↩️ Devama al</Button>
+    );
+  }
+  const gonder = async () => {
+    setKaydet(true);
+    try {
+      await axios.post(`${API}/students/${ogrenci.id}/ayril`, { kategori: kategori || null, neden: neden.trim() || null });
+      toast({ title: "Öğrenci 'eğitime devam etmedi' olarak işaretlendi" });
+      setAcik(false); onDone && onDone();
+    } catch (e) { hataBildir(toast, hataMetniCoz(e, "İşlem başarısız")); } finally { setKaydet(false); }
+  };
+  return (<>
+    <Button variant="outline" size="sm" className={className || "text-orange-600 border-orange-300 hover:bg-orange-50"} title="Eğitime Devam Etmedi" onClick={() => setAcik(true)}>{compact ? "🚪" : "🚪 Devam etmedi"}</Button>
+    {acik && (
+      <div className="fixed inset-0 z-[80] bg-black/40 flex items-center justify-center p-4" onClick={() => setAcik(false)}>
+        <div className="bg-surface rounded-2xl shadow-xl w-full max-w-md p-5" onClick={e => e.stopPropagation()}>
+          <div className="font-bold text-content mb-1">Eğitime Devam Etmedi</div>
+          <p className="text-xs text-subtle mb-3"><b>{ogrenci.ad} {ogrenci.soyad}</b> için ayrılma sebebini seçin (devam-etmeme analizinde kullanılır).</p>
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {AYRILMA_KATEGORILERI.map(k => (
+              <button key={k} onClick={() => setKategori(k === kategori ? "" : k)} className={`px-2.5 py-1 rounded-lg text-xs border ${kategori === k ? "bg-primary text-white border-primary" : "bg-app border-line text-subtle"}`}>{k}</button>
+            ))}
+          </div>
+          <textarea value={neden} onChange={e => setNeden(e.target.value)} rows={3} placeholder="Ek açıklama (opsiyonel)…" className="w-full px-3 py-2 rounded-lg border border-line text-sm" />
+          <div className="flex justify-end gap-2 mt-4">
+            <button onClick={() => setAcik(false)} className="px-3 py-1.5 rounded-lg border border-line text-sm text-subtle">Vazgeç</button>
+            <button onClick={gonder} disabled={kaydet} className="px-3 py-1.5 rounded-lg bg-orange-600 text-white text-sm font-semibold disabled:opacity-50">{kaydet ? "…" : "İşaretle"}</button>
+          </div>
+        </div>
+      </div>
+    )}
+  </>);
+}
+
+// Admin/koordinatör için öğrenci detay modalı — öğretmen tarafındaki detayın eşdeğeri.
+// Vekaleten işlemler (kur atlama, veli anketi) yönetici loguna kaydedilir (backend).
+function OgrenciDetayModal({ ogrenci, user, teachers, onKapat, onGuncelle }) {
+  const { toast } = useToast();
+  const [kurYuk, setKurYuk] = useState(false);
+  const ogretmen = (teachers || []).find(t => t.id === ogrenci.ogretmen_id);
+  const vekaleten = (user.role === "admin" || user.role === "coordinator") && ogrenci.ogretmen_id;
+  const kurAtla = async () => {
+    if (!window.confirm(`${ogrenci.ad} ${ogrenci.soyad} bir üst kura geçirilsin mi? (Öğretmeni adına vekaleten — loga kaydedilir)`)) return;
+    setKurYuk(true);
+    try { await axios.post(`${API}/students/${ogrenci.id}/kur-gecis`, {}); toast({ title: "✓ Öğrenci bir üst kura geçirildi" }); onGuncelle && onGuncelle(); }
+    catch (e) { hataBildir(toast, hataMetniCoz(e, "Kur geçişi başarısız")); } finally { setKurYuk(false); }
+  };
+  return (
+    <div className="fixed inset-0 z-[70] bg-black/50 flex items-start justify-center p-4 overflow-y-auto" onClick={onKapat}>
+      <div className="bg-app rounded-2xl shadow-xl w-full max-w-2xl my-6" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-2 p-4 border-b border-line sticky top-0 bg-app z-10">
+          <div>
+            <div className="font-bold text-content">{ogrenci.ad} {ogrenci.soyad}{ogrenci.ayrildi ? " · (ayrıldı)" : ""}</div>
+            <div className="text-xs text-subtle">{ogrenci.sinif}. sınıf · {ogrenci.kur || "—"} · Öğretmen: {ogretmen ? `${ogretmen.ad} ${ogretmen.soyad}` : "—"}</div>
+          </div>
+          <button onClick={onKapat} className="ml-auto text-subtle hover:text-content px-2 text-lg">✕</button>
+        </div>
+        <div className="p-4 space-y-4">
+          {vekaleten && (
+            <div className="text-xs bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-amber-700">
+              ⚠ Bu öğrencinin <b>öğretmeni adına</b> vekaleten işlem yapıyorsunuz. Kur atlama ve anket gönderme işlemleri yönetici loguna kaydedilir.
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-2 text-sm bg-surface rounded-xl p-3 border border-line">
+            <div><span className="text-subtle">Veli:</span> {ogrenci.veli_ad || "—"} {ogrenci.veli_soyad || ""}</div>
+            <div><span className="text-subtle">Telefon:</span> {ogrenci.veli_telefon || "—"}</div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" className="text-indigo-600 border-indigo-300" disabled={kurYuk} onClick={kurAtla} title="Bir üst kura geçir (vekaleten)">⏫ Kur Atla</Button>
+            <EgitimeDevamEtmediBtn ogrenci={ogrenci} onDone={() => { onGuncelle && onGuncelle(); onKapat(); }} />
+          </div>
+          <AnketLinkKart ogrenci={ogrenci} user={user} toast={toast} />
+          <AnalizRaporlariKart ogrenciId={ogrenci.id} ogrenci={ogrenci} user={user} toast={toast} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════
 // ÖĞRETMEN PANELİ — Sadece kendi öğrencileri, görev, analiz, mesaj
 // ═══════════════════════════════════════════════
@@ -6196,6 +6293,7 @@ function OgretmenPaneli({ user, logout }) {
                 <Button size="sm" onClick={egitimTamamlaOgretmen} className="bg-indigo-600 hover:bg-indigo-700 text-white">
                   🎓 Eğitimi Tamamladı
                 </Button>
+                <EgitimeDevamEtmediBtn ogrenci={seciliOgrenci} onDone={() => setAktifSekme("ogrencilerim")} />
               </>
             )}
           </div>

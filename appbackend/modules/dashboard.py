@@ -57,7 +57,9 @@ class MonthlyStats(BaseModel):
 @router.get("/dashboard", response_model=DashboardStats)
 async def get_dashboard_stats():
     teacher_count = await db.teachers.count_documents({})
-    student_count = await db.students.count_documents({})
+    # Aktif öğrenci = arşivli/mezun/ayrılmış OLMAYAN (eğitime devam etmeyenler hariç)
+    student_count = await db.students.count_documents(
+        {"arsivli": {"$ne": True}, "mezun": {"$ne": True}, "ayrildi": {"$ne": True}})
     course_count = await db.courses.count_documents({})
     teachers = await db.teachers.find().to_list(length=None)
     students = await db.students.find().to_list(length=None)
@@ -333,7 +335,7 @@ async def dashboard_analitik(current_user=Depends(require_role(UserRole.ADMIN)))
         })
 
     # 2a) Aylık nakit akışı
-    nk = {a: {"tahsilat": 0.0, "vergi": 0.0, "ogretmen_odeme": 0.0} for a in aylar}
+    nk = {a: {"tahsilat": 0.0, "vergi": 0.0, "ogretmen_odeme": 0.0, "reklam": 0.0} for a in aylar}
     for p in payments:
         d = _gunf(p.get("tarih"))
         if not d:
@@ -350,12 +352,17 @@ async def dashboard_analitik(current_user=Depends(require_role(UserRole.ADMIN)))
         d = _gunf(od.get("tarih"))
         if d and f"{d.year:04d}-{d.month:02d}" in nk:
             nk[f"{d.year:04d}-{d.month:02d}"]["ogretmen_odeme"] += _numf(od.get("toplam"))
+    # Aylık reklam gideri (muhasebe.py'den girilir; ay 'YYYY-MM')
+    async for rg in db.reklam_giderleri.find({}, {"_id": 0, "ay": 1, "tutar": 1}):
+        if rg.get("ay") in nk:
+            nk[rg["ay"]]["reklam"] += _numf(rg.get("tutar"))
     nakit_akisi = []
     for a in aylar:
         n = nk[a]
+        # Net = Tahsilat − Vergi − Öğretmen Ödemesi − Reklam Gideri (operasyonel nakit)
         nakit_akisi.append({"ay": a, "tahsilat": round(n["tahsilat"], 2), "vergi": round(n["vergi"], 2),
-                            "ogretmen_odeme": round(n["ogretmen_odeme"], 2),
-                            "net": round(n["tahsilat"] - n["vergi"] - n["ogretmen_odeme"], 2)})
+                            "ogretmen_odeme": round(n["ogretmen_odeme"], 2), "reklam": round(n["reklam"], 2),
+                            "net": round(n["tahsilat"] - n["vergi"] - n["ogretmen_odeme"] - n["reklam"], 2)})
 
     # 2b) Alacak yaşlandırma (yaş = kur başlangıç tarihinden bugüne)
     yas = {"0-30": {"sayi": 0, "toplam": 0.0}, "31-60": {"sayi": 0, "toplam": 0.0}, "60+": {"sayi": 0, "toplam": 0.0}}
@@ -468,7 +475,7 @@ async def sinif_dagilimi(current_user=Depends(require_role(UserRole.ADMIN, UserR
     1-8. sınıf ayrı kova; parse edilemeyen/boş/aralık dışı sınıf → '?' kovası.
     normalize_sinif ile ayrıştırılır (ilk rakam grubu, 1-12 aralığı). Anonim: yalnız sayı."""
     ogrenciler = await db.students.find(
-        {"arsivli": {"$ne": True}, "mezun": {"$ne": True}},
+        {"arsivli": {"$ne": True}, "mezun": {"$ne": True}, "ayrildi": {"$ne": True}},
         {"_id": 0, "sinif": 1},
     ).to_list(length=None)
     kovalar = {str(i): 0 for i in range(1, 9)}
@@ -492,7 +499,7 @@ async def egitim_turu_dagilimi(current_user=Depends(require_role(UserRole.ADMIN,
     aldigi_egitim serbest string (isimle eşleşir); boş → 'Belirtilmemiş'. En çoktan aza sıralı."""
     from collections import Counter
     ogrenciler = await db.students.find(
-        {"arsivli": {"$ne": True}, "mezun": {"$ne": True}},
+        {"arsivli": {"$ne": True}, "mezun": {"$ne": True}, "ayrildi": {"$ne": True}},
         {"_id": 0, "aldigi_egitim": 1},
     ).to_list(length=None)
     say = Counter((s.get("aldigi_egitim") or "").strip() or "Belirtilmemiş" for s in ogrenciler)
