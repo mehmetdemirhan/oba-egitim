@@ -60,8 +60,7 @@ import AnalizHavuzBakim from "./components/admin/AnalizHavuzBakim";
 import MetinKaliteRiski from "./components/admin/MetinKaliteRiski";
 import MetinOneriKuyrugu from "./components/admin/MetinOneriKuyrugu";
 import GirisRaporAyarlari from "./components/admin/GirisRaporAyarlari";
-import GlobalArama from "./components/GlobalArama";
-import OzellikArama from "./components/OzellikArama";
+import HerseyiAra from "./components/HerseyiAra";
 import SinavYonetimi from "./components/admin/SinavYonetimi";
 import SinavCozum from "./components/SinavCozum";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
@@ -712,9 +711,8 @@ function AppContent() {
                 <div className="text-xs text-subtle">{roleLabel(user.role)}</div>
               </div>
               <BildirimZili user={user} onNavigate={(sekme, b) => { if (sekme === "payments") setMuhasebeOdakKisi(b?.ilgili_id || ""); setActiveTab(sekme); }} />
-              <OzellikArama user={user} />
+              <HerseyiAra apiBase={API} user={user} onOgrenciSec={(o) => setDetayOgrenci(o)} onOgretmenSec={() => setActiveTab("teachers")} />
               <Button onClick={exportToExcel} disabled={loadingAction} className="bg-green-600 hover:bg-green-700 text-white"><Download className="h-4 w-4 mr-2" />Excel</Button>
-              <GlobalArama apiBase={API} onOgrenciSec={(o) => setDetayOgrenci(o)} />
               <ThemeToggle /><SifreDegistirButton />
               <Button variant="outline" size="sm" onClick={logout} className="flex items-center gap-2"><LogOut className="h-4 w-4" />Çıkış</Button>
             </div>
@@ -6543,8 +6541,7 @@ function OgretmenPaneli({ user, logout }) {
               }
               setAktifSekme(sekme);
             }} />
-            <GlobalArama apiBase={API} onOgrenciSec={(o) => { ogrenciDetayCek(o); setAktifSekme("ogrenci-detay"); }} />
-            <OzellikArama user={user} />
+            <HerseyiAra apiBase={API} user={user} onOgrenciSec={(o) => { ogrenciDetayCek(o); setAktifSekme("ogrenci-detay"); }} />
             <ThemeToggle /><SifreDegistirButton />
             <Button variant="outline" size="sm" onClick={logout}><LogOut className="h-3 w-3 mr-1" />Çıkış</Button>
           </div>
@@ -8010,7 +8007,7 @@ function OgrenciPaneli({ user, logout }) {
           <div className="flex items-center gap-2">
             <div className="text-center"><div className="text-lg font-bold text-orange-600">{seviyeEmoji} Sv.{seviye}</div></div>
             <BildirimZili user={user} onNavigate={(sekme) => setAktifSekme(sekme)} />
-            <OzellikArama user={user} />
+            <HerseyiAra apiBase={API} user={user} />
             <Button variant="outline" size="sm" onClick={() => setSssAcik(true)} className="text-xs" title="Yardım / SSS"><HelpCircle className="h-3.5 w-3.5" /></Button>
             <Button variant="outline" size="sm" onClick={logout} className="text-xs"><LogOut className="h-3 w-3 mr-1" />Çıkış</Button>
           </div>
@@ -9477,8 +9474,7 @@ function VeliPaneli({ user, logout }) {
           </div>
           <div className="flex items-center gap-2">
             <BildirimZili user={user} onNavigate={(sekme) => setAktifSekme(sekme)} />
-            <GlobalArama apiBase={API} />
-            <OzellikArama user={user} />
+            <HerseyiAra apiBase={API} user={user} />
             <ThemeToggle /><SifreDegistirButton />
             <Button variant="outline" size="sm" onClick={logout} className="text-xs"><LogOut className="h-3 w-3 mr-1" />Çıkış</Button>
           </div>

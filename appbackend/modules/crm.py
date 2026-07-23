@@ -453,10 +453,13 @@ async def genel_arama(q: str = "", current_user=Depends(get_current_user)):
     Rol duyarlı: öğretmen yalnız KENDİ öğrencilerini görür; admin/koordinatör/muhasebe herkesi."""
     import re as _re
     q = (q or "").strip()
+    rol = current_user.get("role")
+    # Kişi araması yalnız yetkili personele — veli/öğrenci tüm öğrencileri arayamaz
+    if rol not in ("admin", "coordinator", "teacher", "accountant"):
+        return {"ogrenciler": [], "ogretmenler": []}
     if len(q) < 2:
         return {"ogrenciler": [], "ogretmenler": []}
     rx = _re.compile(_re.escape(q), _re.IGNORECASE)
-    rol = current_user.get("role")
 
     ogr_sorgu = {"$or": [
         {"ad": rx}, {"soyad": rx}, {"veli_ad": rx}, {"veli_soyad": rx},
