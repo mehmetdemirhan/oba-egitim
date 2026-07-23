@@ -61,6 +61,7 @@ import MetinKaliteRiski from "./components/admin/MetinKaliteRiski";
 import MetinOneriKuyrugu from "./components/admin/MetinOneriKuyrugu";
 import GirisRaporAyarlari from "./components/admin/GirisRaporAyarlari";
 import GlobalArama from "./components/GlobalArama";
+import OzellikArama from "./components/OzellikArama";
 import SinavYonetimi from "./components/admin/SinavYonetimi";
 import SinavCozum from "./components/SinavCozum";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
@@ -414,6 +415,12 @@ function AppContent() {
   const { toast } = useToast();
   const { isFullscreen } = useFullscreenExercise();
   const [activeTab, setActiveTab] = useState("dashboard");
+  // Genel özellik araması → sekme yönlendirmesi (oba-git olayı)
+  useEffect(() => {
+    const h = (e) => { const d = e.detail || {}; if (d.sekme) setActiveTab(d.sekme); };
+    window.addEventListener("oba-git", h);
+    return () => window.removeEventListener("oba-git", h);
+  }, []);
   const [aiCeoGorunum, setAiCeoGorunum] = useState(null); // dashboard kısayolundan AI CEO'da açılacak alt görünüm (ör. brifing → "ayda")
   const [sssBekleyenSayi, setSssBekleyenSayi] = useState(0);
   const [teachers, setTeachers] = useState([]);
@@ -705,6 +712,7 @@ function AppContent() {
                 <div className="text-xs text-subtle">{roleLabel(user.role)}</div>
               </div>
               <BildirimZili user={user} onNavigate={(sekme, b) => { if (sekme === "payments") setMuhasebeOdakKisi(b?.ilgili_id || ""); setActiveTab(sekme); }} />
+              <OzellikArama user={user} />
               <Button onClick={exportToExcel} disabled={loadingAction} className="bg-green-600 hover:bg-green-700 text-white"><Download className="h-4 w-4 mr-2" />Excel</Button>
               <GlobalArama apiBase={API} onOgrenciSec={(o) => setDetayOgrenci(o)} />
               <ThemeToggle /><SifreDegistirButton />
@@ -6043,6 +6051,11 @@ function OgretmenPaneli({ user, logout }) {
   const { toast } = useToast();
   const { isFullscreen } = useFullscreenExercise();
   const [aktifSekme, setAktifSekme] = useState("dashboard");
+  useEffect(() => {   // genel arama → sekme yönlendirmesi
+    const h = (e) => { const d = e.detail || {}; if (d.sekme) setAktifSekme(d.sekme); };
+    window.addEventListener("oba-git", h);
+    return () => window.removeEventListener("oba-git", h);
+  }, []);
   useEffect(() => {
     if (aktifSekme === "sss" && !_sssBeacon) {
       _setSssBeacon(true);
@@ -6531,6 +6544,7 @@ function OgretmenPaneli({ user, logout }) {
               setAktifSekme(sekme);
             }} />
             <GlobalArama apiBase={API} onOgrenciSec={(o) => { ogrenciDetayCek(o); setAktifSekme("ogrenci-detay"); }} />
+            <OzellikArama user={user} />
             <ThemeToggle /><SifreDegistirButton />
             <Button variant="outline" size="sm" onClick={logout}><LogOut className="h-3 w-3 mr-1" />Çıkış</Button>
           </div>
@@ -7314,6 +7328,11 @@ function OgrenciPaneli({ user, logout }) {
   const [xpDurum, setXpDurum] = useState(null);
   const [ligSiralama, setLigSiralama] = useState(null);
   const [aktifSekme, setAktifSekme] = useState("ana");
+  useEffect(() => {   // genel arama → sekme yönlendirmesi
+    const h = (e) => { const d = e.detail || {}; if (d.sekme) setAktifSekme(d.sekme); };
+    window.addEventListener("oba-git", h);
+    return () => window.removeEventListener("oba-git", h);
+  }, []);
   const [gelisimAltSekme, setGelisimAltSekme] = useState("icerikler"); // icerikler, egzersizler, okumalarim
   const [aktifEkran, setAktifEkran] = useState(null);
   const [okumaBasladi, setOkumaBasladi] = useState(false);
@@ -7991,6 +8010,7 @@ function OgrenciPaneli({ user, logout }) {
           <div className="flex items-center gap-2">
             <div className="text-center"><div className="text-lg font-bold text-orange-600">{seviyeEmoji} Sv.{seviye}</div></div>
             <BildirimZili user={user} onNavigate={(sekme) => setAktifSekme(sekme)} />
+            <OzellikArama user={user} />
             <Button variant="outline" size="sm" onClick={() => setSssAcik(true)} className="text-xs" title="Yardım / SSS"><HelpCircle className="h-3.5 w-3.5" /></Button>
             <Button variant="outline" size="sm" onClick={logout} className="text-xs"><LogOut className="h-3 w-3 mr-1" />Çıkış</Button>
           </div>
@@ -9358,6 +9378,11 @@ function VeliPaneli({ user, logout }) {
   const [gorevler, setGorevler] = useState([]);
   const [cocukRozet, setCocukRozet] = useState(null); // {tanimlar, kazanilanlar}
   const [aktifSekme, setAktifSekme] = useState("ozet");
+  useEffect(() => {   // genel arama → sekme yönlendirmesi
+    const h = (e) => { const d = e.detail || {}; if (d.sekme) setAktifSekme(d.sekme); };
+    window.addEventListener("oba-git", h);
+    return () => window.removeEventListener("oba-git", h);
+  }, []);
   // Mesaj
   const [mesajlar, setMesajlar] = useState([]);
   const [kullanicilar, setKullanicilar] = useState([]);
@@ -9453,6 +9478,7 @@ function VeliPaneli({ user, logout }) {
           <div className="flex items-center gap-2">
             <BildirimZili user={user} onNavigate={(sekme) => setAktifSekme(sekme)} />
             <GlobalArama apiBase={API} />
+            <OzellikArama user={user} />
             <ThemeToggle /><SifreDegistirButton />
             <Button variant="outline" size="sm" onClick={logout} className="text-xs"><LogOut className="h-3 w-3 mr-1" />Çıkış</Button>
           </div>
@@ -10447,6 +10473,16 @@ function RaporOlcutleriPaneli() {
 function SistemAyarlari({ user }) {
   const { toast } = useToast();
   const [ayarSekme, setAyarSekme] = useState("xp");
+  // Genel arama → Ayarlar alt-sekmesi yönlendirmesi. Mount anında bekleyen hedefi tüket
+  // (AppContent önce activeTab'ı 'ayarlar' yapar, bu bileşen sonra mount olur) + canlı olay.
+  useEffect(() => {
+    const bekleyen = (typeof window !== "undefined" && window.__obaGitHedef) || null;
+    if (bekleyen && bekleyen.altSekme) { setAyarSekme(bekleyen.altSekme); }
+    window.__obaGitHedef = null;
+    const h = (e) => { const d = e.detail || {}; if (d.altSekme) setAyarSekme(d.altSekme); window.__obaGitHedef = null; };
+    window.addEventListener("oba-git", h);
+    return () => window.removeEventListener("oba-git", h);
+  }, []);
   const [xpTablosu, setXpTablosu] = useState({ okuma_gorevi: 10, anlama_testi: 15, kelime_gorevi: 8, gunluk_streak: 5, kitap_bitirme: 30, yazili_ozet: 20, egzersiz: 5, gelisim_tamamla: 5, gorev_tamamla: 10 });
   const [ligEsikleri, setLigEsikleri] = useState({ bronz: 0, gumus: 200, altin: 500, elmas: 1000 });
   const [ogretmenAgirliklari, setOgretmenAgirliklari] = useState({ ogrenci_basi: 20, kur_basi: 50, veli_yildiz: 5 });
