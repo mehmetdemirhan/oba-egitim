@@ -10,8 +10,7 @@ import OgretmenDonemOdeme from "./admin/OgretmenDonemOdeme";
 import GecikenKurlar from "./admin/GecikenKurlar";
 import FunnelPanel from "./admin/FunnelPanel";
 import BilgiIkonu from "./BilgiIkonu";
-import GlobalArama from "./GlobalArama";
-import OzellikArama from "./OzellikArama";
+import HerseyiAra from "./HerseyiAra";
 import { PersonaBalon, PERSONA_UI } from "./aiceo/Personalar";
 
 // Muhasebe rolüne özel "Sistem Danışmanı Miran" kartı (finansal; pedagojik veri YOK)
@@ -142,8 +141,7 @@ export default function MuhasebePaneli({ user, logout }) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <GlobalArama apiBase={API} />
-            <OzellikArama user={user} />
+            <HerseyiAra apiBase={API} user={user} />
             <Button variant="ghost" size="sm" onClick={logout} className="text-subtle">
               <LogOut className="h-4 w-4 mr-1" />Çıkış
             </Button>
