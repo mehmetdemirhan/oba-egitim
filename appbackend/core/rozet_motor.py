@@ -88,6 +88,22 @@ async def _ogretmen_metrikleri(user_id: str, user: dict) -> dict:
     tum_icerikler = await db.gelisim_icerik.find({"durum": {"$in": ["yayinda", "oylama"]}}).to_list(length=None)
     oy_sayisi = sum(1 for ic in tum_icerikler if user_id in (ic.get("oylar") or {}))
 
+    # Egzersiz Kalite Kontrol metrikleri (öğretmen değerlendirmeleri)
+    ekk_degler = await db.egzersiz_kalite_degerlendirme.find(
+        {"ogretmen_id": user_id}, {"tarih": 1, "degisiklik_talebi": 1}).to_list(length=None)
+    ekk_sayisi = len(ekk_degler)
+    ekk_degisiklik = sum(1 for d in ekk_degler if (d.get("degisiklik_talebi") or "").strip())
+    _ekk_gunler = sorted({str(d.get("tarih", ""))[:10] for d in ekk_degler if d.get("tarih")}, reverse=True)
+    ekk_seri = 0
+    if _ekk_gunler:
+        from datetime import date, timedelta
+        bugun = date.today()
+        if _ekk_gunler[0] in (bugun.isoformat(), (bugun - timedelta(days=1)).isoformat()):
+            g = date.fromisoformat(_ekk_gunler[0])
+            gset = set(_ekk_gunler)
+            while g.isoformat() in gset:
+                ekk_seri += 1; g = g - timedelta(days=1)
+
     gorevler = await db.gorevler.find({"atayan_id": user_id}).to_list(length=None)
     gorev_sayisi = len(gorevler)
     tamamlanan_gorev = len([g for g in gorevler if g.get("durum") == "tamamlandi"])
@@ -128,6 +144,9 @@ async def _ogretmen_metrikleri(user_id: str, user: dict) -> dict:
     return {
         "icerik_sayisi": icerikler,
         "kalite_oyu": oy_sayisi,
+        "egzersiz_kalite_sayisi": ekk_sayisi,
+        "egzersiz_kalite_degisiklik": ekk_degisiklik,
+        "egzersiz_kalite_seri": ekk_seri,
         "gorev_atama_sayisi": gorev_sayisi,
         "gorev_tamamlanan": tamamlanan_gorev,
         "ogrenci_ort_streak": ort_streak,

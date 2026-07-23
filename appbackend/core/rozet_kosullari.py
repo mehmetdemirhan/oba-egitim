@@ -59,6 +59,12 @@ OGRETMEN_KOSULLARI = {
     # Egzersiz
     "egz_ilk":    {"metrik": "egzersiz_tur_sayisi", "operator": ">=", "esik": 1},
     "egz_tamset": {"metrik": "egzersiz_tur_sayisi", "operator": ">=", "esik": 14},
+    # Egzersiz Kalite Kontrol (öğretmen değerlendirmesi)
+    "ekk_ilk":        {"metrik": "egzersiz_kalite_sayisi", "operator": ">=", "esik": 1},
+    "ekk_10":         {"metrik": "egzersiz_kalite_sayisi", "operator": ">=", "esik": 10},
+    "ekk_50":         {"metrik": "egzersiz_kalite_sayisi", "operator": ">=", "esik": 50},
+    "ekk_degisiklik": {"metrik": "egzersiz_kalite_degisiklik", "operator": ">=", "esik": 5},
+    "ekk_seri7":      {"metrik": "egzersiz_kalite_seri", "operator": ">=", "esik": 7},
 }
 
 # ─────────────────────────────────────────────
@@ -104,6 +110,9 @@ METRIK_ACIKLAMALARI = {
     # öğretmen
     "icerik_sayisi": "Yayınlanan içerik sayısı",
     "kalite_oyu": "Verilen kalite oyu sayısı",
+    "egzersiz_kalite_sayisi": "Değerlendirilen egzersiz sayısı",
+    "egzersiz_kalite_degisiklik": "Bildirilen değişiklik talebi sayısı",
+    "egzersiz_kalite_seri": "Üst üste katkı günü (seri)",
     "gorev_atama_sayisi": "Atanan görev sayısı",
     "gorev_tamamlanan": "Öğrencilerin tamamladığı görev sayısı",
     "ogrenci_ort_streak": "Öğrencilerin ortalama okuma serisi (gün)",

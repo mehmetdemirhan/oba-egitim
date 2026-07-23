@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
-import { CheckCircle2, XCircle, RefreshCw, ClipboardCheck, AlertTriangle, Archive, RotateCcw, Save, Sparkles } from "lucide-react";
+import { CheckCircle2, XCircle, RefreshCw, ClipboardCheck, AlertTriangle, Archive, RotateCcw, Save, Sparkles, Users, TrendingUp, PauseCircle, Trophy } from "lucide-react";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import EgzersizOnizleme from "./exercises/EgzersizOnizleme";
 
 /**
@@ -86,14 +87,76 @@ function TekEgzersizDegerlendir({ apiBase, egzersiz, onTamam, toast }) {
   );
 }
 
+// ── Öğretmen dashboard'ı: Kalite Kontrol özet kartı (A) — tıklanınca KK'ya gider ──
+export function KaliteOzetKart({ apiBase, onGit }) {
+  const [ozet, setOzet] = useState(null);
+  useEffect(() => { axios.get(`${apiBase}/egzersiz-kalite/ozet`).then((r) => setOzet(r.data)).catch(() => {}); }, [apiBase]);
+  return (
+    <button onClick={onGit} className="w-full text-left bg-surface rounded-2xl p-4 shadow-sm border border-line border-l-4 border-l-green-400 hover:shadow-md transition">
+      <div className="flex items-center gap-1.5 text-xs text-subtle mb-1"><ClipboardCheck className="w-3.5 h-3.5" />Kalite Kontrol Katkım</div>
+      <div className="flex items-baseline gap-3">
+        <div><span className="text-2xl font-bold text-content tabular-nums">{ozet?.toplam_degerlendirme ?? "—"}</span><span className="text-[11px] text-subtle ml-1">değerlendirme</span></div>
+        <div className="text-sm text-green-600 font-semibold">+{ozet?.kazanilan_xp ?? 0} XP</div>
+      </div>
+      <div className="text-[11px] text-primary mt-1">Değerlendirmeye devam et →</div>
+    </button>
+  );
+}
+
+// ── Kalite barı (sağ panel): haftalık katkı hedefine göre dolum (Pazartesi sıfırlanır) ──
+function KaliteBar({ ozet }) {
+  if (!ozet) return null;
+  const dolum = Math.round((ozet.bar_dolum || 0) * 100);
+  return (
+    <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+      <div className="flex items-center gap-2 mb-1"><Sparkles className="h-4 w-4 text-primary" /><div className="font-semibold text-content text-sm">Kalite Barı</div></div>
+      <div className="text-[11px] text-subtle mb-3">Bu hafta {ozet.hafta_sayi}/{ozet.haftalik_hedef} katkı (Pazartesi sıfırlanır)</div>
+      <div className="flex items-end gap-3">
+        {/* Dikey bar */}
+        <div className="relative w-9 h-40 rounded-xl bg-app overflow-hidden border border-line">
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-primary to-indigo-400 transition-all duration-500" style={{ height: `${dolum}%` }} />
+          <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-content/70">%{dolum}</div>
+        </div>
+        <div className="flex-1 space-y-1.5 text-xs">
+          <div className="flex justify-between"><span className="text-subtle">Bugün</span><b className="text-content">{ozet.bugun_sayi}</b></div>
+          <div className="flex justify-between"><span className="text-subtle">Toplam</span><b className="text-content">{ozet.toplam_degerlendirme}</b></div>
+          <div className="flex justify-between"><span className="text-subtle">Kazanılan XP</span><b className="text-green-600">{ozet.kazanilan_xp}</b></div>
+          <div className="flex justify-between"><span className="text-subtle">Seri 🔥</span><b className="text-orange-600">{ozet.seri} gün</b></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Kalite Kontrol'e özel rozetler ──
+function KaliteRozetler({ ozet }) {
+  if (!ozet?.rozetler) return null;
+  return (
+    <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+      <div className="font-semibold text-content text-sm mb-2">Rozetlerim ({ozet.kazanilan_rozet_sayisi}/{ozet.rozetler.length})</div>
+      <div className="grid grid-cols-2 gap-2">
+        {ozet.rozetler.map((r) => (
+          <div key={r.id} title={`${r.aciklama}${r.kazanildi ? "" : ` (${r.ilerleme}/${r.esik})`}`}
+            className={`rounded-xl border p-2 text-center ${r.kazanildi ? "border-amber-200 bg-amber-50" : "border-line bg-app opacity-50"}`}>
+            <div className="text-xl">{r.ikon}</div>
+            <div className="text-[10px] font-medium text-content leading-tight mt-0.5">{r.ad}</div>
+            {!r.kazanildi && <div className="text-[9px] text-subtle">{r.ilerleme}/{r.esik}</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Sıralı akış (tab veya modal içinde) ──
-function DegerlendirmeAkisi({ apiBase, egzersizler, toast, onBitti, kompakt }) {
+function DegerlendirmeAkisi({ apiBase, egzersizler, toast, onBitti, onKatki, kompakt }) {
   const [idx, setIdx] = useState(0);
   const [xpToplam, setXpToplam] = useState(0);
   const toplam = egzersizler.length;
 
   const tamam = (id, xp) => {
     setXpToplam((v) => v + (xp || 0));
+    onKatki?.();
     if (idx + 1 >= toplam) { onBitti?.(xpToplam + (xp || 0)); }
     else { setIdx((i) => i + 1); }
   };
@@ -123,14 +186,19 @@ export function KaliteKontrolSekmesi({ apiBase, user, toast }) {
   const [veri, setVeri] = useState(null);
   const [yuk, setYuk] = useState(false);
   const [bitti, setBitti] = useState(null); // {xp}
+  const [ozet, setOzet] = useState(null);
 
+  const ozetYukle = useCallback(async () => {
+    try { const r = await axios.get(`${apiBase}/egzersiz-kalite/ozet`); setOzet(r.data); } catch { /* yut */ }
+  }, [apiBase]);
   const yukle = useCallback(async () => {
     setYuk(true); setBitti(null);
     try {
       const r = await axios.get(`${apiBase}/egzersiz-kalite/kuyruk?limit=5`);
       setVeri(r.data);
     } catch (e) { setVeri({ egzersizler: [], toplam_bekleyen: 0 }); } finally { setYuk(false); }
-  }, [apiBase]);
+    ozetYukle();
+  }, [apiBase, ozetYukle]);
   useEffect(() => { yukle(); }, [yukle]);
 
   return (
@@ -144,21 +212,30 @@ export function KaliteKontrolSekmesi({ apiBase, user, toast }) {
         <button onClick={yukle} disabled={yuk} className="ml-auto inline-flex items-center gap-1.5 bg-app border border-line rounded-lg px-3 py-1.5 text-sm"><RefreshCw className={`h-4 w-4 ${yuk ? "animate-spin" : ""}`} />Yenile</button>
       </div>
 
-      {bitti ? (
-        <div className="max-w-2xl mx-auto text-center py-10 bg-surface rounded-2xl border border-line">
-          <div className="text-4xl mb-2">✅</div>
-          <div className="font-bold text-content">Bugünkü kalite kontrolünü tamamladın!</div>
-          {bitti.xp > 0 && <div className="text-green-600 font-semibold mt-1">+{bitti.xp} XP kazandın 🎉</div>}
-          <div className="text-xs text-subtle mt-2">Katkın için teşekkürler — egzersiz havuzu senin sayende daha iyi.</div>
-          <button onClick={yukle} className="mt-4 inline-flex items-center gap-1.5 bg-primary text-white rounded-lg px-4 py-2 text-sm font-semibold">Devam et →</button>
+      {/* İki bölüm: SOL akış · SAĞ kalite barı + rozetler */}
+      <div className="flex flex-col lg:flex-row gap-4 items-start">
+        <div className="flex-1 min-w-0 w-full">
+          {bitti ? (
+            <div className="text-center py-10 bg-surface rounded-2xl border border-line">
+              <div className="text-4xl mb-2">✅</div>
+              <div className="font-bold text-content">Bugünkü kalite kontrolünü tamamladın!</div>
+              {bitti.xp > 0 && <div className="text-green-600 font-semibold mt-1">+{bitti.xp} XP kazandın 🎉</div>}
+              <div className="text-xs text-subtle mt-2">Katkın için teşekkürler — egzersiz havuzu senin sayende daha iyi.</div>
+              <button onClick={yukle} className="mt-4 inline-flex items-center gap-1.5 bg-primary text-white rounded-lg px-4 py-2 text-sm font-semibold">Devam et →</button>
+            </div>
+          ) : veri && veri.egzersizler.length === 0 ? (
+            <div className="text-center text-subtle py-10 bg-surface rounded-2xl border border-line">🎉 Şu an değerlendirilecek egzersiz kalmadı. Sonra tekrar bakın.</div>
+          ) : veri && veri.egzersizler.length > 0 ? (
+            <DegerlendirmeAkisi apiBase={apiBase} egzersizler={veri.egzersizler} toast={toast} kompakt onKatki={ozetYukle} onBitti={(xp) => { setBitti({ xp }); ozetYukle(); }} />
+          ) : (
+            <div className="text-center text-subtle py-10">Yükleniyor…</div>
+          )}
         </div>
-      ) : veri && veri.egzersizler.length === 0 ? (
-        <div className="max-w-2xl mx-auto text-center text-subtle py-10 bg-surface rounded-2xl border border-line">🎉 Şu an değerlendirilecek egzersiz kalmadı. Sonra tekrar bakın.</div>
-      ) : veri && veri.egzersizler.length > 0 ? (
-        <DegerlendirmeAkisi apiBase={apiBase} egzersizler={veri.egzersizler} toast={toast} onBitti={(xp) => setBitti({ xp })} />
-      ) : (
-        <div className="text-center text-subtle py-10">Yükleniyor…</div>
-      )}
+        <div className="w-full lg:w-64 shrink-0 space-y-3">
+          <KaliteBar ozet={ozet} />
+          <KaliteRozetler ozet={ozet} />
+        </div>
+      </div>
     </div>
   );
 }
@@ -204,6 +281,68 @@ export function GunlukKaliteModal({ apiBase, user, toast }) {
               <p className="text-xs text-subtle mb-3">Birkaç egzersizi değerlendirerek kaliteyi yükseltmemize yardım edin. İstemezseniz "Daha sonra" ile kapatabilirsiniz.</p>
               <DegerlendirmeAkisi apiBase={apiBase} egzersizler={egzersizler} toast={toast} kompakt onBitti={(xp) => setBitti({ xp })} />
             </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Admin: Kalite Kontrol GÖRSEL analitik panel (B) ──
+function KpiKart({ ikon: Ikon, renk, buyuk, etiket, alt }) {
+  return (
+    <div className={`bg-surface rounded-2xl p-4 shadow-sm border border-line border-l-4 ${renk}`}>
+      <div className="flex items-center gap-1.5 text-xs text-subtle mb-1"><Ikon className="w-3.5 h-3.5" />{etiket}</div>
+      <div className="text-2xl font-bold text-content tabular-nums">{buyuk}</div>
+      {alt && <div className="text-[11px] text-subtle mt-0.5">{alt}</div>}
+    </div>
+  );
+}
+
+export function KaliteAnalitik({ apiBase }) {
+  const [veri, setVeri] = useState(null);
+  const yukle = useCallback(async () => {
+    try { const r = await axios.get(`${apiBase}/egzersiz-kalite/analitik`); setVeri(r.data); } catch { /* yut */ }
+  }, [apiBase]);
+  useEffect(() => { yukle(); }, [yukle]);
+  if (!veri) return <div className="text-sm text-subtle py-6 text-center">Analitik yükleniyor…</div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <KpiKart ikon={ClipboardCheck} renk="border-l-blue-400" buyuk={`%${veri.kapsam_yuzde}`} etiket="Kapsam" alt={`${veri.degerlendirilmis}/${veri.toplam_egzersiz} · ${veri.hic_degerlendirilmemis} kaldı`} />
+        <KpiKart ikon={Users} renk="border-l-emerald-400" buyuk={`%${veri.katilim_yuzde}`} etiket="Öğretmen Katılımı" alt={`${veri.katilan_ogretmen}/${veri.toplam_ogretmen} öğretmen`} />
+        <KpiKart ikon={PauseCircle} renk="border-l-amber-400" buyuk={veri.askida_sayisi} etiket="Askıda Egzersiz" alt={`${veri.bekleyen_degisiklik} değişiklik talebi`} />
+        <KpiKart ikon={TrendingUp} renk="border-l-violet-400" buyuk={veri.toplam_degerlendirme} etiket="Toplam Değerlendirme" alt="tüm zamanlar" />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        {/* Trend */}
+        <div className="lg:col-span-2 bg-surface rounded-2xl p-4 shadow-sm border border-line">
+          <div className="font-semibold text-content text-sm mb-2">Son 14 Gün — Değerlendirme Hacmi</div>
+          <ResponsiveContainer width="100%" height={180}>
+            <BarChart data={veri.trend} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.2} vertical={false} />
+              <XAxis dataKey="gun" tick={{ fontSize: 10 }} interval={1} />
+              <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+              <Tooltip />
+              <Bar dataKey="sayi" fill="#6366F1" radius={[3, 3, 0, 0]} name="Değerlendirme" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        {/* Liderlik */}
+        <div className="bg-surface rounded-2xl p-4 shadow-sm border border-line">
+          <div className="flex items-center gap-1.5 font-semibold text-content text-sm mb-2"><Trophy className="w-4 h-4 text-amber-500" />Katkı Liderliği</div>
+          {veri.liderlik.length === 0 ? <div className="text-xs text-subtle py-4 text-center">Henüz katkı yok.</div> : (
+            <div className="space-y-1.5">
+              {veri.liderlik.map((l, i) => (
+                <div key={l.ogretmen_id} className="flex items-center gap-2 text-sm">
+                  <span className={`w-5 text-center font-bold ${i === 0 ? "text-amber-500" : i === 1 ? "text-slate-400" : i === 2 ? "text-orange-400" : "text-subtle"}`}>{i + 1}</span>
+                  <span className="flex-1 truncate text-content">{l.ad}</span>
+                  <span className="text-xs text-subtle">{l.degisiklik > 0 ? `✍️${l.degisiklik} · ` : ""}<b className="text-content">{l.sayi}</b></span>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>
