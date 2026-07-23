@@ -785,6 +785,7 @@ async def egzersiz_oturum_baslat(data: dict, current_user=Depends(get_current_us
     tip = data.get("tip", "")
     sinif = int(data.get("sinif", 3))
     icerik_id = data.get("icerik_id")
+    onizleme = bool(data.get("onizleme"))   # öğretmen/kalite önizlemesi: skoru/kullanımı etkilemez
     if not tip_var_mi(tip):
         raise HTTPException(status_code=400, detail=f"Bilinmeyen egzersiz tipi: {tip}")
     meta = tip_meta(tip)
@@ -800,17 +801,20 @@ async def egzersiz_oturum_baslat(data: dict, current_user=Depends(get_current_us
                                                  ogrenci_id=_ogrenci_id(current_user),
                                                  manuel_zorluk=manuel_zorluk)
 
-    await db.egzersiz_icerikler.update_one(
-        {"id": icerik_doc["id"]},
-        {"$inc": {"kullanim_sayisi": 1},
-         "$set": {"son_kullanim_tarihi": datetime.utcnow().isoformat()}},
-    )
+    # Önizlemede kullanım sayacı ARTMAZ (istatistik/rotasyon bozulmasın)
+    if not onizleme:
+        await db.egzersiz_icerikler.update_one(
+            {"id": icerik_doc["id"]},
+            {"$inc": {"kullanim_sayisi": 1},
+             "$set": {"son_kullanim_tarihi": datetime.utcnow().isoformat()}},
+        )
 
     oturum = {
         "id": str(uuid.uuid4()),
         "ogrenci_id": _ogrenci_id(current_user),
         "tip": tip,
         "icerik_id": icerik_doc["id"],
+        "onizleme": onizleme,
         "cevaplar": [],
         "dogru_sayisi": 0,
         "toplam_soru": _toplam_soru(meta, icerik_doc.get("icerik", {})),
@@ -865,6 +869,10 @@ async def egzersiz_bitir(oturum_id: str, data: dict = None, current_user=Depends
         raise HTTPException(status_code=404, detail="Oturum bulunamadı")
     if oturum.get("durum") == "tamamlandi":
         return _temizle(oturum)
+    # Önizleme oturumu: hiçbir skor/XP/kayıt yazma (öğretmen/kalite denemesi)
+    if oturum.get("onizleme"):
+        await db.egzersiz_oturumlari.update_one({"id": oturum_id}, {"$set": {"durum": "onizleme_bitti"}})
+        return {"onizleme": True, "xp": 0, "puan": 0}
 
     toplam = oturum.get("toplam_soru", 0) or 1
     dogru_sayisi = oturum.get("dogru_sayisi", 0)

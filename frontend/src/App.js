@@ -61,6 +61,7 @@ import MetinKaliteRiski from "./components/admin/MetinKaliteRiski";
 import MetinOneriKuyrugu from "./components/admin/MetinOneriKuyrugu";
 import GirisRaporAyarlari from "./components/admin/GirisRaporAyarlari";
 import HerseyiAra from "./components/HerseyiAra";
+import MesajKutusu from "./components/MesajKutusu";
 import SinavYonetimi from "./components/admin/SinavYonetimi";
 import SinavCozum from "./components/SinavCozum";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
@@ -7271,24 +7272,7 @@ function OgretmenPaneli({ user, logout }) {
         {/* ═══ MESAJLAR ═══ */}
         {aktifSekme === "mesajlar" && (<div className="space-y-4">
           <h2 className="text-lg font-bold">Mesajlar</h2>
-          <div className="flex gap-2">
-            {[{v:"gelen",l:`Gelen (${gelenMesajlar.length})`},{v:"giden",l:"Gönderilen"},{v:"yeni",l:"Yeni Mesaj"}].map(t => (
-              <button key={t.v} onClick={() => setMesajGorunum(t.v)} className={`px-3 py-1.5 rounded-xl text-xs font-medium border ${mesajGorunum === t.v ? 'bg-primary text-white border-blue-600' : 'bg-surface text-subtle border-line'}`}>{t.l}</button>
-            ))}
-          </div>
-          {mesajGorunum === "yeni" && (<Card className="border border-line shadow-sm"><CardContent className="p-4"><form onSubmit={mesajGonder} className="space-y-3">
-            <div><Label className="text-xs">Alıcı *</Label><Select value={mesajAlici} onValueChange={setMesajAlici}><SelectTrigger className="text-sm"><SelectValue placeholder="Kişi seçin..." /></SelectTrigger><SelectContent>{kullanicilar.filter(u => u.id !== user.id).map(u => (<SelectItem key={u.id} value={u.id}>{u.ad} {u.soyad} ({({admin:"Yönetici",coordinator:"Koord.",teacher:"Öğretmen",student:"Öğrenci",parent:"Veli"})[u.role]})</SelectItem>))}</SelectContent></Select></div>
-            <div><Label className="text-xs">Konu</Label><Input value={mesajForm.konu} onChange={e => setMesajForm({...mesajForm, konu: e.target.value})} className="text-sm" /></div>
-            <div><Label className="text-xs">Mesaj *</Label><textarea value={mesajForm.icerik} onChange={e => setMesajForm({...mesajForm, icerik: e.target.value})} required className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px]" /></div>
-            <Button type="submit" className="w-full bg-primary text-white text-sm">✉️ Gönder</Button>
-          </form></CardContent></Card>)}
-          {mesajGorunum === "gelen" && (<div className="space-y-2">{gelenMesajlar.length === 0 ? <p className="text-center text-subtle py-8">Gelen mesaj yok</p> : gelenMesajlar.map(m => (
-            <div key={m.id} className={`bg-surface rounded-xl p-3 border ${!m.okundu ? 'border-l-4 border-l-blue-500' : ''}`} onClick={() => !m.okundu && mesajOkundu(m.id)}>
-              <div className="flex justify-between"><span className="font-medium text-sm">{m.gonderen_ad}</span><span className="text-xs text-subtle">{new Date(m.tarih).toLocaleDateString('tr-TR')}</span></div>
-              {m.konu && <div className="text-xs font-bold mt-1">{m.konu}</div>}<p className="text-sm text-subtle mt-1">{m.icerik}</p>
-            </div>))}</div>)}
-          {mesajGorunum === "giden" && (<div className="space-y-2">{gidenMesajlar.length === 0 ? <p className="text-center text-subtle py-8">Gönderilen mesaj yok</p> : gidenMesajlar.map(m => (
-            <div key={m.id} className="bg-surface rounded-xl p-3 border"><div className="flex justify-between"><span className="font-medium text-sm">→ {m.alici_ad}</span><span className="text-xs text-subtle">{new Date(m.tarih).toLocaleDateString('tr-TR')}</span></div>{m.konu && <div className="text-xs font-bold mt-1">{m.konu}</div>}<p className="text-sm text-subtle mt-1">{m.icerik}</p></div>))}</div>)}
+          <MesajKutusu user={user} apiBase={API} />
         </div>)}
 
       </div>
@@ -9122,231 +9106,19 @@ function OgrenciPaneli({ user, logout }) {
 // ═══════════════════════════════════════════════
 
 function MesajlarPanel({ user }) {
-  const { toast } = useToast();
-  const [mesajlar, setMesajlar] = useState([]);
-  const [kullanicilar, setKullanicilar] = useState([]);
-  const [okunmamisSayisi, setOkunmamisSayisi] = useState(0);
-  const [seciliAlici, setSeciliAlici] = useState("");
-  const [form, setForm] = useState({ konu: "", icerik: "" });
-  const [gonderiliyor, setGonderiliyor] = useState(false);
-  const [gorunum, setGorunum] = useState("gelen"); // gelen, giden, yeni
-  const [filtre, setFiltre] = useState("hepsi"); // hepsi, okunmamis
-
-  const fetchAll = useCallback(async () => {
-    try { const r = await axios.get(`${API}/mesajlar`); setMesajlar(Array.isArray(r.data) ? r.data : []); } catch(e) { setMesajlar([]); }
-    try { const r = await axios.get(`${API}/mesajlar/okunmamis-sayisi`); setOkunmamisSayisi(r.data?.sayi || 0); } catch(e) {}
-    try { const r = await axios.get(`${API}/auth/users`); setKullanicilar(Array.isArray(r.data) ? r.data : []); } catch(e) { setKullanicilar([]); }
-  }, []);
-
-  useEffect(() => { fetchAll(); }, [fetchAll]);
-
-  const gelenMesajlar = mesajlar.filter(m => m.alici_id === user.id && !m.arsiv);
-  const arsivlenenler = mesajlar.filter(m => m.alici_id === user.id && m.arsiv);
-  const gidenMesajlar = mesajlar.filter(m => m.gonderen_id === user.id);
-  const okunmamislar = gelenMesajlar.filter(m => !m.okundu);
-
-  // Alıcı listesi role göre filtrele
-  const aliciListesi = kullanicilar.filter(u => u.id !== user.id).map(u => ({
-    id: u.id,
-    ad: `${u.ad || ""} ${u.soyad || ""}`.trim(),
-    rol: u.role,
-    rolLabel: ({ admin: "Yönetici", coordinator: "Koordinatör", teacher: "Öğretmen", student: "Öğrenci", parent: "Veli" })[u.role] || u.role,
-  }));
-
-  const mesajGonder = async (e) => {
-    e.preventDefault();
-    if (!seciliAlici) { toast({ title: "Alıcı seçmelisiniz", variant: "destructive" }); return; }
-    setGonderiliyor(true);
-    try {
-      await axios.post(`${API}/mesajlar`, { alici_id: seciliAlici, konu: form.konu, icerik: form.icerik });
-      toast({ title: "✉️ Mesaj gönderildi!" });
-      setForm({ konu: "", icerik: "" }); setSeciliAlici(""); setGorunum("giden"); fetchAll();
-    } catch(e) { toast({ title: "Hata", variant: "destructive" }); }
-    setGonderiliyor(false);
-  };
-
-  const mesajOkundu = async (id) => { try { await axios.put(`${API}/mesajlar/${id}/okundu`); fetchAll(); } catch(e) {} };
-
-  const mesajArsivle = async (id, arsiv) => {
-    try {
-      await axios.put(`${API}/mesajlar/${id}/arsiv`, { arsiv });
-      toast({ title: arsiv ? "🗄️ Mesaj arşivlendi" : "↩️ Arşivden çıkarıldı" });
-      fetchAll();
-    } catch (e) { hataBildir(toast, hataMetniCoz(e, "Arşivleme başarısız")); }
-  };
-
-  const rolRenk = (r) => ({ admin: "bg-red-100 text-red-700", coordinator: "bg-orange-100 text-orange-700", teacher: "bg-blue-100 text-blue-700", student: "bg-green-100 text-green-700", parent: "bg-purple-100 text-purple-700" })[r] || "bg-gray-100 text-subtle";
-
+  const [gorunum, setGorunum] = useState("mesajlar");
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-content">Mesajlar</h2>
-          <p className="text-subtle text-sm mt-1">{okunmamisSayisi > 0 ? `${okunmamisSayisi} okunmamış mesaj` : "Tüm mesajlar okundu"}</p>
-        </div>
-        <Button onClick={() => setGorunum("yeni")} className="bg-primary hover:bg-primary-hover text-white">
-          <Send className="h-4 w-4 mr-2" /> Yeni Mesaj
-        </Button>
-      </div>
-
-      {/* Görünüm Seçici */}
-      <div className="flex gap-2">
-        {[
-          { v: "gelen", l: "Gelen Kutusu", badge: okunmamisSayisi },
-          { v: "giden", l: "Gönderilenler" },
-          { v: "arsiv", l: "🗄️ Arşiv", badge: arsivlenenler.length },
-          { v: "yeni", l: "Yeni Mesaj" },
-          ...(user.role === "admin" ? [{ v: "funnel", l: "📣 Veli Mesajları / Funnel" }] : []),
-        ].map(t => (
-          <button key={t.v} onClick={() => setGorunum(t.v)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all border flex items-center gap-2 ${gorunum === t.v ? 'bg-primary text-white border-primary shadow' : 'bg-surface text-subtle border-line hover:border-primary'}`}>
-            {t.l}
-            {t.badge > 0 && <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold tabular-nums ${gorunum === t.v ? 'bg-white/30' : 'bg-red-100 text-red-600'}`}>{t.badge}</span>}
-          </button>
-        ))}
-      </div>
-
-      {/* Veli Mesajları / Funnel (yalnız admin) */}
-      {gorunum === "funnel" && user.role === "admin" && <FunnelPanel apiBase={API} />}
-
-      {/* Yeni Mesaj */}
-      {gorunum === "yeni" && (
-        <Card className="border border-line shadow-sm">
-          <CardHeader><CardTitle className="text-base flex items-center gap-2"><Send className="h-4 w-4" /> Yeni Mesaj</CardTitle></CardHeader>
-          <CardContent>
-            <form onSubmit={mesajGonder} className="space-y-4">
-              <div>
-                <Label>Alıcı *</Label>
-                <Select value={seciliAlici} onValueChange={setSeciliAlici}>
-                  <SelectTrigger><SelectValue placeholder="Kişi seçin..." /></SelectTrigger>
-                  <SelectContent>
-                    {["admin", "coordinator", "teacher", "student", "parent"].map(rol => {
-                      const kisiler = aliciListesi.filter(k => k.rol === rol);
-                      if (kisiler.length === 0) return null;
-                      return kisiler.map(k => (
-                        <SelectItem key={k.id} value={k.id}>
-                          <span className="flex items-center gap-2">
-                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${rolRenk(k.rol)}`}>{k.rolLabel}</span>
-                            {k.ad}
-                          </span>
-                        </SelectItem>
-                      ));
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div><Label>Konu</Label><Input value={form.konu} onChange={e => setForm({...form, konu: e.target.value})} placeholder="Mesaj konusu..." /></div>
-              <div><Label>Mesaj *</Label><textarea value={form.icerik} onChange={e => setForm({...form, icerik: e.target.value})} required placeholder="Mesajınızı yazın..." className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[120px]" /></div>
-              <div className="flex gap-3">
-                <Button type="submit" disabled={gonderiliyor || !form.icerik.trim()} className="flex-1 bg-primary hover:bg-primary-hover text-white">{gonderiliyor ? "Gönderiliyor..." : <><Send className="h-4 w-4 mr-1" />Gönder</>}</Button>
-                <Button type="button" variant="outline" onClick={() => setGorunum("gelen")} className="flex-1">İptal</Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Gelen Kutusu */}
-      {gorunum === "gelen" && (
-        <div className="space-y-3">
-          <div className="flex gap-2 mb-2">
-            <button onClick={() => setFiltre("hepsi")} className={`text-xs px-3 py-1 rounded-full border tabular-nums ${filtre === "hepsi" ? 'bg-primary text-white border-primary' : 'bg-surface text-subtle border-line'}`}>Tümü ({gelenMesajlar.length})</button>
-            <button onClick={() => setFiltre("okunmamis")} className={`text-xs px-3 py-1 rounded-full border tabular-nums ${filtre === "okunmamis" ? 'bg-primary text-white border-primary' : 'bg-surface text-subtle border-line'}`}>Okunmamış ({okunmamislar.length})</button>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-2xl font-bold text-content">Mesajlar</h2>
+        {user.role === "admin" && (
+          <div className="flex gap-1 bg-app rounded-lg p-1">
+            <button onClick={() => setGorunum("mesajlar")} className={`px-3 py-1.5 rounded-md text-sm ${gorunum==="mesajlar"?"bg-surface shadow-sm font-semibold text-content":"text-subtle"}`}>Kutu</button>
+            <button onClick={() => setGorunum("funnel")} className={`px-3 py-1.5 rounded-md text-sm ${gorunum==="funnel"?"bg-surface shadow-sm font-semibold text-content":"text-subtle"}`}>📣 Veli Funnel</button>
           </div>
-          {(filtre === "okunmamis" ? okunmamislar : gelenMesajlar).length === 0 ? (
-            <div className="text-center py-12"><Mail className="h-12 w-12 text-subtle mx-auto mb-3" /><p className="text-subtle">{filtre === "okunmamis" ? "Okunmamış mesaj yok" : "Gelen mesaj yok"}</p></div>
-          ) : (
-            (filtre === "okunmamis" ? okunmamislar : gelenMesajlar).map(m => (
-              <Card key={m.id} className={`border border-line shadow-sm cursor-pointer transition-all hover:shadow-md ${!m.okundu ? 'border-l-4 border-l-blue-500 bg-blue-50/30' : ''}`} onClick={() => !m.okundu && mesajOkundu(m.id)}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${rolRenk(m.gonderen_rol)}`}>{({admin:"Yönetici",coordinator:"Koord.",teacher:"Öğretmen",student:"Öğrenci",parent:"Veli"})[m.gonderen_rol] || "—"}</span>
-                        <span className="font-medium text-sm text-content">{m.gonderen_ad}</span>
-                        {!m.okundu && <span className="w-2 h-2 bg-blue-500 rounded-full" />}
-                      </div>
-                      {m.konu && <div className="font-bold text-sm text-content mt-1">{m.konu}</div>}
-                      <p className="text-sm text-subtle mt-1 line-clamp-2">{m.icerik}</p>
-                    </div>
-                    <div className="flex flex-col items-end gap-2 shrink-0">
-                      <div className="text-xs text-subtle whitespace-nowrap">{new Date(m.tarih).toLocaleDateString('tr-TR')}</div>
-                      {m.okundu && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); mesajArsivle(m.id, true); }}
-                          title="Arşivle"
-                          className="inline-flex items-center gap-1 text-[11px] text-subtle hover:text-primary border border-line rounded-lg px-2 py-0.5 transition-all">
-                          <Archive className="h-3 w-3" />Arşivle
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </div>
-      )}
-
-      {/* Arşiv (arşivlenmiş gelen mesajlar) */}
-      {gorunum === "arsiv" && (
-        <div className="space-y-3">
-          {arsivlenenler.length === 0 ? (
-            <div className="text-center py-12"><Archive className="h-12 w-12 text-subtle mx-auto mb-3" /><p className="text-subtle">Arşivlenmiş mesaj yok</p></div>
-          ) : (
-            arsivlenenler.map(m => (
-              <Card key={m.id} className="border border-line shadow-sm bg-app/40"><CardContent className="p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${rolRenk(m.gonderen_rol)}`}>{({admin:"Yönetici",coordinator:"Koord.",teacher:"Öğretmen",student:"Öğrenci",parent:"Veli"})[m.gonderen_rol] || "—"}</span>
-                      <span className="font-medium text-sm text-content">{m.gonderen_ad}</span>
-                    </div>
-                    {m.konu && <div className="font-bold text-sm text-content mt-1">{m.konu}</div>}
-                    <p className="text-sm text-subtle mt-1 whitespace-pre-wrap">{m.icerik}</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-2 shrink-0">
-                    <div className="text-xs text-subtle whitespace-nowrap">{new Date(m.tarih).toLocaleDateString('tr-TR')}</div>
-                    <button
-                      onClick={() => mesajArsivle(m.id, false)}
-                      title="Arşivden çıkar"
-                      className="inline-flex items-center gap-1 text-[11px] text-subtle hover:text-primary border border-line rounded-lg px-2 py-0.5 transition-all">
-                      <ArchiveRestore className="h-3 w-3" />Geri al
-                    </button>
-                  </div>
-                </div>
-              </CardContent></Card>
-            ))
-          )}
-        </div>
-      )}
-
-      {/* Gönderilenler */}
-      {gorunum === "giden" && (
-        <div className="space-y-3">
-          {gidenMesajlar.length === 0 ? (
-            <div className="text-center py-12"><Send className="h-12 w-12 text-subtle mx-auto mb-3" /><p className="text-subtle">Gönderilen mesaj yok</p></div>
-          ) : (
-            gidenMesajlar.map(m => (
-              <Card key={m.id} className="border border-line shadow-sm"><CardContent className="p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs text-subtle">→</span>
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${rolRenk(m.alici_rol)}`}>{({admin:"Yönetici",coordinator:"Koord.",teacher:"Öğretmen",student:"Öğrenci",parent:"Veli"})[m.alici_rol] || "—"}</span>
-                      <span className="font-medium text-sm text-content">{m.alici_ad}</span>
-                      {m.okundu ? <span className="inline-flex items-center gap-1 text-xs text-green-600"><Check className="h-3 w-3" />okundu</span> : <span className="text-xs text-subtle">gönderildi</span>}
-                    </div>
-                    {m.konu && <div className="font-bold text-sm text-content mt-1">{m.konu}</div>}
-                    <p className="text-sm text-subtle mt-1 line-clamp-2">{m.icerik}</p>
-                  </div>
-                  <div className="text-xs text-subtle whitespace-nowrap">{new Date(m.tarih).toLocaleDateString('tr-TR')}</div>
-                </div>
-              </CardContent></Card>
-            ))
-          )}
-        </div>
-      )}
+        )}
+      </div>
+      {gorunum === "funnel" && user.role === "admin" ? <FunnelPanel apiBase={API} /> : <MesajKutusu user={user} apiBase={API} />}
     </div>
   );
 }
