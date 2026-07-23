@@ -32,7 +32,7 @@ _ERISIM = require_role(UserRole.ADMIN, UserRole.ACCOUNTANT)
 
 # Satır içi düzenlemede izin verilen alanlar (whitelist) — tip bazlı.
 _DUZENLENEBILIR = {
-    "ogrenci": {"ad", "soyad", "veli_ad", "veli_soyad", "veli_telefon", "sinif", "kur",
+    "ogrenci": {"ad", "soyad", "veli_ad", "veli_soyad", "veli_tc", "veli_telefon", "sinif", "kur",
                 "yapilmasi_gereken_odeme", "yapilan_odeme", "ogretmene_yapilacak_odeme", "muhasebe_notu",
                 "vergi_orani"},
     "ogretmen": {"ad", "soyad", "yapilmasi_gereken_odeme", "yapilan_odeme", "muhasebe_notu"},
@@ -203,7 +203,7 @@ async def muhasebe_kisiler(current_user=Depends(_ERISIM)):
     try:
         async for s in db.students.find({}, {
             "_id": 0, "id": 1, "ad": 1, "soyad": 1, "sinif": 1, "kur": 1,
-            "veli_ad": 1, "veli_soyad": 1, "veli_telefon": 1, "muhasebe_notu": 1,
+            "veli_ad": 1, "veli_soyad": 1, "veli_tc": 1, "veli_telefon": 1, "muhasebe_notu": 1,
             "ogretmen_id": 1, "olusturma_tarihi": 1,
             "yapilmasi_gereken_odeme": 1, "yapilan_odeme": 1, "ogretmene_yapilacak_odeme": 1,
             "ogretmen_odenen": 1,  # kur kaydı olmayan öğrencide öğr. avansı (fallback satır)
@@ -214,7 +214,7 @@ async def muhasebe_kisiler(current_user=Depends(_ERISIM)):
                 "ad": s.get("ad", ""), "soyad": s.get("soyad", ""),
                 "sinif": s.get("sinif", ""),
                 "veli_ad": s.get("veli_ad", ""), "veli_soyad": s.get("veli_soyad", ""),
-                "veli_telefon": s.get("veli_telefon", ""),
+                "veli_tc": s.get("veli_tc", ""), "veli_telefon": s.get("veli_telefon", ""),
                 "muhasebe_notu": s.get("muhasebe_notu", ""),
                 "ogretmen_ad": ogretmen_ad.get(s.get("ogretmen_id"), ""),
                 "ogretmen_id": s.get("ogretmen_id"),

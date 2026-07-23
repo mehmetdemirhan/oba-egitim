@@ -97,6 +97,7 @@ class Student(BaseModel):
     sinif: str
     veli_ad: str
     veli_soyad: str
+    veli_tc: Optional[str] = None
     veli_telefon: str
     aldigi_egitim: str
     kur: str
@@ -127,6 +128,7 @@ class StudentCreate(BaseModel):
     sinif: str
     veli_ad: str
     veli_soyad: str
+    veli_tc: Optional[str] = None
     veli_telefon: str
     aldigi_egitim: str
     kur: str
@@ -142,6 +144,7 @@ class StudentUpdate(BaseModel):
     sinif: Optional[str] = None
     veli_ad: Optional[str] = None
     veli_soyad: Optional[str] = None
+    veli_tc: Optional[str] = None
     veli_telefon: Optional[str] = None
     aldigi_egitim: Optional[str] = None
     kur: Optional[str] = None
@@ -443,6 +446,49 @@ async def create_student(student_data: StudentCreate, current_user=Depends(get_c
     #   (idempotent; kur<=1 ise no-op). "Yeni Kura Geçir" ile aynı XP kuralı.
     await kur_atlama_xp_kaydet(student.dict(), student.kur, eski_kur="", kaynak="ust_kur_kayit")
     return student
+
+@router.get("/ara")
+async def genel_arama(q: str = "", current_user=Depends(get_current_user)):
+    """Site geneli arama: öğrenci (ad/soyad/veli/TC/telefon/sınıf/kur) + öğretmen (ad/soyad/telefon).
+    Rol duyarlı: öğretmen yalnız KENDİ öğrencilerini görür; admin/koordinatör/muhasebe herkesi."""
+    import re as _re
+    q = (q or "").strip()
+    if len(q) < 2:
+        return {"ogrenciler": [], "ogretmenler": []}
+    rx = _re.compile(_re.escape(q), _re.IGNORECASE)
+    rol = current_user.get("role")
+
+    ogr_sorgu = {"$or": [
+        {"ad": rx}, {"soyad": rx}, {"veli_ad": rx}, {"veli_soyad": rx},
+        {"veli_tc": rx}, {"veli_telefon": rx}, {"sinif": rx}, {"kur": rx},
+    ]}
+    # Öğretmen yalnız kendi öğrencilerini arayabilir
+    if rol == "teacher":
+        ogr_sorgu = {"$and": [ogr_sorgu, {"ogretmen_id": _ogretmen_id(current_user)}]}
+
+    ogrenciler = await db.students.find(ogr_sorgu, {
+        "_id": 0, "id": 1, "ad": 1, "soyad": 1, "sinif": 1, "kur": 1,
+        "veli_ad": 1, "veli_soyad": 1, "veli_tc": 1, "veli_telefon": 1,
+        "ogretmen_id": 1, "mezun": 1, "ayrildi": 1, "arsivli": 1,
+    }).limit(25).to_list(length=25)
+
+    ogretmenler = []
+    if rol in ("admin", "coordinator", "accountant"):
+        ogretmenler = await db.teachers.find(
+            {"$or": [{"ad": rx}, {"soyad": rx}, {"telefon": rx}]},
+            {"_id": 0, "id": 1, "ad": 1, "soyad": 1, "telefon": 1, "brans": 1},
+        ).limit(15).to_list(length=15)
+
+    # Öğretmen adlarını öğrenci sonuçlarına ekle (gösterim için)
+    tid_ler = {o.get("ogretmen_id") for o in ogrenciler if o.get("ogretmen_id")}
+    ad_map = {}
+    if tid_ler:
+        async for t in db.teachers.find({"id": {"$in": list(tid_ler)}}, {"_id": 0, "id": 1, "ad": 1, "soyad": 1}):
+            ad_map[t["id"]] = f"{t.get('ad','')} {t.get('soyad','')}".strip()
+    for o in ogrenciler:
+        o["ogretmen_ad"] = ad_map.get(o.get("ogretmen_id"), "")
+    return {"ogrenciler": ogrenciler, "ogretmenler": ogretmenler}
+
 
 @router.get("/students")
 async def get_students(dahil_arsiv: bool = False, durum: Optional[str] = None,

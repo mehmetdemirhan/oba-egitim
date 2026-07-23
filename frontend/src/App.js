@@ -60,6 +60,7 @@ import AnalizHavuzBakim from "./components/admin/AnalizHavuzBakim";
 import MetinKaliteRiski from "./components/admin/MetinKaliteRiski";
 import MetinOneriKuyrugu from "./components/admin/MetinOneriKuyrugu";
 import GirisRaporAyarlari from "./components/admin/GirisRaporAyarlari";
+import GlobalArama from "./components/GlobalArama";
 import SinavYonetimi from "./components/admin/SinavYonetimi";
 import SinavCozum from "./components/SinavCozum";
 import InstagramWidget from "./components/dashboard/InstagramWidget";
@@ -358,6 +359,7 @@ function SimpleEditForm({ item, teachers, courses, classes, onSave, onCancel, us
           </Select>
         </div>
         <div><Label>Veli Adı</Label><Input value={data.veli_ad||''} onChange={e => setData({...data,veli_ad:e.target.value})} /></div>
+        <div><Label>Veli TC</Label><Input value={data.veli_tc||''} onChange={e => setData({...data,veli_tc:e.target.value})} maxLength={11} inputMode="numeric" placeholder="T.C. Kimlik No" /></div>
         <IlIlceSecici il={data.il||''} ilce={data.ilce||''} onIl={v => setData(p => ({...p,il:v}))} onIlce={v => setData(p => ({...p,ilce:v}))} />
         <div><Label>Kur</Label><Input value={data.kur||''} onChange={e => setData({...data,kur:e.target.value})} /></div>
         <div><Label>Öğretmen</Label>
@@ -436,7 +438,7 @@ function AppContent() {
   const [loadingAction, setLoadingAction] = useState(false);
   const [teacherForm, setTeacherForm] = useState({ ad: "", soyad: "", brans: "", telefon: "", seviye: "yeni", yapilmasi_gereken_odeme: 0, hesap_olustur: false, email: "", hesap_rol: "teacher", il: "", ilce: "", kargo_adresi: "", universite: "", fakulte: "", bolum: "" });
   const [ogrGeciciSifre, setOgrGeciciSifre] = useState(null); // öğretmen hesabı geçici şifresi (bir kereliğine)
-  const [studentForm, setStudentForm] = useState({ ad: "", soyad: "", sinif: "", veli_ad: "", veli_soyad: "", veli_telefon: "", aldigi_egitim: "", kur: "", yapilmasi_gereken_odeme: 0, ogretmene_yapilacak_odeme: 0, ogretmen_id: "", il: "", ilce: "" });
+  const [studentForm, setStudentForm] = useState({ ad: "", soyad: "", sinif: "", veli_ad: "", veli_soyad: "", veli_tc: "", veli_telefon: "", aldigi_egitim: "", kur: "", yapilmasi_gereken_odeme: 0, ogretmene_yapilacak_odeme: 0, ogretmen_id: "", il: "", ilce: "" });
   const [courseForm, setCourseForm] = useState({ ad: "", fiyat: 0, sure: 0 });
   const [paymentForm, setPaymentForm] = useState({ tip: "ogrenci", kisi_id: "", miktar: 0, aciklama: "" });
   const [tahsilatDialog, setTahsilatDialog] = useState(null); // {tip: 'ogrenci'|'ogretmen', kisi: {id,ad,soyad}, miktar: 0, aciklama: ''}
@@ -604,7 +606,7 @@ function AppContent() {
   };
 
   const createTeacher = async (e) => { e.preventDefault(); setLoadingAction(true); try { const r = await axios.post(`${API}/teachers`, teacherForm); setTeacherForm({ ad:"",soyad:"",brans:"",telefon:"",seviye:"yeni",yapilmasi_gereken_odeme:0, hesap_olustur:false, email:"", hesap_rol:"teacher", il:"", ilce:"", kargo_adresi:"", universite:"", fakulte:"", bolum:"" }); fetchTeachers(); fetchDashboard(); const sifre = r.data?.hesap?.gecici_sifre; if (sifre) { setOgrGeciciSifre({ ad:`${r.data.ad} ${r.data.soyad}`, email:r.data.hesap.email, sifre }); } else { toast({ title:"Başarılı", description:"Öğretmen eklendi" }); } } catch(err) { toast({ title:"Hata", description: err.response?.data?.detail || "Hata oluştu", variant:"destructive" }); } setLoadingAction(false); };
-  const createStudent = async (e) => { e.preventDefault(); setLoadingAction(true); try { await axios.post(`${API}/students`, studentForm); setStudentForm({ ad:"",soyad:"",sinif:"",veli_ad:"",veli_soyad:"",veli_telefon:"",aldigi_egitim:"",kur:"",yapilmasi_gereken_odeme:0,ogretmene_yapilacak_odeme:0,ogretmen_id:"",il:"",ilce:"" }); fetchStudents(); fetchTeachers(); fetchDashboard(); setTeacherStudents({}); toast({ title:"Başarılı", description:"Öğrenci eklendi" }); } catch { toast({ title:"Hata", description:"Hata oluştu", variant:"destructive" }); } setLoadingAction(false); };
+  const createStudent = async (e) => { e.preventDefault(); setLoadingAction(true); try { await axios.post(`${API}/students`, studentForm); setStudentForm({ ad:"",soyad:"",sinif:"",veli_ad:"",veli_soyad:"",veli_tc:"",veli_telefon:"",aldigi_egitim:"",kur:"",yapilmasi_gereken_odeme:0,ogretmene_yapilacak_odeme:0,ogretmen_id:"",il:"",ilce:"" }); fetchStudents(); fetchTeachers(); fetchDashboard(); setTeacherStudents({}); toast({ title:"Başarılı", description:"Öğrenci eklendi" }); } catch { toast({ title:"Hata", description:"Hata oluştu", variant:"destructive" }); } setLoadingAction(false); };
   const createCourse = async (e) => { e.preventDefault(); setLoadingAction(true); try { await axios.post(`${API}/courses`, courseForm); setCourseForm({ ad:"",fiyat:0,sure:0 }); fetchCourses(); fetchDashboard(); toast({ title:"Başarılı", description:"Kurs eklendi" }); } catch { toast({ title:"Hata", description:"Hata oluştu", variant:"destructive" }); } setLoadingAction(false); };
   const createPayment = async (e) => { e.preventDefault(); setLoadingAction(true); try { await axios.post(`${API}/payments`, paymentForm); setPaymentForm({ tip:"ogrenci",kisi_id:"",miktar:0,aciklama:"" }); fetchPayments(); fetchTeachers(); fetchStudents(); fetchDashboard(); toast({ title:"Başarılı", description:"Ödeme kaydedildi" }); } catch { toast({ title:"Hata", description:"Hata oluştu", variant:"destructive" }); } setLoadingAction(false); };
   const deleteTeacher = async (id) => { try { await axios.delete(`${API}/teachers/${id}`); fetchTeachers(); fetchDashboard(); setTeacherStudents(p => { const n={...p}; delete n[id]; return n; }); toast({ title:"Başarılı", description:"Silindi" }); } catch { toast({ title:"Hata", variant:"destructive" }); } };
@@ -704,6 +706,7 @@ function AppContent() {
               </div>
               <BildirimZili user={user} onNavigate={(sekme, b) => { if (sekme === "payments") setMuhasebeOdakKisi(b?.ilgili_id || ""); setActiveTab(sekme); }} />
               <Button onClick={exportToExcel} disabled={loadingAction} className="bg-green-600 hover:bg-green-700 text-white"><Download className="h-4 w-4 mr-2" />Excel</Button>
+              <GlobalArama apiBase={API} onOgrenciSec={(o) => setDetayOgrenci(o)} />
               <ThemeToggle /><SifreDegistirButton />
               <Button variant="outline" size="sm" onClick={logout} className="flex items-center gap-2"><LogOut className="h-4 w-4" />Çıkış</Button>
             </div>
@@ -1018,6 +1021,7 @@ function AppContent() {
                     </div>
                     <div><Label>Veli Adı</Label><Input value={studentForm.veli_ad} onChange={e => setStudentForm({...studentForm, veli_ad:e.target.value})} required /></div>
                     <div><Label>Veli Soyadı</Label><Input value={studentForm.veli_soyad} onChange={e => setStudentForm({...studentForm, veli_soyad:e.target.value})} required /></div>
+                    <div><Label>Veli TC</Label><Input value={studentForm.veli_tc} onChange={e => setStudentForm({...studentForm, veli_tc:e.target.value})} maxLength={11} inputMode="numeric" placeholder="T.C. Kimlik No" /></div>
                     <div><Label>Veli Telefon</Label><Input value={studentForm.veli_telefon} onChange={e => setStudentForm({...studentForm, veli_telefon:e.target.value})} required /></div>
                     <IlIlceSecici il={studentForm.il} ilce={studentForm.ilce} onIl={v => setStudentForm(p => ({...p, il:v}))} onIlce={v => setStudentForm(p => ({...p, ilce:v}))} />
                     <div><Label>Eğitim</Label>
@@ -1073,11 +1077,6 @@ function AppContent() {
                 </CardContent>
               </Card>
             </div>
-            {detayOgrenci && (
-              <OgrenciDetayModal ogrenci={detayOgrenci} user={user} teachers={teachers}
-                onKapat={() => setDetayOgrenci(null)}
-                onGuncelle={() => { fetchStudents(); }} />
-            )}
           </TabsContent>
 
           {/* Courses */}
@@ -1550,6 +1549,12 @@ function AppContent() {
           )}
 
         </Tabs>
+
+        {/* Genel arama / öğrenci detay modalı — herhangi bir sekmeden açılabilir */}
+        {detayOgrenci && (
+          <OgrenciDetayModal ogrenci={detayOgrenci} user={user} teachers={teachers}
+            onKapat={() => setDetayOgrenci(null)} onGuncelle={() => { fetchStudents(); }} />
+        )}
 
         {/* Edit Dialog */}
         <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
@@ -6135,7 +6140,7 @@ function OgretmenPaneli({ user, logout }) {
   const [duzenleAcik, setDuzenleAcik] = useState(false);
   const [duzenleForm, setDuzenleForm] = useState(null);
   const [silOgrenci, setSilOgrenci] = useState(null);
-  const duzenleAc = (s) => { setDuzenleForm({ id: s.id, ad: s.ad || "", soyad: s.soyad || "", sinif: String(s.sinif || ""), veli_ad: s.veli_ad || "", veli_soyad: s.veli_soyad || "", veli_telefon: s.veli_telefon || "", aldigi_egitim: s.aldigi_egitim || "", kur: s.kur || "", il: s.il || "", ilce: s.ilce || "" }); setDuzenleAcik(true); };
+  const duzenleAc = (s) => { setDuzenleForm({ id: s.id, ad: s.ad || "", soyad: s.soyad || "", sinif: String(s.sinif || ""), veli_ad: s.veli_ad || "", veli_soyad: s.veli_soyad || "", veli_tc: s.veli_tc || "", veli_telefon: s.veli_telefon || "", aldigi_egitim: s.aldigi_egitim || "", kur: s.kur || "", il: s.il || "", ilce: s.ilce || "" }); setDuzenleAcik(true); };
   const ogrenciDuzenleKaydet = async (e) => { e.preventDefault(); try { const { id, ...v } = duzenleForm; await axios.put(`${API}/students/${id}`, v); toast({ title: "Öğrenci güncellendi" }); setDuzenleAcik(false); fetchAll(); } catch (err) { hataBildir(toast, err.response?.data?.detail || "Güncellenemedi"); } };
   const ogrenciKaldir = async () => { try { const r = await axios.delete(`${API}/students/${silOgrenci.id}`); toast({ title: r.data?.mod === "kalici" ? "Öğrenci silindi" : "Öğrenci pasife alındı", description: r.data?.mod === "pasif" ? "Geçmiş/muhasebe verileri korundu." : "" }); setSilOgrenci(null); fetchAll(); } catch (err) { hataBildir(toast, err.response?.data?.detail || "Kaldırılamadı"); } };
   // Hedef sistemi
@@ -6525,6 +6530,7 @@ function OgretmenPaneli({ user, logout }) {
               }
               setAktifSekme(sekme);
             }} />
+            <GlobalArama apiBase={API} onOgrenciSec={(o) => { ogrenciDetayCek(o); setAktifSekme("ogrenci-detay"); }} />
             <ThemeToggle /><SifreDegistirButton />
             <Button variant="outline" size="sm" onClick={logout}><LogOut className="h-3 w-3 mr-1" />Çıkış</Button>
           </div>
@@ -7124,6 +7130,7 @@ function OgretmenPaneli({ user, logout }) {
                   <div><Label>Veli Adı</Label><Input value={yeniOgrenciForm.veli_ad} onChange={e => setYeniOgrenciForm({...yeniOgrenciForm, veli_ad: e.target.value})} /></div>
                   <div><Label>Veli Soyadı</Label><Input value={yeniOgrenciForm.veli_soyad} onChange={e => setYeniOgrenciForm({...yeniOgrenciForm, veli_soyad: e.target.value})} /></div>
                 </div>
+                <div><Label>Veli TC</Label><Input value={yeniOgrenciForm.veli_tc || ""} onChange={e => setYeniOgrenciForm({...yeniOgrenciForm, veli_tc: e.target.value})} maxLength={11} inputMode="numeric" placeholder="T.C. Kimlik No" /></div>
                 <div><Label>Veli Telefon</Label><Input value={yeniOgrenciForm.veli_telefon} onChange={e => setYeniOgrenciForm({...yeniOgrenciForm, veli_telefon: e.target.value})} placeholder="05xx xxx xx xx" /></div>
                 <IlIlceSecici il={yeniOgrenciForm.il} ilce={yeniOgrenciForm.ilce} onIl={v => setYeniOgrenciForm(p => ({...p, il:v}))} onIlce={v => setYeniOgrenciForm(p => ({...p, ilce:v}))} />
                 <div><Label>Eğitim</Label>
@@ -7164,6 +7171,7 @@ function OgretmenPaneli({ user, logout }) {
                   <div><Label>Veli Adı</Label><Input value={duzenleForm.veli_ad} onChange={e => setDuzenleForm({...duzenleForm, veli_ad: e.target.value})} /></div>
                   <div><Label>Veli Soyadı</Label><Input value={duzenleForm.veli_soyad} onChange={e => setDuzenleForm({...duzenleForm, veli_soyad: e.target.value})} /></div>
                 </div>
+                <div><Label>Veli TC</Label><Input value={duzenleForm.veli_tc || ""} onChange={e => setDuzenleForm({...duzenleForm, veli_tc: e.target.value})} maxLength={11} inputMode="numeric" placeholder="T.C. Kimlik No" /></div>
                 <div><Label>Veli Telefon</Label><Input value={duzenleForm.veli_telefon} onChange={e => setDuzenleForm({...duzenleForm, veli_telefon: e.target.value})} placeholder="05xx xxx xx xx" /></div>
                 <IlIlceSecici il={duzenleForm.il||''} ilce={duzenleForm.ilce||''} onIl={v => setDuzenleForm(p => ({...p, il:v}))} onIlce={v => setDuzenleForm(p => ({...p, ilce:v}))} />
                 <div><Label>Eğitim</Label>
@@ -9444,6 +9452,7 @@ function VeliPaneli({ user, logout }) {
           </div>
           <div className="flex items-center gap-2">
             <BildirimZili user={user} onNavigate={(sekme) => setAktifSekme(sekme)} />
+            <GlobalArama apiBase={API} />
             <ThemeToggle /><SifreDegistirButton />
             <Button variant="outline" size="sm" onClick={logout} className="text-xs"><LogOut className="h-3 w-3 mr-1" />Çıkış</Button>
           </div>
