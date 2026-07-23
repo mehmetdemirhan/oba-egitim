@@ -10,6 +10,8 @@ import OgretmenDonemOdeme from "./admin/OgretmenDonemOdeme";
 import GecikenKurlar from "./admin/GecikenKurlar";
 import FunnelPanel from "./admin/FunnelPanel";
 import BilgiIkonu from "./BilgiIkonu";
+import GlobalArama from "./GlobalArama";
+import OzellikArama from "./OzellikArama";
 import { PersonaBalon, PERSONA_UI } from "./aiceo/Personalar";
 
 // Muhasebe rolüne özel "Sistem Danışmanı Miran" kartı (finansal; pedagojik veri YOK)
@@ -86,6 +88,11 @@ export default function MuhasebePaneli({ user, logout }) {
   const [kisiler, setKisiler] = useState({ ogrenciler: [], ogretmenler: [] });
   const [payments, setPayments] = useState([]);
   const [sekme, setSekme] = useState("ogrenci");
+  useEffect(() => {   // genel arama → sekme yönlendirmesi
+    const h = (e) => { const d = e.detail || {}; if (d.sekme) setSekme(d.sekme); };
+    window.addEventListener("oba-git", h);
+    return () => window.removeEventListener("oba-git", h);
+  }, []);
   const [sadeceBorclu, setSadeceBorclu] = useState(false);
   const [odakIdler, setOdakIdler] = useState(null);  // Miran deep-link: işaretsiz ödeme öğrenci id'leri
 
@@ -134,9 +141,13 @@ export default function MuhasebePaneli({ user, logout }) {
               <div className="text-xs text-subtle">{user?.ad} {user?.soyad}</div>
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={logout} className="text-subtle">
-            <LogOut className="h-4 w-4 mr-1" />Çıkış
-          </Button>
+          <div className="flex items-center gap-2">
+            <GlobalArama apiBase={API} />
+            <OzellikArama user={user} />
+            <Button variant="ghost" size="sm" onClick={logout} className="text-subtle">
+              <LogOut className="h-4 w-4 mr-1" />Çıkış
+            </Button>
+          </div>
         </div>
       </header>
 
