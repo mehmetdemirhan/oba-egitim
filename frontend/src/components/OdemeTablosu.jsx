@@ -118,7 +118,7 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
     const q = arama.trim().toLocaleLowerCase("tr");
     if (!q) return liste;
     return liste.filter((k) =>
-      `${k.ad} ${k.soyad} ${k.veli_ad || ""} ${k.veli_soyad || ""} ${k.kur || ""} ${k.sinif || ""}`.toLocaleLowerCase("tr").includes(q));
+      `${k.ad} ${k.soyad} ${k.veli_ad || ""} ${k.veli_soyad || ""} ${k.veli_tc || ""} ${k.veli_telefon || ""} ${k.kur || ""} ${k.sinif || ""}`.toLocaleLowerCase("tr").includes(q));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kisiler, arama, sadeceBorclu, odakKisiId, yasKovasi]);
 
@@ -234,7 +234,7 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
     if (ok) { setKurForm({ kur_adi: "", tutar: "", baslangic_tarihi: "" }); toast({ title: "Kur ücreti eklendi", description: "Yeni satır olarak eklendi." }); }
   };
 
-  const kolonSayisi = ogrenciMi ? 15 : 7;
+  const kolonSayisi = ogrenciMi ? 16 : 7;
 
   return (
     <div className="space-y-3">
@@ -286,6 +286,7 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
                   <th className="px-3 py-2">Sınıfı</th>
                   <th className="px-3 py-2">Kuru</th>
                   <th className="px-3 py-2">Veli Adı Soyadı</th>
+                  <th className="px-3 py-2">Veli TC</th>
                   <th className="px-3 py-2">Telefon</th>
                   <th className="px-3 py-2 text-right">Beklenen</th>
                   <th className="px-3 py-2 text-right">Ödenen</th>
@@ -364,6 +365,8 @@ export default function OdemeTablosu({ tip, kisiler, payments, apiBase, onDegisi
                           onSave={(v) => kurAdiKaydet(k, v)} />
                         <EditableCell value={`${k.veli_ad || ""} ${k.veli_soyad || ""}`.trim()} placeholder="Veli"
                           onSave={(v) => isimKaydet(k.kisi_id, "veli_ad", "veli_soyad", v)} />
+                        <EditableCell value={k.veli_tc} placeholder="TC"
+                          baslik="Veli T.C. Kimlik No" onSave={(v) => alanKaydet(k.kisi_id, "veli_tc", v)} />
                         <EditableCell value={k.veli_telefon} placeholder="Telefon"
                           onSave={(v) => alanKaydet(k.kisi_id, "veli_telefon", v)} />
                         <EditableCell value={k.yapilmasi_gereken_odeme} kind="number" align="right" format={formatTL}
